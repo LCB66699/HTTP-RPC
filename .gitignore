@@ -1,3 +1,4 @@
 data/
 .claude/
 *.exe
+.env
