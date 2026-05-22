@@ -31,17 +31,17 @@ std::string CallLogger::NowString() const {
 }
 
 std::string CallLogger::SerializeEntry(const CallEntry& entry) const {
-    rpc_json::Object obj;
-    obj["id"] = rpc_json::Value(static_cast<double>(entry.id));
-    obj["timestamp"] = rpc_json::Value(entry.timestamp);
-    obj["username"] = rpc_json::Value(entry.username);
-    obj["service"] = rpc_json::Value(entry.service);
-    obj["method"] = rpc_json::Value(entry.method);
+    json obj;
+    obj["id"] = entry.id;
+    obj["timestamp"] = entry.timestamp;
+    obj["username"] = entry.username;
+    obj["service"] = entry.service;
+    obj["method"] = entry.method;
     obj["params"] = entry.params;
     obj["result"] = entry.result;
-    obj["success"] = rpc_json::Value(entry.success);
-    obj["duration_us"] = rpc_json::Value(static_cast<double>(entry.duration_us));
-    return rpc_json::Value(obj).dump();
+    obj["success"] = entry.success;
+    obj["duration_us"] = entry.duration_us;
+    return obj.dump();
 }
 
 void CallLogger::Log(const std::string& username, const std::string& service,

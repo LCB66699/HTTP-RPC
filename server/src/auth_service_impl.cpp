@@ -32,17 +32,6 @@ static std::string b64enc(const std::string& in) {
     return out;
 }
 
-// JSON 字符串转义（防 username 注入）
-static std::string json_escape(const std::string& s) {
-    std::string out;
-    out.reserve(s.size() + 4);
-    for (char c : s) {
-        if (c == '"' || c == '\\') out += '\\';
-        out += c;
-    }
-    return out;
-}
-
 std::string AuthServiceImpl::UsersFilePath() const {
     return "users.json";
 }
@@ -121,11 +110,13 @@ grpc::Status AuthServiceImpl::Login(grpc::ServerContext*,
     if (ver < 0) ver = 0;
     int64_t uid = db_ ? db_->GetUserId(req->username()) : -1;
     long exp = static_cast<long>(std::time(nullptr)) + 86400;
-    std::string payload = "{\"username\":\"" + json_escape(req->username())
-        + "\",\"uid\":" + std::to_string(uid)
-        + ",\"ver\":" + std::to_string(ver)
-        + ",\"exp\":" + std::to_string(exp) + "}";
-    std::string token = jwt::create(payload, jwt_secret_);
+    nlohmann::json payload;
+    payload["username"] = req->username();
+    payload["uid"] = uid;
+    payload["ver"] = ver;
+    payload["exp"] = exp;
+    std::string payload_str = payload.dump();
+    std::string token = jwt::create(payload_str, jwt_secret_);
 
     // 同步 token_version 到 Redis（Gateway 验证用）
     if (redis_ && redis_->IsConnected())
@@ -216,11 +207,13 @@ grpc::Status AuthServiceImpl::Register(grpc::ServerContext*,
     if (ver < 0) ver = 0;
     int64_t uid = db_ ? db_->GetUserId(req->username()) : -1;
     long exp = static_cast<long>(std::time(nullptr)) + 86400;
-    std::string payload = "{\"username\":\"" + json_escape(req->username())
-        + "\",\"uid\":" + std::to_string(uid)
-        + ",\"ver\":" + std::to_string(ver)
-        + ",\"exp\":" + std::to_string(exp) + "}";
-    std::string token = jwt::create(payload, jwt_secret_);
+    nlohmann::json payload;
+    payload["username"] = req->username();
+    payload["uid"] = uid;
+    payload["ver"] = ver;
+    payload["exp"] = exp;
+    std::string payload_str = payload.dump();
+    std::string token = jwt::create(payload_str, jwt_secret_);
 
     // 同步 token_version 到 Redis
     if (redis_ && redis_->IsConnected())

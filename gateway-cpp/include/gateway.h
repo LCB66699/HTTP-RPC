@@ -23,6 +23,7 @@
 #include "generated/rpc_file.pb.h"
 #include "generated/rpc_health.grpc.pb.h"
 #include "generated/rpc_health.pb.h"
+#include <nlohmann/json.hpp>
 
 // Handler 返回状态 — 区分业务失败和传输故障，防止业务错误误触发熔断
 enum class RpcResult { SUCCESS, BUSINESS_FAILURE, TRANSPORT_FAILURE, AUTH_FAILURE, BAD_REQUEST };

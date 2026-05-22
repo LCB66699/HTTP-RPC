@@ -8,7 +8,7 @@
 #include <chrono>
 #include <thread>
 
-using json = rpc_json::Value;
+
 
 // Extract the username carried in gRPC metadata (set by the gateway for logging).
 static std::string UsernameFromMeta(grpc::ServerContext* ctx) {

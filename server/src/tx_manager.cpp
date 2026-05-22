@@ -3,7 +3,7 @@
 #include <cstdio>
 #include <chrono>
 #include <algorithm>
-#include <sstream>
+#include <nlohmann/json.hpp>
 
 TxManager::TxManager(Database* tx_db) : db_(tx_db) {
     // 确保 tx_log 表存在
@@ -36,17 +36,12 @@ bool TxManager::Begin(const std::string& xid,
         return false;
     }
 
-    // 序列化操作列表
-    std::ostringstream ops_json;
-    ops_json << "[";
-    for (size_t i = 0; i < operations.size(); ++i) {
-        if (i > 0) ops_json << ",";
-        ops_json << "{\"service\":\"" << operations[i].service()
-                 << "\",\"type\":\"" << operations[i].type() << "\"}";
+    nlohmann::json ops_json = nlohmann::json::array();
+    for (const auto& op : operations) {
+        ops_json.push_back({{"service", op.service()}, {"type", op.type()}});
     }
-    ops_json << "]";
 
-    LogTxBegin(xid, ops_json.str(), timeout_seconds);
+    LogTxBegin(xid, ops_json.dump(), timeout_seconds);
 
     // ---- Phase 1: PREPARE ----
     printf("[TM] %s Phase 1 PREPARE (%zu participants)\n", xid.c_str(), operations.size());

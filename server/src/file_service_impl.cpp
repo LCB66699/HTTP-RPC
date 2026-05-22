@@ -8,7 +8,7 @@
 #include <chrono>
 #include <thread>
 
-using json = rpc_json::Value;
+
 
 static std::string UsernameFromMeta(grpc::ServerContext* ctx) {
     auto it = ctx->client_metadata().find("username");

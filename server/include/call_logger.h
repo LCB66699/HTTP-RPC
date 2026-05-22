@@ -4,9 +4,9 @@
 #include <mutex>
 #include <deque>
 #include <chrono>
-#include "rpc_json.h"
+#include <nlohmann/json.hpp>
 
-using json = rpc_json::Value;
+using json = nlohmann::json;
 
 class RedisClient;
 

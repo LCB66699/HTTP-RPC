@@ -40,7 +40,6 @@ SERVER_SRCS := $(SERVER_DIR)/src/main.cpp \
                $(SERVER_DIR)/src/health_service_impl.cpp \
                $(SERVER_DIR)/src/tx_resource.cpp \
                $(SERVER_DIR)/src/call_logger.cpp \
-               $(SERVER_DIR)/src/rpc_json_value.cpp \
                $(SERVER_DIR)/src/database.cpp \
                $(SERVER_DIR)/src/redis_client.cpp
 

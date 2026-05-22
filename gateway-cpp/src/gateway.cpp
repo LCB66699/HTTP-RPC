@@ -114,40 +114,30 @@ Gateway::Gateway(const std::string& listen_addr, int listen_port,
     printf("[Gateway] TM deferred (MySQL may not be ready yet)\n");
 }
 
-// JSON helpers
+// JSON helpers (powered by nlohmann/json)
 std::string Gateway::JsonStr(const std::string& s) {
-    std::string out = "\"";
-    for (char c : s) { if (c == '"' || c == '\\') out += '\\'; out += c; }
-    out += '"'; return out;
+    return nlohmann::json(s).dump();
 }
-std::string Gateway::JsonGet(const std::string& json, const std::string& key) {
-    std::string pat = "\"" + key + "\"";
-    auto pos = json.find(pat);
-    if (pos == std::string::npos) return "";
-    pos = json.find(':', pos + pat.size());
-    if (pos == std::string::npos) return "";
-    pos++;
-    while (pos < json.size() && (json[pos] == ' ' || json[pos] == '\t' || json[pos] == '\n')) pos++;
-    if (pos >= json.size()) return "";
-    if (json[pos] == '"') {
-        auto start = pos + 1;
-        auto end = json.find('"', start);
-        while (end != std::string::npos && json[end-1] == '\\') end = json.find('"', end + 1);
-        if (end == std::string::npos) return "";
-        std::string val;
-        for (size_t i = start; i < end; i++) { if (json[i] == '\\' && i + 1 < end) val += json[++i]; else val += json[i]; }
-        return val;
-    } else {
-        auto end = pos;
-        while (end < json.size() && json[end] != ',' && json[end] != '}' && json[end] != '\n' && json[end] != ' ') end++;
-        return json.substr(pos, end - pos);
-    }
+std::string Gateway::JsonGet(const std::string& json_str, const std::string& key) {
+    try {
+        auto j = nlohmann::json::parse(json_str);
+        auto it = j.find(key);
+        if (it == j.end()) return "";
+        if (it->is_string()) return it->get<std::string>();
+        if (it->is_number()) return std::to_string(it->get<double>());
+        if (it->is_boolean()) return it->get<bool>() ? "true" : "false";
+        return it->dump();
+    } catch (...) { return ""; }
 }
-double Gateway::JsonGetNum(const std::string& json, const std::string& key) {
-    std::string val = JsonGet(json, key);
-    if (val.empty()) return 0;
-    try { return std::stod(val); }
-    catch (const std::exception&) { return 0; }
+double Gateway::JsonGetNum(const std::string& json_str, const std::string& key) {
+    try {
+        auto j = nlohmann::json::parse(json_str);
+        auto it = j.find(key);
+        if (it == j.end()) return 0;
+        if (it->is_number()) return it->get<double>();
+        if (it->is_string()) { try { return std::stod(it->get<std::string>()); } catch (...) { return 0; } }
+        return 0;
+    } catch (...) { return 0; }
 }
 
 std::string Gateway::CreateJWT(const std::string& username) const {
@@ -210,9 +200,9 @@ RpcResult Gateway::HandleLogin(const std::string& body, std::string& response, s
     bool ok = st.ok() && resp.success();
     if (ok) {
         token_out = resp.token();
-        response = "{\"success\":true,\"username\":" + JsonStr(u) + "}";
+        nlohmann::json r; r["success"] = true; r["username"] = u; response = r.dump();
     } else {
-        response = "{\"success\":false,\"error\":" + JsonStr(resp.error()) + "}";
+        nlohmann::json r; r["success"] = false; r["error"] = resp.error(); response = r.dump();
     }
     return ok ? RpcResult::SUCCESS : RpcResult::TRANSPORT_FAILURE;
 }
@@ -247,9 +237,9 @@ RpcResult Gateway::HandleRegister(const std::string& body, std::string& response
     bool ok = st.ok() && resp.success();
     if (ok) {
         token_out = resp.token();
-        response = "{\"success\":true,\"username\":" + JsonStr(u) + "}";
+        nlohmann::json r; r["success"] = true; r["username"] = u; response = r.dump();
     } else {
-        response = "{\"success\":false,\"error\":" + JsonStr(resp.error()) + "}";
+        nlohmann::json r; r["success"] = false; r["error"] = resp.error(); response = r.dump();
     }
     return ok ? RpcResult::SUCCESS : RpcResult::TRANSPORT_FAILURE;
 }
@@ -289,9 +279,11 @@ RpcResult Gateway::HandleSheetCreate(const std::string& username, int64_t user_i
             auto st = sheet_stub_->CreateSpreadsheet(ctx, req, &resp);
             return std::pair{st, st.ok() && resp.success()};
         }, peer);
-    response = ok
-        ? "{\"success\":true,\"id\":" + std::to_string(resp.id()) + "}"
-        : "{\"success\":false,\"error\":\"Failed\"}";
+    if (ok) {
+        nlohmann::json r; r["success"] = true; r["id"] = resp.id(); response = r.dump();
+    } else {
+        response = R"({"success":false,"error":"Failed"})";
+    }
     return ok ? RpcResult::SUCCESS : RpcResult::TRANSPORT_FAILURE;
 }
 
@@ -310,9 +302,11 @@ Task<void> Gateway::HandleSheetCreateCoro(std::string username, int64_t user_id,
         sheet_cq_.cq(), sheet_stub_.get(),
         &rpc::SpreadsheetService::Stub::AsyncCreateSpreadsheet, req, 5);
     bool ok = r.st.ok() && r.resp.success();
-    response = ok
-        ? "{\"success\":true,\"id\":" + std::to_string(r.resp.id()) + "}"
-        : "{\"success\":false,\"error\":\"Failed\"}";
+    if (ok) {
+        nlohmann::json j; j["success"] = true; j["id"] = r.resp.id(); response = j.dump();
+    } else {
+        response = R"({"success":false,"error":"Failed"})";
+    }
     co_return;
 }
 
@@ -660,7 +654,10 @@ bool Gateway::Start() {
         }
 
         std::string r, token;
+        auto t0 = std::chrono::steady_clock::now();
         auto result = HandleLogin(req.body, r, token);
+        auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
+            std::chrono::steady_clock::now() - t0).count();
 
         if (redis_ && redis_->IsConnected() && !login_user.empty()) {
             if (result == RpcResult::SUCCESS) {
@@ -672,8 +669,8 @@ bool Gateway::Start() {
         }
 
         switch (result) {
-            case RpcResult::SUCCESS:           cb_auth_.RecordSuccess();  break;
-            case RpcResult::TRANSPORT_FAILURE: cb_auth_.RecordFailure(); break;
+            case RpcResult::SUCCESS:           cb_auth_.RecordResult(true, elapsed);  break;
+            case RpcResult::TRANSPORT_FAILURE: cb_auth_.RecordResult(false, elapsed); break;
             case RpcResult::BUSINESS_FAILURE:  break;
             case RpcResult::AUTH_FAILURE:      break;
             case RpcResult::BAD_REQUEST:       res.status = 400; break;
@@ -711,7 +708,10 @@ bool Gateway::Start() {
         }
 
         std::string r, token;
+        auto t0 = std::chrono::steady_clock::now();
         auto result = HandleRegister(req.body, r, token);
+        auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
+            std::chrono::steady_clock::now() - t0).count();
 
         if (redis_ && redis_->IsConnected() && !reg_user.empty()) {
             if (result == RpcResult::SUCCESS) {
@@ -723,8 +723,8 @@ bool Gateway::Start() {
         }
 
         switch (result) {
-            case RpcResult::SUCCESS:           cb_auth_.RecordSuccess();  break;
-            case RpcResult::TRANSPORT_FAILURE: cb_auth_.RecordFailure(); break;
+            case RpcResult::SUCCESS:           cb_auth_.RecordResult(true, elapsed);  break;
+            case RpcResult::TRANSPORT_FAILURE: cb_auth_.RecordResult(false, elapsed); break;
             case RpcResult::BUSINESS_FAILURE:  break;
             case RpcResult::AUTH_FAILURE:      break;
             case RpcResult::BAD_REQUEST:       res.status = 400; break;
@@ -773,6 +773,7 @@ bool Gateway::Start() {
         freq.set_size(file.content.size()); freq.set_mime_type(mime);
         freq.set_file_content(file.content.data(), file.content.size());
         freq.set_idempotency_key(req.get_header_value("X-Idempotency-Key"));
+        auto t0 = std::chrono::steady_clock::now();
         grpc::Status st; std::string peer;
         for (int attempt = 0; attempt < 2; ++attempt) {
             grpc::ClientContext ctx; ctx.AddMetadata("username", u);
@@ -786,11 +787,13 @@ bool Gateway::Start() {
                 if (rep_file_.AllowReplica(peer)) break; // not quarantined, give up
             } else break; // business failure, no retry
         }
+        auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
+            std::chrono::steady_clock::now() - t0).count();
         if (!st.ok() || !fresp.success()) {
-            if (!st.ok()) cb_file_.RecordFailure();
+            if (!st.ok()) cb_file_.RecordResult(false, elapsed);
             res.set_content("{\"success\":false,\"error\":\"Upload failed\"}", "application/json"); return;
         }
-        cb_file_.RecordSuccess(); rep_file_.RecordSuccess(peer);
+        cb_file_.RecordResult(true, elapsed); rep_file_.RecordSuccess(peer);
         res.set_content("{\"success\":true,\"id\":" + std::to_string(fresp.id()) + "}", "application/json");
     };
 
@@ -802,6 +805,7 @@ bool Gateway::Start() {
         if (!cb_file_.AllowRequest()) { res.set_content("{\"error\":\"circuit open\"}", "application/json"); return; }
         rpc::GetFileRequest freq; rpc::GetFileResponse fresp;
         freq.set_id(std::stoll(id_str)); freq.set_user_id(uid);
+        auto t0 = std::chrono::steady_clock::now();
         grpc::Status st; std::string peer;
         for (int attempt = 0; attempt < 2; ++attempt) {
             grpc::ClientContext ctx; ctx.AddMetadata("username", u);
@@ -815,24 +819,31 @@ bool Gateway::Start() {
                 if (rep_file_.AllowReplica(peer)) break;
             } else break;
         }
-        if (!st.ok() || !fresp.success()) { cb_file_.RecordFailure(); res.status = 404; return; }
-        cb_file_.RecordSuccess(); rep_file_.RecordSuccess(peer);
+        auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
+            std::chrono::steady_clock::now() - t0).count();
+        if (!st.ok() || !fresp.success()) { cb_file_.RecordResult(false, elapsed); res.status = 404; return; }
+        cb_file_.RecordResult(true, elapsed); rep_file_.RecordSuccess(peer);
         // Body comes from MySQL BLOB or MinIO via File service (no browser redirect to :443/:9000).
         res.set_header("Content-Disposition", "attachment; filename=\"" + fresp.file().original_name() + "\"");
         res.set_content(fresp.file_content(), fresp.file().mime_type());
     };
 
-    // Auth+CB handler factory: auth check → inner(rpc_call) → CB success/fail
+    // Auth+CB handler factory: auth check → inner(rpc_call) → CB success/fail (with latency)
     auto with_cb = [](CircuitBreaker& cb, auto inner) {
         return [&cb, inner = std::move(inner)](auto& req, auto& res) {
             std::string r;
             if (!cb.AllowRequest()) { r = "{\"success\":false,\"error\":\"circuit open\"}"; }
             else {
+                auto t0 = std::chrono::steady_clock::now();
                 auto result = inner(req, r);
+                auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
+                    std::chrono::steady_clock::now() - t0).count();
                 switch (result) {
-                    case RpcResult::SUCCESS:           cb.RecordSuccess(); break;
+                    case RpcResult::SUCCESS:
+                        cb.RecordResult(true, elapsed); break;
+                    case RpcResult::TRANSPORT_FAILURE:
+                        cb.RecordResult(false, elapsed); break;
                     case RpcResult::BUSINESS_FAILURE:  break;
-                    case RpcResult::TRANSPORT_FAILURE: cb.RecordFailure(); break;
                     case RpcResult::AUTH_FAILURE:      res.status = 401; break;
                     case RpcResult::BAD_REQUEST:       res.status = 400; break;
                 }
