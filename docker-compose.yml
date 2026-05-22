@@ -1,0 +1,408 @@
+services:
+  nginx:
+    build:
+      dockerfile: Dockerfile.nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./web-ui:/app/web-ui:ro
+    depends_on:
+      minio:
+        condition: service_healthy
+      gateway-1:
+        condition: service_healthy
+      gateway-2:
+        condition: service_healthy
+
+  # ===== MySQL 主从 =====
+  mysql-master:
+    image: mysql:8.0
+    environment:
+      MYSQL_ROOT_PASSWORD: "020421"
+    volumes:
+      - ./mysql/master/conf.d:/etc/mysql/conf.d
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+      - ./data/mysql-master:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  mysql-slave-1:
+    image: mysql:8.0
+    environment:
+      MYSQL_ROOT_PASSWORD: "020421"
+    volumes:
+      - ./mysql/slave/conf.d:/etc/mysql/conf.d
+      - ./mysql/slave/init-slave.sh:/docker-entrypoint-initdb.d/init-slave.sh
+      - ./data/mysql-slave-1:/var/lib/mysql
+    networks:
+      default:
+        aliases: [mysql-slave]
+    depends_on:
+      mysql-master:
+        condition: service_healthy
+
+  mysql-slave-2:
+    image: mysql:8.0
+    environment:
+      MYSQL_ROOT_PASSWORD: "020421"
+    volumes:
+      - ./mysql/slave/conf.d:/etc/mysql/conf.d
+      - ./mysql/slave/init-slave.sh:/docker-entrypoint-initdb.d/init-slave.sh
+      - ./data/mysql-slave-2:/var/lib/mysql
+    networks:
+      default:
+        aliases: [mysql-slave]
+    depends_on:
+      mysql-master:
+        condition: service_healthy
+
+  # ===== Redis 主从 + Sentinel =====
+  redis-master:
+    image: redis:7-alpine
+    volumes:
+      - ./redis/master/redis.conf:/usr/local/etc/redis/redis.conf
+      - ./data/redis-master:/data
+    command: redis-server /usr/local/etc/redis/redis.conf
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "rpc-redis-020421", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  redis-slave-1:
+    image: redis:7-alpine
+    volumes:
+      - ./redis/slave/redis.conf:/usr/local/etc/redis/redis.conf
+    command: redis-server /usr/local/etc/redis/redis.conf
+    networks:
+      default:
+        aliases: [redis-slave]
+    depends_on:
+      - redis-master
+
+  redis-slave-2:
+    image: redis:7-alpine
+    volumes:
+      - ./redis/slave/redis.conf:/usr/local/etc/redis/redis.conf
+    command: redis-server /usr/local/etc/redis/redis.conf
+    networks:
+      default:
+        aliases: [redis-slave]
+    depends_on:
+      - redis-master
+
+  redis-sentinel-1:
+    image: redis:7-alpine
+    volumes:
+      - ./redis/sentinel/sentinel.conf:/usr/local/etc/redis/sentinel.conf
+    command: redis-sentinel /usr/local/etc/redis/sentinel.conf
+    networks:
+      default:
+        aliases: [redis-sentinel]
+    depends_on:
+      redis-master:
+        condition: service_healthy
+
+  redis-sentinel-2:
+    image: redis:7-alpine
+    volumes:
+      - ./redis/sentinel/sentinel.conf:/usr/local/etc/redis/sentinel.conf
+    command: redis-sentinel /usr/local/etc/redis/sentinel.conf
+    networks:
+      default:
+        aliases: [redis-sentinel]
+    depends_on:
+      redis-master:
+        condition: service_healthy
+
+  redis-sentinel-3:
+    image: redis:7-alpine
+    volumes:
+      - ./redis/sentinel/sentinel.conf:/usr/local/etc/redis/sentinel.conf
+    command: redis-sentinel /usr/local/etc/redis/sentinel.conf
+    networks:
+      default:
+        aliases: [redis-sentinel]
+    depends_on:
+      redis-master:
+        condition: service_healthy
+
+  # ===== MinIO 对象存储 =====
+  minio:
+    image: minio/minio:latest
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: "minio-rpc-admin"
+      MINIO_ROOT_PASSWORD: "minio-rpc-020421"
+    ports:
+      - "9000:9000"   # S3 API (presigned URLs reachable from browser)
+      - "9001:9001"   # MinIO Web Console
+    volumes:
+      - ./data/minio:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # Creates the bucket on first start; exits 0 so compose doesn't wait forever.
+  minio-init:
+    image: minio/mc:latest
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "
+        mc alias set local http://minio:9000 minio-rpc-admin minio-rpc-020421 &&
+        mc mb --ignore-existing local/rpc-files &&
+        mc anonymous set download local/rpc-files &&
+        echo 'MinIO bucket ready'
+      "
+    restart: "no"
+
+  # ===== 应用服务 =====
+  auth-1:
+    build: .
+    environment:
+      JWT_SECRET: "${JWT_SECRET}"
+    command: >
+      /app/rpc_server --service auth --port 50051
+      --mysql-write-host mysql-master --mysql-read-hosts mysql-slave --mysql-password 020421 --mysql-db rpc_auth
+      --redis-master-host redis-master --redis-slave-host redis-slave --redis-password rpc-redis-020421 --redis-sentinel-host redis-sentinel --redis-sentinel-port 26379 --redis-master-name redis-master
+    networks:
+      default:
+        aliases: [rpc-auth]
+    depends_on:
+      mysql-master:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c 'echo > /dev/tcp/localhost/50051' 2>/dev/null"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 10s
+
+  auth-2:
+    build: .
+    environment:
+      JWT_SECRET: "${JWT_SECRET}"
+    command: >
+      /app/rpc_server --service auth --port 50051
+      --mysql-write-host mysql-master --mysql-read-hosts mysql-slave --mysql-password 020421 --mysql-db rpc_auth
+      --redis-master-host redis-master --redis-slave-host redis-slave --redis-password rpc-redis-020421 --redis-sentinel-host redis-sentinel --redis-sentinel-port 26379 --redis-master-name redis-master
+    networks:
+      default:
+        aliases: [rpc-auth]
+    depends_on:
+      mysql-master:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c 'echo > /dev/tcp/localhost/50051' 2>/dev/null"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 10s
+
+  sheet-1:
+    build: .
+    environment:
+      JWT_SECRET: "${JWT_SECRET}"
+    command: >
+      /app/rpc_server --service spreadsheet --port 50051
+      --mysql-write-host mysql-master --mysql-read-hosts mysql-slave --mysql-password 020421 --mysql-db rpc_spreadsheet
+      --redis-master-host redis-master --redis-slave-host redis-slave --redis-password rpc-redis-020421 --redis-sentinel-host redis-sentinel --redis-sentinel-port 26379 --redis-master-name redis-master
+    networks:
+      default:
+        aliases: [rpc-sheet]
+    depends_on:
+      mysql-master:
+        condition: service_healthy
+      redis-master:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c 'echo > /dev/tcp/localhost/50051' 2>/dev/null"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 10s
+
+  sheet-2:
+    build: .
+    environment:
+      JWT_SECRET: "${JWT_SECRET}"
+    command: >
+      /app/rpc_server --service spreadsheet --port 50051
+      --mysql-write-host mysql-master --mysql-read-hosts mysql-slave --mysql-password 020421 --mysql-db rpc_spreadsheet
+      --redis-master-host redis-master --redis-slave-host redis-slave --redis-password rpc-redis-020421 --redis-sentinel-host redis-sentinel --redis-sentinel-port 26379 --redis-master-name redis-master
+    networks:
+      default:
+        aliases: [rpc-sheet]
+    depends_on:
+      mysql-master:
+        condition: service_healthy
+      redis-master:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c 'echo > /dev/tcp/localhost/50051' 2>/dev/null"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 10s
+
+  sheet-3:
+    build: .
+    environment:
+      JWT_SECRET: "${JWT_SECRET}"
+    command: >
+      /app/rpc_server --service spreadsheet --port 50051
+      --mysql-write-host mysql-master --mysql-read-hosts mysql-slave --mysql-password 020421 --mysql-db rpc_spreadsheet
+      --redis-master-host redis-master --redis-slave-host redis-slave --redis-password rpc-redis-020421 --redis-sentinel-host redis-sentinel --redis-sentinel-port 26379 --redis-master-name redis-master
+    networks:
+      default:
+        aliases: [rpc-sheet]
+    depends_on:
+      mysql-master:
+        condition: service_healthy
+      redis-master:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c 'echo > /dev/tcp/localhost/50051' 2>/dev/null"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 10s
+
+  file-1:
+    build: .
+    environment:
+      JWT_SECRET: "${JWT_SECRET}"
+      # MinIO S3 endpoint (inside Docker network) and credentials
+      MINIO_ENDPOINT: "minio:9000"
+      # Browser hits Nginx HTTPS and /minio-s3/ proxy (same Host as site); do not use :9000.
+      MINIO_PUBLIC_URL: "https://localhost/minio-s3"
+      MINIO_ACCESS_KEY: "minio-rpc-admin"
+      MINIO_SECRET_KEY: "minio-rpc-020421"
+      MINIO_BUCKET: "rpc-files"
+    command: >
+      /app/rpc_server --service file --port 50051
+      --mysql-write-host mysql-master --mysql-read-hosts mysql-slave --mysql-password 020421 --mysql-db rpc_file
+      --redis-master-host redis-master --redis-slave-host redis-slave --redis-password rpc-redis-020421 --redis-sentinel-host redis-sentinel --redis-sentinel-port 26379 --redis-master-name redis-master
+    networks:
+      default:
+        aliases: [rpc-file]
+    depends_on:
+      mysql-master:
+        condition: service_healthy
+      minio-init:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c 'echo > /dev/tcp/localhost/50051' 2>/dev/null"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 10s
+
+  file-2:
+    build: .
+    environment:
+      JWT_SECRET: "${JWT_SECRET}"
+      MINIO_ENDPOINT: "minio:9000"
+      MINIO_PUBLIC_URL: "https://localhost/minio-s3"
+      MINIO_ACCESS_KEY: "minio-rpc-admin"
+      MINIO_SECRET_KEY: "minio-rpc-020421"
+      MINIO_BUCKET: "rpc-files"
+    command: >
+      /app/rpc_server --service file --port 50051
+      --mysql-write-host mysql-master --mysql-read-hosts mysql-slave --mysql-password 020421 --mysql-db rpc_file
+      --redis-master-host redis-master --redis-slave-host redis-slave --redis-password rpc-redis-020421 --redis-sentinel-host redis-sentinel --redis-sentinel-port 26379 --redis-master-name redis-master
+    networks:
+      default:
+        aliases: [rpc-file]
+    depends_on:
+      mysql-master:
+        condition: service_healthy
+      minio-init:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c 'echo > /dev/tcp/localhost/50051' 2>/dev/null"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 10s
+
+  gateway-1:
+    build: .
+    environment:
+      JWT_SECRET: "${JWT_SECRET}"
+    command: >
+      /app/rpc_gateway --port 8080
+      --grpc-auth rpc-auth:50051
+      --grpc-sheet rpc-sheet:50051
+      --grpc-file rpc-file:50051
+      --redis-master-host redis-master --redis-slave-host redis-slave --redis-password rpc-redis-020421 --redis-sentinel-host redis-sentinel --redis-sentinel-port 26379 --redis-master-name redis-master
+    depends_on:
+      mysql-master:
+        condition: service_healthy
+      redis-master:
+        condition: service_healthy
+      auth-1:
+        condition: service_healthy
+      auth-2:
+        condition: service_healthy
+      sheet-1:
+        condition: service_healthy
+      sheet-2:
+        condition: service_healthy
+      sheet-3:
+        condition: service_healthy
+      file-1:
+        condition: service_healthy
+      file-2:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c 'echo > /dev/tcp/localhost/8081' 2>/dev/null"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
+
+  gateway-2:
+    build: .
+    environment:
+      JWT_SECRET: "${JWT_SECRET}"
+    command: >
+      /app/rpc_gateway --port 8080
+      --grpc-auth rpc-auth:50051
+      --grpc-sheet rpc-sheet:50051
+      --grpc-file rpc-file:50051
+      --redis-master-host redis-master --redis-slave-host redis-slave --redis-password rpc-redis-020421 --redis-sentinel-host redis-sentinel --redis-sentinel-port 26379 --redis-master-name redis-master
+    depends_on:
+      mysql-master:
+        condition: service_healthy
+      redis-master:
+        condition: service_healthy
+      auth-1:
+        condition: service_healthy
+      auth-2:
+        condition: service_healthy
+      sheet-1:
+        condition: service_healthy
+      sheet-2:
+        condition: service_healthy
+      sheet-3:
+        condition: service_healthy
+      file-1:
+        condition: service_healthy
+      file-2:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c 'echo > /dev/tcp/localhost/8081' 2>/dev/null"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 5s

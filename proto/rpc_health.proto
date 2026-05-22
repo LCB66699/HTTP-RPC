@@ -1,0 +1,41 @@
+syntax = "proto3";
+
+package rpc;
+
+option go_package = "rpc-server/proto/rpc";
+
+service HealthMonitor {
+  rpc Report(ReportRequest) returns (ReportResponse);
+  rpc Query(QueryRequest) returns (QueryResponse);
+}
+
+message ReportRequest {
+  string node_id = 1;       // "spreadsheet-1", "file-2", "gateway"
+  string service = 2;       // "SpreadsheetService", "FileService", "Gateway"
+  string host = 3;          // "10.0.0.5"
+  int32 port = 4;           // 50051
+  string version = 5;       // "1.0.0"
+}
+
+message ReportResponse {
+  bool success = 1;
+}
+
+message NodeInfo {
+  string node_id = 1;
+  string service = 2;
+  string host = 3;
+  int32 port = 4;
+  string status = 5;        // "ONLINE" | "OFFLINE"
+  string version = 6;
+  string last_heartbeat = 7;
+  int32 uptime_seconds = 8;
+}
+
+message QueryRequest {}
+
+message QueryResponse {
+  repeated NodeInfo nodes = 1;
+  int32 total_online = 2;
+  int32 total_offline = 3;
+}

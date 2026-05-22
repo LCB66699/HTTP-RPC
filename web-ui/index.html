@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>罗川柏的后花园</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<video id="video-bg" loop muted playsinline></video>
+<video id="video-main" loop muted playsinline style="display:none"></video>
+
+<!-- Login Modal -->
+<div id="login-modal" class="login-modal">
+  <div class="login-card">
+    <div class="login-header">
+      <div class="login-logo">⚓</div>
+      <h2>欢迎来到后花园</h2>
+      <p>请输入用户名和密码</p>
+    </div>
+    <form id="login-form">
+      <div class="form-group">
+        <label>用户名</label>
+        <input type="text" id="login-username" placeholder="请输入用户名" required autocomplete="username">
+      </div>
+      <div class="form-group">
+        <label>密码</label>
+        <input type="password" id="login-password" placeholder="请输入密码" required autocomplete="current-password">
+      </div>
+      <div id="login-error" class="login-error hidden"></div>
+      <button type="submit" class="btn btn-primary btn-login">登录</button>
+      <div class="login-footer">
+        <span>还没有账号？</span>
+        <button type="button" id="btn-show-register" class="btn-link">立即注册</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Register Modal -->
+<div id="register-modal" class="login-modal hidden">
+  <div class="login-card">
+    <div class="login-header">
+      <div class="login-logo">⚓</div>
+      <h2>注册新账号</h2>
+      <p>创建您的后花园账号</p>
+    </div>
+    <form id="register-form">
+      <div class="form-group">
+        <label>用户名</label>
+        <input type="text" id="reg-username" placeholder="请输入用户名（3-20 位）" required minlength="3" maxlength="20" autocomplete="username">
+      </div>
+      <div class="form-group">
+        <label>密码</label>
+        <input type="password" id="reg-password" placeholder="请输入密码（至少 6 位）" required minlength="6" autocomplete="new-password">
+      </div>
+      <div class="form-group">
+        <label>确认密码</label>
+        <input type="password" id="reg-password-confirm" placeholder="请再次输入密码" required autocomplete="new-password">
+      </div>
+      <div id="register-error" class="login-error hidden"></div>
+      <button type="submit" class="btn btn-primary btn-login">注册</button>
+      <button type="button" id="btn-cancel-register" class="btn btn-login" style="background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.08);margin-top:8px;">返回登录</button>
+    </form>
+  </div>
+</div>
+
+<!-- Header -->
+<header id="main-header" class="hidden">
+  <h1>罗川柏的后花园</h1>
+  <nav>
+    <button class="tab active" data-tab="services">服务列表</button>
+    <button class="tab" data-tab="sheets">数据表格</button>
+    <button class="tab" data-tab="files">文件管理</button>
+    <button class="tab" data-tab="stress">压测</button>
+    <button class="tab" data-tab="monitor">系统监控</button>
+    <button class="tab" data-tab="profile">个人中心</button>
+  </nav>
+  <div class="user-info">
+    <img id="header-avatar" class="header-avatar" src="" alt="avatar" title="个人中心" onclick="switchToProfile()">
+    <span id="user-display"></span>
+    <button id="btn-logout" class="btn">退出</button>
+  </div>
+</header>
+
+<main>
+  <!-- Services Panel -->
+  <section id="panel-services" class="panel active">
+    <div class="toolbar">
+      <h2>已注册服务</h2>
+      <div style="display:flex;gap:8px;">
+        <button id="btn-refresh-svc" class="btn">刷新</button>
+        <button id="btn-show-svc-register" class="btn btn-primary">+ 注册新服务</button>
+      </div>
+    </div>
+
+    <div id="svc-register-form" class="card hidden">
+      <h3>注册新服务</h3>
+      <div class="form-row">
+        <div class="form-group flex-1">
+          <label>服务名称</label>
+          <input type="text" id="reg-svc-name" placeholder="如: UserService">
+        </div>
+        <div class="form-group flex-1">
+          <label>描述</label>
+          <input type="text" id="reg-svc-desc" placeholder="服务描述">
+        </div>
+      </div>
+      <div class="form-group">
+        <label>方法定义 (JSON)</label>
+        <textarea id="reg-svc-methods" rows="8" placeholder='[
+  {"name":"GetUser","description":"获取用户信息","return_type":"object","params":[
+    {"name":"id","type":"int","required":true,"description":"用户ID"}
+  ]}
+]'></textarea>
+      </div>
+      <div class="form-actions">
+        <button id="btn-register-svc" class="btn btn-primary">注册服务</button>
+        <button id="btn-cancel-svc-register" class="btn">取消</button>
+      </div>
+    </div>
+
+    <div id="services-list"></div>
+  </section>
+
+  <!-- Sheets Panel -->
+  <section id="panel-sheets" class="panel">
+    <!-- List View -->
+    <div id="sheets-list-view">
+      <div class="toolbar">
+        <h2>我的数据表格</h2>
+        <div style="display:flex;gap:8px;">
+          <button id="btn-sheet-create-blank" class="btn btn-primary" onclick="createBlankSheet()">+ 新建空白表格</button>
+          <button id="btn-sheet-upload" class="btn" onclick="triggerXlsxUpload()">上传 xlsx</button>
+          <input type="file" id="xlsx-file-input" accept=".xlsx,.xls" style="display:none;" onchange="if(this.files[0]){handleXlsxFile(this.files[0]);this.value='';}">
+        </div>
+      </div>
+      <div id="sheets-list"></div>
+      <div id="sheets-pagination"></div>
+      <div id="sheets-empty" class="card" style="text-align:center;padding:48px;display:none;">
+        <div style="font-size:3rem;margin-bottom:12px;">📊</div>
+        <h3>还没有数据表格</h3>
+        <p style="color:var(--text-muted);margin:8px 0 20px;">上传 xlsx 文件或创建空白表格开始使用</p>
+        <button id="btn-sheet-create-blank-2" class="btn btn-primary" onclick="createBlankSheet()">+ 新建空白表格</button>
+        <button id="btn-sheet-upload-2" class="btn" style="margin-left:8px;" onclick="triggerXlsxUpload()">上传 xlsx</button>
+      </div>
+    </div>
+
+    <!-- Editor View -->
+    <div id="sheets-editor-view" style="display:none;">
+      <div class="toolbar">
+        <button id="btn-sheet-back" class="btn" onclick="closeEditor(); loadSheets();">← 返回列表</button>
+        <div style="display:flex;gap:8px;align-items:center;flex:1;margin-left:16px;">
+          <input type="text" id="sheet-edit-name" class="sheet-name-input" placeholder="表格名称" style="font-size:1.1rem;font-weight:600;padding:6px 12px;border-radius:6px;border:1px solid var(--border);background:var(--bg-card);color:var(--text);width:240px;">
+          <input type="text" id="sheet-edit-desc" class="sheet-desc-input" placeholder="添加备注..." style="padding:6px 12px;border-radius:6px;border:1px solid var(--border);background:var(--bg-card);color:var(--text-muted);flex:1;">
+        </div>
+        <div style="display:flex;gap:8px;">
+          <button id="btn-sheet-add-row" class="btn" onclick="addRow()">+行</button>
+          <button id="btn-sheet-add-col" class="btn" onclick="addCol()">+列</button>
+          <button id="btn-sheet-del-row" class="btn" onclick="deleteRow()">-行</button>
+          <button id="btn-sheet-del-col" class="btn" onclick="deleteCol()">-列</button>
+          <input type="number" id="sheet-set-rows" value="10" min="1" max="5000" style="width:60px;padding:6px 8px;border-radius:6px;border:1px solid var(--border);background:var(--bg-card);color:var(--text);text-align:center;" title="目标行数">
+          <input type="number" id="sheet-set-cols" value="5" min="1" max="50" style="width:60px;padding:6px 8px;border-radius:6px;border:1px solid var(--border);background:var(--bg-card);color:var(--text);text-align:center;" title="目标列数">
+          <button id="btn-sheet-resize" class="btn" onclick="resizeGrid()">调整</button>
+          <button id="btn-sheet-export" class="btn" onclick="exportXlsx()">导出 xlsx</button>
+          <button id="btn-sheet-save" class="btn btn-primary" onclick="saveSheet()">保存</button>
+        </div>
+      </div>
+      <div id="sheet-cache-badge" class="cache-badge">
+        数据来源: <span id="cache-source-text">--</span>
+      </div>
+      <div class="sheet-grid-wrapper">
+        <table id="sheet-grid" class="sheet-grid"></table>
+      </div>
+    </div>
+  </section>
+
+  <!-- Files Panel -->
+  <section id="panel-files" class="panel">
+    <div class="toolbar">
+      <h2>我的文件</h2>
+      <div style="display:flex;gap:8px;">
+        <button id="btn-file-upload-trigger" class="btn btn-primary" onclick="document.getElementById('file-upload-input').click()">上传文件</button>
+        <input type="file" id="file-upload-input" style="display:none;" onchange="uploadFile(this.files[0])">
+      </div>
+    </div>
+    <div id="files-list"></div>
+    <div id="files-pagination"></div>
+    <div id="files-empty" class="card" style="text-align:center;padding:48px;display:none;">
+      <div style="font-size:3rem;margin-bottom:12px;">📁</div>
+      <h3>还没有上传文件</h3>
+      <p style="color:var(--text-muted);margin:8px 0 20px;">点击上方按钮上传文件</p>
+    </div>
+  </section>
+
+  <!-- Stress Test Panel -->
+  <section id="panel-stress" class="panel">
+    <div class="toolbar">
+      <h2>压力测试</h2>
+      <div class="stress-actions">
+        <button id="btn-stress-start" class="btn btn-primary">开始压测</button>
+        <button id="btn-stress-stop" class="btn" style="display:none">停止</button>
+        <button id="btn-stress-reset" class="btn">重置</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>测试配置</h3>
+      <div class="form-row">
+        <div class="form-group flex-1">
+          <label>目标服务</label>
+          <select id="stress-service"><option value="">-- 选择服务 --</option></select>
+        </div>
+        <div class="form-group flex-1">
+          <label>调用方法</label>
+          <select id="stress-method"><option value="">-- 先选择服务 --</option></select>
+        </div>
+      </div>
+      <div id="stress-params-container"></div>
+      <div class="form-row" style="margin-top:16px;">
+        <div class="form-group" style="flex:1;">
+          <label>并发数</label>
+          <input type="number" id="stress-concurrency" value="10" min="1" max="200" style="max-width:140px;">
+        </div>
+        <div class="form-group" style="flex:1;">
+          <label>总请求数</label>
+          <input type="number" id="stress-total" value="1000" min="1" max="100000" style="max-width:180px;">
+        </div>
+        <div class="form-group" style="flex:1;">
+          <label>单次超时 (ms)</label>
+          <input type="number" id="stress-timeout" value="10000" min="500" max="60000" style="max-width:140px;">
+        </div>
+      </div>
+    </div>
+
+    <div id="stress-stats" class="stress-stats-grid hidden">
+      <div class="stat-card"><div class="stat-value" id="stat-total">0</div><div class="stat-label">总请求</div></div>
+      <div class="stat-card success"><div class="stat-value" id="stat-success">0</div><div class="stat-label">成功</div></div>
+      <div class="stat-card error"><div class="stat-value" id="stat-fail">0</div><div class="stat-label">失败</div></div>
+      <div class="stat-card"><div class="stat-value" id="stat-qps">0</div><div class="stat-label">QPS</div></div>
+      <div class="stat-card"><div class="stat-value" id="stat-avg">0 ms</div><div class="stat-label">平均延迟</div></div>
+      <div class="stat-card"><div class="stat-value" id="stat-p99">0 ms</div><div class="stat-label">P99 延迟</div></div>
+    </div>
+
+    <div id="stress-progress-wrap" class="card hidden">
+      <div class="stress-progress-bar"><div id="stress-progress-fill" class="stress-progress-fill"></div></div>
+      <div id="stress-progress-text" style="text-align:center;font-size:0.85rem;color:var(--text-muted);margin-top:8px;">0 / 0</div>
+    </div>
+
+    <div id="stress-chart-wrap" class="card hidden">
+      <h3>延迟分布</h3>
+      <div class="latency-bars" id="latency-bars"></div>
+      <div class="latency-labels">
+        <span>&lt;1ms</span><span>1-5</span><span>5-10</span><span>10-50</span><span>50-100</span><span>100-500</span><span>500+</span>
+      </div>
+    </div>
+
+    <div id="stress-errors-wrap" class="card hidden">
+      <h3>错误日志 (最近 20 条)</h3>
+      <div id="stress-errors" style="max-height:280px;overflow-y:auto;font-family:'JetBrains Mono',monospace;font-size:0.78rem;"></div>
+    </div>
+  </section>
+
+  <!-- ==================== System Monitor Panel ==================== -->
+  <section id="panel-monitor" class="panel">
+    <div class="toolbar">
+      <h2>系统监控</h2>
+      <div style="display:flex;align-items:center;gap:12px;">
+        <span id="monitor-refresh-time" style="color:var(--text-muted);font-size:0.8rem;"></span>
+        <button id="btn-refresh-monitor" class="btn">刷新</button>
+      </div>
+    </div>
+
+    <!-- 错误率卡片 -->
+    <div class="monitor-cards">
+      <div class="monitor-card" id="mc-spreadsheet">
+        <div class="mc-label">Spreadsheet</div>
+        <div class="mc-errors" id="mc-err-spreadsheet">0</div>
+        <div class="mc-status" id="mc-st-spreadsheet">—</div>
+      </div>
+      <div class="monitor-card" id="mc-file">
+        <div class="mc-label">File</div>
+        <div class="mc-errors" id="mc-err-file">0</div>
+        <div class="mc-status" id="mc-st-file">—</div>
+      </div>
+      <div class="monitor-card" id="mc-auth">
+        <div class="mc-label">Auth</div>
+        <div class="mc-errors" id="mc-err-auth">0</div>
+        <div class="mc-status" id="mc-st-auth">—</div>
+      </div>
+    </div>
+
+    <!-- 连接状态 + 熔断器 -->
+    <div class="card" style="margin-top:16px;">
+      <h3>服务连通性 & 熔断器</h3>
+      <div id="monitor-services" style="font-family:monospace;font-size:0.82rem;line-height:1.8;padding:8px 0;"></div>
+    </div>
+  </section>
+
+  <!-- ==================== Profile / Personal Center Panel ==================== -->
+  <section id="panel-profile" class="panel">
+    <!-- Profile Header -->
+    <div class="profile-header">
+      <div class="avatar-section">
+        <div class="avatar-wrapper" id="avatar-wrapper" title="点击更换头像">
+          <img id="avatar-img" src="" alt="avatar">
+          <div class="avatar-overlay"><span>更换头像</span></div>
+        </div>
+      </div>
+      <div class="profile-info">
+        <h2 id="profile-username"></h2>
+        <div class="profile-meta">
+          <span>注册时间: <strong id="profile-join-date">--</strong></span>
+          <span class="profile-status">状态: <strong>活跃</strong></span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Stats Cards -->
+    <div class="profile-stats-grid">
+      <div class="profile-stat-card">
+        <div class="profile-stat-icon">📊</div>
+        <div class="profile-stat-value" id="pstat-total">0</div>
+        <div class="profile-stat-label">总调用次数</div>
+      </div>
+      <div class="profile-stat-card">
+        <div class="profile-stat-icon">✅</div>
+        <div class="profile-stat-value" id="pstat-success-rate">0%</div>
+        <div class="profile-stat-label">成功率</div>
+      </div>
+      <div class="profile-stat-card">
+        <div class="profile-stat-icon">⚡</div>
+        <div class="profile-stat-value" id="pstat-avg-latency">0 ms</div>
+        <div class="profile-stat-label">平均延迟</div>
+      </div>
+      <div class="profile-stat-card">
+        <div class="profile-stat-icon">🔝</div>
+        <div class="profile-stat-value" id="pstat-top-service">--</div>
+        <div class="profile-stat-label">最常用服务</div>
+      </div>
+    </div>
+
+    <!-- Service Usage History -->
+    <div class="toolbar">
+      <h2>服务使用记录</h2>
+      <div class="filter-row">
+        <input type="text" id="filter-service" placeholder="按服务过滤…">
+        <input type="text" id="filter-method" placeholder="按方法过滤…">
+        <button id="btn-refresh-history" class="btn">刷新</button>
+      </div>
+    </div>
+    <div class="table-container">
+      <table>
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>时间</th>
+            <th>服务</th>
+            <th>方法</th>
+            <th>状态</th>
+            <th>耗时</th>
+            <th>操作</th>
+          </tr>
+        </thead>
+        <tbody id="history-tbody"></tbody>
+      </table>
+    </div>
+    <div id="history-detail" class="card hidden" style="margin-top:16px;">
+      <h3>调用详情</h3>
+      <div id="history-detail-content"></div>
+    </div>
+  </section>
+</main>
+
+<!-- Avatar Change Modal -->
+<div id="avatar-modal" class="modal-overlay hidden">
+  <div class="modal-card">
+    <h3>更换头像</h3>
+
+    <p class="modal-section-label">上传图片</p>
+    <button class="upload-avatar-btn" id="btn-upload-avatar">
+      <span>📁</span> 从本地选择图片
+    </button>
+    <input type="file" id="avatar-file-input" accept="image/*" style="display:none;">
+
+    <p class="modal-section-label">预设头像</p>
+    <div class="avatar-preset-grid" id="avatar-preset-grid">
+      <!-- JS populated -->
+    </div>
+
+    <div class="modal-actions">
+      <button id="btn-avatar-cancel" class="btn">取消</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

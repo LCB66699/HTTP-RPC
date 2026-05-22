@@ -1,0 +1,69 @@
+syntax = "proto3";
+
+package rpc;
+
+option go_package = "rpc-server/proto/rpc";
+
+// ---- Transaction Manager (TM) ----
+service TxManager {
+  rpc Begin(BeginRequest) returns (BeginResponse);
+}
+
+// ---- Resource Manager (RM) ----
+service TxResource {
+  rpc Prepare(PrepareRequest) returns (PrepareResponse);
+  rpc Commit(CommitRequest) returns (CommitResponse);
+  rpc Rollback(RollbackRequest) returns (RollbackResponse);
+}
+
+// ---- Messages ----
+
+message TxOperation {
+  string type = 1;      // "CreateSheet", "CreateFile", "DeleteSheet", "DeleteFile"
+  string service = 2;   // "SpreadsheetService", "FileService"
+  string params_json = 3;  // 业务参数 JSON
+}
+
+message TxParticipant {
+  string service = 1;         // "SpreadsheetService", "FileService"
+  string grpc_addr = 2;       // "sheet-1:50061"
+  TxOperation operation = 3;
+}
+
+message BeginRequest {
+  string xid = 1;                        // 外部传入的 XID
+  repeated TxParticipant participants = 2;
+  int32 timeout_seconds = 3;             // 默认 30
+}
+
+message BeginResponse {
+  bool success = 1;
+  string xid = 2;
+  string error = 3;
+}
+
+message PrepareRequest {
+  string xid = 1;
+  TxOperation operation = 2;
+}
+
+message PrepareResponse {
+  bool ready = 1;      // YES=true, NO=false
+  string error = 2;
+}
+
+message CommitRequest {
+  string xid = 1;
+}
+
+message CommitResponse {
+  bool success = 1;
+}
+
+message RollbackRequest {
+  string xid = 1;
+}
+
+message RollbackResponse {
+  bool success = 1;
+}

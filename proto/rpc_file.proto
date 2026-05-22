@@ -1,0 +1,80 @@
+syntax = "proto3";
+
+package rpc;
+
+option go_package = "rpc-server/proto/rpc";
+
+service FileService {
+  rpc CreateFile(CreateFileRequest) returns (CreateFileResponse);
+  rpc GetFile(GetFileRequest) returns (GetFileResponse);
+  rpc ListFiles(ListFilesRequest) returns (ListFilesResponse);
+  rpc DeleteFile(DeleteFileRequest) returns (DeleteFileResponse);
+}
+
+message FileInfo {
+  int64 id = 1;
+  string username = 2;
+  string original_name = 3;
+  int64 size = 4;
+  string mime_type = 5;
+  string created_at = 6;
+}
+
+// Requests identify the caller by user_id (integer FK to users.id).
+// username is carried in gRPC metadata for logging only.
+message CreateFileRequest {
+  int64 user_id = 1;
+  string original_name = 2;
+  int64 size = 3;
+  string mime_type = 4;
+  bytes file_content = 5;
+  // Client-generated UUID for idempotency; empty = no dedup.
+  string idempotency_key = 6;
+}
+
+message CreateFileResponse {
+  bool success = 1;
+  int64 id = 2;
+  string error = 3;
+}
+
+message GetFileRequest {
+  int64 id = 1;
+  int64 user_id = 2;
+}
+
+message GetFileResponse {
+  bool success = 1;
+  FileInfo file = 2;
+  string cache_source = 3;
+  string error = 4;
+  bytes file_content = 5;
+  // Non-empty when file body lives in object storage (MinIO/S3).
+  // Gateway should issue a 302 redirect to this URL instead of streaming file_content.
+  string download_url = 6;
+}
+
+message ListFilesRequest {
+  int64 user_id = 1;
+  // 0-based page index; page_size=0 means return all (backward compatible)
+  int32 page = 2;
+  int32 page_size = 3;
+}
+
+message ListFilesResponse {
+  bool success = 1;
+  repeated FileInfo files = 2;
+  int32 total = 3;
+  string cache_source = 4;
+  string error = 5;
+}
+
+message DeleteFileRequest {
+  int64 id = 1;
+  int64 user_id = 2;
+}
+
+message DeleteFileResponse {
+  bool success = 1;
+  string error = 2;
+}
