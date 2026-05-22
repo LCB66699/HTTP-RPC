@@ -2,3 +2,4 @@ data/
 .claude/
 *.exe
 .env
+.mcp.json
