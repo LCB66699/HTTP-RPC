@@ -20,7 +20,7 @@ services:
   mysql-master:
     image: mysql:8.0
     environment:
-      MYSQL_ROOT_PASSWORD: "${MYSQL_ROOT_PASSWORD:-020421}"
+      MYSQL_ROOT_PASSWORD: "${MYSQL_ROOT_PASSWORD:-123456}"
     volumes:
       - ./mysql/master/conf.d:/etc/mysql/conf.d
       - ./init.sql:/docker-entrypoint-initdb.d/init.sql
@@ -34,7 +34,7 @@ services:
   mysql-slave-1:
     image: mysql:8.0
     environment:
-      MYSQL_ROOT_PASSWORD: "${MYSQL_ROOT_PASSWORD:-020421}"
+      MYSQL_ROOT_PASSWORD: "${MYSQL_ROOT_PASSWORD:-123456}"
     volumes:
       - ./mysql/slave/conf.d:/etc/mysql/conf.d
       - ./mysql/slave/init-slave.sh:/docker-entrypoint-initdb.d/init-slave.sh
@@ -49,7 +49,7 @@ services:
   mysql-slave-2:
     image: mysql:8.0
     environment:
-      MYSQL_ROOT_PASSWORD: "${MYSQL_ROOT_PASSWORD:-020421}"
+      MYSQL_ROOT_PASSWORD: "${MYSQL_ROOT_PASSWORD:-123456}"
     volumes:
       - ./mysql/slave/conf.d:/etc/mysql/conf.d
       - ./mysql/slave/init-slave.sh:/docker-entrypoint-initdb.d/init-slave.sh
@@ -69,7 +69,7 @@ services:
       - ./data/redis-master:/data
     command: redis-server /usr/local/etc/redis/redis.conf
     healthcheck:
-      test: ["CMD-SHELL", "redis-cli -a ${REDIS_PASSWORD:-rpc-redis-020421} ping"]
+      test: ["CMD-SHELL", "redis-cli -a ${REDIS_PASSWORD:-rpc-redis-123456} ping"]
       interval: 5s
       timeout: 3s
       retries: 5
@@ -138,7 +138,7 @@ services:
     command: server /data --console-address ":9001"
     environment:
       MINIO_ROOT_USER: "${MINIO_ACCESS_KEY:-minio-rpc-admin}"
-      MINIO_ROOT_PASSWORD: "${MINIO_ROOT_PASSWORD:-minio-rpc-020421}"
+      MINIO_ROOT_PASSWORD: "${MINIO_ROOT_PASSWORD:-minio-rpc-123456}"
     ports:
       - "9000:9000"   # S3 API (presigned URLs reachable from browser)
       - "9001:9001"   # MinIO Web Console
@@ -158,7 +158,7 @@ services:
         condition: service_healthy
     entrypoint: >
       /bin/sh -c "
-        mc alias set local http://minio:9000 ${MINIO_ACCESS_KEY:-minio-rpc-admin} ${MINIO_ROOT_PASSWORD:-minio-rpc-020421} &&
+        mc alias set local http://minio:9000 ${MINIO_ACCESS_KEY:-minio-rpc-admin} ${MINIO_ROOT_PASSWORD:-minio-rpc-123456} &&
         mc mb --ignore-existing local/rpc-files &&
         mc anonymous set download local/rpc-files &&
         echo 'MinIO bucket ready'
@@ -172,8 +172,8 @@ services:
       JWT_SECRET: "${JWT_SECRET}"
     command: >
       /app/rpc_server --service auth --port 50051
-      --mysql-write-host mysql-master --mysql-read-hosts mysql-slave --mysql-password ${MYSQL_ROOT_PASSWORD:-020421} --mysql-db rpc_auth
-      --redis-master-host redis-master --redis-slave-host redis-slave --redis-password ${REDIS_PASSWORD:-rpc-redis-020421} --redis-sentinel-host redis-sentinel --redis-sentinel-port 26379 --redis-master-name redis-master
+      --mysql-write-host mysql-master --mysql-read-hosts mysql-slave --mysql-password ${MYSQL_ROOT_PASSWORD:-123456} --mysql-db rpc_auth
+      --redis-master-host redis-master --redis-slave-host redis-slave --redis-password ${REDIS_PASSWORD:-rpc-redis-123456} --redis-sentinel-host redis-sentinel --redis-sentinel-port 26379 --redis-master-name redis-master
     networks:
       default:
         aliases: [rpc-auth]
@@ -193,8 +193,8 @@ services:
       JWT_SECRET: "${JWT_SECRET}"
     command: >
       /app/rpc_server --service auth --port 50051
-      --mysql-write-host mysql-master --mysql-read-hosts mysql-slave --mysql-password ${MYSQL_ROOT_PASSWORD:-020421} --mysql-db rpc_auth
-      --redis-master-host redis-master --redis-slave-host redis-slave --redis-password ${REDIS_PASSWORD:-rpc-redis-020421} --redis-sentinel-host redis-sentinel --redis-sentinel-port 26379 --redis-master-name redis-master
+      --mysql-write-host mysql-master --mysql-read-hosts mysql-slave --mysql-password ${MYSQL_ROOT_PASSWORD:-123456} --mysql-db rpc_auth
+      --redis-master-host redis-master --redis-slave-host redis-slave --redis-password ${REDIS_PASSWORD:-rpc-redis-123456} --redis-sentinel-host redis-sentinel --redis-sentinel-port 26379 --redis-master-name redis-master
     networks:
       default:
         aliases: [rpc-auth]
@@ -214,8 +214,8 @@ services:
       JWT_SECRET: "${JWT_SECRET}"
     command: >
       /app/rpc_server --service spreadsheet --port 50051
-      --mysql-write-host mysql-master --mysql-read-hosts mysql-slave --mysql-password ${MYSQL_ROOT_PASSWORD:-020421} --mysql-db rpc_spreadsheet
-      --redis-master-host redis-master --redis-slave-host redis-slave --redis-password ${REDIS_PASSWORD:-rpc-redis-020421} --redis-sentinel-host redis-sentinel --redis-sentinel-port 26379 --redis-master-name redis-master
+      --mysql-write-host mysql-master --mysql-read-hosts mysql-slave --mysql-password ${MYSQL_ROOT_PASSWORD:-123456} --mysql-db rpc_spreadsheet
+      --redis-master-host redis-master --redis-slave-host redis-slave --redis-password ${REDIS_PASSWORD:-rpc-redis-123456} --redis-sentinel-host redis-sentinel --redis-sentinel-port 26379 --redis-master-name redis-master
     networks:
       default:
         aliases: [rpc-sheet]
@@ -237,8 +237,8 @@ services:
       JWT_SECRET: "${JWT_SECRET}"
     command: >
       /app/rpc_server --service spreadsheet --port 50051
-      --mysql-write-host mysql-master --mysql-read-hosts mysql-slave --mysql-password ${MYSQL_ROOT_PASSWORD:-020421} --mysql-db rpc_spreadsheet
-      --redis-master-host redis-master --redis-slave-host redis-slave --redis-password ${REDIS_PASSWORD:-rpc-redis-020421} --redis-sentinel-host redis-sentinel --redis-sentinel-port 26379 --redis-master-name redis-master
+      --mysql-write-host mysql-master --mysql-read-hosts mysql-slave --mysql-password ${MYSQL_ROOT_PASSWORD:-123456} --mysql-db rpc_spreadsheet
+      --redis-master-host redis-master --redis-slave-host redis-slave --redis-password ${REDIS_PASSWORD:-rpc-redis-123456} --redis-sentinel-host redis-sentinel --redis-sentinel-port 26379 --redis-master-name redis-master
     networks:
       default:
         aliases: [rpc-sheet]
@@ -260,8 +260,8 @@ services:
       JWT_SECRET: "${JWT_SECRET}"
     command: >
       /app/rpc_server --service spreadsheet --port 50051
-      --mysql-write-host mysql-master --mysql-read-hosts mysql-slave --mysql-password ${MYSQL_ROOT_PASSWORD:-020421} --mysql-db rpc_spreadsheet
-      --redis-master-host redis-master --redis-slave-host redis-slave --redis-password ${REDIS_PASSWORD:-rpc-redis-020421} --redis-sentinel-host redis-sentinel --redis-sentinel-port 26379 --redis-master-name redis-master
+      --mysql-write-host mysql-master --mysql-read-hosts mysql-slave --mysql-password ${MYSQL_ROOT_PASSWORD:-123456} --mysql-db rpc_spreadsheet
+      --redis-master-host redis-master --redis-slave-host redis-slave --redis-password ${REDIS_PASSWORD:-rpc-redis-123456} --redis-sentinel-host redis-sentinel --redis-sentinel-port 26379 --redis-master-name redis-master
     networks:
       default:
         aliases: [rpc-sheet]
@@ -286,12 +286,12 @@ services:
       # Browser hits Nginx HTTPS and /minio-s3/ proxy (same Host as site); do not use :9000.
       MINIO_PUBLIC_URL: "https://localhost/minio-s3"
       MINIO_ACCESS_KEY: "${MINIO_ACCESS_KEY:-minio-rpc-admin}"
-      MINIO_SECRET_KEY: "${MINIO_SECRET_KEY:-minio-rpc-020421}"
+      MINIO_SECRET_KEY: "${MINIO_SECRET_KEY:-minio-rpc-123456}"
       MINIO_BUCKET: "rpc-files"
     command: >
       /app/rpc_server --service file --port 50051
-      --mysql-write-host mysql-master --mysql-read-hosts mysql-slave --mysql-password ${MYSQL_ROOT_PASSWORD:-020421} --mysql-db rpc_file
-      --redis-master-host redis-master --redis-slave-host redis-slave --redis-password ${REDIS_PASSWORD:-rpc-redis-020421} --redis-sentinel-host redis-sentinel --redis-sentinel-port 26379 --redis-master-name redis-master
+      --mysql-write-host mysql-master --mysql-read-hosts mysql-slave --mysql-password ${MYSQL_ROOT_PASSWORD:-123456} --mysql-db rpc_file
+      --redis-master-host redis-master --redis-slave-host redis-slave --redis-password ${REDIS_PASSWORD:-rpc-redis-123456} --redis-sentinel-host redis-sentinel --redis-sentinel-port 26379 --redis-master-name redis-master
     networks:
       default:
         aliases: [rpc-file]
@@ -314,12 +314,12 @@ services:
       MINIO_ENDPOINT: "minio:9000"
       MINIO_PUBLIC_URL: "https://localhost/minio-s3"
       MINIO_ACCESS_KEY: "${MINIO_ACCESS_KEY:-minio-rpc-admin}"
-      MINIO_SECRET_KEY: "${MINIO_SECRET_KEY:-minio-rpc-020421}"
+      MINIO_SECRET_KEY: "${MINIO_SECRET_KEY:-minio-rpc-123456}"
       MINIO_BUCKET: "rpc-files"
     command: >
       /app/rpc_server --service file --port 50051
-      --mysql-write-host mysql-master --mysql-read-hosts mysql-slave --mysql-password ${MYSQL_ROOT_PASSWORD:-020421} --mysql-db rpc_file
-      --redis-master-host redis-master --redis-slave-host redis-slave --redis-password ${REDIS_PASSWORD:-rpc-redis-020421} --redis-sentinel-host redis-sentinel --redis-sentinel-port 26379 --redis-master-name redis-master
+      --mysql-write-host mysql-master --mysql-read-hosts mysql-slave --mysql-password ${MYSQL_ROOT_PASSWORD:-123456} --mysql-db rpc_file
+      --redis-master-host redis-master --redis-slave-host redis-slave --redis-password ${REDIS_PASSWORD:-rpc-redis-123456} --redis-sentinel-host redis-sentinel --redis-sentinel-port 26379 --redis-master-name redis-master
     networks:
       default:
         aliases: [rpc-file]
@@ -344,7 +344,7 @@ services:
       --grpc-auth rpc-auth:50051
       --grpc-sheet rpc-sheet:50051
       --grpc-file rpc-file:50051
-      --redis-master-host redis-master --redis-slave-host redis-slave --redis-password ${REDIS_PASSWORD:-rpc-redis-020421} --redis-sentinel-host redis-sentinel --redis-sentinel-port 26379 --redis-master-name redis-master
+      --redis-master-host redis-master --redis-slave-host redis-slave --redis-password ${REDIS_PASSWORD:-rpc-redis-123456} --redis-sentinel-host redis-sentinel --redis-sentinel-port 26379 --redis-master-name redis-master
     depends_on:
       mysql-master:
         condition: service_healthy
@@ -380,7 +380,7 @@ services:
       --grpc-auth rpc-auth:50051
       --grpc-sheet rpc-sheet:50051
       --grpc-file rpc-file:50051
-      --redis-master-host redis-master --redis-slave-host redis-slave --redis-password ${REDIS_PASSWORD:-rpc-redis-020421} --redis-sentinel-host redis-sentinel --redis-sentinel-port 26379 --redis-master-name redis-master
+      --redis-master-host redis-master --redis-slave-host redis-slave --redis-password ${REDIS_PASSWORD:-rpc-redis-123456} --redis-sentinel-host redis-sentinel --redis-sentinel-port 26379 --redis-master-name redis-master
     depends_on:
       mysql-master:
         condition: service_healthy
