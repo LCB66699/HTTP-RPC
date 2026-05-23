@@ -1,0 +1,38 @@
+# ===== Ingress (TLS + 路由 + 限流) =====
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: http-rpc
+  namespace: http-rpc
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    nginx.ingress.kubernetes.io/proxy-body-size: "50m"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "600"
+    nginx.ingress.kubernetes.io/configuration-snippet: |
+      limit_req zone=api_limit burst=50 nodelay;
+      limit_req_status 429;
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts:
+        - api.http-rpc.example.com
+      secretName: http-rpc-tls
+  rules:
+    - host: api.http-rpc.example.com
+      http:
+        paths:
+          - path: /api/
+            pathType: Prefix
+            backend:
+              service:
+                name: gateway
+                port:
+                  number: 8081
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: gateway
+                port:
+                  number: 8081

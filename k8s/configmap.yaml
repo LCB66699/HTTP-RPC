@@ -1,0 +1,22 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: app-config
+  namespace: http-rpc
+data:
+  # Default values; overridable per-service via env
+  mysql-port: "3306"
+  redis-pool-size: "4"
+  log-level: "info"
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mysql-init-sql
+  namespace: http-rpc
+data:
+  init.sql: |
+    CREATE DATABASE IF NOT EXISTS rpc_auth;
+    CREATE DATABASE IF NOT EXISTS rpc_spreadsheet;
+    CREATE DATABASE IF NOT EXISTS rpc_file;
+    CREATE DATABASE IF NOT EXISTS rpc_tx_log;

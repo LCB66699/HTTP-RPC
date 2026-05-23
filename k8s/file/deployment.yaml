@@ -1,0 +1,78 @@
+# ===== File Service =====
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: file
+  namespace: http-rpc
+  labels:
+    app: file
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: file
+  template:
+    metadata:
+      labels:
+        app: file
+    spec:
+      containers:
+        - name: file
+          image: http-rpc/server:latest
+          args:
+            - --service=file
+            - --port=50051
+            - --mysql-write-host=mysql-file
+            - --mysql-read-hosts=mysql-file
+            - --mysql-db=rpc_file
+            - --mysql-shards=2
+            - --redis-cluster=redis-cluster-0.redis-cluster.http-rpc.svc.cluster.local:7000
+            - --redis-cluster=redis-cluster-1.redis-cluster.http-rpc.svc.cluster.local:7000
+            - --redis-cluster=redis-cluster-2.redis-cluster.http-rpc.svc.cluster.local:7000
+            - --log-level=info
+          env:
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: app-secret
+                  key: jwt-secret
+            - name: MYSQL_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: mysql-secret
+                  key: root-password
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: redis-secret
+                  key: password
+            - name: MINIO_ENDPOINT
+              value: "minio.http-rpc.svc.cluster.local:9000"
+            - name: MINIO_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: minio-secret
+                  key: access-key
+            - name: MINIO_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: minio-secret
+                  key: secret-key
+            - name: MINIO_BUCKET
+              value: "rpc-files"
+          ports:
+            - containerPort: 50051
+              name: grpc
+          readinessProbe:
+            exec:
+              command: ["bash", "-c", "echo > /dev/tcp/localhost/50051"]
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            failureThreshold: 3
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "100m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"

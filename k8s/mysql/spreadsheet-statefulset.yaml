@@ -1,0 +1,71 @@
+# ===== MySQL Spreadsheet (双分片) =====
+apiVersion: v1
+kind: Service
+metadata:
+  name: mysql-spreadsheet
+  namespace: http-rpc
+  labels:
+    app: mysql-spreadsheet
+spec:
+  clusterIP: None   # Headless — Pod DNS 名稳定
+  selector:
+    app: mysql-spreadsheet
+  ports:
+    - port: 3306
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: mysql-spreadsheet
+  namespace: http-rpc
+spec:
+  serviceName: mysql-spreadsheet
+  replicas: 2   # shard-0, shard-1
+  selector:
+    matchLabels:
+      app: mysql-spreadsheet
+  template:
+    metadata:
+      labels:
+        app: mysql-spreadsheet
+    spec:
+      containers:
+        - name: mysql
+          image: mysql:8.0
+          env:
+            - name: MYSQL_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: mysql-secret
+                  key: root-password
+          ports:
+            - containerPort: 3306
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/mysql
+            - name: init-sql
+              mountPath: /docker-entrypoint-initdb.d
+          readinessProbe:
+            exec:
+              command: ["mysqladmin", "ping", "-h", "localhost"]
+            initialDelaySeconds: 10
+            periodSeconds: 5
+          resources:
+            requests:
+              memory: "512Mi"
+              cpu: "250m"
+            limits:
+              memory: "1Gi"
+              cpu: "500m"
+      volumes:
+        - name: init-sql
+          configMap:
+            name: mysql-init-sql
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 50Gi

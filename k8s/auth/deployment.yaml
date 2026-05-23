@@ -1,0 +1,70 @@
+# ===== Auth Service =====
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: auth
+  namespace: http-rpc
+  labels:
+    app: auth
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: auth
+  template:
+    metadata:
+      labels:
+        app: auth
+    spec:
+      containers:
+        - name: auth
+          image: http-rpc/server:latest
+          args:
+            - --service=auth
+            - --port=50051
+            - --mysql-write-host=mysql-auth-0.mysql-auth.http-rpc.svc.cluster.local
+            - --mysql-read-hosts=mysql-auth-0.mysql-auth.http-rpc.svc.cluster.local
+            - --mysql-db=rpc_auth
+            - --mysql-shards=1
+            - --redis-cluster=redis-cluster-0.redis-cluster.http-rpc.svc.cluster.local:7000
+            - --redis-cluster=redis-cluster-1.redis-cluster.http-rpc.svc.cluster.local:7000
+            - --redis-cluster=redis-cluster-2.redis-cluster.http-rpc.svc.cluster.local:7000
+            - --log-level=info
+          env:
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: app-secret
+                  key: jwt-secret
+            - name: MYSQL_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: mysql-secret
+                  key: root-password
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: redis-secret
+                  key: password
+          ports:
+            - containerPort: 50051
+              name: grpc
+          readinessProbe:
+            exec:
+              command: ["bash", "-c", "echo > /dev/tcp/localhost/50051"]
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            failureThreshold: 3
+          livenessProbe:
+            exec:
+              command: ["bash", "-c", "echo > /dev/tcp/localhost/50051"]
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            failureThreshold: 5
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "100m"
+            limits:
+              memory: "256Mi"
+              cpu: "250m"

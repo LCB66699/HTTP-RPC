@@ -1,0 +1,78 @@
+# ===== API Gateway =====
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gateway
+  namespace: http-rpc
+  labels:
+    app: gateway
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: gateway
+  template:
+    metadata:
+      labels:
+        app: gateway
+    spec:
+      containers:
+        - name: gateway
+          image: http-rpc/gateway:latest
+          args:
+            - --port=8080
+            - --grpc-auth=auth.http-rpc.svc.cluster.local:50051
+            - --grpc-sheet=sheet.http-rpc.svc.cluster.local:50051
+            - --grpc-file=file.http-rpc.svc.cluster.local:50051
+            - --redis-cluster=redis-cluster-0.redis-cluster.http-rpc.svc.cluster.local:7000
+            - --redis-cluster=redis-cluster-1.redis-cluster.http-rpc.svc.cluster.local:7000
+            - --redis-cluster=redis-cluster-2.redis-cluster.http-rpc.svc.cluster.local:7000
+          env:
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: app-secret
+                  key: jwt-secret
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: redis-secret
+                  key: password
+          ports:
+            - containerPort: 8080
+              name: h2c
+            - containerPort: 8081
+              name: http
+          readinessProbe:
+            httpGet:
+              path: /api/health
+              port: 8081
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /api/health
+              port: 8081
+            initialDelaySeconds: 15
+            periodSeconds: 10
+            failureThreshold: 5
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "100m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: gateway
+  namespace: http-rpc
+spec:
+  selector:
+    app: gateway
+  ports:
+    - port: 8081
+      name: http

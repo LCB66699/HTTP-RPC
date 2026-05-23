@@ -1,0 +1,153 @@
+# ===== Redis Cluster (6 nodes, 3M+3S) =====
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis-cluster
+  namespace: http-rpc
+  labels:
+    app: redis-cluster
+spec:
+  clusterIP: None   # Headless — Pod DNS 稳定，gossip 协议需要
+  selector:
+    app: redis-cluster
+  ports:
+    - name: client
+      port: 7000
+    - name: gossip
+      port: 17000
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: redis-cluster-config
+  namespace: http-rpc
+data:
+  redis.conf: |
+    port 7000
+    bind 0.0.0.0
+    cluster-enabled yes
+    cluster-config-file /data/nodes.conf
+    cluster-node-timeout 5000
+    appendonly yes
+    appendfsync everysec
+    requirepass $(REDIS_PASSWORD)
+    masterauth $(REDIS_PASSWORD)
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: redis-cluster
+  namespace: http-rpc
+spec:
+  serviceName: redis-cluster
+  replicas: 6
+  podManagementPolicy: Parallel   # 并行启动，加速初始化
+  selector:
+    matchLabels:
+      app: redis-cluster
+  template:
+    metadata:
+      labels:
+        app: redis-cluster
+    spec:
+      containers:
+        - name: redis
+          image: redis:7-alpine
+          command: ["redis-server"]
+          args: ["/etc/redis/redis.conf"]
+          env:
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: redis-secret
+                  key: password
+          ports:
+            - containerPort: 7000
+              name: client
+            - containerPort: 17000
+              name: gossip
+          volumeMounts:
+            - name: data
+              mountPath: /data
+            - name: config
+              mountPath: /etc/redis
+          readinessProbe:
+            exec:
+              command:
+                - /bin/sh
+                - -c
+                - redis-cli -p 7000 -a $(REDIS_PASSWORD) ping | grep -q PONG
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          livenessProbe:
+            exec:
+              command:
+                - /bin/sh
+                - -c
+                - redis-cli -p 7000 -a $(REDIS_PASSWORD) ping | grep -q PONG
+            initialDelaySeconds: 15
+            periodSeconds: 10
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "100m"
+            limits:
+              memory: "512Mi"
+              cpu: "250m"
+      volumes:
+        - name: config
+          configMap:
+            name: redis-cluster-config
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 10Gi
+---
+# Init Job: 创建 Redis Cluster
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: redis-cluster-init
+  namespace: http-rpc
+spec:
+  ttlSecondsAfterFinished: 60
+  template:
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: init
+          image: redis:7-alpine
+          env:
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: redis-secret
+                  key: password
+          command:
+            - /bin/sh
+            - -c
+            - |
+              echo "Waiting for all 6 nodes to be ready..."
+              for i in 0 1 2 3 4 5; do
+                until redis-cli -p 7000 -h redis-cluster-$i.redis-cluster.http-rpc.svc.cluster.local -a $REDIS_PASSWORD --no-auth-warning ping 2>/dev/null | grep -q PONG; do
+                  echo "Waiting for redis-cluster-$i..."
+                  sleep 3
+                done
+                echo "redis-cluster-$i ready"
+              done
+              sleep 3
+              echo "Creating cluster..."
+              echo yes | redis-cli --cluster create \
+                redis-cluster-0.redis-cluster.http-rpc.svc.cluster.local:7000 \
+                redis-cluster-1.redis-cluster.http-rpc.svc.cluster.local:7000 \
+                redis-cluster-2.redis-cluster.http-rpc.svc.cluster.local:7000 \
+                redis-cluster-3.redis-cluster.http-rpc.svc.cluster.local:7000 \
+                redis-cluster-4.redis-cluster.http-rpc.svc.cluster.local:7000 \
+                redis-cluster-5.redis-cluster.http-rpc.svc.cluster.local:7000 \
+                --cluster-replicas 1 \
+                -a $REDIS_PASSWORD --no-auth-warning
+              echo "=== Redis Cluster initialized ==="

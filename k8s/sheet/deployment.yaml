@@ -1,0 +1,64 @@
+# ===== Spreadsheet Service =====
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sheet
+  namespace: http-rpc
+  labels:
+    app: sheet
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: sheet
+  template:
+    metadata:
+      labels:
+        app: sheet
+    spec:
+      containers:
+        - name: sheet
+          image: http-rpc/server:latest
+          args:
+            - --service=spreadsheet
+            - --port=50051
+            - --mysql-write-host=mysql-spreadsheet
+            - --mysql-read-hosts=mysql-spreadsheet
+            - --mysql-db=rpc_spreadsheet
+            - --mysql-shards=2
+            - --redis-cluster=redis-cluster-0.redis-cluster.http-rpc.svc.cluster.local:7000
+            - --redis-cluster=redis-cluster-1.redis-cluster.http-rpc.svc.cluster.local:7000
+            - --redis-cluster=redis-cluster-2.redis-cluster.http-rpc.svc.cluster.local:7000
+            - --log-level=info
+          env:
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: app-secret
+                  key: jwt-secret
+            - name: MYSQL_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: mysql-secret
+                  key: root-password
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: redis-secret
+                  key: password
+          ports:
+            - containerPort: 50051
+              name: grpc
+          readinessProbe:
+            exec:
+              command: ["bash", "-c", "echo > /dev/tcp/localhost/50051"]
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            failureThreshold: 3
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "100m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"

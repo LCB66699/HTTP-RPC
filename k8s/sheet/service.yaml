@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: sheet
+  namespace: http-rpc
+spec:
+  clusterIP: None
+  selector:
+    app: sheet
+  ports:
+    - port: 50051
+      name: grpc
