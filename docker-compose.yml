@@ -16,50 +16,76 @@ services:
       gateway-2:
         condition: service_healthy
 
-  # ===== MySQL 主从 =====
-  mysql-master:
+  # ===== MySQL Auth (不分片) =====
+  mysql-auth:
     image: mysql:8.0
     environment:
       MYSQL_ROOT_PASSWORD: "${MYSQL_ROOT_PASSWORD:-123456}"
     volumes:
       - ./mysql/master/conf.d:/etc/mysql/conf.d
       - ./init.sql:/docker-entrypoint-initdb.d/init.sql
-      - ./data/mysql-master:/var/lib/mysql
+      - ./data/mysql-auth:/var/lib/mysql
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
-      interval: 5s
-      timeout: 3s
-      retries: 10
+      interval: 5s; timeout: 3s; retries: 10
 
-  mysql-slave-1:
+  # ===== MySQL Spreadsheet (双分片, 每片1主1从) =====
+  mysql-spreadsheet-0:
     image: mysql:8.0
-    environment:
-      MYSQL_ROOT_PASSWORD: "${MYSQL_ROOT_PASSWORD:-123456}"
-    volumes:
-      - ./mysql/slave/conf.d:/etc/mysql/conf.d
-      - ./mysql/slave/init-slave.sh:/docker-entrypoint-initdb.d/init-slave.sh
-      - ./data/mysql-slave-1:/var/lib/mysql
-    networks:
-      default:
-        aliases: [mysql-slave]
-    depends_on:
-      mysql-master:
-        condition: service_healthy
+    environment: { MYSQL_ROOT_PASSWORD: "${MYSQL_ROOT_PASSWORD:-123456}" }
+    volumes: ["./init.sql:/docker-entrypoint-initdb.d/init.sql", "./data/mysql-sp-0:/var/lib/mysql"]
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 5s; timeout: 3s; retries: 10
 
-  mysql-slave-2:
+  mysql-spreadsheet-0-slave:
     image: mysql:8.0
-    environment:
-      MYSQL_ROOT_PASSWORD: "${MYSQL_ROOT_PASSWORD:-123456}"
-    volumes:
-      - ./mysql/slave/conf.d:/etc/mysql/conf.d
-      - ./mysql/slave/init-slave.sh:/docker-entrypoint-initdb.d/init-slave.sh
-      - ./data/mysql-slave-2:/var/lib/mysql
-    networks:
-      default:
-        aliases: [mysql-slave]
-    depends_on:
-      mysql-master:
-        condition: service_healthy
+    environment: { MYSQL_ROOT_PASSWORD: "${MYSQL_ROOT_PASSWORD:-123456}" }
+    volumes: ["./mysql/slave/conf.d:/etc/mysql/conf.d", "./data/mysql-sp-0s:/var/lib/mysql"]
+    depends_on: [mysql-spreadsheet-0]
+
+  mysql-spreadsheet-1:
+    image: mysql:8.0
+    environment: { MYSQL_ROOT_PASSWORD: "${MYSQL_ROOT_PASSWORD:-123456}" }
+    volumes: ["./init.sql:/docker-entrypoint-initdb.d/init.sql", "./data/mysql-sp-1:/var/lib/mysql"]
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 5s; timeout: 3s; retries: 10
+
+  mysql-spreadsheet-1-slave:
+    image: mysql:8.0
+    environment: { MYSQL_ROOT_PASSWORD: "${MYSQL_ROOT_PASSWORD:-123456}" }
+    volumes: ["./mysql/slave/conf.d:/etc/mysql/conf.d", "./data/mysql-sp-1s:/var/lib/mysql"]
+    depends_on: [mysql-spreadsheet-1]
+
+  # ===== MySQL File (双分片, 每片1主1从) =====
+  mysql-file-0:
+    image: mysql:8.0
+    environment: { MYSQL_ROOT_PASSWORD: "${MYSQL_ROOT_PASSWORD:-123456}" }
+    volumes: ["./init.sql:/docker-entrypoint-initdb.d/init.sql", "./data/mysql-f-0:/var/lib/mysql"]
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 5s; timeout: 3s; retries: 10
+
+  mysql-file-0-slave:
+    image: mysql:8.0
+    environment: { MYSQL_ROOT_PASSWORD: "${MYSQL_ROOT_PASSWORD:-123456}" }
+    volumes: ["./mysql/slave/conf.d:/etc/mysql/conf.d", "./data/mysql-f-0s:/var/lib/mysql"]
+    depends_on: [mysql-file-0]
+
+  mysql-file-1:
+    image: mysql:8.0
+    environment: { MYSQL_ROOT_PASSWORD: "${MYSQL_ROOT_PASSWORD:-123456}" }
+    volumes: ["./init.sql:/docker-entrypoint-initdb.d/init.sql", "./data/mysql-f-1:/var/lib/mysql"]
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 5s; timeout: 3s; retries: 10
+
+  mysql-file-1-slave:
+    image: mysql:8.0
+    environment: { MYSQL_ROOT_PASSWORD: "${MYSQL_ROOT_PASSWORD:-123456}" }
+    volumes: ["./mysql/slave/conf.d:/etc/mysql/conf.d", "./data/mysql-f-1s:/var/lib/mysql"]
+    depends_on: [mysql-file-1]
 
   # ===== Redis Cluster (6 nodes, 3 masters + 3 replicas) =====
   redis-cluster-1:
@@ -206,13 +232,13 @@ services:
       JWT_SECRET: "${JWT_SECRET}"
     command: >
       /app/rpc_server --service auth --port 50051
-      --mysql-write-host mysql-master --mysql-read-hosts mysql-slave --mysql-password ${MYSQL_ROOT_PASSWORD:-123456} --mysql-db rpc_auth --mysql-shards 1
+      --mysql-write-host mysql-auth --mysql-read-hosts mysql-auth --mysql-password ${MYSQL_ROOT_PASSWORD:-123456} --mysql-db rpc_auth --mysql-shards 1
       --redis-cluster redis-cluster:7000 --redis-cluster redis-cluster:7001 --redis-cluster redis-cluster:7002 --redis-password ${REDIS_PASSWORD:-rpc-redis-123456}
     networks:
       default:
         aliases: [rpc-auth]
     depends_on:
-      mysql-master:
+      mysql-auth:
         condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "bash -c 'echo > /dev/tcp/localhost/50051' 2>/dev/null"]
@@ -227,13 +253,13 @@ services:
       JWT_SECRET: "${JWT_SECRET}"
     command: >
       /app/rpc_server --service auth --port 50051
-      --mysql-write-host mysql-master --mysql-read-hosts mysql-slave --mysql-password ${MYSQL_ROOT_PASSWORD:-123456} --mysql-db rpc_auth --mysql-shards 1
+      --mysql-write-host mysql-auth --mysql-read-hosts mysql-auth --mysql-password ${MYSQL_ROOT_PASSWORD:-123456} --mysql-db rpc_auth --mysql-shards 1
       --redis-cluster redis-cluster:7000 --redis-cluster redis-cluster:7001 --redis-cluster redis-cluster:7002 --redis-password ${REDIS_PASSWORD:-rpc-redis-123456}
     networks:
       default:
         aliases: [rpc-auth]
     depends_on:
-      mysql-master:
+      mysql-auth:
         condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "bash -c 'echo > /dev/tcp/localhost/50051' 2>/dev/null"]
@@ -248,13 +274,13 @@ services:
       JWT_SECRET: "${JWT_SECRET}"
     command: >
       /app/rpc_server --service spreadsheet --port 50051
-      --mysql-write-host mysql-master --mysql-read-hosts mysql-slave --mysql-password ${MYSQL_ROOT_PASSWORD:-123456} --mysql-db rpc_spreadsheet --mysql-shards 1
+      --mysql-write-host mysql-spreadsheet --mysql-read-hosts mysql-spreadsheet --mysql-password ${MYSQL_ROOT_PASSWORD:-123456} --mysql-db rpc_spreadsheet --mysql-shards 2
       --redis-cluster redis-cluster:7000 --redis-cluster redis-cluster:7001 --redis-cluster redis-cluster:7002 --redis-password ${REDIS_PASSWORD:-rpc-redis-123456}
     networks:
       default:
         aliases: [rpc-sheet]
     depends_on:
-      mysql-master:
+      mysql-spreadsheet-0:
         condition: service_healthy
       redis-cluster-init:
         condition: service_completed_successfully
@@ -271,13 +297,13 @@ services:
       JWT_SECRET: "${JWT_SECRET}"
     command: >
       /app/rpc_server --service spreadsheet --port 50051
-      --mysql-write-host mysql-master --mysql-read-hosts mysql-slave --mysql-password ${MYSQL_ROOT_PASSWORD:-123456} --mysql-db rpc_spreadsheet --mysql-shards 1
+      --mysql-write-host mysql-spreadsheet --mysql-read-hosts mysql-spreadsheet --mysql-password ${MYSQL_ROOT_PASSWORD:-123456} --mysql-db rpc_spreadsheet --mysql-shards 2
       --redis-cluster redis-cluster:7000 --redis-cluster redis-cluster:7001 --redis-cluster redis-cluster:7002 --redis-password ${REDIS_PASSWORD:-rpc-redis-123456}
     networks:
       default:
         aliases: [rpc-sheet]
     depends_on:
-      mysql-master:
+      mysql-spreadsheet-0:
         condition: service_healthy
       redis-cluster-init:
         condition: service_completed_successfully
@@ -294,13 +320,13 @@ services:
       JWT_SECRET: "${JWT_SECRET}"
     command: >
       /app/rpc_server --service spreadsheet --port 50051
-      --mysql-write-host mysql-master --mysql-read-hosts mysql-slave --mysql-password ${MYSQL_ROOT_PASSWORD:-123456} --mysql-db rpc_spreadsheet --mysql-shards 1
+      --mysql-write-host mysql-spreadsheet --mysql-read-hosts mysql-spreadsheet --mysql-password ${MYSQL_ROOT_PASSWORD:-123456} --mysql-db rpc_spreadsheet --mysql-shards 2
       --redis-cluster redis-cluster:7000 --redis-cluster redis-cluster:7001 --redis-cluster redis-cluster:7002 --redis-password ${REDIS_PASSWORD:-rpc-redis-123456}
     networks:
       default:
         aliases: [rpc-sheet]
     depends_on:
-      mysql-master:
+      mysql-spreadsheet-0:
         condition: service_healthy
       redis-cluster-init:
         condition: service_completed_successfully
@@ -324,13 +350,13 @@ services:
       MINIO_BUCKET: "rpc-files"
     command: >
       /app/rpc_server --service file --port 50051
-      --mysql-write-host mysql-master --mysql-read-hosts mysql-slave --mysql-password ${MYSQL_ROOT_PASSWORD:-123456} --mysql-db rpc_file
+      --mysql-write-host mysql-file --mysql-read-hosts mysql-file --mysql-password ${MYSQL_ROOT_PASSWORD:-123456} --mysql-db rpc_file --mysql-shards 2
       --redis-cluster redis-cluster:7000 --redis-cluster redis-cluster:7001 --redis-cluster redis-cluster:7002 --redis-password ${REDIS_PASSWORD:-rpc-redis-123456}
     networks:
       default:
         aliases: [rpc-file]
     depends_on:
-      mysql-master:
+      mysql-auth:
         condition: service_healthy
       minio-init:
         condition: service_completed_successfully
@@ -352,13 +378,13 @@ services:
       MINIO_BUCKET: "rpc-files"
     command: >
       /app/rpc_server --service file --port 50051
-      --mysql-write-host mysql-master --mysql-read-hosts mysql-slave --mysql-password ${MYSQL_ROOT_PASSWORD:-123456} --mysql-db rpc_file
+      --mysql-write-host mysql-file --mysql-read-hosts mysql-file --mysql-password ${MYSQL_ROOT_PASSWORD:-123456} --mysql-db rpc_file --mysql-shards 2
       --redis-cluster redis-cluster:7000 --redis-cluster redis-cluster:7001 --redis-cluster redis-cluster:7002 --redis-password ${REDIS_PASSWORD:-rpc-redis-123456}
     networks:
       default:
         aliases: [rpc-file]
     depends_on:
-      mysql-master:
+      mysql-auth:
         condition: service_healthy
       minio-init:
         condition: service_completed_successfully
@@ -380,7 +406,7 @@ services:
       --grpc-file rpc-file:50051
       --redis-cluster redis-cluster:7000 --redis-cluster redis-cluster:7001 --redis-cluster redis-cluster:7002 --redis-password ${REDIS_PASSWORD:-rpc-redis-123456}
     depends_on:
-      mysql-master:
+      mysql-spreadsheet-0:
         condition: service_healthy
       redis-cluster-init:
         condition: service_completed_successfully
@@ -416,7 +442,7 @@ services:
       --grpc-file rpc-file:50051
       --redis-cluster redis-cluster:7000 --redis-cluster redis-cluster:7001 --redis-cluster redis-cluster:7002 --redis-password ${REDIS_PASSWORD:-rpc-redis-123456}
     depends_on:
-      mysql-master:
+      mysql-spreadsheet-0:
         condition: service_healthy
       redis-cluster-init:
         condition: service_completed_successfully
