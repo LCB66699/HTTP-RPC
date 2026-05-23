@@ -12,18 +12,18 @@ nginx :443/80                    ← TLS 终结 + 静态文件(sendfile) + gzip 
    │  /api/*  → least_conn 负载均衡
    ├─────────────────────────────────────┐
    ▼                                     ▼
-Gateway-1 :8081                  Gateway-2 :8081   ← HttpOnly Cookie 鉴权 + TM(2PC) + 熔断器(Redis共享)
+Gateway-1 :8081                  Gateway-2 :8081   ← HttpOnly Cookie 鉴权 + TM(2PC) + 熔断器(Redis Cluster)
    │  gRPC/HTTP/2  round_robin (DNS aliases, 5s 重解析)
    │
    ├──→ Auth  (rpc-auth:50051)   副本 x2  DB: rpc_auth
-   ├──→ Sheet (rpc-sheet:50051)  副本 x3  DB: rpc_spreadsheet  Redis 缓存
-   └──→ File  (rpc-file:50051)   副本 x2  DB: rpc_file
-          │
+   ├──→ Sheet (rpc-sheet:50051)  副本 x3  DB: rpc_spreadsheet (可 hash 分片)  Redis 缓存
+   └──→ File  (rpc-file:50051)   副本 x2  DB: rpc_file (可 hash 分片)         MinIO
+
           ├── MySQL 1主2从 :3306  (rpc_auth / rpc_spreadsheet / rpc_file / rpc_tx_log)
-          └── Redis 1主2从 + 3哨兵 :6379
+          └── Redis Cluster 6节点 (3M+3S)
 ```
 
-**容器总数：19 个**（nginx×1 + gateway×2 + auth×2 + sheet×3 + file×2 + MySQL×3 + Redis×6）
+**容器总数：21 个**（nginx×1 + gateway×2 + auth×2 + sheet×3 + file×2 + MySQL×3 + Redis×7 + MinIO×1）
 
 ### 协议栈
 
@@ -40,41 +40,57 @@ Gateway-1 :8081                  Gateway-2 :8081   ← HttpOnly Cookie 鉴权 + 
       写操作: MySQL INSERT + undo_log → 失效 Redis 缓存
 
 读取: 查 Redis → 命中返回 → 未命中查 MySQL → 回填 Redis
+      逻辑过期(300s) → SetNX 加锁 → 后台线程异步刷新 → 返回旧值
 ```
 
 ## 项目结构
 
 ```
 ├── gateway-cpp/                 HTTP 网关 + TM
-│   ├── gateway.cpp/h             路由、JWT、gRPC 代理、TM 协调
-│   └── main.cpp                  网关入口
+│   ├── include/
+│   │   ├── gateway.h              路由、JWT、gRPC 代理、TM 协调
+│   │   ├── circuit_breaker.h      多维熔断器（滑动窗口 + P99 + 慢调用率）
+│   │   ├── coro_grpc.h            co_await gRPC (CompletionQueue)
+│   │   ├── coro_task.h            C++20 Task<T> 协程
+│   │   └── coro_sched.h           协程调度
+│   └── src/
+│       ├── main.cpp               网关入口
+│       ├── gateway.cpp            路由 + 鉴权 + 熔断 + 协议转换
+│       └── http2_server.cpp       nghttp2 h2c 服务器
 ├── server/                      gRPC 后端服务
-│   ├── main.cpp                  --service 参数启动不同角色
-│   ├── database.cpp/h            MySQL 层（4 库 6 表 + undo_log + tx_log）
-│   ├── redis_client.cpp/h        Redis 客户端（缓存 + 断线重连）
-│   ├── tx_manager.cpp/h          2PC 事务管理器（Prepare/Commit/Rollback）
-│   ├── tx_resource.cpp/h         2PC 资源管理器基类
-│   ├── health_service_impl.cpp/h 集群健康监控（心跳上报 + 查询）
-│   ├── auth_service_impl.cpp/h   登录/注册
-│   ├── spreadsheet_service_impl.cpp/h  表格 CRUD
-│   ├── file_service_impl.cpp/h   文件管理
-│   ├── call_logger.cpp/h         调用日志
-│   ├── auth_interceptor.cpp/h    gRPC JWT 拦截器（预留）
-│   ├── jwt.h、sha256.h           安全工具
-│   ├── httplib.h                 cpp-httplib HTTP/1.1 库
-│   └── rpc_json.h/cpp            自定义 JSON 库
+│   ├── include/
+│   │   ├── database.h             MySQL 读写分离 + ShardedDatabase 分片路由
+│   │   ├── redis_client.h         Redis Cluster 客户端 (redis-plus-plus)
+│   │   ├── tx_manager.h           2PC 事务管理器
+│   │   ├── tx_resource.h          2PC 资源管理器基类
+│   │   ├── auth_service_impl.h    认证服务
+│   │   ├── spreadsheet_service_impl.h  表格 CRUD
+│   │   ├── file_service_impl.h    文件管理
+│   │   ├── health_service_impl.h  集群健康监控
+│   │   ├── call_logger.h          调用日志
+│   │   ├── system_logger.h        结构化日志 + 错误聚合
+│   │   ├── auth_interceptor.h     gRPC JWT 拦截器
+│   │   ├── jwt.h / sha256.h       安全工具
+│   │   ├── minio_client.h         MinIO 对象存储客户端
+│   │   └── snowflake.h            Snowflake 分布式 ID 生成
+│   └── src/
+│       ├── main.cpp               --service 参数启动不同角色
+│       ├── database.cpp           MySQL 连接池 + 健康检查 + ShardedDatabase
+│       ├── redis_client.cpp       RedisCluster 封装
+│       ├── tx_manager.cpp         TM Begin() + 超时恢复
+│       ├── tx_resource.cpp        RM Prepare/Commit/Rollback + undo_log
+│       └── ...
 ├── proto/                       Protobuf 定义
-│   ├── rpc_auth.proto            AuthService
-│   ├── rpc_spreadsheet.proto     SpreadsheetService
-│   ├── rpc_file.proto            FileService
-│   ├── rpc_tx.proto              TxManager + TxResource (2PC)
-│   └── rpc_health.proto          HealthMonitor（集群健康）
-├── web-ui/                      Web 管理界面
-│   ├── index.html                四面板：服务/表格/文件/个人
-│   ├── app.js                    xlsx 导入导出 + 在线编辑 + 文件管理
-│   └── style.css
-├── Dockerfile                   多阶段构建，单镜像多角色
-├── docker-compose.yml           19 容器一键部署
+│   ├── rpc_auth.proto             AuthService
+│   ├── rpc_spreadsheet.proto      SpreadsheetService
+│   ├── rpc_file.proto             FileService
+│   ├── rpc_tx.proto               TxManager + TxResource (2PC)
+│   └── rpc_health.proto           HealthMonitor
+├── web-ui/                       Web 管理界面
+├── redis/cluster/               Redis Cluster 配置
+├── mysql/                       MySQL 主从配置
+├── Dockerfile                   多阶段构建 (含 redis-plus-plus 源码编译)
+├── docker-compose.yml           21 容器一键部署
 ├── init.sql                     MySQL 初始建库
 └── Makefile
 ```
@@ -83,28 +99,69 @@ Gateway-1 :8081                  Gateway-2 :8081   ← HttpOnly Cookie 鉴权 + 
 
 | 模块 | 协议 | 用途 | 来源 |
 |------|------|------|------|
-| **gRPC + Protobuf** | HTTP/2 | RPC 框架（含 round_robin LB + 5s DNS 重解析） | `apt install libgrpc++-dev` |
-| **OpenSSL** | TLS/Crypto | JWT / SHA-256 / PBKDF2 密码哈希 | `apt install libssl-dev` |
+| **gRPC + Protobuf** | HTTP/2 | RPC 框架 | `apt install libgrpc++-dev` |
+| **OpenSSL** | TLS/Crypto | JWT / SHA-256 / PBKDF2 | `apt install libssl-dev` |
 | **libmysqlclient** | MySQL/TCP | MySQL 8.0 | `apt install libmysqlclient-dev` |
-| **hiredis** | RESP/TCP | Redis | `apt install libhiredis-dev` |
-| **cpp-httplib** | HTTP/1.1 | 网关 HTTP 服务 | [github.com/yhirose/cpp-httplib](https://github.com/yhirose/cpp-httplib) |
-| **SheetJS** | CDN | 前端 xlsx | [cdn.sheetjs.com](https://cdn.sheetjs.com) |
+| **redis-plus-plus** | RESP/TCP | Redis Cluster 客户端 (含 slot 路由/MOVED) | 源码编译 (v1.3.15) |
+| **hiredis** | RESP/TCP | redis-plus-plus 底层协议 | `apt install libhiredis-dev` |
+| **nlohmann/json** | — | JSON 解析/序列化 | 单头文件 v3.11.3 |
+| **nghttp2** | HTTP/2 h2c | 自定义 HTTP/2 服务器 | `apt install libnghttp2-dev` |
+| **cpp-httplib** | HTTP/1.1 | 网关 HTTP/1.1 服务 | header-only |
+| **SheetJS** | CDN | 前端 xlsx | cdn.sheetjs.com |
 
 ## gRPC 机制
 
 | 机制 | 实现 | 位置 |
 |------|------|------|
 | **服务发现** | Docker DNS aliases（rpc-auth/rpc-sheet/rpc-file） | `docker-compose.yml` |
-| **负载均衡** | gRPC `round_robin` + nginx `least_conn`（双 gateway） | `gateway.cpp` / `nginx.conf` |
-| **DNS 缓存** | 5s 重解析（实例下线后最多 5s 感知） | `gateway.cpp` |
-| **Keepalive** | 客户端 10s PING，服务端 30s PING | 双向 |
-| **超时** | `set_deadline(5s)` | 每次 RPC |
-| **重试** | UNAVAILABLE 自动重试 3 次，退避 0.1s~5s | `gateway.cpp` |
-| **健康检查** | `EnableDefaultHealthCheckService` + HealthMonitor 服务 | 双检 |
-| **熔断器** | CLOSED→OPEN→HALF_OPEN，状态共享到 Redis（跨 gateway 实例一致） | `circuit_breaker.h` |
-| **限流** | nginx 令牌桶 100r/s + burst 50，超限返回 429 | `nginx.conf` |
-| **MySQL 重连** | CR_SERVER_LOST 自动重连 | `database.cpp` |
-| **Redis 重连** | 每次操作前 ReconnectIfNeeded | `redis_client.cpp` |
+| **负载均衡** | gRPC `round_robin` + nginx `least_conn` | `gateway.cpp` / `nginx.conf` |
+| **DNS 缓存** | 5s 重解析 | `gateway.cpp` |
+| **Keepalive** | 客户端 60s，服务端 30s | 双向 |
+| **超时** | `set_deadline(5s)` (upload=30s, download=600s) | 每次 RPC |
+| **重试** | UNAVAILABLE 自动重试 3 次，退避 0.1s~5s；副本级重试 1 次 | `gateway.cpp` |
+| **健康检查** | 内置 gRPC health check + HealthMonitor 服务 | 双检 |
+| **熔断器** | 多维：连续失败 + 错误率 + 慢调用率 + P99 延迟；增强半开多探测 | `circuit_breaker.h` |
+| **限流** | nginx 令牌桶 100r/s + burst 50 + 账号级封禁(Redis) | `nginx.conf` / `gateway.cpp` |
+| **MySQL 重连** | CR_SERVER_LOST 自动重连 + 30s 健康检查 | `database.cpp` |
+
+## Redis Cluster 水平扩展
+
+已从 Redis Sentinel (1M+2S+3Sentinel) 迁移至 Redis Cluster (6节点: 3M+3S)：
+
+| 特性 | Sentinel (改前) | Cluster (改后) |
+|------|------|------|
+| **客户端库** | hiredis C 直连 | redis-plus-plus C++ 封装 |
+| **路由方式** | 写→master / 读→slave (手动) | CRC16 slot 自动路由 + MOVED 重定向 |
+| **故障转移** | 外部 Sentinel 进程 | 内置 gossip 协议，replica 自动选举 |
+| **水平扩展** | 垂直（加内存） | 水平（加节点 + reshard） |
+| **代码量** | 620 行（连接池 + Sentinel + 健康检查） | 225 行（委托到 RedisCluster） |
+
+## 熔断器增强
+
+| 维度 | 改前 | 改后 |
+|------|------|------|
+| **触发条件** | 连续失败 5 次 | 连续失败(快速) + 错误率≥50% + 慢调用率≥50% + P99≥2000ms |
+| **统计方式** | 简单计数器 | 滑动窗口 (6桶×10s=60s) + 9桶延迟直方图 |
+| **半开探测** | 单次探针 SetNX | 5 次探针，≥80%成功率 → CLOSED |
+| **状态共享** | 同已 | Redis `cb:*:state` / `cb:*:fails` / `cb:*:window:*` |
+| **延迟测量** | 无 | 5 个注入点 (with_cb / login / register / file_up / file_down) |
+
+## MySQL 分库设计
+
+通过 `ShardedDatabase` 支持按 `user_id % N` 水平分片：
+
+```
+--mysql-shards 1   → 单 MySQL 实例 (默认，向后兼容)
+--mysql-shards 4   → 4 分片: mysql-host-0~3 / rpc_db_0~3
+
+路由规则:
+  - CreateSpreadsheet(user_id, ...) → user_id % N
+  - GetSpreadsheet(id, user_id)    → user_id % N
+  - ListSpreadsheets(user_id, ...) → user_id % N
+  - DeleteSpreadsheet(id)          → 广播 (id 全局唯一)
+  - GetSpreadsheetOwner(id)        → 广播 (无可用的 user_id)
+  - Auth 系列                        → shard 0 (不分片)
+```
 
 ## 分布式事务 (2PC)
 
@@ -121,12 +178,6 @@ TM.Begin("tx-001")
        └─ 任一 NO → Rollback 全部（恢复快照 + 删数据）
 ```
 
-| 组件 | 文件 | 职责 |
-|------|------|------|
-| TM | `server/tx_manager.cpp` | 生成 XID、协调 2PC、超时恢复 |
-| RM 基类 | `server/tx_resource.cpp` | Prepare/Commit/Rollback 模板 + undo_log |
-| Handler | `server/main.cpp` | CreateSheet/DeleteSheet/CreateFile/DeleteFile 业务具体实现 |
-
 ## 集群健康监控
 
 每个节点每 10s 心跳上报至 MySQL `health_status` 表，Gateway 通过 `/api/health` 查询所有节点在线状态，30s 无心跳判定为 OFFLINE。
@@ -141,177 +192,58 @@ TM.Begin("tx-001")
 | POST | `/api/register` | 注册，同上自动登录 |
 | POST | `/api/logout` | 登出，清除 Cookie（Set-Cookie Max-Age=0） |
 
-**Cookie 鉴权**：登录/注册成功后 Gateway 在响应头写入 `Set-Cookie: rpc_token=<jwt>; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=86400`。后续受保护接口通过浏览器自动携带的 Cookie 鉴权，无需手动设置 Header。
-
-- `HttpOnly`：JS 无法读取，防 XSS 窃取
-- `SameSite=Strict`：防 CSRF 跨站攻击
-- `Secure`：仅 HTTPS 传输
-
-**Token 结构**：JWT payload 含 `username`、`uid`（用户 ID）、`ver`（token 版本号）、`exp`（过期时间戳）。版本号来自 MySQL `users.token_version`，Redis 缓存 `token_ver:{username}`，`VerifyAuth` 校验版本号实现 token 吊销。
-
 ### 数据表格
 
 | 方法 | 路径 | 说明 |
 |------|------|------|
 | GET | `/api/sheets` | 列表（Redis 缓存；支持 `?page=0&page_size=20` 分页） |
-| POST | `/api/sheets` | 创建（写 MySQL，失效 Redis），body: `{name, description, headers_json, data_json}` |
+| POST | `/api/sheets` | 创建，body: `{name, description, headers_json, data_json}` |
 | POST | `/api/sheets/get` | 获取单表，body: `{id}` |
 | PUT | `/api/sheets` | 更新，body: `{id, name, description, headers_json, data_json}` |
 | POST | `/api/sheets/delete` | 删除，body: `{id}` |
-
-> 注：Sheet 的 Get/Delete 使用 POST 而非 GET/DELETE，因前端通过 fetch body 传递 id，兼容 Cookie 鉴权模式。
 
 ### 文件管理
 
 | 方法 | 路径 | 说明 |
 |------|------|------|
-| POST | `/api/files/upload` | 上传（multipart） |
+| POST | `/api/files/upload` | 上传（multipart，文件存 MinIO，元数据存 MySQL） |
 | GET | `/api/files` | 列表（支持 `?page=0&page_size=20` 分页） |
 | GET | `/api/files/download?id=1` | 下载 |
 | POST | `/api/files/delete` | 删除，body: `{id}` |
 
-### 事务
+### 系统
 
 | 方法 | 路径 | 说明 |
 |------|------|------|
 | POST | `/api/tx/begin` | 发起分布式事务 |
-
-### 监控
-
-| 方法 | 路径 | 说明 |
-|------|------|------|
-| GET | `/api/health` | 集群健康仪表盘 |
+| GET | `/api/health` | 集群健康 + 熔断器状态 |
+| GET | `/api/system/status` | 系统状态 (含 P99 / 错误数) |
 | GET | `/api/services` | 服务列表 |
 | GET | `/api/history` | 调用历史 |
 
-## 分页设计
+## 配置参数
 
-列表接口统一采用 **0-based offset 分页**，`page_size=0` 时退化为返回全量（向后兼容）。
+### Gateway
 
-### gRPC 层（proto）
+| 参数 | 默认值 | 说明 |
+|------|--------|------|
+| `--port` | 8080 | HTTP 端口 |
+| `--grpc-auth` | rpc-auth:50051 | AuthService 地址 |
+| `--grpc-sheet` | rpc-sheet:50051 | SpreadsheetService 地址 |
+| `--grpc-file` | rpc-file:50051 | FileService 地址 |
+| `--redis-cluster` | — | Redis Cluster 种子节点 (可重复多次) |
+| `--redis-password` | — | Redis AUTH 密码 |
+| `--redis-pool-size` | 4 | 每节点连接数 |
 
-```protobuf
-message ListSpreadsheetsRequest {
-  string username  = 1;
-  int32  page      = 2;   // 0-based，默认 0
-  int32  page_size = 3;   // 0 = 全量（向后兼容）
-}
-// ListFilesRequest 结构相同
-```
+### Server
 
-响应始终返回 `total`（数据库中该用户的总行数，独立 `COUNT(*)` 查询获得）和当页数据数组。
-
-### 数据库层（MySQL）
-
-```sql
--- 第 1 步：独立 COUNT，不拉取任何行数据
-SELECT COUNT(*) FROM spreadsheets WHERE username = ?
-
--- 第 2 步：分页数据（page_size > 0 时追加）
-SELECT id, name, ...
-FROM spreadsheets
-WHERE username = ?
-ORDER BY updated_at DESC
-LIMIT {page_size} OFFSET {page * page_size}
-```
-
-### Redis 缓存 key（含分页维度）
-
-分页结果按维度独立缓存，避免不同页的结果互相污染：
-
-```
-user:{name}:sheets:v{ver}                        # page_size=0（全量，向后兼容）
-user:{name}:sheets:v{ver}:p{page}:ps{page_size}  # 分页时追加后缀
-```
-
-写操作（Create / Update / Delete）通过 `INCR user:{name}:sheets:version` 使所有分页缓存自动失效。
-
----
-
-## Redis Key 设计
-
-统一命名规范：`{namespace}:{entity}:{id}[:{suffix}]`
-
-| Key | 类型 | TTL | 说明 |
-|-----|------|-----|------|
-| `sheet:{id}` | protobuf binary | 300s | 单表完整数据 |
-| `file:{id}` | protobuf binary | 300s | 单文件元数据 |
-| `user:{name}:sheets:version` | int | 永久 | 表格列表缓存版本号（写操作 INCR） |
-| `user:{name}:files:version` | int | 永久 | 文件列表缓存版本号（写操作 INCR） |
-| `user:{name}:sheets:v{ver}[:p{p}:ps{ps}]` | protobuf binary | 120s | 表格列表缓存（含分页后缀） |
-| `user:{name}:files:v{ver}[:p{p}:ps{ps}]` | protobuf binary | 120s | 文件列表缓存（含分页后缀） |
-| `token_ver:{name}` | string (int) | 86400s | JWT token 版本号（Gateway Cookie 鉴权用） |
-| `cb:{svc}:state` | string (0/1/2) | 120s | 熔断器状态（0=CLOSED,1=OPEN,2=HALF_OPEN），跨 gateway 共享 |
-| `cb:{svc}:fails` | int | 120s | 熔断器连续失败计数，跨 gateway 累计 |
-| `cb:{svc}:opened` | string (timestamp) | 120s | 熔断器打开时间点（Unix 秒），用于 timeout 判断 |
-| `cb:{svc}:probe` | string | 30s | 半开探针锁（SetNX），防止多实例同时发出探针 |
-| `call_history:global` | list | 30天滚动 | 全局调用日志（所有用户，LTRIM 10000） |
-| `call_history:{name}` | list | 30天滚动 | 单用户调用日志（LTRIM 10000） |
-| `errors:{svc}:total` | int | 永久 | 各服务错误计数 |
-
-**call_history 双写机制**：每次调用同时写入 `call_history:global`（全局聚合，供监控面板使用）和 `call_history:{username}`（按用户隔离，供用户级别查询使用）。两个 list 均在每次 `LPUSH` 后执行 `EXPIRE 2592000`（30 天滚动 TTL），并通过 `LTRIM` 控制容量上限为 10000 条。
-
----
-
-## 数据库索引设计
-
-所有索引在 `Database::Initialize()` 中幂等创建（失败忽略），支持滚动升级。
-
-### spreadsheets 表
-
-| 索引名 | 列 | 类型 | 作用 |
-|--------|----|------|------|
-| PRIMARY | `id` | 主键 | 按 id 点查 |
-| `idx_sheets_user_time` | `(username, updated_at DESC)` | 复合 | 覆盖 `WHERE username=? ORDER BY updated_at DESC LIMIT n`，消除 filesort |
-
-**设计要点**：`username` 在前用于等值过滤，`updated_at DESC` 在后与 ORDER BY 方向一致，MySQL 可直接按索引顺序输出，无需额外排序。
-
-### files 表
-
-| 索引名 | 列 | 类型 | 作用 |
-|--------|----|------|------|
-| PRIMARY | `id` | 主键 | 按 id 点查 |
-| `idx_files_user_time` | `(username, created_at DESC)` | 复合 | 覆盖 `WHERE username=? ORDER BY created_at DESC LIMIT n`，消除 filesort |
-
-### undo_log 表
-
-| 索引名 | 列 | 类型 | 作用 |
-|--------|----|------|------|
-| PRIMARY | `id` | 主键 | — |
-| `idx_undo_xid_id` | `(xid, id DESC)` | 复合 | 覆盖 `WHERE xid=? ORDER BY id DESC LIMIT 1`，无 filesort |
-| `idx_undo_created` | `(created_at)` | 单列 | 加速定期清理 `DELETE WHERE created_at < NOW() - INTERVAL N DAY` |
-
-`undo_log` 通过 `Database::PurgeOldUndoLogs(days=7)` 定期清理，防止表无限膨胀。
-
-### users 表
-
-| 索引名 | 列 | 类型 | 作用 |
-|--------|----|------|------|
-| PRIMARY | `id` | 主键 | — |
-| UNIQUE | `username` | 唯一 | 登录查询、注册去重（强一致，走主库） |
-
----
-
-## 数据库表
-
-| Database | 表 | 所属 | 关键列 |
-|----------|-----|------|--------|
-| `rpc_auth` | `users` | AuthService | `id, username(UNIQUE), password_hash, token_version INT DEFAULT 0, created_at` |
-| `rpc_spreadsheet` | `spreadsheets` | SpreadsheetService | `id, username, name, headers_json(JSON), data_json(JSON), row_count, col_count, version, updated_at` |
-| `rpc_spreadsheet` | `undo_log` | SpreadsheetService/2PC | `id, xid(VARCHAR 64), table_name, row_id, before_snapshot(JSON), created_at` |
-| `rpc_spreadsheet` | `health_status` | HealthMonitor | 集群节点心跳 |
-| `rpc_file` | `files` | FileService | `id, username, original_name, size, mime_type, file_content(LONGBLOB), storage_path(VARCHAR 512), created_at` |
-| `rpc_file` | `undo_log` | FileService/2PC | 同上 |
-| `rpc_tx_log` | `tx_log` | TM (Gateway) | 分布式事务日志 |
-
-**`users` 表说明**：
-- `password_hash`：采用 PBKDF2-HMAC-SHA256 100000 迭代 + 随机盐，格式为 `pbkdf2_sha256$100000$hex_salt$hex_hash`。旧格式（纯 SHA256 hex）登录时自动升级。
-- `token_version`：JWT token 版本号。修改密码时递增该值，使所有已签发的 token 立即失效。
-
-**`files` 表说明**：
-- `file_content`：存量数据的 LONGBLOB（向后兼容）。
-- `storage_path`：迁移至对象存储（MinIO/S3）后填写存储路径；非空时 `GetFile` 跳过读取 LONGBLOB，由调用方从对象存储获取内容。新上传文件应优先写对象存储并只在此列记录路径。
-
-**`spreadsheets` 表说明**：
-- `data_json`：存储整张表格的所有行，每次读写均为全量。`row_count`/`col_count` 为冗余计数，在 `UpdateSpreadsheet` 时同步更新。
-- `version`：乐观锁版本号，`UpdateSpreadsheet(version>0)` 时追加 `AND version=?` 并校验 `affected_rows`，防止并发写冲突。
+| 参数 | 默认值 | 说明 |
+|------|--------|------|
+| `--service` | all | 启动角色: auth / spreadsheet / file / all |
+| `--port` | 50051 | gRPC 端口 |
+| `--mysql-write-host` | — | MySQL 写库 |
+| `--mysql-read-hosts` | — | MySQL 读库 (逗号分隔) |
+| `--mysql-db` | rpc_demo | 数据库名 |
+| `--mysql-shards` | 1 | 分片数 (>1 时 host 加 `-{i}` 后缀) |
+| `--redis-cluster` | — | Redis Cluster 种子节点 |
+| `--log-level` | info | off / error / warn / info / debug |
