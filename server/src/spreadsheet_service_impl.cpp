@@ -379,7 +379,8 @@ grpc::Status SpreadsheetServiceImpl::UpdateSpreadsheet(
             return grpc::Status::OK;
         }
 
-        bool ok = db_->UpdateSpreadsheet(req->id(), req->name(), req->description(),
+        bool ok = db_->UpdateSpreadsheet(req->id(), req->user_id(),
+                                         req->name(), req->description(),
                                          req->headers_json(), req->data_json(), version);
 
         if (ok) {
@@ -442,7 +443,7 @@ grpc::Status SpreadsheetServiceImpl::DeleteSpreadsheet(
         return grpc::Status::OK;
     }
 
-    bool ok = db_->DeleteSpreadsheet(req->id());
+    bool ok = db_->DeleteSpreadsheet(req->id(), req->user_id());
 
     if (!ok) {
         resp->set_success(false);

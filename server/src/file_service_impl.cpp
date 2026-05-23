@@ -363,7 +363,7 @@ grpc::Status FileServiceImpl::DeleteFile(grpc::ServerContext* context,
         }
     }
 
-    bool ok = db_->DeleteFile(req->id());
+    bool ok = db_->DeleteFile(req->id(), req->user_id());
     if (!ok) {
         resp->set_success(false);
         resp->set_error("Failed to delete");

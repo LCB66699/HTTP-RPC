@@ -498,6 +498,13 @@ bool Database::ListSpreadsheets(int64_t user_id, std::vector<SpreadsheetSummary>
     });
 }
 
+bool Database::UpdateSpreadsheet(int64_t id, int64_t /*user_id*/,
+                                 const std::string& name, const std::string& desc,
+                                 const std::string& headers_json, const std::string& data_json,
+                                 int version) {
+    return UpdateSpreadsheet(id, name, desc, headers_json, data_json, version);
+}
+
 bool Database::UpdateSpreadsheet(int64_t id, const std::string& name,
                                  const std::string& desc, const std::string& headers_json,
                                  const std::string& data_json, int version) {
@@ -532,7 +539,7 @@ bool Database::UpdateSpreadsheet(int64_t id, const std::string& name,
     return ExecWrite(sql);
 }
 
-bool Database::DeleteSpreadsheet(int64_t id) {
+bool Database::DeleteSpreadsheet(int64_t id, int64_t /*user_id*/) {
     return ExecWrite("DELETE FROM spreadsheets WHERE id=" + std::to_string(id));
 }
 
@@ -652,7 +659,7 @@ bool Database::ListFiles(int64_t user_id, std::vector<FileRow>& out, int& total,
     });
 }
 
-bool Database::DeleteFile(int64_t id) {
+bool Database::DeleteFile(int64_t id, int64_t /*user_id*/) {
     return ExecWrite("DELETE FROM files WHERE id=" + std::to_string(id));
 }
 
@@ -854,12 +861,31 @@ bool ShardedDatabase::ListSpreadsheets(int64_t user_id, std::vector<SpreadsheetS
                                         int& total, int page, int page_size) {
     return ShardFor(user_id)->ListSpreadsheets(user_id, out, total, page, page_size);
 }
+bool ShardedDatabase::UpdateSpreadsheet(int64_t id, int64_t user_id,
+                                         const std::string& name, const std::string& desc,
+                                         const std::string& headers_json,
+                                         const std::string& data_json, int version) {
+    return ShardFor(user_id)->UpdateSpreadsheet(id, name, desc, headers_json, data_json, version);
+}
 bool ShardedDatabase::UpdateSpreadsheet(int64_t id, const std::string& name,
                                          const std::string& desc, const std::string& headers_json,
                                          const std::string& data_json, int version) {
-    // id is globally unique — broadcast to find the right shard
+    // Legacy: no user_id → broadcast
     for (auto& db : shards_)
         if (db->UpdateSpreadsheet(id, name, desc, headers_json, data_json, version)) return true;
+    return false;
+}
+
+// Broadcast: id is globally unique, try each shard
+bool ShardedDatabase::DeleteSpreadsheet(int64_t id, int64_t user_id) {
+    if (user_id > 0) return ShardFor(user_id)->DeleteSpreadsheet(id);
+    for (auto& db : shards_) if (db->DeleteSpreadsheet(id)) return true;
+    return false;
+}
+
+bool ShardedDatabase::DeleteFile(int64_t id, int64_t user_id) {
+    if (user_id > 0) return ShardFor(user_id)->DeleteFile(id);
+    for (auto& db : shards_) if (db->DeleteFile(id)) return true;
     return false;
 }
 

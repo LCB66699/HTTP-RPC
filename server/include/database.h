@@ -72,10 +72,14 @@ public:
     bool ListSpreadsheets(int64_t user_id,
                           std::vector<SpreadsheetSummary>& out, int& total,
                           int page = 0, int page_size = 0);
+    bool UpdateSpreadsheet(int64_t id, int64_t user_id,
+                           const std::string& name, const std::string& desc,
+                           const std::string& headers_json, const std::string& data_json,
+                           int version = 0);
     bool UpdateSpreadsheet(int64_t id, const std::string& name,
                            const std::string& desc, const std::string& headers_json,
                            const std::string& data_json, int version = 0);
-    bool DeleteSpreadsheet(int64_t id);
+    bool DeleteSpreadsheet(int64_t id, int64_t user_id = 0);
     // Returns the owner's user_id and optionally the current version for optimistic locking.
     bool GetSpreadsheetOwner(int64_t id, int64_t& owner_user_id, int* out_version = nullptr);
 
@@ -89,7 +93,7 @@ public:
     // page is 0-based; page_size=0 disables pagination and returns all rows (backward compat)
     bool ListFiles(int64_t user_id, std::vector<FileRow>& out, int& total,
                    int page = 0, int page_size = 0);
-    bool DeleteFile(int64_t id);
+    bool DeleteFile(int64_t id, int64_t user_id = 0);
     bool GetFileOwner(int64_t id, int64_t& owner_user_id);
     bool GetFileStoragePath(int64_t id, std::string& storage_path);
 
@@ -177,10 +181,14 @@ public:
     bool GetSpreadsheet(int64_t id, int64_t user_id, SpreadsheetRow& out);
     bool ListSpreadsheets(int64_t user_id, std::vector<SpreadsheetSummary>& out, int& total,
                           int page = 0, int page_size = 0);
+    bool UpdateSpreadsheet(int64_t id, int64_t user_id,
+                           const std::string& name, const std::string& desc,
+                           const std::string& headers_json, const std::string& data_json,
+                           int version = 0);
     bool UpdateSpreadsheet(int64_t id, const std::string& name,
                            const std::string& desc, const std::string& headers_json,
                            const std::string& data_json, int version = 0);
-    bool DeleteSpreadsheet(int64_t id) { return ShardForBroadcast()->DeleteSpreadsheet(id); }
+    bool DeleteSpreadsheet(int64_t id, int64_t user_id = 0);
     bool GetSpreadsheetOwner(int64_t id, int64_t& owner_user_id, int* out_version = nullptr);
 
     // === Files (hash by user_id) ===
@@ -191,7 +199,7 @@ public:
     bool GetFile(int64_t id, int64_t user_id, FileRow& out);
     bool ListFiles(int64_t user_id, std::vector<FileRow>& out, int& total,
                    int page = 0, int page_size = 0);
-    bool DeleteFile(int64_t id) { return ShardForBroadcast()->DeleteFile(id); }
+    bool DeleteFile(int64_t id, int64_t user_id = 0);
     bool GetFileOwner(int64_t id, int64_t& owner_user_id);
     bool GetFileStoragePath(int64_t id, std::string& storage_path);
 
