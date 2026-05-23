@@ -6,6 +6,7 @@
 // ============================================================
 #pragma once
 #include <string>
+#include <vector>
 #include <memory>
 #include <grpcpp/grpcpp.h>
 #include "server/include/redis_client.h"
@@ -36,13 +37,9 @@ public:
             const std::string& grpc_file_addr,
             const std::string& jwt_secret,
             const std::string& web_dir,
-            const std::string& redis_host = "",
-            const std::string& redis_slave_host = "",
+            const std::vector<std::string>& redis_cluster_seeds = {},
             const std::string& redis_password = "",
-            int redis_port = 6379,
-            const std::string& redis_sentinel_host = "",
-            int redis_sentinel_port = 26379,
-            const std::string& redis_master_name = "redis-master");
+            int redis_pool_size = 4);
 
     bool Start();
     void Stop();
@@ -53,11 +50,9 @@ private:
     std::string grpc_auth_addr_, grpc_sheet_addr_, grpc_file_addr_;
     std::string jwt_secret_;
     std::string web_dir_;
-    std::string redis_host_, redis_slave_host_, redis_password_;
-    int redis_port_;
-    std::string redis_sentinel_host_;
-    int redis_sentinel_port_;
-    std::string redis_master_name_;
+    std::vector<std::string> redis_cluster_seeds_;
+    std::string redis_password_;
+    int redis_pool_size_;
     std::unique_ptr<RedisClient> redis_;
     std::unique_ptr<Database> tx_db_;
     std::unique_ptr<TxManager> tx_manager_;

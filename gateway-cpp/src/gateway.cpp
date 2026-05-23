@@ -77,21 +77,14 @@ Gateway::Gateway(const std::string& listen_addr, int listen_port,
                  const std::string& grpc_file_addr,
                  const std::string& jwt_secret,
                  const std::string& web_dir,
-                 const std::string& redis_host,
-                 const std::string& redis_slave_host,
+                 const std::vector<std::string>& redis_cluster_seeds,
                  const std::string& redis_password,
-                 int redis_port,
-                 const std::string& redis_sentinel_host,
-                 int redis_sentinel_port,
-                 const std::string& redis_master_name)
+                 int redis_pool_size)
     : listen_addr_(listen_addr), listen_port_(listen_port),
       grpc_auth_addr_(grpc_auth_addr), grpc_sheet_addr_(grpc_sheet_addr), grpc_file_addr_(grpc_file_addr),
       jwt_secret_(jwt_secret), web_dir_(web_dir),
-      redis_host_(redis_host), redis_slave_host_(redis_slave_host),
-      redis_password_(redis_password), redis_port_(redis_port),
-      redis_sentinel_host_(redis_sentinel_host),
-      redis_sentinel_port_(redis_sentinel_port),
-      redis_master_name_(redis_master_name)
+      redis_cluster_seeds_(redis_cluster_seeds),
+      redis_password_(redis_password), redis_pool_size_(redis_pool_size)
 {
     // 每个服务一个 Channel，DNS别名返回多IP → gRPC round_robin 自动负载均衡
     if (!grpc_auth_addr_.empty()) {
@@ -917,10 +910,8 @@ bool Gateway::Start() {
     http_svr->Get("/api/history", history);
     http_svr->Get("/api/system/status", sys_status);
 
-    if (!redis_host_.empty()) {
-        std::string slave = redis_slave_host_.empty() ? redis_host_ : redis_slave_host_;
-        redis_ = std::make_unique<RedisClient>(redis_host_, redis_port_, slave, redis_port_, redis_password_,
-                                               redis_sentinel_host_, redis_sentinel_port_, redis_master_name_);
+    if (!redis_cluster_seeds_.empty()) {
+        redis_ = std::make_unique<RedisClient>(redis_cluster_seeds_, redis_password_, redis_pool_size_);
         if (redis_->Connect()) {
             // 将 Redis 注入熔断器，启用跨实例共享状态
             cb_auth_.SetRedis(redis_.get());

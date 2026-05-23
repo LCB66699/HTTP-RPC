@@ -1,6 +1,6 @@
 # ---- Configuration ----
 CXX      := g++
-CXXFLAGS := -std=c++20 -fcoroutines -Wall -O2 -I. -Iserver -Iserver/include -Iserver/generated -Igateway-cpp/include
+CXXFLAGS := -std=c++20 -fcoroutines -Wall -O2 -I. -Iserver -Iserver/include -Iserver/generated -Igateway-cpp/include -I/usr/local/include
 LDFLAGS_RPC := -lssl -lcrypto -lpthread -lnghttp2
 
 PKG_CONFIG := $(shell command -v pkg-config 2>/dev/null)
@@ -14,12 +14,12 @@ ifneq ($(PKG_CONFIG),)
         LDFLAGS_RPC += -lmysqlclient
     endif
     ifneq ($(HIREDIS_LIBS),)
-        LDFLAGS_RPC += $(HIREDIS_LIBS)
+        LDFLAGS_RPC += $(HIREDIS_LIBS) -lredis++
     else
-        LDFLAGS_RPC += -lhiredis
+        LDFLAGS_RPC += -lhiredis -lredis++
     endif
 else
-    LDFLAGS_RPC += -lgrpc++ -lgrpc -lgrpc++_reflection -lgpr -lprotobuf -lmysqlclient -lhiredis
+    LDFLAGS_RPC += -lgrpc++ -lgrpc -lgrpc++_reflection -lgpr -lprotobuf -lmysqlclient -lhiredis -lredis++
 endif
 
 PROTO_DIR    := proto

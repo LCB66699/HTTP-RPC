@@ -43,13 +43,9 @@ int main(int argc, char* argv[]) {
     std::string mysql_user = "root";
     std::string mysql_password;
     std::string mysql_db = "rpc_demo";
-    std::string redis_host;       // backward compat
-    std::string redis_slave_host;   // --redis-slave-host
+    std::vector<std::string> redis_cluster_seeds;
     std::string redis_password;     // --redis-password
-    int redis_port = 6379;
-    std::string redis_sentinel_host;   // --redis-sentinel-host
-    int redis_sentinel_port = 26379;    // --redis-sentinel-port
-    std::string redis_master_name = "redis-master"; // --redis-master-name
+    int redis_pool_size = 4;
     std::string log_level = "info";          // --log-level: off|error|warn|info|debug
 
     for (int i = 1; i < argc; ++i) {
@@ -63,14 +59,11 @@ int main(int argc, char* argv[]) {
         else if (arg == "--mysql-user" && i + 1 < argc) mysql_user = argv[++i];
         else if (arg == "--mysql-password" && i + 1 < argc) mysql_password = argv[++i];
         else if (arg == "--mysql-db" && i + 1 < argc) mysql_db = argv[++i];
-        else if (arg == "--redis-host" && i + 1 < argc) redis_host = argv[++i];
-        else if (arg == "--redis-master-host" && i + 1 < argc) redis_host = argv[++i];
-        else if (arg == "--redis-slave-host" && i + 1 < argc) redis_slave_host = argv[++i];
+        else if (arg == "--redis-cluster" && i + 1 < argc) {
+            redis_cluster_seeds.push_back(argv[++i]);
+        }
         else if (arg == "--redis-password" && i + 1 < argc) redis_password = argv[++i];
-        else if (arg == "--redis-port" && i + 1 < argc) redis_port = std::atoi(argv[++i]);
-        else if (arg == "--redis-sentinel-host" && i + 1 < argc) redis_sentinel_host = argv[++i];
-        else if (arg == "--redis-sentinel-port" && i + 1 < argc) redis_sentinel_port = std::atoi(argv[++i]);
-        else if (arg == "--redis-master-name" && i + 1 < argc) redis_master_name = argv[++i];
+        else if (arg == "--redis-pool-size" && i + 1 < argc) redis_pool_size = std::atoi(argv[++i]);
         else if (arg == "--log-level" && i + 1 < argc) log_level = argv[++i];
         else if (arg == "--mysql-write-host" && i + 1 < argc) mysql_host = argv[++i];
         else if (arg == "--mysql-read-hosts" && i + 1 < argc) mysql_read_hosts = argv[++i];
@@ -84,15 +77,10 @@ int main(int argc, char* argv[]) {
             printf("  --mysql-user <user>        MySQL user (default: root)\n");
             printf("  --mysql-password <pw>      MySQL password\n");
             printf("  --mysql-db <db>            MySQL database name\n");
-            printf("  --redis-master-host <host> Redis master (write)\n");
-            printf("  --redis-slave-host <host>  Redis slave DNS alias (read)\n");
+            printf("  --redis-cluster <h:p>      Add Redis Cluster seed node (can repeat)\n");
             printf("  --redis-password <pw>      Redis AUTH password\n");
-            printf("  --redis-port <port>        Redis port (default: 6379)\n");
-            printf("  --redis-sentinel-host <h>  Sentinel host (default: redis-sentinel)\n");
-            printf("  --redis-sentinel-port <p>  Sentinel port (default: 26379)\n");
-            printf("  --redis-master-name <n>    Sentinel master name (default: redis-master)\n");
+            printf("  --redis-pool-size <n>      Connections per seed (default: 4)\n");
             printf("  --log-level <level>        off|error|warn|info|debug (default: info)\n");
-            printf("  (--mysql-host, --redis-host also accepted for backward compat)\n");
             return 0;
         }
     }
@@ -137,12 +125,9 @@ int main(int argc, char* argv[]) {
     }
 
     std::unique_ptr<RedisClient> redis;
-    if (!redis_host.empty()) {
-        std::string slave_host = redis_slave_host.empty() ? redis_host : redis_slave_host;
-        redis = std::make_unique<RedisClient>(redis_host, redis_port, slave_host, redis_port, redis_password,
-                                              redis_sentinel_host, redis_sentinel_port, redis_master_name);
+    if (!redis_cluster_seeds.empty()) {
+        redis = std::make_unique<RedisClient>(redis_cluster_seeds, redis_password, redis_pool_size);
         redis->Connect();
-        redis->StartHealthCheck();
     }
 
     // Snowflake 动态 worker_id（Redis 已连接后执行）
@@ -358,7 +343,7 @@ int main(int argc, char* argv[]) {
     printf("  Service: %s\n", service.c_str());
     printf("  gRPC:   %s\n", addr.c_str());
     if (!mysql_host.empty()) printf("  MySQL:  %s:%d/%s\n", mysql_host.c_str(), mysql_port, mysql_db.c_str());
-    if (!redis_host.empty()) printf("  Redis:  %s:%d\n", redis_host.c_str(), redis_port);
+    if (!redis_cluster_seeds.empty()) printf("  Redis Cluster: %zu seeds\n", redis_cluster_seeds.size());
     printf("========================================\n");
 
     g_server->Wait();
