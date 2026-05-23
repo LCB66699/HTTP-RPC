@@ -296,7 +296,7 @@ $CURL -X POST "$API/api/login" \
 
 # 6.2 递增 token_version（模拟改密码）
 title "6.2 递增 token_version"
-NEW_VER=$(docker exec http-rpc-mysql-master-1 mysql -u root -p123456 -N \
+NEW_VER=$(docker exec http-rpc-mysql-auth-1 mysql -u root -p123456 -N \
     -e "UPDATE rpc_auth.users SET token_version=token_version+1 WHERE username='tester_fn'; SELECT token_version FROM rpc_auth.users WHERE username='tester_fn';" 2>/dev/null | tail -1)
 docker exec http-rpc-redis-cluster-1 redis-cli -c -p 7000 -a rpc-redis-123456 --no-auth-warning \
     SETEX "token_ver:tester_fn" 86400 "$NEW_VER" 2>/dev/null

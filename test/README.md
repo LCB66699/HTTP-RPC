@@ -217,10 +217,10 @@ docker logs http-rpc-redis-cluster-4 --tail 5
 bash test/functional_test.sh
 docker start http-rpc-redis-cluster-1
 
-# 3. MySQL Slave 容错
-docker stop http-rpc-mysql-slave-1-1
+# 3. MySQL 分片 Slave 容错
+docker stop http-rpc-mysql-spreadsheet-0-slave-1
 bash test/functional_test.sh
-docker start http-rpc-mysql-slave-1-1
+docker start http-rpc-mysql-spreadsheet-0-slave-1
 
 # 4. 熔断器验证：停全部 sheet 副本，触发 OPEN
 docker stop http-rpc-sheet-1-1 http-rpc-sheet-2-1 http-rpc-sheet-3-1
