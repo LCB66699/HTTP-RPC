@@ -61,76 +61,110 @@ services:
       mysql-master:
         condition: service_healthy
 
-  # ===== Redis 主从 + Sentinel =====
-  redis-master:
+  # ===== Redis Cluster (6 nodes, 3 masters + 3 replicas) =====
+  redis-cluster-1:
     image: redis:7-alpine
     volumes:
-      - ./redis/master/redis.conf:/usr/local/etc/redis/redis.conf
-      - ./data/redis-master:/data
+      - ./redis/cluster/redis.conf:/usr/local/etc/redis/redis.conf
+      - ./data/redis-cluster-1:/data
+    environment:
+      REDIS_PORT: "7000"
     command: redis-server /usr/local/etc/redis/redis.conf
+    networks:
+      default:
+        aliases: [redis-cluster]
     healthcheck:
-      test: ["CMD-SHELL", "redis-cli -a ${REDIS_PASSWORD:-rpc-redis-123456} ping"]
+      test: ["CMD-SHELL", "redis-cli -p 7000 -a ${REDIS_PASSWORD:-rpc-redis-123456} ping"]
       interval: 5s
       timeout: 3s
       retries: 5
 
-  redis-slave-1:
+  redis-cluster-2:
     image: redis:7-alpine
     volumes:
-      - ./redis/slave/redis.conf:/usr/local/etc/redis/redis.conf
+      - ./redis/cluster/redis.conf:/usr/local/etc/redis/redis.conf
+      - ./data/redis-cluster-2:/data
+    environment:
+      REDIS_PORT: "7001"
     command: redis-server /usr/local/etc/redis/redis.conf
     networks:
       default:
-        aliases: [redis-slave]
-    depends_on:
-      - redis-master
+        aliases: [redis-cluster]
 
-  redis-slave-2:
+  redis-cluster-3:
     image: redis:7-alpine
     volumes:
-      - ./redis/slave/redis.conf:/usr/local/etc/redis/redis.conf
+      - ./redis/cluster/redis.conf:/usr/local/etc/redis/redis.conf
+      - ./data/redis-cluster-3:/data
+    environment:
+      REDIS_PORT: "7002"
     command: redis-server /usr/local/etc/redis/redis.conf
     networks:
       default:
-        aliases: [redis-slave]
-    depends_on:
-      - redis-master
+        aliases: [redis-cluster]
 
-  redis-sentinel-1:
+  redis-cluster-4:
     image: redis:7-alpine
     volumes:
-      - ./redis/sentinel/sentinel.conf:/usr/local/etc/redis/sentinel.conf
-    command: redis-sentinel /usr/local/etc/redis/sentinel.conf
+      - ./redis/cluster/redis.conf:/usr/local/etc/redis/redis.conf
+      - ./data/redis-cluster-4:/data
+    environment:
+      REDIS_PORT: "7003"
+    command: redis-server /usr/local/etc/redis/redis.conf
     networks:
       default:
-        aliases: [redis-sentinel]
-    depends_on:
-      redis-master:
-        condition: service_healthy
+        aliases: [redis-cluster]
 
-  redis-sentinel-2:
+  redis-cluster-5:
     image: redis:7-alpine
     volumes:
-      - ./redis/sentinel/sentinel.conf:/usr/local/etc/redis/sentinel.conf
-    command: redis-sentinel /usr/local/etc/redis/sentinel.conf
+      - ./redis/cluster/redis.conf:/usr/local/etc/redis/redis.conf
+      - ./data/redis-cluster-5:/data
+    environment:
+      REDIS_PORT: "7004"
+    command: redis-server /usr/local/etc/redis/redis.conf
     networks:
       default:
-        aliases: [redis-sentinel]
-    depends_on:
-      redis-master:
-        condition: service_healthy
+        aliases: [redis-cluster]
 
-  redis-sentinel-3:
+  redis-cluster-6:
     image: redis:7-alpine
     volumes:
-      - ./redis/sentinel/sentinel.conf:/usr/local/etc/redis/sentinel.conf
-    command: redis-sentinel /usr/local/etc/redis/sentinel.conf
+      - ./redis/cluster/redis.conf:/usr/local/etc/redis/redis.conf
+      - ./data/redis-cluster-6:/data
+    environment:
+      REDIS_PORT: "7005"
+    command: redis-server /usr/local/etc/redis/redis.conf
     networks:
       default:
-        aliases: [redis-sentinel]
+        aliases: [redis-cluster]
+
+  redis-cluster-init:
+    image: redis:7-alpine
     depends_on:
-      redis-master:
+      redis-cluster-1:
         condition: service_healthy
+      redis-cluster-2:
+        condition: service_healthy
+      redis-cluster-3:
+        condition: service_healthy
+      redis-cluster-4:
+        condition: service_healthy
+      redis-cluster-5:
+        condition: service_healthy
+      redis-cluster-6:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "
+        sleep 3 &&
+        echo yes | redis-cli --cluster create
+          redis-cluster-1:7000 redis-cluster-2:7001 redis-cluster-3:7002
+          redis-cluster-4:7003 redis-cluster-5:7004 redis-cluster-6:7005
+          --cluster-replicas 1
+          -a ${REDIS_PASSWORD:-rpc-redis-123456} &&
+        echo '=== Redis Cluster initialized ==='
+      "
+    restart: "no"
 
   # ===== MinIO 对象存储 =====
   minio:
@@ -173,7 +207,7 @@ services:
     command: >
       /app/rpc_server --service auth --port 50051
       --mysql-write-host mysql-master --mysql-read-hosts mysql-slave --mysql-password ${MYSQL_ROOT_PASSWORD:-123456} --mysql-db rpc_auth
-      --redis-master-host redis-master --redis-slave-host redis-slave --redis-password ${REDIS_PASSWORD:-rpc-redis-123456} --redis-sentinel-host redis-sentinel --redis-sentinel-port 26379 --redis-master-name redis-master
+      --redis-cluster redis-cluster:7000 --redis-cluster redis-cluster:7001 --redis-cluster redis-cluster:7002 --redis-password ${REDIS_PASSWORD:-rpc-redis-123456}
     networks:
       default:
         aliases: [rpc-auth]
@@ -194,7 +228,7 @@ services:
     command: >
       /app/rpc_server --service auth --port 50051
       --mysql-write-host mysql-master --mysql-read-hosts mysql-slave --mysql-password ${MYSQL_ROOT_PASSWORD:-123456} --mysql-db rpc_auth
-      --redis-master-host redis-master --redis-slave-host redis-slave --redis-password ${REDIS_PASSWORD:-rpc-redis-123456} --redis-sentinel-host redis-sentinel --redis-sentinel-port 26379 --redis-master-name redis-master
+      --redis-cluster redis-cluster:7000 --redis-cluster redis-cluster:7001 --redis-cluster redis-cluster:7002 --redis-password ${REDIS_PASSWORD:-rpc-redis-123456}
     networks:
       default:
         aliases: [rpc-auth]
@@ -215,15 +249,15 @@ services:
     command: >
       /app/rpc_server --service spreadsheet --port 50051
       --mysql-write-host mysql-master --mysql-read-hosts mysql-slave --mysql-password ${MYSQL_ROOT_PASSWORD:-123456} --mysql-db rpc_spreadsheet
-      --redis-master-host redis-master --redis-slave-host redis-slave --redis-password ${REDIS_PASSWORD:-rpc-redis-123456} --redis-sentinel-host redis-sentinel --redis-sentinel-port 26379 --redis-master-name redis-master
+      --redis-cluster redis-cluster:7000 --redis-cluster redis-cluster:7001 --redis-cluster redis-cluster:7002 --redis-password ${REDIS_PASSWORD:-rpc-redis-123456}
     networks:
       default:
         aliases: [rpc-sheet]
     depends_on:
       mysql-master:
         condition: service_healthy
-      redis-master:
-        condition: service_healthy
+      redis-cluster-init:
+        condition: service_completed_successfully
     healthcheck:
       test: ["CMD-SHELL", "bash -c 'echo > /dev/tcp/localhost/50051' 2>/dev/null"]
       interval: 5s
@@ -238,15 +272,15 @@ services:
     command: >
       /app/rpc_server --service spreadsheet --port 50051
       --mysql-write-host mysql-master --mysql-read-hosts mysql-slave --mysql-password ${MYSQL_ROOT_PASSWORD:-123456} --mysql-db rpc_spreadsheet
-      --redis-master-host redis-master --redis-slave-host redis-slave --redis-password ${REDIS_PASSWORD:-rpc-redis-123456} --redis-sentinel-host redis-sentinel --redis-sentinel-port 26379 --redis-master-name redis-master
+      --redis-cluster redis-cluster:7000 --redis-cluster redis-cluster:7001 --redis-cluster redis-cluster:7002 --redis-password ${REDIS_PASSWORD:-rpc-redis-123456}
     networks:
       default:
         aliases: [rpc-sheet]
     depends_on:
       mysql-master:
         condition: service_healthy
-      redis-master:
-        condition: service_healthy
+      redis-cluster-init:
+        condition: service_completed_successfully
     healthcheck:
       test: ["CMD-SHELL", "bash -c 'echo > /dev/tcp/localhost/50051' 2>/dev/null"]
       interval: 5s
@@ -261,15 +295,15 @@ services:
     command: >
       /app/rpc_server --service spreadsheet --port 50051
       --mysql-write-host mysql-master --mysql-read-hosts mysql-slave --mysql-password ${MYSQL_ROOT_PASSWORD:-123456} --mysql-db rpc_spreadsheet
-      --redis-master-host redis-master --redis-slave-host redis-slave --redis-password ${REDIS_PASSWORD:-rpc-redis-123456} --redis-sentinel-host redis-sentinel --redis-sentinel-port 26379 --redis-master-name redis-master
+      --redis-cluster redis-cluster:7000 --redis-cluster redis-cluster:7001 --redis-cluster redis-cluster:7002 --redis-password ${REDIS_PASSWORD:-rpc-redis-123456}
     networks:
       default:
         aliases: [rpc-sheet]
     depends_on:
       mysql-master:
         condition: service_healthy
-      redis-master:
-        condition: service_healthy
+      redis-cluster-init:
+        condition: service_completed_successfully
     healthcheck:
       test: ["CMD-SHELL", "bash -c 'echo > /dev/tcp/localhost/50051' 2>/dev/null"]
       interval: 5s
@@ -291,7 +325,7 @@ services:
     command: >
       /app/rpc_server --service file --port 50051
       --mysql-write-host mysql-master --mysql-read-hosts mysql-slave --mysql-password ${MYSQL_ROOT_PASSWORD:-123456} --mysql-db rpc_file
-      --redis-master-host redis-master --redis-slave-host redis-slave --redis-password ${REDIS_PASSWORD:-rpc-redis-123456} --redis-sentinel-host redis-sentinel --redis-sentinel-port 26379 --redis-master-name redis-master
+      --redis-cluster redis-cluster:7000 --redis-cluster redis-cluster:7001 --redis-cluster redis-cluster:7002 --redis-password ${REDIS_PASSWORD:-rpc-redis-123456}
     networks:
       default:
         aliases: [rpc-file]
@@ -319,7 +353,7 @@ services:
     command: >
       /app/rpc_server --service file --port 50051
       --mysql-write-host mysql-master --mysql-read-hosts mysql-slave --mysql-password ${MYSQL_ROOT_PASSWORD:-123456} --mysql-db rpc_file
-      --redis-master-host redis-master --redis-slave-host redis-slave --redis-password ${REDIS_PASSWORD:-rpc-redis-123456} --redis-sentinel-host redis-sentinel --redis-sentinel-port 26379 --redis-master-name redis-master
+      --redis-cluster redis-cluster:7000 --redis-cluster redis-cluster:7001 --redis-cluster redis-cluster:7002 --redis-password ${REDIS_PASSWORD:-rpc-redis-123456}
     networks:
       default:
         aliases: [rpc-file]
@@ -344,12 +378,12 @@ services:
       --grpc-auth rpc-auth:50051
       --grpc-sheet rpc-sheet:50051
       --grpc-file rpc-file:50051
-      --redis-master-host redis-master --redis-slave-host redis-slave --redis-password ${REDIS_PASSWORD:-rpc-redis-123456} --redis-sentinel-host redis-sentinel --redis-sentinel-port 26379 --redis-master-name redis-master
+      --redis-cluster redis-cluster:7000 --redis-cluster redis-cluster:7001 --redis-cluster redis-cluster:7002 --redis-password ${REDIS_PASSWORD:-rpc-redis-123456}
     depends_on:
       mysql-master:
         condition: service_healthy
-      redis-master:
-        condition: service_healthy
+      redis-cluster-init:
+        condition: service_completed_successfully
       auth-1:
         condition: service_healthy
       auth-2:
@@ -380,12 +414,12 @@ services:
       --grpc-auth rpc-auth:50051
       --grpc-sheet rpc-sheet:50051
       --grpc-file rpc-file:50051
-      --redis-master-host redis-master --redis-slave-host redis-slave --redis-password ${REDIS_PASSWORD:-rpc-redis-123456} --redis-sentinel-host redis-sentinel --redis-sentinel-port 26379 --redis-master-name redis-master
+      --redis-cluster redis-cluster:7000 --redis-cluster redis-cluster:7001 --redis-cluster redis-cluster:7002 --redis-password ${REDIS_PASSWORD:-rpc-redis-123456}
     depends_on:
       mysql-master:
         condition: service_healthy
-      redis-master:
-        condition: service_healthy
+      redis-cluster-init:
+        condition: service_completed_successfully
       auth-1:
         condition: service_healthy
       auth-2:
