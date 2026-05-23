@@ -11,23 +11,24 @@
                       ├─ 8081: httplib HTTP/1.1 (nginx 用)
                       └─ 8080: nghttp2 h2c + ThreadPool (预留)
                          │
-                      JWT 鉴权 + 熔断器 + RESTful 路由
+                      JWT 鉴权 + 多维熔断 + RESTful 路由
                          │
                       gRPC(round_robin) → Auth(x2) / Sheet(x3) / File(x2)
-                         └→ MySQL(1主2从) + Redis(1主2从+3哨兵)
+                         └→ MySQL(1主2从, 可hash分片) + Redis Cluster(6节点,3M+3S) + MinIO
 ```
 
 | 层 | 核心技术 | 测试关注点 |
 |----|---------|----------|
 | 边缘代理 | nginx TLS + keepalive 128 + 静态文件 serve | 连接复用、TLS 开销 |
-| 网关 8081 | httplib 内置线程池 + 同步 gRPC + JWT + 熔断器 | 并发能力、JWT 验证 |
+| 网关 8081 | httplib + 同步 gRPC + JWT + 多维熔断(滑动窗口/P99/慢调用率) | 并发能力、JWT 验证 |
 | 网关 8080 | nghttp2 h2c + ThreadPool(eventfd唤醒) + poll I/O | stream 多路复用 |
-| 负载均衡 | gRPC round_robin + Docker DNS 别名多 IP | 副本故障不中断 |
-| 缓存 | Cache-Aside + 列表版本号失效 + Redis 连接池 | 命中率、一致性 |
-| 数据库 | MySQL 主从读写分离 + 乐观锁(version列+CAS) | 并发写冲突 |
-| Redis HA | Sentinel 三节点 quorum=2 | 故障转移 RTO |
-| 安全 | JWT HS256 + token_version 吊销 (Redis) | Token 有效期、吊销 |
-| 分布式事务 | 2PC TM + RM (4 个 handler) | Prepare/Commit/Rollback |
+| 负载均衡 | gRPC round_robin + Docker DNS 别名多 IP + PerReplicaTracker 副本隔离 | 副本故障不中断 |
+| 缓存 | Cache-Aside + 逻辑过期异步刷新 + 版本号失效 + 空值防穿透 | 命中率、一致性 |
+| 数据库 | MySQL 主从读写分离 + ShardedDatabase(user_id%N hash分片) | 分片路由、并发冲突 |
+| Redis HA | Redis Cluster 6节点 (3M+3S, gossip协议自动故障转移) | 故障转移 RTO |
+| 安全 | JWT HS256 + token_version 吊销 (Redis) + Gateway+Server 双验签 | Token 有效期、吊销 |
+| 分布式事务 | 2PC TM + RM + undo_log 补偿 | Prepare/Commit/Rollback |
+| 对象存储 | MinIO S3-compatible | 文件上传下载完整性 |
 
 ## 文件说明
 
@@ -51,13 +52,13 @@
 | POST | /api/tx/begin | 分布式事务 |
 | POST | /api/sheets | 创建表格 |
 | GET | /api/sheets | 表格列表 |
-| GET | /api/sheets/:id | 获取单个表格 |
+| POST | /api/sheets/get | 获取单个表格 |
 | PUT | /api/sheets | 更新表格 |
-| DELETE | /api/sheets/:id | 删除表格 |
+| POST | /api/sheets/delete | 删除表格 |
 | GET | /api/files | 文件列表 |
 | POST | /api/files/upload | 上传文件 |
 | GET | /api/files/download | 下载文件 |
-| DELETE | /api/files/:id | 删除文件 |
+| POST | /api/files/delete | 删除文件 |
 
 ## 前置条件
 
@@ -209,12 +210,12 @@ docker stop http-rpc-sheet-2-1
 bash test/functional_test.sh
 docker start http-rpc-sheet-2-1
 
-# 2. Redis Sentinel 故障转移（12s 内自动恢复）
-docker stop http-rpc-redis-master-1
-sleep 12
-docker logs http-rpc-redis-sentinel-1-1 --tail 5
+# 2. Redis Cluster 故障转移（gossip 自动选举，5s 内恢复）
+docker stop http-rpc-redis-cluster-1
+sleep 8
+docker logs http-rpc-redis-cluster-4 --tail 5
 bash test/functional_test.sh
-docker start http-rpc-redis-master-1
+docker start http-rpc-redis-cluster-1
 
 # 3. MySQL Slave 容错
 docker stop http-rpc-mysql-slave-1-1
