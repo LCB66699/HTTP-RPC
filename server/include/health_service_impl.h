@@ -10,11 +10,11 @@
 #include "generated/rpc_health.grpc.pb.h"
 #include "generated/rpc_health.pb.h"
 
-class Database;
+class ShardedDatabase;
 
 class HealthMonitorImpl final : public rpc::HealthMonitor::Service {
 public:
-    void SetDatabase(Database* db) { db_ = db; }
+    void SetDatabase(ShardedDatabase* db) { db_ = db; }
     void SetNodeInfo(const std::string& node_id, const std::string& service,
                      const std::string& host, int port);
 
@@ -30,7 +30,7 @@ public:
     void StopHeartbeat();
 
 private:
-    Database* db_ = nullptr;
+    ShardedDatabase* db_ = nullptr;
     std::string node_id_, service_, host_;
     int port_ = 0;
     std::atomic<bool> running_{false};

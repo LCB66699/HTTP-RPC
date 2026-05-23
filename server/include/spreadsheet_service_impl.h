@@ -4,7 +4,7 @@
 #include "generated/rpc_spreadsheet.grpc.pb.h"
 #include "generated/rpc_spreadsheet.pb.h"
 
-class Database;
+class ShardedDatabase;
 class RedisClient;
 class CallLogger;
 class SystemLogger;
@@ -13,7 +13,7 @@ class AuthInterceptor;
 
 class SpreadsheetServiceImpl final : public rpc::SpreadsheetService::Service {
 public:
-    void SetDatabase(Database* db) { db_ = db; }
+    void SetDatabase(ShardedDatabase* db) { db_ = db; }
     void SetRedis(RedisClient* redis) { redis_ = redis; }
     void SetLogger(CallLogger* logger) { logger_ = logger; }
     void SetSysLog(SystemLogger* slog) { slog_ = slog; }
@@ -36,7 +36,7 @@ public:
                                    rpc::DeleteSpreadsheetResponse* resp) override;
 
 private:
-    Database*       db_    = nullptr;
+    ShardedDatabase* db_    = nullptr;
     RedisClient*    redis_ = nullptr;
     CallLogger*     logger_ = nullptr;
     SystemLogger*   slog_  = nullptr;

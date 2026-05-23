@@ -43,6 +43,7 @@ int main(int argc, char* argv[]) {
     std::string mysql_user = "root";
     std::string mysql_password;
     std::string mysql_db = "rpc_demo";
+    int mysql_shards = 1;
     std::vector<std::string> redis_cluster_seeds;
     std::string redis_password;     // --redis-password
     int redis_pool_size = 4;
@@ -59,6 +60,7 @@ int main(int argc, char* argv[]) {
         else if (arg == "--mysql-user" && i + 1 < argc) mysql_user = argv[++i];
         else if (arg == "--mysql-password" && i + 1 < argc) mysql_password = argv[++i];
         else if (arg == "--mysql-db" && i + 1 < argc) mysql_db = argv[++i];
+        else if (arg == "--mysql-shards" && i + 1 < argc) mysql_shards = std::atoi(argv[++i]);
         else if (arg == "--redis-cluster" && i + 1 < argc) {
             redis_cluster_seeds.push_back(argv[++i]);
         }
@@ -77,6 +79,7 @@ int main(int argc, char* argv[]) {
             printf("  --mysql-user <user>        MySQL user (default: root)\n");
             printf("  --mysql-password <pw>      MySQL password\n");
             printf("  --mysql-db <db>            MySQL database name\n");
+            printf("  --mysql-shards <n>         Number of DB shards (default: 1)\n");
             printf("  --redis-cluster <h:p>      Add Redis Cluster seed node (can repeat)\n");
             printf("  --redis-password <pw>      Redis AUTH password\n");
             printf("  --redis-pool-size <n>      Connections per seed (default: 4)\n");
@@ -115,12 +118,18 @@ int main(int argc, char* argv[]) {
     }
 
     // ---- Database + Redis ----
-    std::unique_ptr<Database> db;
+    std::unique_ptr<ShardedDatabase> db;
     if (!mysql_host.empty()) {
         std::string read_hosts = mysql_read_hosts.empty() ? mysql_host : mysql_read_hosts;
-        db = std::make_unique<Database>(mysql_host, mysql_port, read_hosts, mysql_port,
-                                        mysql_user, mysql_password, mysql_db);
-        db->Initialize();
+        // When shards==1, ShardedDatabase creates exactly one underlying Database using
+        // the host name as-is (no -0 suffix appended, no db name suffix applied).
+        // When shards>1, each shard i gets host "{prefix}-{i}" and db "{prefix}_{i}".
+        db = std::make_unique<ShardedDatabase>(mysql_shards,
+                                                mysql_host, mysql_port,
+                                                read_hosts, mysql_port,
+                                                mysql_user, mysql_password,
+                                                mysql_db, 4);
+        db->InitializeAll();
         db->StartHealthCheck();
     }
 
@@ -342,7 +351,7 @@ int main(int argc, char* argv[]) {
     printf("========================================\n");
     printf("  Service: %s\n", service.c_str());
     printf("  gRPC:   %s\n", addr.c_str());
-    if (!mysql_host.empty()) printf("  MySQL:  %s:%d/%s\n", mysql_host.c_str(), mysql_port, mysql_db.c_str());
+    if (!mysql_host.empty()) printf("  MySQL:  %s:%d/%s (shards=%d)\n", mysql_host.c_str(), mysql_port, mysql_db.c_str(), mysql_shards);
     if (!redis_cluster_seeds.empty()) printf("  Redis Cluster: %zu seeds\n", redis_cluster_seeds.size());
     printf("========================================\n");
 

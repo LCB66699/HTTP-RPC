@@ -144,3 +144,82 @@ private:
     std::atomic<bool> health_running_{false};
     void HealthLoop();
 };
+
+// ---- ShardedDatabase: hash-routes by user_id across N Database shards ----
+class ShardedDatabase {
+public:
+    // shard_count: 分片数; host_prefix: "mysql-spreadsheet" → "mysql-spreadsheet-0","mysql-spreadsheet-1"...
+    // db_name_prefix: "rpc_spreadsheet" → "rpc_spreadsheet_0","rpc_spreadsheet_1"...
+    ShardedDatabase(int shard_count,
+                    const std::string& write_host_prefix, int write_port,
+                    const std::string& read_hosts_prefix, int read_port,
+                    const std::string& user, const std::string& password,
+                    const std::string& db_name_prefix,
+                    int write_pool_size = 4);
+
+    void InitializeAll();
+    void SetSnowflake(Snowflake* sf) { for (auto& db : shards_) db->SetSnowflake(sf); }
+
+    // === Users (auth — single shard) ===
+    bool AddUser(const std::string& username, const std::string& password_hash);
+    bool GetUser(const std::string& username, std::string& password_hash);
+    bool UserExists(const std::string& username);
+    int  GetTokenVersion(const std::string& username);
+    bool IncrementTokenVersion(const std::string& username);
+    int64_t GetUserId(const std::string& username);
+    bool ImportFromUsersJson(const std::string& json_path);
+
+    // === Spreadsheets (hash by user_id) ===
+    bool CreateSpreadsheet(int64_t user_id, const std::string& username,
+                           const std::string& name, const std::string& desc,
+                           const std::string& headers_json, const std::string& data_json,
+                           int64_t& out_id, const std::string& idempotency_key = "");
+    bool GetSpreadsheet(int64_t id, int64_t user_id, SpreadsheetRow& out);
+    bool ListSpreadsheets(int64_t user_id, std::vector<SpreadsheetSummary>& out, int& total,
+                          int page = 0, int page_size = 0);
+    bool UpdateSpreadsheet(int64_t id, const std::string& name,
+                           const std::string& desc, const std::string& headers_json,
+                           const std::string& data_json, int version = 0);
+    bool DeleteSpreadsheet(int64_t id) { return ShardForBroadcast()->DeleteSpreadsheet(id); }
+    bool GetSpreadsheetOwner(int64_t id, int64_t& owner_user_id, int* out_version = nullptr);
+
+    // === Files (hash by user_id) ===
+    bool CreateFile(int64_t user_id, const std::string& username,
+                    const std::string& original_name, int64_t size,
+                    const std::string& mime_type, const std::string& storage_key,
+                    int64_t& out_id, const std::string& idempotency_key = "");
+    bool GetFile(int64_t id, int64_t user_id, FileRow& out);
+    bool ListFiles(int64_t user_id, std::vector<FileRow>& out, int& total,
+                   int page = 0, int page_size = 0);
+    bool DeleteFile(int64_t id) { return ShardForBroadcast()->DeleteFile(id); }
+    bool GetFileOwner(int64_t id, int64_t& owner_user_id);
+    bool GetFileStoragePath(int64_t id, std::string& storage_path);
+
+    // === Undo Log (by user_id or broadcast) ===
+    bool WriteUndoLog(const std::string& xid, const std::string& table_name,
+                      int64_t row_id, const std::string& before_snapshot);
+    bool GetUndoLog(const std::string& xid, std::string& table_name,
+                    int64_t& row_id, std::string& before_snapshot);
+    bool ClearUndoLog(const std::string& xid);
+    int  PurgeOldUndoLogs(int days = 7);
+
+    bool Exec(const std::string& sql) { return shards_[0]->Exec(sql); }
+    MYSQL* GetConnection() { return shards_[0]->GetConnection(); }
+
+    void StartHealthCheck() { for (auto& db : shards_) db->StartHealthCheck(); }
+    void StopHealthCheck()  { for (auto& db : shards_) db->StopHealthCheck(); }
+
+    int ShardCount() const { return shard_count_; }
+    Database* ShardFor(int64_t user_id);
+    Database* ShardForBroadcast();  // 返回第一个分片（用于广播类查询）
+
+    Database* AuthDB() { return shards_[0].get(); }
+
+private:
+    int shard_count_;
+    std::vector<std::unique_ptr<Database>> shards_;
+    std::string write_host_prefix_, read_hosts_prefix_, db_name_prefix_;
+    int write_port_, read_port_;
+    std::string user_, password_;
+    int write_pool_size_;
+};

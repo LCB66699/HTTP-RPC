@@ -206,7 +206,7 @@ services:
       JWT_SECRET: "${JWT_SECRET}"
     command: >
       /app/rpc_server --service auth --port 50051
-      --mysql-write-host mysql-master --mysql-read-hosts mysql-slave --mysql-password ${MYSQL_ROOT_PASSWORD:-123456} --mysql-db rpc_auth
+      --mysql-write-host mysql-master --mysql-read-hosts mysql-slave --mysql-password ${MYSQL_ROOT_PASSWORD:-123456} --mysql-db rpc_auth --mysql-shards 1
       --redis-cluster redis-cluster:7000 --redis-cluster redis-cluster:7001 --redis-cluster redis-cluster:7002 --redis-password ${REDIS_PASSWORD:-rpc-redis-123456}
     networks:
       default:
@@ -227,7 +227,7 @@ services:
       JWT_SECRET: "${JWT_SECRET}"
     command: >
       /app/rpc_server --service auth --port 50051
-      --mysql-write-host mysql-master --mysql-read-hosts mysql-slave --mysql-password ${MYSQL_ROOT_PASSWORD:-123456} --mysql-db rpc_auth
+      --mysql-write-host mysql-master --mysql-read-hosts mysql-slave --mysql-password ${MYSQL_ROOT_PASSWORD:-123456} --mysql-db rpc_auth --mysql-shards 1
       --redis-cluster redis-cluster:7000 --redis-cluster redis-cluster:7001 --redis-cluster redis-cluster:7002 --redis-password ${REDIS_PASSWORD:-rpc-redis-123456}
     networks:
       default:
@@ -248,7 +248,7 @@ services:
       JWT_SECRET: "${JWT_SECRET}"
     command: >
       /app/rpc_server --service spreadsheet --port 50051
-      --mysql-write-host mysql-master --mysql-read-hosts mysql-slave --mysql-password ${MYSQL_ROOT_PASSWORD:-123456} --mysql-db rpc_spreadsheet
+      --mysql-write-host mysql-master --mysql-read-hosts mysql-slave --mysql-password ${MYSQL_ROOT_PASSWORD:-123456} --mysql-db rpc_spreadsheet --mysql-shards 1
       --redis-cluster redis-cluster:7000 --redis-cluster redis-cluster:7001 --redis-cluster redis-cluster:7002 --redis-password ${REDIS_PASSWORD:-rpc-redis-123456}
     networks:
       default:
@@ -271,7 +271,7 @@ services:
       JWT_SECRET: "${JWT_SECRET}"
     command: >
       /app/rpc_server --service spreadsheet --port 50051
-      --mysql-write-host mysql-master --mysql-read-hosts mysql-slave --mysql-password ${MYSQL_ROOT_PASSWORD:-123456} --mysql-db rpc_spreadsheet
+      --mysql-write-host mysql-master --mysql-read-hosts mysql-slave --mysql-password ${MYSQL_ROOT_PASSWORD:-123456} --mysql-db rpc_spreadsheet --mysql-shards 1
       --redis-cluster redis-cluster:7000 --redis-cluster redis-cluster:7001 --redis-cluster redis-cluster:7002 --redis-password ${REDIS_PASSWORD:-rpc-redis-123456}
     networks:
       default:
@@ -294,7 +294,7 @@ services:
       JWT_SECRET: "${JWT_SECRET}"
     command: >
       /app/rpc_server --service spreadsheet --port 50051
-      --mysql-write-host mysql-master --mysql-read-hosts mysql-slave --mysql-password ${MYSQL_ROOT_PASSWORD:-123456} --mysql-db rpc_spreadsheet
+      --mysql-write-host mysql-master --mysql-read-hosts mysql-slave --mysql-password ${MYSQL_ROOT_PASSWORD:-123456} --mysql-db rpc_spreadsheet --mysql-shards 1
       --redis-cluster redis-cluster:7000 --redis-cluster redis-cluster:7001 --redis-cluster redis-cluster:7002 --redis-password ${REDIS_PASSWORD:-rpc-redis-123456}
     networks:
       default:

@@ -10,11 +10,11 @@
 #include "generated/rpc_tx.grpc.pb.h"
 #include "generated/rpc_tx.pb.h"
 
-class Database;
+class ShardedDatabase;
 
 class TxResource : public rpc::TxResource::Service {
 public:
-    void SetDatabase(Database* db) { db_ = db; }
+    void SetDatabase(ShardedDatabase* db) { db_ = db; }
 
     // 注册业务操作处理器（public，main 中调用）
     using OpHandler = std::function<bool(const std::string& params_json, std::string& error)>;
@@ -32,7 +32,7 @@ public:
                           rpc::RollbackResponse* resp) override;
 
 protected:
-    Database* db_ = nullptr;
+    ShardedDatabase* db_ = nullptr;
 
     // undo log 操作（子类可调用）
     bool WriteUndoLog(const std::string& xid, const std::string& table_name,

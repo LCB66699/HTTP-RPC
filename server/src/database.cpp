@@ -776,3 +776,148 @@ void Database::HealthLoop() {
         }
     }
 }
+
+// ============================================================
+// ShardedDatabase — hash-routes user_id across N Database shards
+// ============================================================
+
+ShardedDatabase::ShardedDatabase(int shard_count,
+                                 const std::string& write_host_prefix, int write_port,
+                                 const std::string& read_hosts_prefix, int read_port,
+                                 const std::string& user, const std::string& password,
+                                 const std::string& db_name_prefix,
+                                 int write_pool_size)
+    : shard_count_(shard_count),
+      write_host_prefix_(write_host_prefix), read_hosts_prefix_(read_hosts_prefix),
+      db_name_prefix_(db_name_prefix),
+      write_port_(write_port), read_port_(read_port),
+      user_(user), password_(password), write_pool_size_(write_pool_size)
+{
+    for (int i = 0; i < shard_count; i++) {
+        // shard_count==1: use host/db name as-is (no suffix), backward compat
+        std::string wh = (shard_count == 1) ? write_host_prefix
+                         : write_host_prefix + "-" + std::to_string(i);
+        std::string rh = (shard_count == 1) ? read_hosts_prefix
+                         : read_hosts_prefix + "-" + std::to_string(i);
+        std::string db_name = (shard_count == 1) ? db_name_prefix
+                              : db_name_prefix + "_" + std::to_string(i);
+        auto db = std::make_unique<Database>(wh, write_port, rh, read_port,
+                                              user, password, db_name, write_pool_size);
+        shards_.push_back(std::move(db));
+    }
+    printf("[ShardedDB] %d shards created (prefix: %s)\n", shard_count, write_host_prefix.c_str());
+}
+
+void ShardedDatabase::InitializeAll() {
+    for (auto& db : shards_) db->Initialize();
+}
+
+Database* ShardedDatabase::ShardFor(int64_t user_id) {
+    int idx = static_cast<int>(std::abs(user_id) % shard_count_);
+    return shards_[idx].get();
+}
+
+Database* ShardedDatabase::ShardForBroadcast() {
+    return shards_.empty() ? nullptr : shards_[0].get();
+}
+
+// === Users (auth shard only — shard 0) ===
+
+bool ShardedDatabase::AddUser(const std::string& username, const std::string& password_hash)
+    { return shards_[0]->AddUser(username, password_hash); }
+bool ShardedDatabase::GetUser(const std::string& username, std::string& password_hash)
+    { return shards_[0]->GetUser(username, password_hash); }
+bool ShardedDatabase::UserExists(const std::string& username)
+    { return shards_[0]->UserExists(username); }
+int ShardedDatabase::GetTokenVersion(const std::string& username)
+    { return shards_[0]->GetTokenVersion(username); }
+bool ShardedDatabase::IncrementTokenVersion(const std::string& username)
+    { return shards_[0]->IncrementTokenVersion(username); }
+int64_t ShardedDatabase::GetUserId(const std::string& username)
+    { return shards_[0]->GetUserId(username); }
+bool ShardedDatabase::ImportFromUsersJson(const std::string& json_path)
+    { return shards_[0]->ImportFromUsersJson(json_path); }
+
+// === Spreadsheets (hash by user_id) ===
+
+bool ShardedDatabase::CreateSpreadsheet(int64_t user_id, const std::string& username,
+                                         const std::string& name, const std::string& desc,
+                                         const std::string& headers_json, const std::string& data_json,
+                                         int64_t& out_id, const std::string& idempotency_key) {
+    return ShardFor(user_id)->CreateSpreadsheet(user_id, username, name, desc,
+                                                 headers_json, data_json, out_id, idempotency_key);
+}
+bool ShardedDatabase::GetSpreadsheet(int64_t id, int64_t user_id, SpreadsheetRow& out) {
+    return ShardFor(user_id)->GetSpreadsheet(id, user_id, out);
+}
+bool ShardedDatabase::ListSpreadsheets(int64_t user_id, std::vector<SpreadsheetSummary>& out,
+                                        int& total, int page, int page_size) {
+    return ShardFor(user_id)->ListSpreadsheets(user_id, out, total, page, page_size);
+}
+bool ShardedDatabase::UpdateSpreadsheet(int64_t id, const std::string& name,
+                                         const std::string& desc, const std::string& headers_json,
+                                         const std::string& data_json, int version) {
+    // id is globally unique — broadcast to find the right shard
+    for (auto& db : shards_)
+        if (db->UpdateSpreadsheet(id, name, desc, headers_json, data_json, version)) return true;
+    return false;
+}
+
+// Broadcast: id is globally unique, try each shard
+bool ShardedDatabase::GetSpreadsheetOwner(int64_t id, int64_t& owner_user_id, int* out_version) {
+    for (auto& db : shards_)
+        if (db->GetSpreadsheetOwner(id, owner_user_id, out_version)) return true;
+    return false;
+}
+
+// === Files (hash by user_id) ===
+
+bool ShardedDatabase::CreateFile(int64_t user_id, const std::string& username,
+                                  const std::string& original_name, int64_t size,
+                                  const std::string& mime_type, const std::string& storage_key,
+                                  int64_t& out_id, const std::string& idempotency_key) {
+    return ShardFor(user_id)->CreateFile(user_id, username, original_name, size,
+                                          mime_type, storage_key, out_id, idempotency_key);
+}
+bool ShardedDatabase::GetFile(int64_t id, int64_t user_id, FileRow& out) {
+    return ShardFor(user_id)->GetFile(id, user_id, out);
+}
+bool ShardedDatabase::ListFiles(int64_t user_id, std::vector<FileRow>& out, int& total,
+                                  int page, int page_size) {
+    return ShardFor(user_id)->ListFiles(user_id, out, total, page, page_size);
+}
+
+// Broadcast: id is globally unique
+bool ShardedDatabase::GetFileOwner(int64_t id, int64_t& owner_user_id) {
+    for (auto& db : shards_)
+        if (db->GetFileOwner(id, owner_user_id)) return true;
+    return false;
+}
+bool ShardedDatabase::GetFileStoragePath(int64_t id, std::string& storage_path) {
+    for (auto& db : shards_)
+        if (db->GetFileStoragePath(id, storage_path)) return true;
+    return false;
+}
+
+// === Undo Log (broadcast — 2PC 一致性要求) ===
+
+bool ShardedDatabase::WriteUndoLog(const std::string& xid, const std::string& table_name,
+                                    int64_t row_id, const std::string& before_snapshot) {
+    for (auto& db : shards_) db->WriteUndoLog(xid, table_name, row_id, before_snapshot);
+    return true;
+}
+bool ShardedDatabase::GetUndoLog(const std::string& xid, std::string& table_name,
+                                  int64_t& row_id, std::string& before_snapshot) {
+    for (auto& db : shards_)
+        if (db->GetUndoLog(xid, table_name, row_id, before_snapshot)) return true;
+    return false;
+}
+bool ShardedDatabase::ClearUndoLog(const std::string& xid) {
+    for (auto& db : shards_) db->ClearUndoLog(xid);
+    return true;
+}
+int ShardedDatabase::PurgeOldUndoLogs(int days) {
+    int total = 0;
+    for (auto& db : shards_) total += db->PurgeOldUndoLogs(days);
+    return total;
+}

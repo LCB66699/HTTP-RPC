@@ -5,7 +5,7 @@
 #include "generated/rpc_file.pb.h"
 #include "minio_client.h"
 
-class Database;
+class ShardedDatabase;
 class RedisClient;
 class CallLogger;
 class SystemLogger;
@@ -14,7 +14,7 @@ class AuthInterceptor;
 
 class FileServiceImpl final : public rpc::FileService::Service {
 public:
-    void SetDatabase(Database* db) { db_ = db; }
+    void SetDatabase(ShardedDatabase* db) { db_ = db; }
     void SetRedis(RedisClient* redis) { redis_ = redis; }
     void SetLogger(CallLogger* logger) { logger_ = logger; }
     void SetSysLog(SystemLogger* slog) { slog_ = slog; }
@@ -36,7 +36,7 @@ public:
                             rpc::DeleteFileResponse* resp) override;
 
 private:
-    Database*       db_    = nullptr;
+    ShardedDatabase* db_    = nullptr;
     RedisClient*    redis_ = nullptr;
     CallLogger*     logger_ = nullptr;
     SystemLogger*   slog_  = nullptr;
