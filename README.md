@@ -19,11 +19,12 @@ Gateway-1 :8081                  Gateway-2 :8081   ← HttpOnly Cookie 鉴权 + 
    ├──→ Sheet (rpc-sheet:50051)  副本 x3  DB: rpc_spreadsheet (可 hash 分片)  Redis 缓存
    └──→ File  (rpc-file:50051)   副本 x2  DB: rpc_file (可 hash 分片)         MinIO
 
-          ├── MySQL 1主2从 :3306  (rpc_auth / rpc_spreadsheet / rpc_file / rpc_tx_log)
+          ├── MySQL 分片: auth×1 + spreadsheet×2 + file×2 (每片1主1从)
           └── Redis Cluster 6节点 (3M+3S)
 ```
 
-**容器总数：21 个**（nginx×1 + gateway×2 + auth×2 + sheet×3 + file×2 + MySQL×3 + Redis×7 + MinIO×1）
+**容器总数：24 个**（nginx×1 + gateway×2 + auth×2 + sheet×3 + file×2 + MySQL×9 + Redis×7 + MinIO×1）
+> MySQL 9 个 = mysql-auth ×1 + mysql-spreadsheet-0×2(master+slave) + mysql-spreadsheet-1×2 + mysql-file-0×2 + mysql-file-1×2
 
 ### 协议栈
 
@@ -247,3 +248,36 @@ TM.Begin("tx-001")
 | `--mysql-shards` | 1 | 分片数 (>1 时 host 加 `-{i}` 后缀) |
 | `--redis-cluster` | — | Redis Cluster 种子节点 |
 | `--log-level` | info | off / error / warn / info / debug |
+
+## Kubernetes 部署（可选）
+
+```bash
+# 一键部署至 K8s 集群
+kubectl apply -k k8s/
+
+# 查看状态
+kubectl get pods -n http-rpc
+
+# 扩缩容
+kubectl scale deployment gateway -n http-rpc --replicas=5
+
+# HPA 自动伸缩（2-10 副本，CPU 70% 触发）
+kubectl get hpa gateway -n http-rpc
+```
+
+K8s manifest 文件位于 `k8s/` 目录，包含 Deployment、StatefulSet、Service、Ingress、HPA 完整部署。详见 `docs/OPS.md`。
+
+## 线程安全
+
+| 层级 | 并发原语 | 说明 |
+|------|------|------|
+| Gateway HTTP | 无共享状态 | 每请求独立线程上下文 |
+| 熔断器读路径 | `atomic<State>` | 每请求调 AllowRequest，无锁 |
+| 熔断器写路径 | `mutex` | 状态变迁时加锁，微秒级 |
+| SlidingWindow | `mutex` | 3 个 int++，O(1) |
+| 数据库写池 | `mutex × 4` | 每连接独立锁，4 路并行 |
+| 数据库读池 | `mutex × N` | 每连接独立锁 |
+| Redis Cluster | redis-plus-plus 内置 | 库保证线程安全 |
+| PerReplicaTracker | `shared_mutex` | 读共享，写排他 |
+| CallLogger | `mutex` + 后台线程 | 业务线程只操作内存（微秒），Redis 写入由后台 flush 线程异步完成 |
+| 协程 CqLoop | 单线程 | 无竞争 |
