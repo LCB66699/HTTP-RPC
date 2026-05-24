@@ -137,63 +137,88 @@ std::string Gateway::CreateJWT(const std::string& username) const {
     long exp = static_cast<long>(std::time(nullptr)) + 86400;
     return jwt::create("{\"username\":" + JsonStr(username) + ",\"exp\":" + std::to_string(exp) + "}", jwt_secret_);
 }
-bool Gateway::VerifyAuth(const std::string& cookie_header, std::string& username, int64_t& user_id, std::string& raw_token) const {
-    // Parse rpc_token= from Cookie header (format: "k1=v1; k2=v2; ...")
-    std::string token;
-    const std::string needle = "rpc_token=";
+
+// ---- 双 Token: Access Token (JWT 15min) + Refresh Token (UUID 7d) ----
+
+std::string Gateway::CreateAccessToken(const std::string& username) const {
+    long exp = static_cast<long>(std::time(nullptr)) + 900;  // 15 minutes
+    nlohmann::json payload;
+    payload["username"] = username;
+    payload["uid"] = 0;         // uid from JWT, set on refresh
+    payload["type"] = "access";
+    payload["exp"] = exp;
+    return jwt::create(payload.dump(), jwt_secret_);
+}
+
+std::string Gateway::CreateRefreshToken(const std::string& username) const {
+    unsigned char raw[16];
+    for (int i = 0; i < 16; ++i) raw[i] = (unsigned char)(rand() % 256);
+    raw[6] = (raw[6] & 0x0f) | 0x40;
+    raw[8] = (raw[8] & 0x3f) | 0x80;
+    char buf[37];
+    snprintf(buf, sizeof(buf),
+        "%02x%02x%02x%02x-%02x%02x-%02x%02x-%02x%02x-%02x%02x%02x%02x%02x%02x",
+        raw[0],raw[1],raw[2],raw[3],raw[4],raw[5],raw[6],raw[7],
+        raw[8],raw[9],raw[10],raw[11],raw[12],raw[13],raw[14],raw[15]);
+    std::string rt(buf);
+    if (redis_ && redis_->IsConnected())
+        redis_->SetJSON("rt:" + username, rt, 604800);  // 7 days
+    return rt;
+}
+
+// AT 验证: 仅验签+过期, 不查 Redis token_ver — 15min 短过期天然防吊销延迟
+bool Gateway::VerifyAccessToken(const std::string& cookie_header,
+                                 std::string& username, int64_t& user_id) const {
+    const std::string needle = "rpc_at=";
     size_t pos = cookie_header.find(needle);
-    if (pos != std::string::npos) {
-        pos += needle.size();
-        size_t end = cookie_header.find(';', pos);
-        token = cookie_header.substr(pos, end == std::string::npos ? std::string::npos : end - pos);
-        while (!token.empty() && (token.back() == ' ' || token.back() == '\t')) token.pop_back();
-    }
+    if (pos == std::string::npos) return false;
+    pos += needle.size();
+    size_t end = cookie_header.find(';', pos);
+    std::string token = cookie_header.substr(pos, end == std::string::npos ? std::string::npos : end - pos);
     if (token.empty()) return false;
 
     std::string payload;
     if (!jwt::verify(token, jwt_secret_, payload)) return false;
 
-    // 检查 JWT 过期时间（exp 字段，Unix 时间戳）
+    // 验 type 字段
+    if (JsonGet(payload, "type") != "access") return false;
+
     long exp = (long)JsonGetNum(payload, "exp");
     if (exp == 0 || exp < (long)std::time(nullptr)) return false;
 
     username = JsonGet(payload, "username");
     if (username.empty()) return false;
     user_id = static_cast<int64_t>(JsonGetNum(payload, "uid"));
-    raw_token = token;
-
-    // token_version 吊销检查（Redis 中存有当前有效版本）
-    // Redis 不可用时拒绝请求（fail-closed），防止吊销检查被绕过
-    if (redis_ && redis_->IsConnected()) {
-        std::string ver_str;
-        if (redis_->GetJSON("token_ver:" + username, ver_str)) {
-            int current_ver = std::stoi(ver_str);
-            int token_ver = (int)JsonGetNum(payload, "ver");
-            if (token_ver < current_ver) return false;  // token 已被吊销
-        }
-        // key 不存在 = TTL 过期，未吊销，放行
-    } else {
-        // Redis 完全不可用 → 拒绝，防止被吊销 token 绕过检查
-        fprintf(stderr, "[Auth] Redis unavailable — rejecting request for safety\n");
-        return false;
-    }
     return true;
 }
 
+// 向后兼容: VerifyAuth → VerifyAccessToken, 忽略 raw_token
+bool Gateway::VerifyAuth(const std::string& cookie_header, std::string& username,
+                          int64_t& user_id, std::string& raw_token) const {
+    if (VerifyAccessToken(cookie_header, username, user_id)) {
+        raw_token = "";  // AT 不再通过 gRPC metadata 传递吊销参数
+        return true;
+    }
+    return false;
+}
+
 // Auth handlers
-// token_out receives the raw JWT to be placed in Set-Cookie by the caller.
-// response body intentionally omits the token — JS cannot read HttpOnly cookies.
-RpcResult Gateway::HandleLogin(const std::string& body, std::string& response, std::string& token_out) {
+// at_out: Access Token JWT → Set-Cookie HttpOnly (15min)
+// rt_out: Refresh Token UUID → response body _rt field (7d)
+RpcResult Gateway::HandleLogin(const std::string& body, std::string& response,
+                                std::string& at_out, std::string& rt_out) {
     std::string u = JsonGet(body, "username"), p = JsonGet(body, "password");
-    if (u.empty() || p.empty()) { response = "{\"success\":false,\"error\":\"Username and password required\"}"; return RpcResult::BAD_REQUEST; }
+    if (u.empty() || p.empty()) { response = R"({"success":false,"error":"Username and password required"})"; return RpcResult::BAD_REQUEST; }
     grpc::ClientContext ctx; ctx.set_deadline(std::chrono::system_clock::now() + std::chrono::seconds(5));
     rpc::LoginRequest req; rpc::LoginResponse resp;
     req.set_username(u); req.set_password(p);
     auto st = auth_stub_->Login(&ctx, req, &resp);
     bool ok = st.ok() && resp.success();
     if (ok) {
-        token_out = resp.token();
-        nlohmann::json r; r["success"] = true; r["username"] = u; response = r.dump();
+        at_out = CreateAccessToken(u);
+        rt_out = CreateRefreshToken(u);
+        nlohmann::json r;
+        r["success"] = true; r["username"] = u; r["_rt"] = rt_out; response = r.dump();
     } else {
         nlohmann::json r; r["success"] = false; r["error"] = resp.error(); response = r.dump();
     }
@@ -220,17 +245,20 @@ Task<void> Gateway::HandleLoginCoro(std::string body, std::string& response) {
     co_return;
 }
 
-RpcResult Gateway::HandleRegister(const std::string& body, std::string& response, std::string& token_out) {
+RpcResult Gateway::HandleRegister(const std::string& body, std::string& response,
+                                   std::string& at_out, std::string& rt_out) {
     std::string u = JsonGet(body, "username"), p = JsonGet(body, "password");
-    if (u.empty() || p.empty()) { response = "{\"success\":false,\"error\":\"Username and password required\"}"; return RpcResult::BAD_REQUEST; }
+    if (u.empty() || p.empty()) { response = R"({"success":false,"error":"Username and password required"})"; return RpcResult::BAD_REQUEST; }
     grpc::ClientContext ctx; ctx.set_deadline(std::chrono::system_clock::now() + std::chrono::seconds(5));
     rpc::RegisterRequest req; rpc::RegisterResponse resp;
     req.set_username(u); req.set_password(p);
     auto st = auth_stub_->Register(&ctx, req, &resp);
     bool ok = st.ok() && resp.success();
     if (ok) {
-        token_out = resp.token();
-        nlohmann::json r; r["success"] = true; r["username"] = u; response = r.dump();
+        at_out = CreateAccessToken(u);
+        rt_out = CreateRefreshToken(u);
+        nlohmann::json r;
+        r["success"] = true; r["username"] = u; r["_rt"] = rt_out; response = r.dump();
     } else {
         nlohmann::json r; r["success"] = false; r["error"] = resp.error(); response = r.dump();
     }
@@ -616,9 +644,9 @@ bool Gateway::Start() {
 
     // Cookie属性: HttpOnly防JS读取; SameSite=Strict防CSRF; Path=/限制范围; 24h过期
     static const std::string kSetCookieFmt =
-        "rpc_token=%s; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=86400";
+        "rpc_at=%s; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=900";
     static const std::string kClearCookie =
-        "rpc_token=; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=0";
+        "rpc_at=; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=0";
 
     auto login = [this, &kSetCookieFmt](auto& req, auto& res) {
         if (!cb_auth_.AllowRequest()) {
@@ -646,9 +674,9 @@ bool Gateway::Start() {
             }
         }
 
-        std::string r, token;
+        std::string r, at, rt;
         auto t0 = std::chrono::steady_clock::now();
-        auto result = HandleLogin(req.body, r, token);
+        auto result = HandleLogin(req.body, r, at, rt);
         auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
             std::chrono::steady_clock::now() - t0).count();
 
@@ -668,13 +696,13 @@ bool Gateway::Start() {
             case RpcResult::AUTH_FAILURE:      break;
             case RpcResult::BAD_REQUEST:       res.status = 400; break;
         }
-        if (!token.empty()) {
-            char buf[2048]; snprintf(buf, sizeof(buf), kSetCookieFmt.c_str(), token.c_str());
+        if (!at.empty()) {
+            char buf[2048]; snprintf(buf, sizeof(buf), kSetCookieFmt.c_str(), at.c_str());
             res.set_header("Set-Cookie", buf);
         }
         res.set_content(r, "application/json");
     };
-    auto reg = [this, &kSetCookieFmt](auto& req, auto& res) {
+    auto reg = [this](auto& req, auto& res) {
         if (!cb_auth_.AllowRequest()) {
             res.set_content("{\"success\":false,\"error\":\"circuit open\"}", "application/json");
             return;
@@ -700,9 +728,9 @@ bool Gateway::Start() {
             }
         }
 
-        std::string r, token;
+        std::string r, at, rt;
         auto t0 = std::chrono::steady_clock::now();
-        auto result = HandleRegister(req.body, r, token);
+        auto result = HandleRegister(req.body, r, at, rt);
         auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
             std::chrono::steady_clock::now() - t0).count();
 
@@ -722,8 +750,8 @@ bool Gateway::Start() {
             case RpcResult::AUTH_FAILURE:      break;
             case RpcResult::BAD_REQUEST:       res.status = 400; break;
         }
-        if (!token.empty()) {
-            char buf[2048]; snprintf(buf, sizeof(buf), kSetCookieFmt.c_str(), token.c_str());
+        if (!at.empty()) {
+            char buf[2048]; snprintf(buf, sizeof(buf), kSetCookieFmt.c_str(), at.c_str());
             res.set_header("Set-Cookie", buf);
         }
         res.set_content(r, "application/json");
@@ -731,6 +759,20 @@ bool Gateway::Start() {
     auto do_logout = [&kClearCookie](auto& /*req*/, auto& res) {
         res.set_header("Set-Cookie", kClearCookie);
         res.set_content("{\"success\":true}", "application/json");
+    };
+    auto refresh_tok = [this](auto& req, auto& res) {
+        std::string rt = JsonGet(req.body, "refresh_token");
+        std::string u  = JsonGet(req.body, "username");
+        if (rt.empty() || u.empty()) { res.status = 400; res.set_content(R"({"error":"Missing fields"})", "application/json"); return; }
+        std::string stored;
+        if (!redis_ || !redis_->GetJSON("rt:" + u, stored) || stored != rt) {
+            if (redis_) { redis_->DeleteKey("rt:" + u); redis_->DeleteKey("rate:login:" + u + ":total"); }
+            res.status = 401; res.set_content(R"({"error":"Invalid refresh token"})", "application/json"); return;
+        }
+        std::string new_at = CreateAccessToken(u);
+        char buf[2048]; snprintf(buf, sizeof(buf), kSetCookieFmt.c_str(), new_at.c_str());
+        res.set_header("Set-Cookie", buf);
+        res.set_content(R"({"success":true})", "application/json");
     };
     auto services    = [&require_auth, this](auto& req, auto& res) { std::string u, tok; if (!require_auth(req, res, u, tok)) return; std::string r; HandleServices(r); res.set_content(r, "application/json"); };
     auto health      = [this](auto&, auto& res) { std::string r; HandleHealth(r); res.set_content(r, "application/json"); };
@@ -876,6 +918,7 @@ bool Gateway::Start() {
     svr.Post("/api/login", login);
     svr.Post("/api/register", reg);
     svr.Post("/api/logout", do_logout);
+    svr.Post("/api/refresh", refresh_tok);
     svr.Get("/api/services", services);
     svr.Post("/api/sheets", with_cb(cb_sheet_, sh_create));
     svr.Get("/api/sheets", with_cb(cb_sheet_, sh_list));
@@ -895,6 +938,7 @@ bool Gateway::Start() {
     http_svr->Post("/api/login", login);
     http_svr->Post("/api/register", reg);
     http_svr->Post("/api/logout", do_logout);
+    http_svr->Post("/api/refresh", refresh_tok);
     http_svr->Get("/api/services", services);
     http_svr->Post("/api/sheets", with_cb(cb_sheet_, sh_create));
     http_svr->Get("/api/sheets", with_cb(cb_sheet_, sh_list));

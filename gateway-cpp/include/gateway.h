@@ -79,10 +79,11 @@ private:
     // Route handlers — 返回三态供熔断器区分业务/传输错误
     // username 通过 gRPC metadata 传递（供日志使用），user_id 写入 proto 字段（供 DB 查询使用）。
     // ---- 同步 handler (httplib 8081 使用) ----
-    // token_out receives the raw JWT; callers set it as HttpOnly Set-Cookie.
-    // Response body contains {"success":true/false} without the token.
-    RpcResult HandleLogin(const std::string& body, std::string& response, std::string& token_out);
-    RpcResult HandleRegister(const std::string& body, std::string& response, std::string& token_out);
+    // token_out receives the raw Access Token JWT; callers set it as HttpOnly Set-Cookie.
+    // rt_out receives the Refresh Token UUID; callers include it in the JSON response body.
+    // Response body contains {"success":true,"username":"...","_rt":"<uuid>"} without the AT.
+    RpcResult HandleLogin(const std::string& body, std::string& response, std::string& at_out, std::string& rt_out);
+    RpcResult HandleRegister(const std::string& body, std::string& response, std::string& at_out, std::string& rt_out);
     RpcResult HandleServices(std::string& response);
     RpcResult HandleSheetCreate(const std::string& username, int64_t user_id,
                                 const std::string& body, const std::string& idempotency_key,
@@ -120,7 +121,13 @@ private:
     Task<void> HandleSheetListCoro(std::string username, int64_t user_id,
                                    int page, int page_size, std::string& response);
 
-    // Parses rpc_token from the Cookie header value; old tokens without "uid" get user_id=0.
+    // Parse and verify the Access Token from rpc_at Cookie. No Redis token_ver check
+    // needed — AT is short-lived (15min) and expires naturally.
+    bool VerifyAccessToken(const std::string& cookie_header, std::string& username, int64_t& user_id) const;
+    // Generate AT (JWT, 15min) and RT (UUID, stored in Redis, 7d)
+    std::string CreateAccessToken(const std::string& username) const;
+    std::string CreateRefreshToken(const std::string& username) const;
+    // Legacy: kept for backward compat
     bool VerifyAuth(const std::string& cookie_header, std::string& username, int64_t& user_id, std::string& raw_token) const;
     std::string CreateJWT(const std::string& username) const;
     bool WaitForBackends(int timeout_sec = 30);

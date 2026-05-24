@@ -118,9 +118,6 @@ grpc::Status AuthServiceImpl::Login(grpc::ServerContext*,
     std::string payload_str = payload.dump();
     std::string token = jwt::create(payload_str, jwt_secret_);
 
-    // 同步 token_version 到 Redis（Gateway 验证用）
-    if (redis_ && redis_->IsConnected())
-        redis_->SetJSON("token_ver:" + req->username(), std::to_string(ver), 86400);
 
     // 密码使用完毕，擦除内存中的副本
     { std::string pw = req->password(); if (!pw.empty()) OPENSSL_cleanse(&pw[0], pw.size()); }
