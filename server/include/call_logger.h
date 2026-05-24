@@ -4,6 +4,9 @@
 #include <mutex>
 #include <deque>
 #include <chrono>
+#include <thread>
+#include <condition_variable>
+#include <atomic>
 #include <nlohmann/json.hpp>
 
 using json = nlohmann::json;
@@ -25,6 +28,7 @@ struct CallEntry {
 class CallLogger {
 public:
     CallLogger(size_t max_entries = 1000, RedisClient* redis = nullptr);
+    ~CallLogger();
 
     void Log(const std::string& username, const std::string& service,
              const std::string& method, const json& params, const json& result,
@@ -41,6 +45,14 @@ private:
     int next_id_ = 1;
     RedisClient* redis_ = nullptr;
 
+    // 后台 flush 线程 — Redis 网络 I/O 不阻塞业务线程
+    std::vector<std::pair<std::string, std::string>> pending_;  // (json, username)
+    std::condition_variable cv_;
+    std::thread flush_thread_;
+    std::atomic<bool> running_{true};
+
+    void FlushLoop();
+
     std::string NowString() const;
-    std::string SerializeEntry(const CallEntry& entry) const;
+    static std::string SerializeEntry(const CallEntry& entry);
 };
