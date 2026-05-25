@@ -144,7 +144,9 @@ services:
         aliases: [redis-cluster]
     healthcheck:
       test: ["CMD-SHELL", "redis-cli -p 7000 -a ${REDIS_PASSWORD:-rpc-redis-123456} ping"]
-      interval: 5s; timeout: 3s; retries: 5
+      interval: 5s
+      timeout: 3s
+      retries: 5
 
   redis-cluster-2:
     image: redis:7-alpine
@@ -183,18 +185,12 @@ services:
   redis-cluster-init:
     image: redis:7-alpine
     depends_on:
-      redis-cluster-1:
-        condition: service_healthy
-      redis-cluster-2:
-        condition: service_healthy
-      redis-cluster-3:
-        condition: service_healthy
-      redis-cluster-4:
-        condition: service_healthy
-      redis-cluster-5:
-        condition: service_healthy
-      redis-cluster-6:
-        condition: service_healthy
+      - redis-cluster-1
+      - redis-cluster-2
+      - redis-cluster-3
+      - redis-cluster-4
+      - redis-cluster-5
+      - redis-cluster-6
     entrypoint: >
       /bin/sh -c "
         sleep 3 &&
