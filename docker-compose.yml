@@ -434,6 +434,7 @@ services:
     build: .
     environment:
       JWT_SECRET: "${JWT_SECRET}"
+      ADMIN_USERS: "${ADMIN_USERS:-}"
     command: >
       /app/rpc_gateway --port 8080
       --grpc-auth rpc-auth:50051
@@ -470,6 +471,7 @@ services:
     build: .
     environment:
       JWT_SECRET: "${JWT_SECRET}"
+      ADMIN_USERS: "${ADMIN_USERS:-}"
     command: >
       /app/rpc_gateway --port 8080
       --grpc-auth rpc-auth:50051
