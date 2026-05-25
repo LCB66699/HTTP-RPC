@@ -8,11 +8,15 @@
 浏览器 (Web UI)
    │  HTTPS
    ▼
-nginx :443/80                    ← TLS 终结 + 静态文件(sendfile) + gzip + 限流(100r/s+burst50)
-   │  /api/*  → least_conn 负载均衡
-   ├─────────────────────────────────────┐
-   ▼                                     ▼
-Gateway-1 :8081                  Gateway-2 :8081   ← HttpOnly Cookie 鉴权 + TM(2PC) + 熔断器(Redis Cluster)
+LVS + Keepalived (VIP浮动)      ← 4层 DR 模式 wlc 调度
+   │  /api/*  → TCP 负载均衡
+   ├──────────┬──────────┐
+   ▼          ▼          ▼
+nginx-1 :443 nginx-2 :443 nginx-3 :443  ← TLS 终结 + 限流(100r/s+burst50) + 静态文件
+   │  upstream least_conn → gateway_pool
+   ├──────────┐
+   ▼          ▼
+Gateway-1 :8081 Gateway-2 :8081   ← 双Token鉴权 + TM(2PC) + 多维熔断(滑动窗口/P99)
    │  gRPC/HTTP/2  round_robin (DNS aliases, 5s 重解析)
    │
    ├──→ Auth  (rpc-auth:50051)   副本 x2  DB: rpc_auth
@@ -23,8 +27,7 @@ Gateway-1 :8081                  Gateway-2 :8081   ← HttpOnly Cookie 鉴权 + 
           └── Redis Cluster 6节点 (3M+3S)
 ```
 
-**容器总数：24 个**（nginx×1 + gateway×2 + auth×2 + sheet×3 + file×2 + MySQL×9 + Redis×7 + MinIO×1）
-> MySQL 9 个 = mysql-auth ×1 + mysql-spreadsheet-0×2(master+slave) + mysql-spreadsheet-1×2 + mysql-file-0×2 + mysql-file-1×2
+**容器总数：27 个**（LVS×2 + nginx×3 + gateway×2 + auth×2 + sheet×3 + file×2 + MySQL×5 + Redis×7 + MinIO×1）
 
 ### 协议栈
 
@@ -90,8 +93,10 @@ Gateway-1 :8081                  Gateway-2 :8081   ← HttpOnly Cookie 鉴权 + 
 ├── web-ui/                       Web 管理界面
 ├── redis/cluster/               Redis Cluster 配置
 ├── mysql/                       MySQL 主从配置
+├── lvs/                          LVS DR + Keepalived 4层LB
+├── k8s/                          Kubernetes 部署清单
 ├── Dockerfile                   多阶段构建 (含 redis-plus-plus 源码编译)
-├── docker-compose.yml           21 容器一键部署
+├── docker-compose.yml           27 容器一键部署
 ├── init.sql                     MySQL 初始建库
 └── Makefile
 ```
@@ -189,8 +194,9 @@ TM.Begin("tx-001")
 
 | 方法 | 路径 | 说明 |
 |------|------|------|
-| POST | `/api/login` | 登录，响应写入 HttpOnly Cookie `rpc_token=<jwt>` |
-| POST | `/api/register` | 注册，同上自动登录 |
+| POST | `/api/login` | 登录，Cookie `rpc_at=<AT>` 15min + body `_rt=<RT>` 7d |
+| POST | `/api/register` | 注册，同上双 Token |
+| POST | `/api/refresh` | 换票：RT → 新 AT（无需鉴权） |
 | POST | `/api/logout` | 登出，清除 Cookie（Set-Cookie Max-Age=0） |
 
 ### 数据表格
@@ -235,6 +241,8 @@ TM.Begin("tx-001")
 | `--redis-cluster` | — | Redis Cluster 种子节点 (可重复多次) |
 | `--redis-password` | — | Redis AUTH 密码 |
 | `--redis-pool-size` | 4 | 每节点连接数 |
+| `--max-concurrent` | 256 | 信号量并发上限 |
+| `--queue-timeout-ms` | 3000 | 并发排队超时 (ms) |
 
 ### Server
 
@@ -271,6 +279,8 @@ K8s manifest 文件位于 `k8s/` 目录，包含 Deployment、StatefulSet、Serv
 
 | 层级 | 并发原语 | 说明 |
 |------|------|------|
+| LVS | VRRP + wlc | 主备 VIP 漂移，TCP 四层无锁 |
+| Gateway 信号量 | `counting_semaphore<256>` | 并发上限，排队 3s 超时 503 |
 | Gateway HTTP | 无共享状态 | 每请求独立线程上下文 |
 | 熔断器读路径 | `atomic<State>` | 每请求调 AllowRequest，无锁 |
 | 熔断器写路径 | `mutex` | 状态变迁时加锁，微秒级 |
