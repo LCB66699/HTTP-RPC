@@ -291,6 +291,7 @@ public:
         }
         return "UNKNOWN";
     }
+    int TimeoutSec() const { return cfg_.timeout_sec; }
 
     // 暴露指标给系统状态端点
     struct Metrics {

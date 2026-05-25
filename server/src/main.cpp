@@ -195,7 +195,7 @@ int main(int argc, char* argv[]) {
 
     // HealthMonitor（所有实例启用心跳）
     HealthMonitorImpl health_monitor;
-    health_monitor.SetDatabase(db.get());
+    health_monitor.SetRedis(redis.get());
     health_monitor.SetNodeInfo(service + "-" + std::to_string(port), service, host, port);
     health_monitor.StartHeartbeat();
     builder.RegisterService(&health_monitor);

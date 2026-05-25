@@ -79,12 +79,15 @@ Gateway::Gateway(const std::string& listen_addr, int listen_port,
                  const std::string& web_dir,
                  const std::vector<std::string>& redis_cluster_seeds,
                  const std::string& redis_password,
-                 int redis_pool_size)
+                 int redis_pool_size,
+                 int max_concurrent,
+                 int queue_timeout_ms)
     : listen_addr_(listen_addr), listen_port_(listen_port),
       grpc_auth_addr_(grpc_auth_addr), grpc_sheet_addr_(grpc_sheet_addr), grpc_file_addr_(grpc_file_addr),
       jwt_secret_(jwt_secret), web_dir_(web_dir),
       redis_cluster_seeds_(redis_cluster_seeds),
-      redis_password_(redis_password), redis_pool_size_(redis_pool_size)
+      redis_password_(redis_password), redis_pool_size_(redis_pool_size),
+      max_concurrent_(max_concurrent), queue_timeout_ms_(queue_timeout_ms)
 {
     // 每个服务一个 Channel，DNS别名返回多IP → gRPC round_robin 自动负载均衡
     if (!grpc_auth_addr_.empty()) {
@@ -540,15 +543,50 @@ RpcResult Gateway::HandleHealth(std::string& response) {
             default:                               return "SHUTDOWN";
         }
     };
-    response = std::string("{")
-        + "\"auth\":{\"channel\":\"" + state_str(auth_ch_ ? auth_ch_->GetState(true) : GRPC_CHANNEL_SHUTDOWN)
-        + "\",\"breaker\":\"" + cb_auth_.StateStr() + "\"},"
-        + "\"sheet\":{\"channel\":\"" + state_str(sheet_ch_ ? sheet_ch_->GetState(true) : GRPC_CHANNEL_SHUTDOWN)
-        + "\",\"breaker\":\"" + cb_sheet_.StateStr() + "\"},"
-        + "\"file\":{\"channel\":\"" + state_str(file_ch_ ? file_ch_->GetState(true) : GRPC_CHANNEL_SHUTDOWN)
-        + "\",\"breaker\":\"" + cb_file_.StateStr() + "\"},"
-        + "\"gateway\":\"READY\""
-        + "}";
+
+    nlohmann::json result;
+    result["gateway"] = "READY";
+
+    // gRPC channel + breaker state
+    result["channels"]["auth"]["state"]   = state_str(auth_ch_ ? auth_ch_->GetState(true) : GRPC_CHANNEL_SHUTDOWN);
+    result["channels"]["auth"]["breaker"] = cb_auth_.StateStr();
+    result["channels"]["sheet"]["state"]  = state_str(sheet_ch_ ? sheet_ch_->GetState(true) : GRPC_CHANNEL_SHUTDOWN);
+    result["channels"]["sheet"]["breaker"] = cb_sheet_.StateStr();
+    result["channels"]["file"]["state"]   = state_str(file_ch_ ? file_ch_->GetState(true) : GRPC_CHANNEL_SHUTDOWN);
+    result["channels"]["file"]["breaker"] = cb_file_.StateStr();
+
+    // 从 Redis 聚合所有节点心跳
+    int online = 0, offline = 0;
+    if (redis_ && redis_->IsConnected()) {
+        // 已知的节点 ID 列表（硬编码，后续可改为 Redis SCAN）
+        static const char* kKnownNodes[] = {
+            "auth-50051", "auth-50052",
+            "spreadsheet-50051", "spreadsheet-50052", "spreadsheet-50053",
+            "file-50051", "file-50052",
+            "gateway-8080", "gateway-8081"
+        };
+        nlohmann::json nodes = nlohmann::json::array();
+        for (auto* nid : kKnownNodes) {
+            std::string val;
+            if (redis_->GetJSON("hb:" + std::string(nid), val)) {
+                auto hb = nlohmann::json::parse(val);
+                hb["status"] = "ONLINE";
+                nodes.push_back(hb);
+                online++;
+            } else {
+                nlohmann::json off;
+                off["node_id"] = nid;
+                off["status"]  = "OFFLINE";
+                nodes.push_back(off);
+                offline++;
+            }
+        }
+        result["nodes"] = nodes;
+    }
+    result["total_online"]  = online;
+    result["total_offline"] = offline;
+
+    response = result.dump();
     return RpcResult::SUCCESS;
 }
 
@@ -607,6 +645,18 @@ bool Gateway::Start() {
     file_cq_.Start();
     printf("[Gateway] CQ loops started (auth/sheet/file)\n");
 
+    // 信号量限流 — C++20 std::counting_semaphore
+    // 压测时设 STRESS_TEST=1 禁用以测裸性能
+    const char* stress_env = std::getenv("STRESS_TEST");
+    if (stress_env && stress_env[0] == '1') {
+        max_concurrent_ = 1000000;  // 极高值 = 禁用
+        queue_timeout_ms_ = 100;
+        printf("[Gateway] STRESS_TEST mode — protections disabled\n");
+    }
+    sem_ = std::make_unique<std::counting_semaphore<>>(max_concurrent_);
+    printf("[Gateway] Concurrency limit: %d (queue timeout: %dms)\n",
+           max_concurrent_, queue_timeout_ms_);
+
     // ---- h2c server (8080) ----
     Http2Server svr;
     svr.set_pre_routing_handler([](const Http2Server::Request&, Http2Server::Response& res) {
@@ -650,11 +700,11 @@ bool Gateway::Start() {
 
     auto login = [this, &kSetCookieFmt](auto& req, auto& res) {
         if (!cb_auth_.AllowRequest()) {
-            res.set_content("{\"success\":false,\"error\":\"circuit open\"}", "application/json");
+            res.status = 503; res.set_header("Retry-After", "10"); res.set_content(R"({"error":"service unavailable"})", "application/json");
             return;
         }
 
-        // 用户名级防爆破：跨 IP 累计失败 → 封锁（nginx 已处理单 IP 流速）
+        // 用户名级防爆破：跨 IP 累计失败 → 封锁（nginx 已处理单 IP 流速限制）
         std::string login_user = JsonGet(req.body, "username");
         if (redis_ && redis_->IsConnected() && !login_user.empty()) {
             if (redis_->GetInt("rate:block:" + login_user) >= 1) {
@@ -704,7 +754,7 @@ bool Gateway::Start() {
     };
     auto reg = [this](auto& req, auto& res) {
         if (!cb_auth_.AllowRequest()) {
-            res.set_content("{\"success\":false,\"error\":\"circuit open\"}", "application/json");
+            res.status = 503; res.set_header("Retry-After", "10"); res.set_content(R"({"error":"service unavailable"})", "application/json");
             return;
         }
 
@@ -783,7 +833,7 @@ bool Gateway::Start() {
     auto file_up = [this, &require_auth_full](auto& req, auto& res) {
         std::string u, tok; int64_t uid = 0;
         if (!require_auth_full(req, res, u, uid, tok)) return;
-        if (!cb_file_.AllowRequest()) { res.set_content("{\"success\":false,\"error\":\"circuit open\"}", "application/json"); return; }
+        if (!cb_file_.AllowRequest()) { res.status = 503; res.set_header("Retry-After", "10"); res.set_content(R"({"error":"service unavailable"})", "application/json"); return; }
         auto file = req.form.get_file("file");
         if (file.filename.empty()) { res.set_content("{\"success\":false,\"error\":\"No file\"}", "application/json"); res.status = 400; return; }
         // 限制上传大小：gRPC 64MB 硬限制内留余量
@@ -863,25 +913,47 @@ bool Gateway::Start() {
         res.set_content(fresp.file_content(), fresp.file().mime_type());
     };
 
-    // Auth+CB handler factory: auth check → inner(rpc_call) → CB success/fail (with latency)
-    auto with_cb = [](CircuitBreaker& cb, auto inner) {
-        return [&cb, inner = std::move(inner)](auto& req, auto& res) {
+    // Auth+CB handler factory: semaphore排队 → CB检查 → inner(rpc_call) → 反馈
+    auto with_cb = [this](CircuitBreaker& cb, auto inner) {
+        return [this, &cb, inner = std::move(inner)](auto& req, auto& res) {
             std::string r;
-            if (!cb.AllowRequest()) { r = "{\"success\":false,\"error\":\"circuit open\"}"; }
-            else {
-                auto t0 = std::chrono::steady_clock::now();
-                auto result = inner(req, r);
-                auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
-                    std::chrono::steady_clock::now() - t0).count();
-                switch (result) {
-                    case RpcResult::SUCCESS:
-                        cb.RecordResult(true, elapsed); break;
-                    case RpcResult::TRANSPORT_FAILURE:
-                        cb.RecordResult(false, elapsed); break;
-                    case RpcResult::BUSINESS_FAILURE:  break;
-                    case RpcResult::AUTH_FAILURE:      res.status = 401; break;
-                    case RpcResult::BAD_REQUEST:       res.status = 400; break;
-                }
+
+            // ① 熔断检查 → 503
+            if (!cb.AllowRequest()) {
+                res.status = 503;
+                char buf[64]; snprintf(buf, sizeof(buf), "%d", cb.TimeoutSec());
+                res.set_header("Retry-After", buf);
+                res.set_content(R"({"error":"service unavailable","reason":"circuit_breaker_open"})",
+                                "application/json");
+                return;
+            }
+
+            // ② 并发控制 → 排队 → 超时 503
+            auto deadline = std::chrono::steady_clock::now()
+                          + std::chrono::milliseconds(queue_timeout_ms_);
+            if (!sem_->try_acquire_until(deadline)) {
+                res.status = 503;
+                res.set_header("Retry-After", "5");
+                res.set_content(R"({"error":"server overloaded"})", "application/json");
+                return;
+            }
+
+            // ③ 执行
+            auto t0 = std::chrono::steady_clock::now();
+            auto result = inner(req, r);
+            auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
+                std::chrono::steady_clock::now() - t0).count();
+            sem_->release();
+
+            // ④ 熔断反馈
+            switch (result) {
+                case RpcResult::SUCCESS:
+                    cb.RecordResult(true, elapsed); break;
+                case RpcResult::TRANSPORT_FAILURE:
+                    cb.RecordResult(false, elapsed); break;
+                case RpcResult::BUSINESS_FAILURE:  break;
+                case RpcResult::AUTH_FAILURE:      res.status = 401; break;
+                case RpcResult::BAD_REQUEST:       res.status = 400; break;
             }
             res.set_content(r, "application/json");
         };

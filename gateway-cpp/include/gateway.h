@@ -8,6 +8,7 @@
 #include <string>
 #include <vector>
 #include <memory>
+#include <semaphore>
 #include <grpcpp/grpcpp.h>
 #include "server/include/redis_client.h"
 #include "server/include/tx_manager.h"
@@ -39,7 +40,9 @@ public:
             const std::string& web_dir,
             const std::vector<std::string>& redis_cluster_seeds = {},
             const std::string& redis_password = "",
-            int redis_pool_size = 4);
+            int redis_pool_size = 4,
+            int max_concurrent = 256,
+            int queue_timeout_ms = 3000);
 
     bool Start();
     void Stop();
@@ -53,6 +56,9 @@ private:
     std::vector<std::string> redis_cluster_seeds_;
     std::string redis_password_;
     int redis_pool_size_;
+    int max_concurrent_ = 256;
+    int queue_timeout_ms_ = 3000;
+    std::unique_ptr<std::counting_semaphore<>> sem_;
     std::unique_ptr<RedisClient> redis_;
     std::unique_ptr<Database> tx_db_;
     std::unique_ptr<TxManager> tx_manager_;

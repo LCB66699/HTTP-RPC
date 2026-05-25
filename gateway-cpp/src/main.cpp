@@ -26,6 +26,8 @@ int main(int argc, char* argv[]) {
     std::vector<std::string> redis_cluster_seeds;
     std::string redis_password;
     int redis_pool_size = 4;
+    int max_concurrent = 256;
+    int queue_timeout_ms = 3000;
 
     for (int i = 1; i < argc; ++i) {
         std::string arg = argv[i];
@@ -41,6 +43,8 @@ int main(int argc, char* argv[]) {
         }
         else if (arg == "--redis-password" && i+1 < argc) redis_password = argv[++i];
         else if (arg == "--redis-pool-size" && i+1 < argc) redis_pool_size = std::atoi(argv[++i]);
+        else if (arg == "--max-concurrent" && i+1 < argc) max_concurrent = std::atoi(argv[++i]);
+        else if (arg == "--queue-timeout-ms" && i+1 < argc) queue_timeout_ms = std::atoi(argv[++i]);
         else if (arg == "--help" || arg == "-h") {
             printf("Usage: %s [options]\n", argv[0]);
             printf("  --port <port>              HTTP port (default: 8080)\n");
@@ -50,6 +54,8 @@ int main(int argc, char* argv[]) {
             printf("  --redis-cluster <h:p>      Add Redis Cluster seed node (can repeat)\n");
             printf("  --redis-password <pw>      Redis AUTH password\n");
             printf("  --redis-pool-size <n>      Connections per seed node (default: 4)\n");
+            printf("  --max-concurrent <n>       Max concurrent requests (default: 256)\n");
+            printf("  --queue-timeout-ms <ms>    Queue wait timeout (default: 3000)\n");
             return 0;
         }
     }
@@ -59,7 +65,8 @@ int main(int argc, char* argv[]) {
 
     Gateway gw(listen_addr, listen_port, grpc_auth, grpc_sheet, grpc_file,
                jwt_secret, web_dir,
-               redis_cluster_seeds, redis_password, redis_pool_size);
+               redis_cluster_seeds, redis_password, redis_pool_size,
+               max_concurrent, queue_timeout_ms);
     g_gw = &gw;
     gw.Start();
     return 0;
