@@ -628,6 +628,12 @@ async function loadMonitor() {
   } catch (e) {
     console.error('[monitor] load error:', e);
   }
+  // 加载熔断器滑动窗口数据
+  try {
+    const bs = await apiGet('/breaker/stats');
+    renderBreakerStats(bs);
+  } catch(e) { console.error('[breaker-stats]', e); }
+
   // 10s 自动刷新
   if (monitorTimer) clearTimeout(monitorTimer);
   monitorTimer = setTimeout(loadMonitor, 10000);
@@ -687,6 +693,47 @@ function renderMonitor(data) {
     }
   });
 }
+
+function renderBreakerStats(data) {
+  const el = document.getElementById('breaker-stats');
+  if (!el || !data) return;
+  const keys = ['auth', 'sheet', 'file'];
+  el.innerHTML = keys.map(k => {
+    const s = data[k];
+    if (!s) return '';
+    const errRate = s.total > 0 ? (s.failed / s.total * 100).toFixed(1) : '0.0';
+    const slowRate = s.total > 0 ? (s.slow / s.total * 100).toFixed(1) : '0.0';
+    const color = s.state === 'CLOSED' ? '#10b981' : s.state === 'OPEN' ? '#f43f5e' : '#f59e0b';
+    return `<span style="color:${color};font-weight:500;">${k.padEnd(7)}</span>` +
+      `state=<b>${s.state.padEnd(10)}</b>` +
+      `total=${s.total} failed=${s.failed}(${errRate}%) slow=${s.slow}(${slowRate}%) ` +
+      `P99=${s.p99_ms}ms fails=${s.local_fails}`;
+  }).join('<br>');
+}
+
+// 压测按钮
+document.getElementById('btn-stress-run').addEventListener('click', async () => {
+  const status = document.getElementById('stress-status');
+  const result = document.getElementById('stress-result');
+  status.textContent = '压测运行中...  (等待 2-3s)';
+  result.style.display = 'none';
+  try {
+    const res = await fetch(API + '/stress/run', { method: 'POST', credentials: 'same-origin' });
+    const data = await res.json();
+    status.textContent = '完成 ✓';
+    result.style.display = 'block';
+    result.textContent =
+      `QPS:      ${data.qps || 'N/A'}\n` +
+      `P50:      ${data.p50 || 'N/A'}\n` +
+      `P95:      ${data.p95 || 'N/A'}\n` +
+      `P99:      ${data.p99 || 'N/A'}\n` +
+      `Failed:   ${data.failed || '0'}\n` +
+      `Non-2xx:  ${data.non_2xx || '0'}`;
+  } catch(e) {
+    status.textContent = '压测失败';
+    console.error('[stress]', e);
+  }
+});
 
 document.getElementById('btn-refresh-monitor').addEventListener('click', () => {
   if (monitorTimer) clearTimeout(monitorTimer);

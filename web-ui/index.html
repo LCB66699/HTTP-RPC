@@ -298,6 +298,22 @@
       <h3>服务连通性 & 熔断器</h3>
       <div id="monitor-services" style="font-family:monospace;font-size:0.82rem;line-height:1.8;padding:8px 0;"></div>
     </div>
+
+    <!-- 熔断器滑动窗口数据 -->
+    <div class="card" style="margin-top:16px;">
+      <h3>熔断器滑动窗口 (P99 / 错误率 / 慢调用率)</h3>
+      <div id="breaker-stats" style="font-family:monospace;font-size:0.8rem;line-height:1.6;padding:8px 0;">
+        <span style="color:var(--text-muted);">加载中...</span>
+      </div>
+    </div>
+
+    <!-- 快速压测 -->
+    <div class="card" style="margin-top:16px;">
+      <h3>快速压测 (ab -n 200 -c 10)</h3>
+      <button id="btn-stress-run" class="btn" style="background:var(--accent);color:#fff;">▶ 开始压测</button>
+      <span id="stress-status" style="margin-left:12px;color:var(--text-muted);"></span>
+      <pre id="stress-result" style="margin-top:8px;background:var(--bg-secondary);padding:10px;border-radius:6px;font-size:0.78rem;max-height:300px;overflow:auto;display:none;"></pre>
+    </div>
   </section>
 
   <!-- ==================== Profile / Personal Center Panel ==================== -->
