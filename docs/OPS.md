@@ -95,7 +95,41 @@ docker compose start gateway-1
 
 ---
 
-## 二、DNS 别名
+## 二、LVS + Keepalived（4 层负载均衡）
+
+**架构**：LVS Master × 1 + LVS Backup × 1 → nginx × 3（DR 模式）
+
+```bash
+# 查看 LVS 状态
+docker exec -it lvs-master ipvsadm -Ln
+
+# 查看 VIP 持有者
+docker exec lvs-master ip addr show eth0 | grep 192.168
+
+# 查看 real server 健康状态
+docker exec lvs-master ipvsadm -Ln --stats
+
+# 查看 Keepalived 日志
+docker logs lvs-master --tail 20
+
+# 手动摘除 nginx real server
+docker exec lvs-master ipvsadm -d -t 192.168.1.100:443 -r nginx-2
+
+# 恢复
+docker exec lvs-master ipvsadm -a -t 192.168.1.100:443 -r nginx-2 -w 1
+
+# LVS 故障转移测试 — 停 Master, VIP 应漂移到 Backup
+docker stop lvs-master
+docker exec lvs-backup ip addr show eth0 | grep 192.168  # 应看到 VIP
+docker start lvs-master
+
+# nginx 故障转移 — 停一个 nginx, LVS 应摘除
+docker stop nginx-2
+docker exec lvs-master ipvsadm -Ln  # nginx-2 应消失
+docker start nginx-2
+```
+
+## 三、DNS 别名
 
 ```bash
 docker compose exec gateway-1 getent hosts rpc-sheet   # → 3 行 IP (sheet-1/2/3)

@@ -1,20 +1,55 @@
 services:
-  nginx:
+  # ===== LVS + Keepalived (4层负载均衡, DR模式) =====
+  lvs-master:
     build:
-      dockerfile: Dockerfile.nginx
-    ports:
-      - "80:80"
-      - "443:443"
+      context: ./lvs
+    cap_add: [NET_ADMIN, SYS_MODULE]
+    network_mode: host
+    environment:
+      - VIP=${LVS_VIP:-192.168.1.100}
+      - ROLE=MASTER
+      - PRIORITY=100
+
+  lvs-backup:
+    build:
+      context: ./lvs
+    cap_add: [NET_ADMIN, SYS_MODULE]
+    network_mode: host
+    environment:
+      - VIP=${LVS_VIP:-192.168.1.100}
+      - ROLE=BACKUP
+      - PRIORITY=90
+
+  # ===== nginx ×3 (LVS real servers) =====
+  nginx-1:
+    build: { dockerfile: Dockerfile.nginx }
     volumes:
       - ./nginx.conf:/etc/nginx/nginx.conf:ro
       - ./web-ui:/app/web-ui:ro
-    depends_on:
-      minio:
-        condition: service_healthy
-      gateway-1:
-        condition: service_healthy
-      gateway-2:
-        condition: service_healthy
+      - ./lvs/realserver.sh:/usr/local/bin/realserver.sh:ro
+    command: >
+      sh -c "/usr/local/bin/realserver.sh && nginx -g 'daemon off;'"
+    depends_on: [gateway-1, gateway-2]
+
+  nginx-2:
+    build: { dockerfile: Dockerfile.nginx }
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./web-ui:/app/web-ui:ro
+      - ./lvs/realserver.sh:/usr/local/bin/realserver.sh:ro
+    command: >
+      sh -c "/usr/local/bin/realserver.sh && nginx -g 'daemon off;'"
+    depends_on: [gateway-1, gateway-2]
+
+  nginx-3:
+    build: { dockerfile: Dockerfile.nginx }
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./web-ui:/app/web-ui:ro
+      - ./lvs/realserver.sh:/usr/local/bin/realserver.sh:ro
+    command: >
+      sh -c "/usr/local/bin/realserver.sh && nginx -g 'daemon off;'"
+    depends_on: [gateway-1, gateway-2]
 
   # ===== MySQL Auth (不分片) =====
   mysql-auth:
