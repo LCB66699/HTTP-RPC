@@ -62,7 +62,9 @@ services:
       - ./data/mysql-auth:/var/lib/mysql
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
-      interval: 5s; timeout: 3s; retries: 10
+      interval: 5s
+      timeout: 3s
+      retries: 10
 
   # ===== MySQL Spreadsheet (双分片, 每片1主1从) =====
   mysql-spreadsheet-0:
@@ -71,7 +73,9 @@ services:
     volumes: ["./init.sql:/docker-entrypoint-initdb.d/init.sql", "./data/mysql-sp-0:/var/lib/mysql"]
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
-      interval: 5s; timeout: 3s; retries: 10
+      interval: 5s
+      timeout: 3s
+      retries: 10
 
   mysql-spreadsheet-0-slave:
     image: mysql:8.0
@@ -85,7 +89,9 @@ services:
     volumes: ["./init.sql:/docker-entrypoint-initdb.d/init.sql", "./data/mysql-sp-1:/var/lib/mysql"]
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
-      interval: 5s; timeout: 3s; retries: 10
+      interval: 5s
+      timeout: 3s
+      retries: 10
 
   mysql-spreadsheet-1-slave:
     image: mysql:8.0
@@ -100,7 +106,9 @@ services:
     volumes: ["./init.sql:/docker-entrypoint-initdb.d/init.sql", "./data/mysql-f-0:/var/lib/mysql"]
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
-      interval: 5s; timeout: 3s; retries: 10
+      interval: 5s
+      timeout: 3s
+      retries: 10
 
   mysql-file-0-slave:
     image: mysql:8.0
@@ -114,7 +122,9 @@ services:
     volumes: ["./init.sql:/docker-entrypoint-initdb.d/init.sql", "./data/mysql-f-1:/var/lib/mysql"]
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
-      interval: 5s; timeout: 3s; retries: 10
+      interval: 5s
+      timeout: 3s
+      retries: 10
 
   mysql-file-1-slave:
     image: mysql:8.0
@@ -128,77 +138,47 @@ services:
     volumes:
       - ./redis/cluster/redis.conf:/usr/local/etc/redis/redis.conf
       - ./data/redis-cluster-1:/data
-    environment:
-      REDIS_PORT: "7000"
-    command: redis-server /usr/local/etc/redis/redis.conf
+    command: redis-server /usr/local/etc/redis/redis.conf --port 7000 --requirepass ${REDIS_PASSWORD:-rpc-redis-123456} --masterauth ${REDIS_PASSWORD:-rpc-redis-123456}
     networks:
       default:
         aliases: [redis-cluster]
     healthcheck:
       test: ["CMD-SHELL", "redis-cli -p 7000 -a ${REDIS_PASSWORD:-rpc-redis-123456} ping"]
-      interval: 5s
-      timeout: 3s
-      retries: 5
+      interval: 5s; timeout: 3s; retries: 5
 
   redis-cluster-2:
     image: redis:7-alpine
     volumes:
       - ./redis/cluster/redis.conf:/usr/local/etc/redis/redis.conf
       - ./data/redis-cluster-2:/data
-    environment:
-      REDIS_PORT: "7001"
-    command: redis-server /usr/local/etc/redis/redis.conf
+    command: redis-server /usr/local/etc/redis/redis.conf --port 7001 --requirepass ${REDIS_PASSWORD:-rpc-redis-123456} --masterauth ${REDIS_PASSWORD:-rpc-redis-123456}
     networks:
       default:
         aliases: [redis-cluster]
 
   redis-cluster-3:
     image: redis:7-alpine
-    volumes:
-      - ./redis/cluster/redis.conf:/usr/local/etc/redis/redis.conf
-      - ./data/redis-cluster-3:/data
-    environment:
-      REDIS_PORT: "7002"
-    command: redis-server /usr/local/etc/redis/redis.conf
-    networks:
-      default:
-        aliases: [redis-cluster]
+    volumes: [./redis/cluster/redis.conf:/usr/local/etc/redis/redis.conf, ./data/redis-cluster-3:/data]
+    command: redis-server /usr/local/etc/redis/redis.conf --port 7002 --requirepass ${REDIS_PASSWORD:-rpc-redis-123456} --masterauth ${REDIS_PASSWORD:-rpc-redis-123456}
+    networks: { default: { aliases: [redis-cluster] } }
 
   redis-cluster-4:
     image: redis:7-alpine
-    volumes:
-      - ./redis/cluster/redis.conf:/usr/local/etc/redis/redis.conf
-      - ./data/redis-cluster-4:/data
-    environment:
-      REDIS_PORT: "7003"
-    command: redis-server /usr/local/etc/redis/redis.conf
-    networks:
-      default:
-        aliases: [redis-cluster]
+    volumes: [./redis/cluster/redis.conf:/usr/local/etc/redis/redis.conf, ./data/redis-cluster-4:/data]
+    command: redis-server /usr/local/etc/redis/redis.conf --port 7003 --requirepass ${REDIS_PASSWORD:-rpc-redis-123456} --masterauth ${REDIS_PASSWORD:-rpc-redis-123456}
+    networks: { default: { aliases: [redis-cluster] } }
 
   redis-cluster-5:
     image: redis:7-alpine
-    volumes:
-      - ./redis/cluster/redis.conf:/usr/local/etc/redis/redis.conf
-      - ./data/redis-cluster-5:/data
-    environment:
-      REDIS_PORT: "7004"
-    command: redis-server /usr/local/etc/redis/redis.conf
-    networks:
-      default:
-        aliases: [redis-cluster]
+    volumes: [./redis/cluster/redis.conf:/usr/local/etc/redis/redis.conf, ./data/redis-cluster-5:/data]
+    command: redis-server /usr/local/etc/redis/redis.conf --port 7004 --requirepass ${REDIS_PASSWORD:-rpc-redis-123456} --masterauth ${REDIS_PASSWORD:-rpc-redis-123456}
+    networks: { default: { aliases: [redis-cluster] } }
 
   redis-cluster-6:
     image: redis:7-alpine
-    volumes:
-      - ./redis/cluster/redis.conf:/usr/local/etc/redis/redis.conf
-      - ./data/redis-cluster-6:/data
-    environment:
-      REDIS_PORT: "7005"
-    command: redis-server /usr/local/etc/redis/redis.conf
-    networks:
-      default:
-        aliases: [redis-cluster]
+    volumes: [./redis/cluster/redis.conf:/usr/local/etc/redis/redis.conf, ./data/redis-cluster-6:/data]
+    command: redis-server /usr/local/etc/redis/redis.conf --port 7005 --requirepass ${REDIS_PASSWORD:-rpc-redis-123456} --masterauth ${REDIS_PASSWORD:-rpc-redis-123456}
+    networks: { default: { aliases: [redis-cluster] } }
 
   redis-cluster-init:
     image: redis:7-alpine
