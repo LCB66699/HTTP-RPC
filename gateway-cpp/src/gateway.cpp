@@ -666,6 +666,57 @@ bool Gateway::HandleSystemStatus(std::string& response) {
     return true;
 }
 
+RpcResult Gateway::HandleBreakerStats(std::string& response) {
+    nlohmann::json r;
+    for (auto* cb : {&cb_auth_, &cb_sheet_, &cb_file_}) {
+        auto m = cb->GetMetrics();
+        nlohmann::json s;
+        s["state"]       = cb->StateStr();
+        s["total"]       = m.total_requests;
+        s["failed"]      = m.failed_requests;
+        s["slow"]        = m.slow_requests;
+        s["p99_ms"]      = m.p99_ms;
+        s["local_fails"] = m.local_fails;
+        const char* name = (cb == &cb_auth_) ? "auth" : (cb == &cb_sheet_) ? "sheet" : "file";
+        r[name] = s;
+    }
+    response = r.dump();
+    return RpcResult::SUCCESS;
+}
+
+bool Gateway::HandleStressRun(std::string& response, const std::string& token) {
+    // 简单压测: 用 ab 发 100 请求到 /api/health，返回结果
+    nlohmann::json r;
+    std::ostringstream cmd;
+    cmd << "ab -n 200 -c 10 -k ";
+    if (!token.empty()) cmd << "-C \"rpc_at=" << token << "\" ";
+    cmd << "http://127.0.0.1:8081/api/health 2>&1";
+    FILE* pipe = popen(cmd.str().c_str(), "r");
+    if (!pipe) { r["error"] = "cannot run ab"; response = r.dump(); return false; }
+    char buf[1024];
+    std::string output;
+    while (fgets(buf, sizeof(buf), pipe)) output += buf;
+    pclose(pipe);
+    // 解析 ab 输出
+    auto extract = [&](const std::string& key) -> std::string {
+        auto pos = output.find(key);
+        if (pos == std::string::npos) return "";
+        pos = output.find(':', pos + key.size());
+        if (pos == std::string::npos) return "";
+        auto end = output.find('\n', pos);
+        return output.substr(pos + 1, end - pos - 1);
+    };
+    r["qps"]       = extract("Requests per second");
+    r["p50"]       = extract("50%");
+    r["p95"]       = extract("95%");
+    r["p99"]       = extract("99%");
+    r["failed"]    = extract("Failed requests");
+    r["non_2xx"]   = extract("Non-2xx responses");
+    r["raw_output"] = output;
+    response = r.dump();
+    return true;
+}
+
 // Start
 bool Gateway::Start() {
     // ---- 启动 CQ 协程调度线程 ----
@@ -719,6 +770,11 @@ bool Gateway::Start() {
     // Convenience overload that only needs username (auth-only routes)
     auto require_auth = [&require_auth_full](const auto& req, auto& res, std::string& u, std::string& tok) -> bool {
         int64_t uid = 0; return require_auth_full(req, res, u, uid, tok);
+    };
+    auto require_admin = [this](auto& req, auto& res) -> bool {
+        std::string role = GetRoleFromCookie(req.get_header_value("Cookie"));
+        if (role != "admin") { res.status = 403; res.set_content(R"({"error":"admin required"})", "application/json"); return false; }
+        return true;
     };
 
     // Cookie属性: HttpOnly防JS读取; SameSite=Strict防CSRF; Path=/限制范围; 24h过期
@@ -1042,6 +1098,16 @@ bool Gateway::Start() {
     svr.Get("/api/health", health);
     svr.Get("/api/history", history);
     svr.Get("/api/system/status", sys_status);
+    auto breaker_stats = [&require_admin, this](auto& req, auto& res) {
+        if (!require_admin(req, res)) return; std::string r; HandleBreakerStats(r); res.set_content(r, "application/json");
+    };
+    auto stress_run = [&require_admin, this](auto& req, auto& res) {
+        if (!require_admin(req, res)) return;
+        std::string r; HandleStressRun(r, "");
+        res.set_content(r, "application/json");
+    };
+    svr.Get("/api/breaker/stats", breaker_stats);
+    svr.Post("/api/stress/run", stress_run);
 
     // ---- Register on HTTP/1.1 server (same handlers) ----
     http_svr->Post("/api/login", login);
@@ -1062,6 +1128,14 @@ bool Gateway::Start() {
     http_svr->Get("/api/health", health);
     http_svr->Get("/api/history", history);
     http_svr->Get("/api/system/status", sys_status);
+    http_svr->Get("/api/breaker/stats", [&require_admin, this](auto& req, auto& res) {
+        if (!require_admin(req, res)) return; std::string r; HandleBreakerStats(r); res.set_content(r, "application/json");
+    });
+    http_svr->Post("/api/stress/run", [&require_admin, this](auto& req, auto& res) {
+        if (!require_admin(req, res)) return;
+        std::string r; HandleStressRun(r, "");
+        res.set_content(r, "application/json");
+    });
 
     if (!redis_cluster_seeds_.empty()) {
         redis_ = std::make_unique<RedisClient>(redis_cluster_seeds_, redis_password_, redis_pool_size_);

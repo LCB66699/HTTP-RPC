@@ -117,6 +117,8 @@ private:
     RpcResult HandleHealth(std::string& response);
     RpcResult HandleHistory(std::string& response);
     bool HandleSystemStatus(std::string& response);
+    RpcResult HandleBreakerStats(std::string& response);
+    bool HandleStressRun(std::string& response, const std::string& token);
 
     // ---- 协程 handler (h2c 8080 使用, co_await gRPC) ----
     Task<void> HandleLoginCoro(std::string body, std::string& response);
