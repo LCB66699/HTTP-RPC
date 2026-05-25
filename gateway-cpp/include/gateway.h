@@ -133,6 +133,7 @@ private:
     // Generate AT (JWT, 15min) and RT (UUID, stored in Redis, 7d)
     std::string CreateAccessToken(const std::string& username) const;
     std::string CreateRefreshToken(const std::string& username) const;
+    std::string GetRoleFromCookie(const std::string& cookie_header) const;
     // Legacy: kept for backward compat
     bool VerifyAuth(const std::string& cookie_header, std::string& username, int64_t& user_id, std::string& raw_token) const;
     std::string CreateJWT(const std::string& username) const;

@@ -145,9 +145,15 @@ std::string Gateway::CreateJWT(const std::string& username) const {
 
 std::string Gateway::CreateAccessToken(const std::string& username) const {
     long exp = static_cast<long>(std::time(nullptr)) + 900;  // 15 minutes
+    std::string role = "user";
+    // 简单规则: admin 用户名前缀 或 环境变量 ADMIN_USERS 列表
+    const char* admin_env = std::getenv("ADMIN_USERS");
+    if (username.rfind("admin", 0) == 0) role = "admin";
+    else if (admin_env && std::string(admin_env).find(username) != std::string::npos) role = "admin";
     nlohmann::json payload;
     payload["username"] = username;
-    payload["uid"] = 0;         // uid from JWT, set on refresh
+    payload["uid"] = 0;
+    payload["role"] = role;
     payload["type"] = "access";
     payload["exp"] = exp;
     return jwt::create(payload.dump(), jwt_secret_);
@@ -183,7 +189,6 @@ bool Gateway::VerifyAccessToken(const std::string& cookie_header,
     std::string payload;
     if (!jwt::verify(token, jwt_secret_, payload)) return false;
 
-    // 验 type 字段
     if (JsonGet(payload, "type") != "access") return false;
 
     long exp = (long)JsonGetNum(payload, "exp");
@@ -193,6 +198,20 @@ bool Gateway::VerifyAccessToken(const std::string& cookie_header,
     if (username.empty()) return false;
     user_id = static_cast<int64_t>(JsonGetNum(payload, "uid"));
     return true;
+}
+
+// 提取 AT 中的 role 字段
+std::string Gateway::GetRoleFromCookie(const std::string& cookie_header) const {
+    const std::string needle = "rpc_at=";
+    size_t pos = cookie_header.find(needle);
+    if (pos == std::string::npos) return "";
+    pos += needle.size();
+    size_t end = cookie_header.find(';', pos);
+    std::string token = cookie_header.substr(pos, end == std::string::npos ? std::string::npos : end - pos);
+    if (token.empty()) return "";
+    std::string payload;
+    if (!jwt::verify(token, jwt_secret_, payload)) return "";
+    return JsonGet(payload, "role");
 }
 
 // 向后兼容: VerifyAuth → VerifyAccessToken, 忽略 raw_token
@@ -220,8 +239,13 @@ RpcResult Gateway::HandleLogin(const std::string& body, std::string& response,
     if (ok) {
         at_out = CreateAccessToken(u);
         rt_out = CreateRefreshToken(u);
+        std::string role = "user";
+        if (u.rfind("admin", 0) == 0) role = "admin";
+        const char* ae = std::getenv("ADMIN_USERS");
+        if (ae && std::string(ae).find(u) != std::string::npos) role = "admin";
         nlohmann::json r;
-        r["success"] = true; r["username"] = u; r["_rt"] = rt_out; response = r.dump();
+        r["success"] = true; r["username"] = u; r["_rt"] = rt_out;
+        r["_role"] = role; response = r.dump();
     } else {
         nlohmann::json r; r["success"] = false; r["error"] = resp.error(); response = r.dump();
     }
@@ -260,8 +284,13 @@ RpcResult Gateway::HandleRegister(const std::string& body, std::string& response
     if (ok) {
         at_out = CreateAccessToken(u);
         rt_out = CreateRefreshToken(u);
+        std::string role = "user";
+        if (u.rfind("admin", 0) == 0) role = "admin";
+        const char* ae = std::getenv("ADMIN_USERS");
+        if (ae && std::string(ae).find(u) != std::string::npos) role = "admin";
         nlohmann::json r;
-        r["success"] = true; r["username"] = u; r["_rt"] = rt_out; response = r.dump();
+        r["success"] = true; r["username"] = u; r["_rt"] = rt_out;
+        r["_role"] = role; response = r.dump();
     } else {
         nlohmann::json r; r["success"] = false; r["error"] = resp.error(); response = r.dump();
     }
@@ -825,9 +854,17 @@ bool Gateway::Start() {
         res.set_content(R"({"success":true})", "application/json");
     };
     auto services    = [&require_auth, this](auto& req, auto& res) { std::string u, tok; if (!require_auth(req, res, u, tok)) return; std::string r; HandleServices(r); res.set_content(r, "application/json"); };
-    auto health      = [this](auto&, auto& res) { std::string r; HandleHealth(r); res.set_content(r, "application/json"); };
+    auto health = [this](auto& req, auto& res) {
+	    std::string role = GetRoleFromCookie(req.get_header_value("Cookie"));
+	    if (role != "admin") { res.set_content(R"({"gateway":"READY"})", "application/json"); return; }
+	    std::string r; HandleHealth(r); res.set_content(r, "application/json");
+	};
     auto history     = [&require_auth, this](auto& req, auto& res) { std::string u, tok; if (!require_auth(req, res, u, tok)) return; std::string r; HandleHistory(r); res.set_content(r, "application/json"); };
-    auto sys_status  = [&require_auth, this](auto& req, auto& res) { std::string u, tok; if (!require_auth(req, res, u, tok)) return; std::string r; HandleSystemStatus(r); res.set_content(r, "application/json"); };
+    auto sys_status  = [&require_auth, this](auto& req, auto& res) {
+	    std::string u, tok; if (!require_auth(req, res, u, tok)) return;
+	    if (GetRoleFromCookie(req.get_header_value("Cookie")) != "admin") { res.status = 403; res.set_content(R"({"error":"admin required"})", "application/json"); return; }
+	    std::string r; HandleSystemStatus(r); res.set_content(r, "application/json");
+	};
     auto tx_begin    = [this, &require_auth](auto& req, auto& res) { std::string u, tok; if (!require_auth(req, res, u, tok)) return; std::string r; HandleTxBegin(u, req.body, r); res.set_content(r, "application/json"); };
 
     auto file_up = [this, &require_auth_full](auto& req, auto& res) {

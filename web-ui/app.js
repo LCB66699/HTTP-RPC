@@ -246,6 +246,14 @@ function showMainApp() {
   document.getElementById('user-display').textContent = currentUser.username;
   document.getElementById('profile-username').textContent = currentUser.username;
   document.getElementById('profile-join-date').textContent = currentUser.joinDate || new Date().toLocaleDateString('zh-CN');
+  // 隐藏非管理员功能
+  const isAdmin = currentUser && currentUser.role === 'admin';
+  document.querySelector('[data-tab="monitor"]').style.display = isAdmin ? '' : 'none';
+  if (!isAdmin && document.getElementById('panel-monitor').classList.contains('active')) {
+    document.getElementById('panel-monitor').classList.remove('active');
+    document.getElementById('panel-sheets').classList.add('active');
+    document.querySelector('[data-tab="sheets"]').classList.add('active');
+  }
   loadAvatar();
   const video = document.getElementById('video-bg');
   video.pause();
@@ -296,7 +304,8 @@ document.getElementById('login-form').addEventListener('submit', async (e) => {
       authToken = '1';   // 仅作登录状态标志
       const loginUsername = data.username || username;
       const joinDate = localStorage.getItem('rpc_join_date_' + loginUsername) || new Date().toLocaleDateString('zh-CN');
-      currentUser = { username: loginUsername, joinDate };
+      const role = data._role || 'user';
+      currentUser = { username: loginUsername, joinDate, role };
       localStorage.setItem('rpc_user', JSON.stringify(currentUser));
       if (!localStorage.getItem('rpc_join_date_' + loginUsername)) {
         localStorage.setItem('rpc_join_date_' + loginUsername, joinDate);
