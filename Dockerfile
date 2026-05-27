@@ -28,7 +28,7 @@ FROM ubuntu:24.04
 
 RUN apt update && apt install -y \
     libgrpc++1.51t64 libmysqlclient21 libhiredis-dev libssl3t64 zlib1g \
-    libnghttp2-14 \
+    libnghttp2-14 apache2-utils \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy redis-plus-plus runtime library

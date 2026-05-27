@@ -197,26 +197,47 @@ document.getElementById('avatar-file-input')?.addEventListener('change', functio
 //  AUTH
 // ============================================================
 
-function checkAuth() {
+async function checkAuth() {
   try {
-    // Token lives in an HttpOnly cookie — JS cannot read it.
-    // Use rpc_user in localStorage as the UI session indicator only.
-    const user = localStorage.getItem('rpc_user');
-    if (user) {
-      currentUser = JSON.parse(user);
-      authToken = '1';   // truthy flag; actual JWT is in the HttpOnly cookie
+    // 用 /api/me 验证 HttpOnly Cookie 是否有效（而非仅依赖 localStorage）
+    const res = await fetch(API + '/me', { credentials: 'same-origin' });
+    if (res.status === 200) {
+      const data = await res.json();
+      const stored = localStorage.getItem('rpc_user');
+      const local = stored ? JSON.parse(stored) : {};
+      const joinDate = local.joinDate || new Date().toLocaleDateString('zh-CN');
+      currentUser = { username: data.username, joinDate, role: data.role };
+      localStorage.setItem('rpc_user', JSON.stringify(currentUser));
+      authToken = '1';
       showMainApp();
       const lastTab = localStorage.getItem('rpc_last_tab') || 'services';
       const tab = document.querySelector(`[data-tab="${lastTab}"]`);
       if (tab) tab.click();
       else loadServices();
     } else {
+      // Cookie 无效 → 清除本地状态，显示登录页
+      localStorage.removeItem('rpc_user');
       showLoginModal();
     }
   } catch (e) {
-    console.error('checkAuth error:', e);
-    localStorage.removeItem('rpc_user');
-    showLoginModal();
+    // 网络错误等 → 如果 localStorage 有数据，尝试显示（离线兜底）
+    const user = localStorage.getItem('rpc_user');
+    if (user) {
+      try {
+        currentUser = JSON.parse(user);
+        authToken = '1';
+        showMainApp();
+        const lastTab = localStorage.getItem('rpc_last_tab') || 'services';
+        const tab = document.querySelector(`[data-tab="${lastTab}"]`);
+        if (tab) tab.click();
+        else loadServices();
+      } catch (_) {
+        localStorage.removeItem('rpc_user');
+        showLoginModal();
+      }
+    } else {
+      showLoginModal();
+    }
   }
 }
 
@@ -272,6 +293,9 @@ function logout() {
   localStorage.removeItem('rpc_user');
   currentUser = null;
   authToken = null;
+  refreshToken = null;
+  refreshUsername = null;
+  refreshPromise = null;
   showLoginModal();
   document.getElementById('login-error').classList.add('hidden');
   document.getElementById('login-password').value = '';
@@ -302,6 +326,7 @@ document.getElementById('login-form').addEventListener('submit', async (e) => {
     if (data.success) {
       // JWT 已通过 Set-Cookie: rpc_token HttpOnly 设置，JS 无法读取，也不需要存储
       authToken = '1';   // 仅作登录状态标志
+      if (data._rt) { refreshToken = data._rt; refreshUsername = data.username; }
       const loginUsername = data.username || username;
       const joinDate = localStorage.getItem('rpc_join_date_' + loginUsername) || new Date().toLocaleDateString('zh-CN');
       const role = data._role || 'user';
@@ -359,6 +384,7 @@ document.getElementById('register-form').addEventListener('submit', async (e) =>
     const data = await res.json();
     if (data.success) {
       authToken = '1';   // JWT 在 HttpOnly cookie 中，JS 不存储
+      if (data._rt) { refreshToken = data._rt; refreshUsername = data.username; }
       const regUsername = data.username || username;
       const joinDate = new Date().toLocaleDateString('zh-CN');
       currentUser = { username: regUsername, joinDate };
@@ -400,14 +426,56 @@ document.querySelectorAll('.tab').forEach(btn => {
 });
 
 // ============================================================
-//  API HELPERS
+//  TOKEN REFRESH
+// ============================================================
+let refreshToken = null;
+let refreshUsername = null;
+let refreshPromise = null;  // 防并发刷新
+
+async function tryRefreshToken() {
+  if (!refreshToken || !refreshUsername) return false;
+  // 已有刷新在进行中，等它完成
+  if (refreshPromise) {
+    await refreshPromise;
+    return true;
+  }
+  refreshPromise = (async () => {
+    try {
+      const res = await fetch(API + '/refresh', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'same-origin',
+        body: JSON.stringify({ username: refreshUsername, refresh_token: refreshToken })
+      });
+      if (res.ok) {
+        authToken = '1';
+        return true;
+      }
+      return false;
+    } catch (_) {
+      return false;
+    } finally {
+      refreshPromise = null;
+    }
+  })();
+  return refreshPromise;
+}
+
+// ============================================================
+//  API HELPERS (自动 401 → 刷新 AT → 重试)
 // ============================================================
 
 async function apiGet(path) {
   if (!authToken) { showLoginModal(); throw new Error('未登录'); }
-  // HttpOnly cookie 由浏览器自动携带，无需手动设置 Authorization 头
   const res = await fetch(API + path, { credentials: 'same-origin' });
-  if (res.status === 401) { logout(); throw new Error('会话已过期'); }
+  if (res.status === 401) {
+    if (await tryRefreshToken()) {
+      const retry = await fetch(API + path, { credentials: 'same-origin' });
+      if (retry.status === 401) { logout(); throw new Error('会话已过期'); }
+      return retry.json();
+    }
+    logout(); throw new Error('会话已过期');
+  }
   return res.json();
 }
 
@@ -418,14 +486,19 @@ async function apiPost(path, body, extraHeaders = {}) {
   }
   const headers = { 'Content-Type': 'application/json', ...extraHeaders };
   const res = await fetch(API + path, {
-    method: 'POST',
-    headers,
-    credentials: 'same-origin',
+    method: 'POST', headers, credentials: 'same-origin',
     body: JSON.stringify(body)
   });
   if (res.status === 401 && path !== '/login' && path !== '/register') {
-    logout();
-    throw new Error('会话已过期');
+    if (await tryRefreshToken()) {
+      const retry = await fetch(API + path, {
+        method: 'POST', headers, credentials: 'same-origin',
+        body: JSON.stringify(body)
+      });
+      if (retry.status === 401) { logout(); throw new Error('会话已过期'); }
+      return retry.json();
+    }
+    logout(); throw new Error('会话已过期');
   }
   return res.json();
 }
@@ -585,38 +658,94 @@ document.getElementById('btn-call')?.addEventListener('click', async () => {
 //  HISTORY (inside Personal Center)
 // ============================================================
 
+// ---- History state ----
+let historyStore = []; // in-memory store for showDetail lookup
+
+async function loadHistoryUsers() {
+  const sel = document.getElementById('history-user-select');
+  try {
+    const data = await apiGet('/history/users');
+    sel.innerHTML = '<option value="">— 选择用户 —</option>' +
+      (data.users || []).map(u => `<option value="${esc(u)}">${esc(u)}</option>`).join('');
+  } catch (e) {
+    sel.innerHTML = '<option value="">加载失败</option>';
+  }
+}
+
 async function loadHistory() {
+  const isAdmin = currentUser && currentUser.role === 'admin';
+  const userSelect = document.getElementById('history-user-select');
+  const titleUser = document.getElementById('history-title-user');
+  const tbody = document.getElementById('history-tbody');
   const serviceFilter = document.getElementById('filter-service').value.trim();
   const methodFilter = document.getElementById('filter-method').value.trim();
-  let url = '/history?limit=100';
-  if (serviceFilter) url += '&service=' + encodeURIComponent(serviceFilter);
-  if (methodFilter) url += '&method=' + encodeURIComponent(methodFilter);
 
-  const data = await apiGet(url);
-  const tbody = document.getElementById('history-tbody');
-  if (!data.history || data.history.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="7" style="color:var(--text-muted);text-align:center;padding:32px 16px;">暂无调用记录</td></tr>';
+  // Admin UI: show user selector
+  if (isAdmin) {
+    userSelect.style.display = '';
+    if (userSelect.options.length <= 1) await loadHistoryUsers();
+  } else {
+    userSelect.style.display = 'none';
+  }
+
+  const selUser = isAdmin ? userSelect.value : '';
+  let url = '/history?limit=100';
+  if (selUser) url += '&user=' + encodeURIComponent(selUser);
+
+  let data;
+  try {
+    data = await apiGet(url);
+  } catch (e) {
+    tbody.innerHTML = '<tr><td colspan="7" style="color:var(--text-muted);text-align:center;padding:32px 16px;">加载失败</td></tr>';
     updateProfileStats([]);
     return;
   }
-  tbody.innerHTML = data.history.map(e => `
+
+  if (!data.history || data.history.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="7" style="color:var(--text-muted);text-align:center;padding:32px 16px;">暂无调用记录</td></tr>';
+    updateProfileStats([]);
+    // Hide user column for non-admin empty state
+    return;
+  }
+
+  // Store for showDetail lookup
+  historyStore = data.history;
+
+  // Client-side filtering
+  let filtered = data.history;
+  if (serviceFilter) {
+    const sf = serviceFilter.toLowerCase();
+    filtered = filtered.filter(e => (e.service || '').toLowerCase().includes(sf));
+  }
+  if (methodFilter) {
+    const mf = methodFilter.toLowerCase();
+    filtered = filtered.filter(e => (e.method || '').toLowerCase().includes(mf));
+  }
+
+  titleUser.textContent = selUser ? '— ' + selUser : (isAdmin ? '— 全部用户' : '');
+
+  tbody.innerHTML = filtered.map(e => {
+    const entryId = e.id || '';
+    const username = e.username || '';
+    return `
     <tr>
-      <td><span style="color:var(--text-muted);font-family:monospace;font-size:0.8rem;">#${e.id}</span></td>
+      <td style="font-weight:500;">${esc(username)}</td>
       <td>${esc(e.timestamp)}</td>
       <td><span style="font-weight:500;">${esc(e.service)}</span></td>
       <td><span style="font-family:monospace;font-size:0.8rem;color:var(--accent-light);">${esc(e.method)}</span></td>
       <td><span class="status-badge ${e.success ? 'success' : 'error'}">${e.success ? '成功' : '失败'}</span></td>
       <td style="font-family:monospace;font-size:0.8rem;">${(e.duration_us / 1000).toFixed(2)} ms</td>
-      <td><button class="btn" onclick="showDetail(${e.id})" style="padding:4px 14px;font-size:0.75rem;">详情</button></td>
+      <td><button class="btn" onclick="showDetail('${esc(entryId)}')" style="padding:4px 14px;font-size:0.75rem;">详情</button></td>
     </tr>
-  `).join('');
+  `}).join('');
 
-  updateProfileStats(data.history);
+  updateProfileStats(filtered);
 }
 
 document.getElementById('btn-refresh-history').addEventListener('click', loadHistory);
 document.getElementById('filter-service').addEventListener('input', debounce(loadHistory, 400));
 document.getElementById('filter-method').addEventListener('input', debounce(loadHistory, 400));
+document.getElementById('history-user-select').addEventListener('change', loadHistory);
 
 // ---- System Monitor ----
 let monitorTimer = null;
@@ -740,27 +869,31 @@ document.getElementById('btn-refresh-monitor').addEventListener('click', () => {
   loadMonitor();
 });
 
-async function showDetail(id) {
-  // 详情接口未实现，直接从列表数据展示
+function showDetail(id) {
+  const entry = historyStore.find(e => String(e.id) === String(id));
+  if (!entry) return;
   const div = document.getElementById('history-detail');
   div.classList.remove('hidden');
   const content = document.getElementById('history-detail-content');
   content.innerHTML = `
     <div class="detail-section">
-      <h4>时间</h4><div>${esc(data.timestamp)}</div>
+      <h4>用户</h4><div>${esc(entry.username || '')}</div>
     </div>
     <div class="detail-section">
-      <h4>服务 / 方法</h4><div>${esc(data.service)} :: ${esc(data.method)}</div>
+      <h4>时间</h4><div>${esc(entry.timestamp)}</div>
+    </div>
+    <div class="detail-section">
+      <h4>服务 / 方法</h4><div>${esc(entry.service)} :: ${esc(entry.method)}</div>
     </div>
     <div class="detail-section">
       <h4>状态 / 耗时</h4>
-      <div><span class="status-badge ${data.success ? 'success' : 'error'}">${data.success ? '成功' : '失败'}</span> ${(data.duration_us / 1000).toFixed(2)} ms</div>
+      <div><span class="status-badge ${entry.success ? 'success' : 'error'}">${entry.success ? '成功' : '失败'}</span> ${(entry.duration_us / 1000).toFixed(2)} ms</div>
     </div>
     <div class="detail-section">
-      <h4>参数</h4><pre>${JSON.stringify(data.params, null, 2)}</pre>
+      <h4>参数</h4><pre>${JSON.stringify(entry.params || {}, null, 2)}</pre>
     </div>
     <div class="detail-section">
-      <h4>结果</h4><pre>${JSON.stringify(data.result, null, 2)}</pre>
+      <h4>结果</h4><pre>${JSON.stringify(entry.result || {}, null, 2)}</pre>
     </div>
   `;
   div.scrollIntoView({ behavior: 'smooth' });
@@ -1129,8 +1262,8 @@ function renderSheetList(data) {
         </div>
       </div>
       <div class="sheet-card-actions">
-        <button class="btn btn-primary btn-sm" onclick="openSheet(${s.id})">打开</button>
-        <button class="btn btn-sm" onclick="deleteSheet(${s.id}, '${esc(s.name)}')">删除</button>
+        <button class="btn btn-primary btn-sm" onclick="openSheet('${s.id}')">打开</button>
+        <button class="btn btn-sm" onclick="deleteSheet('${s.id}', '${esc(s.name)}')">删除</button>
       </div>
     </div>
   `).join('');
@@ -1502,8 +1635,8 @@ function renderFileList(data) {
         </div>
       </div>
       <div class="sheet-card-actions">
-        <button class="btn btn-sm" onclick="downloadFile(${f.id}, '${esc(f.original_name)}')">下载</button>
-        <button class="btn btn-sm" onclick="deleteFile(${f.id}, '${esc(f.original_name)}')">删除</button>
+        <button class="btn btn-sm" onclick="downloadFile('${f.id}', '${esc(f.original_name)}')">下载</button>
+        <button class="btn btn-sm" onclick="deleteFile('${f.id}', '${esc(f.original_name)}')">删除</button>
       </div>
     </div>`;
   }).join('');
@@ -1544,16 +1677,26 @@ async function uploadFile(file) {
   }
 }
 
-function downloadFile(id, filename) {
-  // Use browser navigation so HttpOnly cookie is sent automatically and
-  // the gateway's 302 redirect to the MinIO presigned URL is followed natively.
-  // This avoids cross-origin fetch/CORS issues for large file downloads.
-  const a = document.createElement('a');
-  a.href = API + '/files/download?id=' + id;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
+async function downloadFile(id, filename) {
+  try {
+    // 用 fetch 触发自动刷新，拿到 blob 后通过 URL 下载
+    var res = await fetch(API + '/files/download?id=' + encodeURIComponent(id), { credentials: 'same-origin' });
+    if (res.status === 401) { logout(); return; }
+    if (!res.ok) { alert('下载失败 (HTTP ' + res.status + ')'); return; }
+    var blob = await res.blob();
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url;
+    a.download = filename || 'download';
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(function() {
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }, 100);
+  } catch (e) {
+    alert('下载失败: ' + e.message);
+  }
 }
 
 async function deleteFile(id, name) {

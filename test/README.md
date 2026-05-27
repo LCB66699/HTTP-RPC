@@ -36,7 +36,7 @@
 |------|------|------|
 | `functional_test.sh` | 功能正确性：认证、鉴权、CRUD、缓存、Token 吊销、文件完整性、熔断器/健康状态 | ~30s |
 | `performance_test.sh` | 性能基准：预热 → 单请求延迟 → 并发(P50/P95/P99) → 缓存命中率 → 写入压测 → ab/wrk2 QPS | ~90s |
-| `stress_test.sh` | 逐层压测：L0 阶梯加压 → L1 内网 → L2 TLS → L3 公网 → L4 故障转移 → L5 稳定性 | ~2-7min |
+| `stress_test.sh` | 逐层压测：L0 阶梯加压 → L1 内网 → L2 TLS → L3 公网 → L4 故障转移 → L5 稳定性(需 --long) | ~2-37min |
 | `wrk_scripts/health.lua` | wrk2 GET 基准：纯网关吞吐，含自定义延迟分布报告 | — |
 | `wrk_scripts/mixed.lua` | wrk2 读写混合：70%列表/20%获取/10%创建，模拟真实流量 | — |
 
@@ -140,8 +140,16 @@ bash test/stress_test.sh
 bash test/stress_test.sh https://localhost 5000 20
 #                               API         请求数  并发数
 
-# 长时间稳定性测试 (5 分钟恒定负载)
-STRESS_LONG=1 bash test/stress_test.sh
+# 全时长稳定性测试 (30min)
+bash test/stress_test.sh --long
+
+# 自定义参数 + 全时长
+bash test/stress_test.sh --long https://localhost 5000 20
+STRESS_LONG_DURATION=3600 STRESS_LONG_READERS=20 STRESS_LONG_WRITERS=5 \
+    bash test/stress_test.sh --long
+
+# 跳过 L5
+STRESS_LONG=0 bash test/stress_test.sh
 ```
 
 ### 七层递进
@@ -155,7 +163,7 @@ STRESS_LONG=1 bash test/stress_test.sh
 | L2 本地TLS | localhost:443 | 加 nginx TLS 开销 | QPS + P50/P95/P99 |
 | L3 公网 | 106.53.100.198 | 加外网延迟 | QPS + P50/P95/P99 |
 | L4 故障转移 | localhost:443 | 停 gateway-1，验证流量切到 gateway-2 | 失败请求数 |
-| L5 稳定性 | nginx容器→gateway-1:8081 | 5min 恒定 100r/s，每 30s 采样 | P99 漂移检测 (STRESS_LONG=1) |
+| L5 稳定性 | nginx容器→gateway-1:8081 | 混合读写(80%+20%)，默认 60s 浸泡 / --long 30min | P99漂移/RSS/FD/熔断器/错误率 |
 
 ### 瓶颈判定
 
@@ -168,7 +176,7 @@ STRESS_LONG=1 bash test/stress_test.sh
 | L2 QPS < L1a × 0.8 | nginx/TLS 开销过大 |
 | L3 P99 > 200ms | 外网带宽/延迟 |
 | L4 失败 > 5/20 | nginx 健康探测间隔过长 |
-| L5 P99 漂移 > 2x | 资源泄漏（内存/连接/文件描述符） |
+| L5 P99 漂移 > 2x 或 RSS/FD 持续增长 | 资源泄漏（内存/连接/文件描述符） |
 
 ### 测试要点
 
@@ -176,7 +184,7 @@ STRESS_LONG=1 bash test/stress_test.sh
 - **全部用 ab -k (keep-alive)**，避免 TCP 握手占满连接数
 - **压测时 nginx 限流已注释**（nginx.conf `limit_req` 行），避免 429 干扰
 - **ab 首次运行自动安装**到 nginx 容器（apt-get apache2-utils），后续秒启
-- **L5 默认关闭**，设置 `STRESS_LONG=1` 启用。适合通宵跑或 CI 流水线
+- **L5 默认运行 60s 快速浸泡**，加 `--long` 切换到 30min 全时长 + 系统指标采集。跳过: `STRESS_LONG=0`
 
 ### wrk2 手动使用
 

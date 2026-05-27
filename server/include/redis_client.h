@@ -4,6 +4,7 @@
 #include <string>
 #include <vector>
 #include <memory>
+#include <cstdlib>
 
 namespace sw { namespace redis { class RedisCluster; } }
 
@@ -23,6 +24,7 @@ public:
     std::vector<std::string> GetCallEntries(int limit, int offset,
                                             const std::string& username = "") const;
     int64_t GetCallCount(const std::string& username = "") const;
+    std::vector<std::string> GetHistoryUsers() const;
 
     // Cache writes
     bool SetJSON(const std::string& key, const std::string& value, int ttl_seconds);
@@ -39,6 +41,11 @@ public:
     // Kept for backward compatibility (no-ops).
     void StartHealthCheck() {}
     void StopHealthCheck() {}
+
+    // 给 TTL 加随机偏移，防止缓存雪崩。jitter 为偏移上限（秒）。
+    static int JitteredTTL(int base_ttl, int jitter) {
+        return base_ttl + (std::rand() % (jitter + 1));
+    }
 
 private:
     std::vector<std::string> cluster_seeds_;

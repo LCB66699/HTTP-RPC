@@ -115,7 +115,8 @@ private:
                                PerReplicaTracker& rep, std::string& response);
     RpcResult HandleTxBegin(const std::string& username, const std::string& body, std::string& response);
     RpcResult HandleHealth(std::string& response);
-    RpcResult HandleHistory(std::string& response);
+    RpcResult HandleHistory(const std::string& username, std::string& response);
+    RpcResult HandleHistoryUsers(std::string& response);
     bool HandleSystemStatus(std::string& response);
     RpcResult HandleBreakerStats(std::string& response);
     bool HandleStressRun(std::string& response, const std::string& token);
@@ -131,7 +132,7 @@ private:
 
     // Parse and verify the Access Token from rpc_at Cookie. No Redis token_ver check
     // needed — AT is short-lived (15min) and expires naturally.
-    bool VerifyAccessToken(const std::string& cookie_header, std::string& username, int64_t& user_id) const;
+    bool VerifyAccessToken(const std::string& cookie_header, std::string& username, int64_t& user_id, std::string& raw_token) const;
     // Generate AT (JWT, 15min) and RT (UUID, stored in Redis, 7d)
     std::string CreateAccessToken(const std::string& username) const;
     std::string CreateRefreshToken(const std::string& username) const;
@@ -156,4 +157,5 @@ private:
     static std::string JsonStr(const std::string& s);
     static std::string JsonGet(const std::string& json, const std::string& key);
     static double   JsonGetNum(const std::string& json, const std::string& key);
+    static int64_t  JsonGetInt64(const std::string& json, const std::string& key);
 };

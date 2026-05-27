@@ -28,6 +28,8 @@ static void SignalHandler(int sig) {
 }
 
 int main(int argc, char* argv[]) {
+    setbuf(stdout, NULL);
+    setbuf(stderr, NULL);
     int port = 50051;
     std::string host = "0.0.0.0";
     const char* env_secret = std::getenv("JWT_SECRET");

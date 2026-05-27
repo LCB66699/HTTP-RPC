@@ -8,9 +8,31 @@
 #include <chrono>
 #include <thread>
 #include <sstream>
+#include <algorithm>
 
 // gRPC channel 配置 (keepalive + round_robin + retry)
 // DNS aliases 返回多个 IP → gRPC 内置 round_robin 在 Subchannel 间自动轮询
+
+// 检查用户是否为管理员（admin_ 前缀或精确匹配 ADMIN_USERS 逗号列表）
+static bool IsAdminUser(const std::string& username) {
+    if (username.rfind("admin", 0) == 0) return true;
+    const char* env = std::getenv("ADMIN_USERS");
+    if (!env || !*env) return false;
+    std::string list(env);
+    size_t pos = 0;
+    while (pos < list.size()) {
+        size_t comma = list.find(',', pos);
+        std::string token = list.substr(pos, comma - pos);
+        // 去除前后空格
+        size_t s = 0, e = token.size();
+        while (s < e && token[s] == ' ') ++s;
+        while (e > s && token[e-1] == ' ') --e;
+        if (token.substr(s, e - s) == username) return true;
+        if (comma == std::string::npos) break;
+        pos = comma + 1;
+    }
+    return false;
+}
 static std::shared_ptr<grpc::Channel> MakeChannel(const std::string& addr) {
     // Create operations are NOT retried at the gRPC level — idempotency is handled
     // by the client-supplied idempotency_key + server-side ON DUPLICATE KEY instead.
@@ -40,7 +62,7 @@ static std::shared_ptr<grpc::Channel> MakeChannel(const std::string& addr) {
     args.SetServiceConfigJSON(kRetryPolicy);
     args.SetInt(GRPC_ARG_KEEPALIVE_TIME_MS, 60000);
     args.SetInt(GRPC_ARG_KEEPALIVE_TIMEOUT_MS, 20000);
-    args.SetInt(GRPC_ARG_KEEPALIVE_PERMIT_WITHOUT_CALLS, 1);
+    args.SetInt(GRPC_ARG_KEEPALIVE_PERMIT_WITHOUT_CALLS, 0);
     args.SetInt(GRPC_ARG_HTTP2_MAX_PINGS_WITHOUT_DATA, 0);
     args.SetInt(GRPC_ARG_MAX_RECEIVE_MESSAGE_LENGTH, 64 * 1024 * 1024);
     args.SetInt(GRPC_ARG_MAX_SEND_MESSAGE_LENGTH, 64 * 1024 * 1024);
@@ -136,6 +158,17 @@ double Gateway::JsonGetNum(const std::string& json_str, const std::string& key) 
     } catch (...) { return 0; }
 }
 
+int64_t Gateway::JsonGetInt64(const std::string& json_str, const std::string& key) {
+    try {
+        auto j = nlohmann::json::parse(json_str);
+        auto it = j.find(key);
+        if (it == j.end()) return 0;
+        if (it->is_number()) return static_cast<int64_t>(it->get<double>());
+        if (it->is_string()) { try { return std::stoll(it->get<std::string>()); } catch (...) { return 0; } }
+        return 0;
+    } catch (...) { return 0; }
+}
+
 std::string Gateway::CreateJWT(const std::string& username) const {
     long exp = static_cast<long>(std::time(nullptr)) + 86400;
     return jwt::create("{\"username\":" + JsonStr(username) + ",\"exp\":" + std::to_string(exp) + "}", jwt_secret_);
@@ -146,10 +179,7 @@ std::string Gateway::CreateJWT(const std::string& username) const {
 std::string Gateway::CreateAccessToken(const std::string& username) const {
     long exp = static_cast<long>(std::time(nullptr)) + 900;  // 15 minutes
     std::string role = "user";
-    // 简单规则: admin 用户名前缀 或 环境变量 ADMIN_USERS 列表
-    const char* admin_env = std::getenv("ADMIN_USERS");
-    if (username.rfind("admin", 0) == 0) role = "admin";
-    else if (admin_env && std::string(admin_env).find(username) != std::string::npos) role = "admin";
+    if (IsAdminUser(username)) role = "admin";
     nlohmann::json payload;
     payload["username"] = username;
     payload["uid"] = 0;
@@ -177,7 +207,8 @@ std::string Gateway::CreateRefreshToken(const std::string& username) const {
 
 // AT 验证: 仅验签+过期, 不查 Redis token_ver — 15min 短过期天然防吊销延迟
 bool Gateway::VerifyAccessToken(const std::string& cookie_header,
-                                 std::string& username, int64_t& user_id) const {
+                                 std::string& username, int64_t& user_id,
+                                 std::string& raw_token) const {
     const std::string needle = "rpc_at=";
     size_t pos = cookie_header.find(needle);
     if (pos == std::string::npos) return false;
@@ -197,6 +228,7 @@ bool Gateway::VerifyAccessToken(const std::string& cookie_header,
     username = JsonGet(payload, "username");
     if (username.empty()) return false;
     user_id = static_cast<int64_t>(JsonGetNum(payload, "uid"));
+    raw_token = token;
     return true;
 }
 
@@ -214,14 +246,10 @@ std::string Gateway::GetRoleFromCookie(const std::string& cookie_header) const {
     return JsonGet(payload, "role");
 }
 
-// 向后兼容: VerifyAuth → VerifyAccessToken, 忽略 raw_token
+// 向后兼容: VerifyAuth → VerifyAccessToken, 传递真实 token 用于后端 gRPC 认证
 bool Gateway::VerifyAuth(const std::string& cookie_header, std::string& username,
                           int64_t& user_id, std::string& raw_token) const {
-    if (VerifyAccessToken(cookie_header, username, user_id)) {
-        raw_token = "";  // AT 不再通过 gRPC metadata 传递吊销参数
-        return true;
-    }
-    return false;
+    return VerifyAccessToken(cookie_header, username, user_id, raw_token);
 }
 
 // Auth handlers
@@ -333,7 +361,7 @@ RpcResult Gateway::HandleSheetCreate(const std::string& username, int64_t user_i
             return std::pair{st, st.ok() && resp.success()};
         }, peer);
     if (ok) {
-        nlohmann::json r; r["success"] = true; r["id"] = resp.id(); response = r.dump();
+        nlohmann::json r; r["success"] = true; r["id"] = std::to_string(resp.id()); response = r.dump();
     } else {
         response = R"({"success":false,"error":"Failed"})";
     }
@@ -356,7 +384,7 @@ Task<void> Gateway::HandleSheetCreateCoro(std::string username, int64_t user_id,
         &rpc::SpreadsheetService::Stub::AsyncCreateSpreadsheet, req, 5);
     bool ok = r.st.ok() && r.resp.success();
     if (ok) {
-        nlohmann::json j; j["success"] = true; j["id"] = r.resp.id(); response = j.dump();
+        nlohmann::json j; j["success"] = true; j["id"] = std::to_string(r.resp.id());; response = j.dump();
     } else {
         response = R"({"success":false,"error":"Failed"})";
     }
@@ -366,7 +394,7 @@ Task<void> Gateway::HandleSheetCreateCoro(std::string username, int64_t user_id,
 // 协程版 Sheet Get
 Task<void> Gateway::HandleSheetGetCoro(std::string username, int64_t user_id,
                                         std::string body, std::string& response) {
-    int64_t id = static_cast<int64_t>(JsonGetNum(body, "id"));
+    int64_t id = JsonGetInt64(body, "id");
     rpc::GetSpreadsheetRequest req; req.set_id(id); req.set_user_id(user_id);
     auto r = co_await GrpcCallOf(
         sheet_cq_.cq(), sheet_stub_.get(),
@@ -374,7 +402,7 @@ Task<void> Gateway::HandleSheetGetCoro(std::string username, int64_t user_id,
     if (!r.st.ok() || !r.resp.success()) { response = "{\"success\":false}"; co_return; }
     const auto& s = r.resp.spreadsheet();
     response = "{\"success\":true,\"cache_source\":" + JsonStr(r.resp.cache_source())
-        + ",\"spreadsheet\":{\"id\":" + std::to_string(s.id())
+        + ",\"spreadsheet\":{\"id\":\"" + std::to_string(s.id()) + "\""
         + ",\"name\":" + JsonStr(s.name())
         + ",\"row_count\":" + std::to_string(s.row_count())
         + ",\"updated_at\":" + JsonStr(s.updated_at()) + "}}";
@@ -396,7 +424,7 @@ Task<void> Gateway::HandleSheetListCoro(std::string username, int64_t user_id,
     for (int i = 0; i < r.resp.sheets_size(); ++i) {
         if (i > 0) arr += ",";
         const auto& s = r.resp.sheets(i);
-        arr += "{\"id\":" + std::to_string(s.id()) + ",\"name\":" + JsonStr(s.name())
+        arr += "{\"id\":\"" + std::to_string(s.id()) + "\",\"name\":" + JsonStr(s.name())
             + ",\"description\":" + JsonStr(s.description())
             + ",\"row_count\":" + std::to_string(s.row_count())
             + ",\"col_count\":" + std::to_string(s.col_count())
@@ -411,7 +439,7 @@ Task<void> Gateway::HandleSheetListCoro(std::string username, int64_t user_id,
 RpcResult Gateway::HandleSheetGet(const std::string& username, int64_t user_id,
                                    const std::string& body, const std::string& raw_token,
                                    PerReplicaTracker& rep, std::string& response) {
-    int64_t id = static_cast<int64_t>(JsonGetNum(body, "id"));
+    int64_t id = JsonGetInt64(body, "id");
     rpc::GetSpreadsheetRequest req; rpc::GetSpreadsheetResponse resp;
     req.set_id(id); req.set_user_id(user_id);
     std::string peer;
@@ -423,7 +451,7 @@ RpcResult Gateway::HandleSheetGet(const std::string& username, int64_t user_id,
     if (!ok) { response = "{\"success\":false}"; return RpcResult::TRANSPORT_FAILURE; }
     const auto& s = resp.spreadsheet();
     response = "{\"success\":true,\"cache_source\":" + JsonStr(resp.cache_source())
-        + ",\"spreadsheet\":{\"id\":" + std::to_string(s.id())
+        + ",\"spreadsheet\":{\"id\":\"" + std::to_string(s.id()) + "\""
         + ",\"name\":" + JsonStr(s.name())
         + ",\"description\":" + JsonStr(s.description())
         + ",\"headers_json\":" + s.headers_json()
@@ -452,7 +480,7 @@ RpcResult Gateway::HandleSheetList(const std::string& username, int64_t user_id,
     std::string arr = "[";
     for (int i = 0; i < resp.sheets_size(); ++i) {
         if (i > 0) arr += ","; const auto& s = resp.sheets(i);
-        arr += "{\"id\":" + std::to_string(s.id()) + ",\"name\":" + JsonStr(s.name())
+        arr += "{\"id\":\"" + std::to_string(s.id()) + "\",\"name\":" + JsonStr(s.name())
             + ",\"description\":" + JsonStr(s.description())
             + ",\"row_count\":" + std::to_string(s.row_count())
             + ",\"col_count\":" + std::to_string(s.col_count())
@@ -467,7 +495,7 @@ RpcResult Gateway::HandleSheetList(const std::string& username, int64_t user_id,
 RpcResult Gateway::HandleSheetUpdate(const std::string& username, int64_t user_id,
                                       const std::string& body, const std::string& raw_token,
                                       PerReplicaTracker& rep, std::string& response) {
-    int64_t id = static_cast<int64_t>(JsonGetNum(body, "id"));
+    int64_t id = JsonGetInt64(body, "id");
     rpc::UpdateSpreadsheetRequest req; rpc::UpdateSpreadsheetResponse resp;
     req.set_id(id); req.set_user_id(user_id);
     req.set_name(JsonGet(body, "name")); req.set_description(JsonGet(body, "description"));
@@ -485,7 +513,7 @@ RpcResult Gateway::HandleSheetUpdate(const std::string& username, int64_t user_i
 RpcResult Gateway::HandleSheetDelete(const std::string& username, int64_t user_id,
                                       const std::string& body, const std::string& raw_token,
                                       PerReplicaTracker& rep, std::string& response) {
-    int64_t id = static_cast<int64_t>(JsonGetNum(body, "id"));
+    int64_t id = JsonGetInt64(body, "id");
     rpc::DeleteSpreadsheetRequest req; rpc::DeleteSpreadsheetResponse resp;
     req.set_id(id); req.set_user_id(user_id);
     std::string peer;
@@ -516,7 +544,7 @@ RpcResult Gateway::HandleFileList(const std::string& username, int64_t user_id,
     std::string arr = "[";
     for (int i = 0; i < resp.files_size(); ++i) {
         if (i > 0) arr += ","; const auto& f = resp.files(i);
-        arr += "{\"id\":" + std::to_string(f.id()) + ",\"original_name\":" + JsonStr(f.original_name())
+        arr += "{\"id\":\"" + std::to_string(f.id()) + "\",\"original_name\":" + JsonStr(f.original_name())
             + ",\"size\":" + std::to_string(f.size()) + ",\"mime_type\":" + JsonStr(f.mime_type())
             + ",\"created_at\":" + JsonStr(f.created_at()) + "}";
     }
@@ -528,7 +556,7 @@ RpcResult Gateway::HandleFileList(const std::string& username, int64_t user_id,
 RpcResult Gateway::HandleFileDelete(const std::string& username, int64_t user_id,
                                      const std::string& body, const std::string& raw_token,
                                      PerReplicaTracker& rep, std::string& response) {
-    int64_t id = static_cast<int64_t>(JsonGetNum(body, "id"));
+    int64_t id = JsonGetInt64(body, "id");
     rpc::DeleteFileRequest req; rpc::DeleteFileResponse resp;
     req.set_id(id); req.set_user_id(user_id);
     std::string peer;
@@ -619,14 +647,26 @@ RpcResult Gateway::HandleHealth(std::string& response) {
     return RpcResult::SUCCESS;
 }
 
-RpcResult Gateway::HandleHistory(std::string& response) {
+RpcResult Gateway::HandleHistory(const std::string& username, std::string& response) {
     if (!redis_ || !redis_->IsConnected()) { response = "{\"history\":[],\"total\":0}"; return RpcResult::BUSINESS_FAILURE; }
-    // Empty username → read from call_history:global (aggregate of all users)
-    auto entries = redis_->GetCallEntries(50, 0, "");
+    auto entries = redis_->GetCallEntries(50, 0, username);
     std::string arr = "[";
     for (size_t i = 0; i < entries.size(); ++i) { if (i > 0) arr += ","; arr += entries[i]; }
     arr += "]";
-    response = "{\"history\":" + arr + ",\"total\":" + std::to_string(redis_->GetCallCount("")) + "}";
+    response = "{\"history\":" + arr + ",\"total\":" + std::to_string(redis_->GetCallCount(username)) + "}";
+    return RpcResult::SUCCESS;
+}
+
+RpcResult Gateway::HandleHistoryUsers(std::string& response) {
+    if (!redis_ || !redis_->IsConnected()) { response = "{\"users\":[]}"; return RpcResult::BUSINESS_FAILURE; }
+    auto users = redis_->GetHistoryUsers();
+    std::string arr = "[";
+    for (size_t i = 0; i < users.size(); ++i) {
+        if (i > 0) arr += ",";
+        arr += "\"" + users[i] + "\"";
+    }
+    arr += "]";
+    response = "{\"users\":" + arr + "}";
     return RpcResult::SUCCESS;
 }
 
@@ -698,20 +738,37 @@ bool Gateway::HandleStressRun(std::string& response, const std::string& token) {
     while (fgets(buf, sizeof(buf), pipe)) output += buf;
     pclose(pipe);
     // 解析 ab 输出
-    auto extract = [&](const std::string& key) -> std::string {
+    auto extract_colon = [&](const std::string& key) -> std::string {
         auto pos = output.find(key);
         if (pos == std::string::npos) return "";
         pos = output.find(':', pos + key.size());
         if (pos == std::string::npos) return "";
         auto end = output.find('\n', pos);
-        return output.substr(pos + 1, end - pos - 1);
+        std::string v = output.substr(pos + 1, end - pos - 1);
+        // trim
+        auto s = v.find_first_not_of(" \t"), e = v.find_last_not_of(" \t");
+        return (s != std::string::npos) ? v.substr(s, e - s + 1) : v;
     };
-    r["qps"]       = extract("Requests per second");
-    r["p50"]       = extract("50%");
-    r["p95"]       = extract("95%");
-    r["p99"]       = extract("99%");
-    r["failed"]    = extract("Failed requests");
-    r["non_2xx"]   = extract("Non-2xx responses");
+    auto extract_pct = [&](const std::string& pct) -> std::string {
+        // ab percentile lines: "  50%      0" (no colon, leading spaces)
+        auto pos = output.find(pct);
+        if (pos == std::string::npos) return "";
+        // make sure it's at start of a line (only spaces before it on this line)
+        auto line_start = output.rfind('\n', pos);
+        if (line_start == std::string::npos) line_start = 0; else line_start++;
+        std::string before = output.substr(line_start, pos - line_start);
+        if (before.find_first_not_of(" \t") != std::string::npos) return ""; // not at line start
+        size_t val_start = pos + pct.size();
+        while (val_start < output.size() && (output[val_start] == ' ' || output[val_start] == '\t')) val_start++;
+        auto end = output.find('\n', val_start);
+        return output.substr(val_start, end - val_start);
+    };
+    r["qps"]       = extract_colon("Requests per second");
+    r["p50"]       = extract_pct("50%");
+    r["p95"]       = extract_pct("95%");
+    r["p99"]       = extract_pct("99%");
+    r["failed"]    = extract_colon("Failed requests");
+    r["non_2xx"]   = extract_colon("Non-2xx responses");
     r["raw_output"] = output;
     response = r.dump();
     return true;
@@ -750,6 +807,8 @@ bool Gateway::Start() {
 
     // ---- HTTP/1.1 server (8081, for nginx proxy) ----
     auto* http_svr = new httplib::Server();
+    // 扩大线程池, 避免 8 线程成为并发瓶颈
+    http_svr->new_task_queue = [] { return new httplib::ThreadPool(50, 100); };
     http_svr->set_pre_routing_handler([](const httplib::Request&, httplib::Response& res) {
         res.set_header("Access-Control-Allow-Origin", "*");
         res.set_header("Access-Control-Allow-Methods", "GET, POST, PUT, OPTIONS");
@@ -915,7 +974,24 @@ bool Gateway::Start() {
 	    if (role != "admin") { res.set_content(R"({"gateway":"READY"})", "application/json"); return; }
 	    std::string r; HandleHealth(r); res.set_content(r, "application/json");
 	};
-    auto history     = [&require_auth, this](auto& req, auto& res) { std::string u, tok; if (!require_auth(req, res, u, tok)) return; std::string r; HandleHistory(r); res.set_content(r, "application/json"); };
+    auto history = [&require_auth, this](auto& req, auto& res) {
+        std::string u, tok; if (!require_auth(req, res, u, tok)) return;
+        std::string r;
+        std::string role = GetRoleFromCookie(req.get_header_value("Cookie"));
+        bool is_admin = (role == "admin");
+        // admin 可查特定用户: ?user=xxx；不传则只查自己
+        std::string quser = is_admin ? req.get_param_value("user") : "";
+        if (quser.empty()) quser = u;
+        HandleHistory(quser, r);
+        res.set_content(r, "application/json");
+    };
+    auto history_users = [&require_auth, this](auto& req, auto& res) {
+        std::string u, tok; if (!require_auth(req, res, u, tok)) return;
+        if (GetRoleFromCookie(req.get_header_value("Cookie")) != "admin") {
+            res.status = 403; res.set_content(R"({"error":"admin required"})", "application/json"); return;
+        }
+        std::string r; HandleHistoryUsers(r); res.set_content(r, "application/json");
+    };
     auto sys_status  = [&require_auth, this](auto& req, auto& res) {
 	    std::string u, tok; if (!require_auth(req, res, u, tok)) return;
 	    if (GetRoleFromCookie(req.get_header_value("Cookie")) != "admin") { res.status = 403; res.set_content(R"({"error":"admin required"})", "application/json"); return; }
@@ -940,11 +1016,17 @@ bool Gateway::Start() {
             std::string ext = file.filename.substr(dot);
             if (ext == ".png") mime = "image/png";
             else if (ext == ".jpg"||ext==".jpeg") mime = "image/jpeg";
+            else if (ext == ".gif") mime = "image/gif";
             else if (ext == ".pdf") mime = "application/pdf";
             else if (ext == ".txt") mime = "text/plain";
             else if (ext == ".zip") mime = "application/zip";
+            else if (ext == ".docx") mime = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+            else if (ext == ".doc") mime = "application/msword";
             else if (ext == ".xlsx") mime = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+            else if (ext == ".xls") mime = "application/vnd.ms-excel";
+            else if (ext == ".pptx") mime = "application/vnd.openxmlformats-officedocument.presentationml.presentation";
             else if (ext == ".mp4") mime = "video/mp4";
+            else if (ext == ".mp3") mime = "audio/mpeg";
         }
         rpc::CreateFileRequest freq; rpc::CreateFileResponse fresp;
         freq.set_user_id(uid); freq.set_original_name(file.filename);
@@ -972,7 +1054,7 @@ bool Gateway::Start() {
             res.set_content("{\"success\":false,\"error\":\"Upload failed\"}", "application/json"); return;
         }
         cb_file_.RecordResult(true, elapsed); rep_file_.RecordSuccess(peer);
-        res.set_content("{\"success\":true,\"id\":" + std::to_string(fresp.id()) + "}", "application/json");
+        res.set_content("{\"success\":true,\"id\":\"" + std::to_string(fresp.id()) + "\"}", "application/json");
     };
 
     auto file_down = [this, &require_auth_full](auto& req, auto& res) {
@@ -1003,7 +1085,27 @@ bool Gateway::Start() {
         cb_file_.RecordResult(true, elapsed); rep_file_.RecordSuccess(peer);
         // Body comes from MySQL BLOB or MinIO via File service (no browser redirect to :443/:9000).
         res.set_header("Content-Disposition", "attachment; filename=\"" + fresp.file().original_name() + "\"");
-        res.set_content(fresp.file_content(), fresp.file().mime_type());
+        // 根据文件名扩展名推断 MIME（数据库存的可能不准确）
+        std::string dl_mime = "application/octet-stream";
+        const std::string& oname = fresp.file().original_name();
+        auto dl_dot = oname.rfind('.');
+        if (dl_dot != std::string::npos) {
+            std::string dl_ext = oname.substr(dl_dot);
+            if (dl_ext == ".png") dl_mime = "image/png";
+            else if (dl_ext == ".jpg" || dl_ext == ".jpeg") dl_mime = "image/jpeg";
+            else if (dl_ext == ".gif") dl_mime = "image/gif";
+            else if (dl_ext == ".pdf") dl_mime = "application/pdf";
+            else if (dl_ext == ".txt") dl_mime = "text/plain";
+            else if (dl_ext == ".zip") dl_mime = "application/zip";
+            else if (dl_ext == ".docx") dl_mime = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+            else if (dl_ext == ".doc") dl_mime = "application/msword";
+            else if (dl_ext == ".xlsx") dl_mime = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+            else if (dl_ext == ".xls") dl_mime = "application/vnd.ms-excel";
+            else if (dl_ext == ".pptx") dl_mime = "application/vnd.openxmlformats-officedocument.presentationml.presentation";
+            else if (dl_ext == ".mp4") dl_mime = "video/mp4";
+            else if (dl_ext == ".mp3") dl_mime = "audio/mpeg";
+        }
+        res.set_content(fresp.file_content(), dl_mime);
     };
 
     // Auth+CB handler factory: semaphore排队 → CB检查 → inner(rpc_call) → 反馈
@@ -1084,6 +1186,15 @@ bool Gateway::Start() {
     svr.Post("/api/register", reg);
     svr.Post("/api/logout", do_logout);
     svr.Post("/api/refresh", refresh_tok);
+    auto me = [this](auto& req, auto& res) {
+        std::string u; int64_t uid = 0;
+        std::string tok; if (!VerifyAuth(req.get_header_value("Cookie"), u, uid, tok)) {
+            res.status = 401; res.set_content(R"({"error":"Unauthorized"})", "application/json"); return;
+        }
+        std::string role = GetRoleFromCookie(req.get_header_value("Cookie"));
+        res.set_content("{\"username\":" + JsonStr(u) + ",\"role\":" + JsonStr(role) + "}", "application/json");
+    };
+    svr.Get("/api/me", me);
     svr.Get("/api/services", services);
     svr.Post("/api/sheets", with_cb(cb_sheet_, sh_create));
     svr.Get("/api/sheets", with_cb(cb_sheet_, sh_list));
@@ -1097,6 +1208,7 @@ bool Gateway::Start() {
     svr.Post("/api/tx/begin", tx_begin);
     svr.Get("/api/health", health);
     svr.Get("/api/history", history);
+    svr.Get("/api/history/users", history_users);
     svr.Get("/api/system/status", sys_status);
     auto breaker_stats = [&require_admin, this](auto& req, auto& res) {
         if (!require_admin(req, res)) return; std::string r; HandleBreakerStats(r); res.set_content(r, "application/json");
@@ -1114,6 +1226,14 @@ bool Gateway::Start() {
     http_svr->Post("/api/register", reg);
     http_svr->Post("/api/logout", do_logout);
     http_svr->Post("/api/refresh", refresh_tok);
+    http_svr->Get("/api/me", [this](auto& req, auto& res) {
+        std::string u; int64_t uid = 0;
+        std::string tok; if (!VerifyAuth(req.get_header_value("Cookie"), u, uid, tok)) {
+            res.status = 401; res.set_content(R"({"error":"Unauthorized"})", "application/json"); return;
+        }
+        std::string role = GetRoleFromCookie(req.get_header_value("Cookie"));
+        res.set_content("{\"username\":" + JsonStr(u) + ",\"role\":" + JsonStr(role) + "}", "application/json");
+    });
     http_svr->Get("/api/services", services);
     http_svr->Post("/api/sheets", with_cb(cb_sheet_, sh_create));
     http_svr->Get("/api/sheets", with_cb(cb_sheet_, sh_list));
@@ -1127,6 +1247,7 @@ bool Gateway::Start() {
     http_svr->Post("/api/tx/begin", tx_begin);
     http_svr->Get("/api/health", health);
     http_svr->Get("/api/history", history);
+    http_svr->Get("/api/history/users", history_users);
     http_svr->Get("/api/system/status", sys_status);
     http_svr->Get("/api/breaker/stats", [&require_admin, this](auto& req, auto& res) {
         if (!require_admin(req, res)) return; std::string r; HandleBreakerStats(r); res.set_content(r, "application/json");

@@ -23,6 +23,9 @@ services:
   # ===== nginx ×3 (LVS real servers) =====
   nginx-1:
     build: { dockerfile: Dockerfile.nginx }
+    ports:
+      - "80:80"
+      - "443:443"
     volumes:
       - ./nginx.conf:/etc/nginx/nginx.conf:ro
       - ./web-ui:/app/web-ui:ro
@@ -71,6 +74,9 @@ services:
     image: mysql:8.0
     environment: { MYSQL_ROOT_PASSWORD: "${MYSQL_ROOT_PASSWORD:-123456}" }
     volumes: ["./init.sql:/docker-entrypoint-initdb.d/init.sql", "./data/mysql-sp-0:/var/lib/mysql"]
+    networks:
+      default:
+        aliases: [mysql-spreadsheet]
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
       interval: 5s
@@ -87,6 +93,9 @@ services:
     image: mysql:8.0
     environment: { MYSQL_ROOT_PASSWORD: "${MYSQL_ROOT_PASSWORD:-123456}" }
     volumes: ["./init.sql:/docker-entrypoint-initdb.d/init.sql", "./data/mysql-sp-1:/var/lib/mysql"]
+    networks:
+      default:
+        aliases: [mysql-spreadsheet]
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
       interval: 5s
@@ -104,6 +113,9 @@ services:
     image: mysql:8.0
     environment: { MYSQL_ROOT_PASSWORD: "${MYSQL_ROOT_PASSWORD:-123456}" }
     volumes: ["./init.sql:/docker-entrypoint-initdb.d/init.sql", "./data/mysql-f-0:/var/lib/mysql"]
+    networks:
+      default:
+        aliases: [mysql-file]
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
       interval: 5s
@@ -120,6 +132,9 @@ services:
     image: mysql:8.0
     environment: { MYSQL_ROOT_PASSWORD: "${MYSQL_ROOT_PASSWORD:-123456}" }
     volumes: ["./init.sql:/docker-entrypoint-initdb.d/init.sql", "./data/mysql-f-1:/var/lib/mysql"]
+    networks:
+      default:
+        aliases: [mysql-file]
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
       interval: 5s
@@ -141,7 +156,7 @@ services:
     command: redis-server /usr/local/etc/redis/redis.conf --port 7000 --requirepass ${REDIS_PASSWORD:-rpc-redis-123456} --masterauth ${REDIS_PASSWORD:-rpc-redis-123456}
     networks:
       default:
-        aliases: [redis-cluster]
+        aliases: [redis-cluster, redis-cluster-7000]
     healthcheck:
       test: ["CMD-SHELL", "redis-cli -p 7000 -a ${REDIS_PASSWORD:-rpc-redis-123456} ping"]
       interval: 5s
@@ -156,31 +171,31 @@ services:
     command: redis-server /usr/local/etc/redis/redis.conf --port 7001 --requirepass ${REDIS_PASSWORD:-rpc-redis-123456} --masterauth ${REDIS_PASSWORD:-rpc-redis-123456}
     networks:
       default:
-        aliases: [redis-cluster]
+        aliases: [redis-cluster, redis-cluster-7001]
 
   redis-cluster-3:
     image: redis:7-alpine
     volumes: [./redis/cluster/redis.conf:/usr/local/etc/redis/redis.conf, ./data/redis-cluster-3:/data]
     command: redis-server /usr/local/etc/redis/redis.conf --port 7002 --requirepass ${REDIS_PASSWORD:-rpc-redis-123456} --masterauth ${REDIS_PASSWORD:-rpc-redis-123456}
-    networks: { default: { aliases: [redis-cluster] } }
+    networks: { default: { aliases: [redis-cluster, redis-cluster-7002] } }
 
   redis-cluster-4:
     image: redis:7-alpine
     volumes: [./redis/cluster/redis.conf:/usr/local/etc/redis/redis.conf, ./data/redis-cluster-4:/data]
     command: redis-server /usr/local/etc/redis/redis.conf --port 7003 --requirepass ${REDIS_PASSWORD:-rpc-redis-123456} --masterauth ${REDIS_PASSWORD:-rpc-redis-123456}
-    networks: { default: { aliases: [redis-cluster] } }
+    networks: { default: { aliases: [redis-cluster, redis-cluster-7003] } }
 
   redis-cluster-5:
     image: redis:7-alpine
     volumes: [./redis/cluster/redis.conf:/usr/local/etc/redis/redis.conf, ./data/redis-cluster-5:/data]
     command: redis-server /usr/local/etc/redis/redis.conf --port 7004 --requirepass ${REDIS_PASSWORD:-rpc-redis-123456} --masterauth ${REDIS_PASSWORD:-rpc-redis-123456}
-    networks: { default: { aliases: [redis-cluster] } }
+    networks: { default: { aliases: [redis-cluster, redis-cluster-7004] } }
 
   redis-cluster-6:
     image: redis:7-alpine
     volumes: [./redis/cluster/redis.conf:/usr/local/etc/redis/redis.conf, ./data/redis-cluster-6:/data]
     command: redis-server /usr/local/etc/redis/redis.conf --port 7005 --requirepass ${REDIS_PASSWORD:-rpc-redis-123456} --masterauth ${REDIS_PASSWORD:-rpc-redis-123456}
-    networks: { default: { aliases: [redis-cluster] } }
+    networks: { default: { aliases: [redis-cluster, redis-cluster-7005] } }
 
   redis-cluster-init:
     image: redis:7-alpine
@@ -191,16 +206,11 @@ services:
       - redis-cluster-4
       - redis-cluster-5
       - redis-cluster-6
-    entrypoint: >
-      /bin/sh -c "
-        sleep 3 &&
-        echo yes | redis-cli --cluster create
-          redis-cluster-1:7000 redis-cluster-2:7001 redis-cluster-3:7002
-          redis-cluster-4:7003 redis-cluster-5:7004 redis-cluster-6:7005
-          --cluster-replicas 1
-          -a ${REDIS_PASSWORD:-rpc-redis-123456} &&
-        echo '=== Redis Cluster initialized ==='
-      "
+    volumes:
+      - ./redis/cluster/init.sh:/init.sh:ro
+    environment:
+      - REDIS_PASSWORD=${REDIS_PASSWORD:-rpc-redis-123456}
+    entrypoint: ["/bin/sh", "/init.sh"]
     restart: "no"
 
   # ===== MinIO 对象存储 =====
@@ -244,7 +254,7 @@ services:
     command: >
       /app/rpc_server --service auth --port 50051
       --mysql-write-host mysql-auth --mysql-read-hosts mysql-auth --mysql-password ${MYSQL_ROOT_PASSWORD:-123456} --mysql-db rpc_auth --mysql-shards 1
-      --redis-cluster redis-cluster:7000 --redis-cluster redis-cluster:7001 --redis-cluster redis-cluster:7002 --redis-password ${REDIS_PASSWORD:-rpc-redis-123456}
+      --redis-cluster redis-cluster-7000:7000 --redis-cluster redis-cluster-7001:7001 --redis-cluster redis-cluster-7002:7002 --redis-password ${REDIS_PASSWORD:-rpc-redis-123456}
     networks:
       default:
         aliases: [rpc-auth]
@@ -265,7 +275,7 @@ services:
     command: >
       /app/rpc_server --service auth --port 50051
       --mysql-write-host mysql-auth --mysql-read-hosts mysql-auth --mysql-password ${MYSQL_ROOT_PASSWORD:-123456} --mysql-db rpc_auth --mysql-shards 1
-      --redis-cluster redis-cluster:7000 --redis-cluster redis-cluster:7001 --redis-cluster redis-cluster:7002 --redis-password ${REDIS_PASSWORD:-rpc-redis-123456}
+      --redis-cluster redis-cluster-7000:7000 --redis-cluster redis-cluster-7001:7001 --redis-cluster redis-cluster-7002:7002 --redis-password ${REDIS_PASSWORD:-rpc-redis-123456}
     networks:
       default:
         aliases: [rpc-auth]
@@ -286,7 +296,7 @@ services:
     command: >
       /app/rpc_server --service spreadsheet --port 50051
       --mysql-write-host mysql-spreadsheet --mysql-read-hosts mysql-spreadsheet --mysql-password ${MYSQL_ROOT_PASSWORD:-123456} --mysql-db rpc_spreadsheet --mysql-shards 2
-      --redis-cluster redis-cluster:7000 --redis-cluster redis-cluster:7001 --redis-cluster redis-cluster:7002 --redis-password ${REDIS_PASSWORD:-rpc-redis-123456}
+      --redis-cluster redis-cluster-7000:7000 --redis-cluster redis-cluster-7001:7001 --redis-cluster redis-cluster-7002:7002 --redis-password ${REDIS_PASSWORD:-rpc-redis-123456}
     networks:
       default:
         aliases: [rpc-sheet]
@@ -309,7 +319,7 @@ services:
     command: >
       /app/rpc_server --service spreadsheet --port 50051
       --mysql-write-host mysql-spreadsheet --mysql-read-hosts mysql-spreadsheet --mysql-password ${MYSQL_ROOT_PASSWORD:-123456} --mysql-db rpc_spreadsheet --mysql-shards 2
-      --redis-cluster redis-cluster:7000 --redis-cluster redis-cluster:7001 --redis-cluster redis-cluster:7002 --redis-password ${REDIS_PASSWORD:-rpc-redis-123456}
+      --redis-cluster redis-cluster-7000:7000 --redis-cluster redis-cluster-7001:7001 --redis-cluster redis-cluster-7002:7002 --redis-password ${REDIS_PASSWORD:-rpc-redis-123456}
     networks:
       default:
         aliases: [rpc-sheet]
@@ -332,7 +342,7 @@ services:
     command: >
       /app/rpc_server --service spreadsheet --port 50051
       --mysql-write-host mysql-spreadsheet --mysql-read-hosts mysql-spreadsheet --mysql-password ${MYSQL_ROOT_PASSWORD:-123456} --mysql-db rpc_spreadsheet --mysql-shards 2
-      --redis-cluster redis-cluster:7000 --redis-cluster redis-cluster:7001 --redis-cluster redis-cluster:7002 --redis-password ${REDIS_PASSWORD:-rpc-redis-123456}
+      --redis-cluster redis-cluster-7000:7000 --redis-cluster redis-cluster-7001:7001 --redis-cluster redis-cluster-7002:7002 --redis-password ${REDIS_PASSWORD:-rpc-redis-123456}
     networks:
       default:
         aliases: [rpc-sheet]
@@ -362,7 +372,7 @@ services:
     command: >
       /app/rpc_server --service file --port 50051
       --mysql-write-host mysql-file --mysql-read-hosts mysql-file --mysql-password ${MYSQL_ROOT_PASSWORD:-123456} --mysql-db rpc_file --mysql-shards 2
-      --redis-cluster redis-cluster:7000 --redis-cluster redis-cluster:7001 --redis-cluster redis-cluster:7002 --redis-password ${REDIS_PASSWORD:-rpc-redis-123456}
+      --redis-cluster redis-cluster-7000:7000 --redis-cluster redis-cluster-7001:7001 --redis-cluster redis-cluster-7002:7002 --redis-password ${REDIS_PASSWORD:-rpc-redis-123456}
     networks:
       default:
         aliases: [rpc-file]
@@ -390,7 +400,7 @@ services:
     command: >
       /app/rpc_server --service file --port 50051
       --mysql-write-host mysql-file --mysql-read-hosts mysql-file --mysql-password ${MYSQL_ROOT_PASSWORD:-123456} --mysql-db rpc_file --mysql-shards 2
-      --redis-cluster redis-cluster:7000 --redis-cluster redis-cluster:7001 --redis-cluster redis-cluster:7002 --redis-password ${REDIS_PASSWORD:-rpc-redis-123456}
+      --redis-cluster redis-cluster-7000:7000 --redis-cluster redis-cluster-7001:7001 --redis-cluster redis-cluster-7002:7002 --redis-password ${REDIS_PASSWORD:-rpc-redis-123456}
     networks:
       default:
         aliases: [rpc-file]
@@ -416,7 +426,7 @@ services:
       --grpc-auth rpc-auth:50051
       --grpc-sheet rpc-sheet:50051
       --grpc-file rpc-file:50051
-      --redis-cluster redis-cluster:7000 --redis-cluster redis-cluster:7001 --redis-cluster redis-cluster:7002 --redis-password ${REDIS_PASSWORD:-rpc-redis-123456}
+      --redis-cluster redis-cluster-7000:7000 --redis-cluster redis-cluster-7001:7001 --redis-cluster redis-cluster-7002:7002 --redis-password ${REDIS_PASSWORD:-rpc-redis-123456}
     depends_on:
       mysql-spreadsheet-0:
         condition: service_healthy
@@ -453,7 +463,7 @@ services:
       --grpc-auth rpc-auth:50051
       --grpc-sheet rpc-sheet:50051
       --grpc-file rpc-file:50051
-      --redis-cluster redis-cluster:7000 --redis-cluster redis-cluster:7001 --redis-cluster redis-cluster:7002 --redis-password ${REDIS_PASSWORD:-rpc-redis-123456}
+      --redis-cluster redis-cluster-7000:7000 --redis-cluster redis-cluster-7001:7001 --redis-cluster redis-cluster-7002:7002 --redis-password ${REDIS_PASSWORD:-rpc-redis-123456}
     depends_on:
       mysql-spreadsheet-0:
         condition: service_healthy

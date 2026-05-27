@@ -63,6 +63,7 @@ bool RedisClient::PushCallEntry(const std::string& json_entry, const std::string
             cluster_->lpush(user_key, json_entry);
             cluster_->ltrim(user_key, 0, MAX_HISTORY - 1);
             cluster_->expire(user_key, std::chrono::seconds(CALL_HISTORY_TTL_SECONDS));
+            cluster_->sadd("call_history:users", username);
         }
         return true;
     } catch (const sw::redis::Error& e) {
@@ -94,6 +95,18 @@ int64_t RedisClient::GetCallCount(const std::string& username) const {
         return cluster_->llen(key);
     } catch (const sw::redis::Error& e) {
         return 0;
+    }
+}
+
+std::vector<std::string> RedisClient::GetHistoryUsers() const {
+    if (!cluster_) return {};
+    try {
+        std::vector<std::string> users;
+        cluster_->smembers("call_history:users", std::back_inserter(users));
+        std::sort(users.begin(), users.end());
+        return users;
+    } catch (const sw::redis::Error& e) {
+        return {};
     }
 }
 

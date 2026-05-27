@@ -18,7 +18,6 @@ nginx-1 :443 nginx-2 :443 nginx-3 :443  ← TLS 终结 + 限流(100r/s+burst50) 
    ▼          ▼
 Gateway-1 :8081 Gateway-2 :8081   ← 双Token鉴权 + TM(2PC) + 多维熔断(滑动窗口/P99)
    │  gRPC/HTTP/2  round_robin (DNS aliases, 5s 重解析)
-   │
    ├──→ Auth  (rpc-auth:50051)   副本 x2  DB: rpc_auth
    ├──→ Sheet (rpc-sheet:50051)  副本 x3  DB: rpc_spreadsheet (可 hash 分片)  Redis 缓存
    └──→ File  (rpc-file:50051)   副本 x2  DB: rpc_file (可 hash 分片)         MinIO
@@ -45,6 +44,29 @@ Gateway-1 :8081 Gateway-2 :8081   ← 双Token鉴权 + TM(2PC) + 多维熔断(�
 
 读取: 查 Redis → 命中返回 → 未命中查 MySQL → 回填 Redis
       逻辑过期(300s) → SetNX 加锁 → 后台线程异步刷新 → 返回旧值
+```
+
+### 缓存策略 — 防穿透/击穿/雪崩
+
+| 问题 | 机制 | 实现 | 关键参数 |
+|------|------|------|----------|
+| **缓存穿透** | 空值缓存 | MySQL 查不到时写 `"__NULL__"` 标记；命中空值直接返回 Not found | `NULL_TTL = 60s + jitter(0~30s)` |
+| **缓存击穿** | 逻辑过期 + 分布式锁 | 热点 key 逻辑过期后返回旧值，`SetNX` 只让 1 个线程异步刷新 | `LOGICAL_TTL = 300s`，`LOCK_TTL = 10s` |
+| **缓存雪崩** | TTL 随机偏移 | `JitteredTTL(base, jitter)` 给每个 key 物理 TTL 加随机偏移，分散过期窗口 | 物理 TTL `3600s + jitter(0~600s)`，空值 TTL `60s + jitter(0~30s)` |
+| **写后失效** | 懒删除 + 版本自增 | 写操作 `DeleteKey` 单实体缓存 + `INCR version` 使列表缓存过期 | 列表缓存 `TTL = 120s` |
+
+```
+读路径:
+  Redis命中
+    ├── 空值标记 "__NULL__" → 返回 Not found          ← 防穿透
+    ├── 逻辑未过期(≤300s) → 返回缓存                  ← 正常命中
+    └── 逻辑已过期(>300s) → 返回旧值 + SetNX 异步刷新   ← 防击穿
+  Redis未命中 → MySQL → 回写 Redis(JitteredTTL)        ← 防雪崩
+
+写路径:
+  CAS 乐观锁 UPDATE(version) → 成功
+    ├── DeleteKey("sheet:{id}")    懒删除单实体缓存
+    └── INCR version              使列表缓存过期
 ```
 
 ## 项目结构

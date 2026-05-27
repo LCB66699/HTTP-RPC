@@ -117,7 +117,7 @@ grpc::Status FileServiceImpl::GetFile(grpc::ServerContext* context,
     int64_t req_uid = req->user_id();
 
     // 异步刷新函数
-    auto async_refresh = [this, kNullMarker, NULL_TTL, PHYSICAL_TTL](int64_t id, int64_t uid, std::string ck, std::string tk, std::string lk) {
+    auto async_refresh = [this, kNullMarker](int64_t id, int64_t uid, std::string ck, std::string tk, std::string lk) {
         FileRow row;
         if (db_ && db_->GetFile(id, uid, row)) {
             rpc::GetFileResponse fresh;
@@ -142,14 +142,14 @@ grpc::Status FileServiceImpl::GetFile(grpc::ServerContext* context,
             if (fresh.file_content().size() < 1024 * 1024) {
                 std::string ser;
                 if (fresh.SerializeToString(&ser) && redis_ && redis_->IsConnected()) {
-                    redis_->SetJSON(ck, ser, PHYSICAL_TTL);
-                    redis_->SetJSON(tk, std::to_string(std::time(nullptr)), PHYSICAL_TTL);
+                    redis_->SetJSON(ck, ser, RedisClient::JitteredTTL(PHYSICAL_TTL, 600));
+                    redis_->SetJSON(tk, std::to_string(std::time(nullptr)), RedisClient::JitteredTTL(PHYSICAL_TTL, 600));
                     if (slog_) LOG_DEBUG(*slog_, "Get id=" + std::to_string(id) + " ASYNC-REFRESHED key=" + ck);
                 }
             }
         } else if (db_ && redis_ && redis_->IsConnected()) {
-            redis_->SetJSON(ck, kNullMarker, NULL_TTL);
-            redis_->SetJSON(tk, std::to_string(std::time(nullptr)), NULL_TTL);
+            redis_->SetJSON(ck, kNullMarker, RedisClient::JitteredTTL(NULL_TTL, 30));
+            redis_->SetJSON(tk, std::to_string(std::time(nullptr)), RedisClient::JitteredTTL(NULL_TTL, 30));
         }
         if (redis_ && redis_->IsConnected()) {
             redis_->DeleteKey(lk);
@@ -200,8 +200,8 @@ grpc::Status FileServiceImpl::GetFile(grpc::ServerContext* context,
     FileRow row;
     if (!db_->GetFile(req->id(), req_uid, row)) {
         if (redis_ && redis_->IsConnected()) {
-            redis_->SetJSON(cache_key, kNullMarker, NULL_TTL);
-            redis_->SetJSON(ts_key, std::to_string(std::time(nullptr)), NULL_TTL);
+            redis_->SetJSON(cache_key, kNullMarker, RedisClient::JitteredTTL(NULL_TTL, 30));
+            redis_->SetJSON(ts_key, std::to_string(std::time(nullptr)), RedisClient::JitteredTTL(NULL_TTL, 30));
         }
         resp->set_success(false);
         resp->set_error("Not found");
@@ -235,8 +235,8 @@ grpc::Status FileServiceImpl::GetFile(grpc::ServerContext* context,
         if (resp->file_content().size() < 1024 * 1024) {
             std::string serialized;
             if (resp->SerializeToString(&serialized)) {
-                redis_->SetJSON(cache_key, serialized, PHYSICAL_TTL);
-                redis_->SetJSON(ts_key, std::to_string(std::time(nullptr)), PHYSICAL_TTL);
+                redis_->SetJSON(cache_key, serialized, RedisClient::JitteredTTL(PHYSICAL_TTL, 600));
+                redis_->SetJSON(ts_key, std::to_string(std::time(nullptr)), RedisClient::JitteredTTL(PHYSICAL_TTL, 600));
                 if (slog_) LOG_DEBUG(*slog_, "Get id=" + std::to_string(req->id()) + " POPULATED key=" + cache_key);
             }
         }

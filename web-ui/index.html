@@ -361,8 +361,10 @@
 
     <!-- Service Usage History -->
     <div class="toolbar">
-      <h2>服务使用记录</h2>
+      <h2>服务使用记录 <span id="history-title-user" style="color:var(--accent-light);font-size:0.85rem;"></span></h2>
       <div class="filter-row">
+        <!-- Admin: user selector | Regular: hidden -->
+        <select id="history-user-select" style="display:none;min-width:160px;padding:6px 12px;border:1px solid var(--border);border-radius:6px;background:var(--bg-card);color:var(--text);font-size:0.85rem;"></select>
         <input type="text" id="filter-service" placeholder="按服务过滤…">
         <input type="text" id="filter-method" placeholder="按方法过滤…">
         <button id="btn-refresh-history" class="btn">刷新</button>
@@ -372,7 +374,7 @@
       <table>
         <thead>
           <tr>
-            <th>ID</th>
+            <th>用户</th>
             <th>时间</th>
             <th>服务</th>
             <th>方法</th>

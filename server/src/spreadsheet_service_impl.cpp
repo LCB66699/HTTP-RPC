@@ -111,7 +111,7 @@ grpc::Status SpreadsheetServiceImpl::GetSpreadsheet(
 
     // 异步刷新函数：查 MySQL → 回写 Redis(data+ts) → 释放锁
     int64_t req_uid = req->user_id();
-    auto async_refresh = [this, kNullMarker, NULL_TTL, PHYSICAL_TTL](int64_t id, int64_t uid, std::string ck, std::string tk, std::string lk) {
+    auto async_refresh = [this, kNullMarker](int64_t id, int64_t uid, std::string ck, std::string tk, std::string lk) {
         SpreadsheetRow row;
         if (db_ && db_->GetSpreadsheet(id, uid, row)) {
             rpc::GetSpreadsheetResponse fresh;
@@ -129,14 +129,14 @@ grpc::Status SpreadsheetServiceImpl::GetSpreadsheet(
             fresh.set_success(true);
             std::string ser;
             if (fresh.SerializeToString(&ser) && redis_ && redis_->IsConnected()) {
-                redis_->SetJSON(ck, ser, PHYSICAL_TTL);
-                redis_->SetJSON(tk, std::to_string(std::time(nullptr)), PHYSICAL_TTL);
+                redis_->SetJSON(ck, ser, RedisClient::JitteredTTL(PHYSICAL_TTL, 600));
+                redis_->SetJSON(tk, std::to_string(std::time(nullptr)), RedisClient::JitteredTTL(PHYSICAL_TTL, 600));
                 if (slog_) LOG_DEBUG(*slog_, "Get id=" + std::to_string(id) + " ASYNC-REFRESHED key=" + ck);
             }
         } else if (db_ && redis_ && redis_->IsConnected()) {
             // Not found — cache null marker to prevent penetration
-            redis_->SetJSON(ck, kNullMarker, NULL_TTL);
-            redis_->SetJSON(tk, std::to_string(std::time(nullptr)), NULL_TTL);
+            redis_->SetJSON(ck, kNullMarker, RedisClient::JitteredTTL(NULL_TTL, 30));
+            redis_->SetJSON(tk, std::to_string(std::time(nullptr)), RedisClient::JitteredTTL(NULL_TTL, 30));
             if (slog_) LOG_DEBUG(*slog_, "Get id=" + std::to_string(id) + " ASYNC-NULL-CACHED key=" + ck);
         }
         if (redis_ && redis_->IsConnected()) {
@@ -210,8 +210,8 @@ grpc::Status SpreadsheetServiceImpl::GetSpreadsheet(
     if (!db_->GetSpreadsheet(req->id(), req_uid, row)) {
         // Cache null sentinel to prevent cache penetration
         if (redis_ && redis_->IsConnected()) {
-            redis_->SetJSON(cache_key, kNullMarker, NULL_TTL);
-            redis_->SetJSON(ts_key, std::to_string(std::time(nullptr)), NULL_TTL);
+            redis_->SetJSON(cache_key, kNullMarker, RedisClient::JitteredTTL(NULL_TTL, 30));
+            redis_->SetJSON(ts_key, std::to_string(std::time(nullptr)), RedisClient::JitteredTTL(NULL_TTL, 30));
             if (slog_) LOG_DEBUG(*slog_, "Get id=" + std::to_string(req->id()) + " NULL-CACHED key=" + cache_key);
         }
         resp->set_success(false);
@@ -246,8 +246,8 @@ grpc::Status SpreadsheetServiceImpl::GetSpreadsheet(
     if (redis_ && redis_->IsConnected()) {
         std::string serialized;
         if (resp->SerializeToString(&serialized)) {
-            redis_->SetJSON(cache_key, serialized, PHYSICAL_TTL);
-            redis_->SetJSON(ts_key, std::to_string(std::time(nullptr)), PHYSICAL_TTL);
+            redis_->SetJSON(cache_key, serialized, RedisClient::JitteredTTL(PHYSICAL_TTL, 600));
+            redis_->SetJSON(ts_key, std::to_string(std::time(nullptr)), RedisClient::JitteredTTL(PHYSICAL_TTL, 600));
             if (slog_) LOG_DEBUG(*slog_, "Get id=" + std::to_string(req->id()) + " POPULATED key=" + cache_key + " ttl=" + std::to_string(PHYSICAL_TTL) + "s");
         }
     }
