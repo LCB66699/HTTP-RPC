@@ -124,6 +124,7 @@ grpc::Status AuthServiceImpl::Login(grpc::ServerContext*,
 
     resp->set_success(true);
     resp->set_token(token);
+    resp->set_user_id(uid);
 
     if (logger_) {
         auto dur = std::chrono::duration_cast<std::chrono::microseconds>(
@@ -221,6 +222,7 @@ grpc::Status AuthServiceImpl::Register(grpc::ServerContext*,
 
     resp->set_success(true);
     resp->set_token(token);
+    resp->set_user_id(uid);
 
     if (logger_) {
         auto dur = std::chrono::duration_cast<std::chrono::microseconds>(

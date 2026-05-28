@@ -134,8 +134,8 @@ private:
     // needed — AT is short-lived (15min) and expires naturally.
     bool VerifyAccessToken(const std::string& cookie_header, std::string& username, int64_t& user_id, std::string& raw_token) const;
     // Generate AT (JWT, 15min) and RT (UUID, stored in Redis, 7d)
-    std::string CreateAccessToken(const std::string& username) const;
-    std::string CreateRefreshToken(const std::string& username) const;
+    std::string CreateAccessToken(const std::string& username, int64_t uid = 0) const;
+    std::string CreateRefreshToken(const std::string& username, int64_t uid = 0) const;
     std::string GetRoleFromCookie(const std::string& cookie_header) const;
     // Legacy: kept for backward compat
     bool VerifyAuth(const std::string& cookie_header, std::string& username, int64_t& user_id, std::string& raw_token) const;

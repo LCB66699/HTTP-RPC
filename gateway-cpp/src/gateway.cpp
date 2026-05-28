@@ -176,20 +176,20 @@ std::string Gateway::CreateJWT(const std::string& username) const {
 
 // ---- 双 Token: Access Token (JWT 15min) + Refresh Token (UUID 7d) ----
 
-std::string Gateway::CreateAccessToken(const std::string& username) const {
+std::string Gateway::CreateAccessToken(const std::string& username, int64_t uid) const {
     long exp = static_cast<long>(std::time(nullptr)) + 900;  // 15 minutes
     std::string role = "user";
     if (IsAdminUser(username)) role = "admin";
     nlohmann::json payload;
     payload["username"] = username;
-    payload["uid"] = 0;
+    payload["uid"] = uid;
     payload["role"] = role;
     payload["type"] = "access";
     payload["exp"] = exp;
     return jwt::create(payload.dump(), jwt_secret_);
 }
 
-std::string Gateway::CreateRefreshToken(const std::string& username) const {
+std::string Gateway::CreateRefreshToken(const std::string& username, int64_t uid) const {
     unsigned char raw[16];
     for (int i = 0; i < 16; ++i) raw[i] = (unsigned char)(rand() % 256);
     raw[6] = (raw[6] & 0x0f) | 0x40;
@@ -200,8 +200,12 @@ std::string Gateway::CreateRefreshToken(const std::string& username) const {
         raw[0],raw[1],raw[2],raw[3],raw[4],raw[5],raw[6],raw[7],
         raw[8],raw[9],raw[10],raw[11],raw[12],raw[13],raw[14],raw[15]);
     std::string rt(buf);
-    if (redis_ && redis_->IsConnected())
-        redis_->SetJSON("rt:" + username, rt, 604800);  // 7 days
+    if (redis_ && redis_->IsConnected()) {
+        nlohmann::json store;
+        store["token"] = rt;
+        store["uid"] = uid;
+        redis_->SetJSON("rt:" + username, store.dump(), 604800);  // 7 days
+    }
     return rt;
 }
 
@@ -265,8 +269,9 @@ RpcResult Gateway::HandleLogin(const std::string& body, std::string& response,
     auto st = auth_stub_->Login(&ctx, req, &resp);
     bool ok = st.ok() && resp.success();
     if (ok) {
-        at_out = CreateAccessToken(u);
-        rt_out = CreateRefreshToken(u);
+        int64_t uid = resp.user_id();
+        at_out = CreateAccessToken(u, uid);
+        rt_out = CreateRefreshToken(u, uid);
         std::string role = "user";
         if (u.rfind("admin", 0) == 0) role = "admin";
         const char* ae = std::getenv("ADMIN_USERS");
@@ -310,8 +315,9 @@ RpcResult Gateway::HandleRegister(const std::string& body, std::string& response
     auto st = auth_stub_->Register(&ctx, req, &resp);
     bool ok = st.ok() && resp.success();
     if (ok) {
-        at_out = CreateAccessToken(u);
-        rt_out = CreateRefreshToken(u);
+        int64_t uid = resp.user_id();
+        at_out = CreateAccessToken(u, uid);
+        rt_out = CreateRefreshToken(u, uid);
         std::string role = "user";
         if (u.rfind("admin", 0) == 0) role = "admin";
         const char* ae = std::getenv("ADMIN_USERS");
@@ -959,11 +965,21 @@ bool Gateway::Start() {
         std::string u  = JsonGet(req.body, "username");
         if (rt.empty() || u.empty()) { res.status = 400; res.set_content(R"({"error":"Missing fields"})", "application/json"); return; }
         std::string stored;
-        if (!redis_ || !redis_->GetJSON("rt:" + u, stored) || stored != rt) {
+        if (!redis_ || !redis_->GetJSON("rt:" + u, stored)) {
+            res.status = 401; res.set_content(R"({"error":"Invalid refresh token"})", "application/json"); return;
+        }
+        std::string stored_rt;
+        int64_t stored_uid = 0;
+        try {
+            auto j = nlohmann::json::parse(stored);
+            stored_rt = j.value("token", "");
+            stored_uid = j.value("uid", 0);
+        } catch (...) { stored_rt = stored; }
+        if (stored_rt != rt) {
             if (redis_) { redis_->DeleteKey("rt:" + u); redis_->DeleteKey("rate:login:" + u + ":total"); }
             res.status = 401; res.set_content(R"({"error":"Invalid refresh token"})", "application/json"); return;
         }
-        std::string new_at = CreateAccessToken(u);
+        std::string new_at = CreateAccessToken(u, static_cast<int64_t>(stored_uid));
         char buf[2048]; snprintf(buf, sizeof(buf), kSetCookieFmt.c_str(), new_at.c_str());
         res.set_header("Set-Cookie", buf);
         res.set_content(R"({"success":true})", "application/json");

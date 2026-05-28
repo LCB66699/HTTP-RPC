@@ -18,6 +18,7 @@ message LoginResponse {
   bool success = 1;
   string token = 2;
   string error = 3;
+  int64 user_id = 4;
 }
 
 message RegisterRequest {
@@ -29,4 +30,5 @@ message RegisterResponse {
   bool success = 1;
   string token = 2;
   string error = 3;
+  int64 user_id = 4;
 }
