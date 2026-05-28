@@ -53,17 +53,13 @@ bool RedisClient::IsConnected() const {
 bool RedisClient::PushCallEntry(const std::string& json_entry, const std::string& username) {
     if (!cluster_) return false;
     try {
-        const std::string global_key = "call_history:global";
-        cluster_->lpush(global_key, json_entry);
-        cluster_->ltrim(global_key, 0, MAX_HISTORY - 1);
-        cluster_->expire(global_key, std::chrono::seconds(CALL_HISTORY_TTL_SECONDS));
-
         if (!username.empty()) {
             const std::string user_key = "call_history:" + username;
             cluster_->lpush(user_key, json_entry);
             cluster_->ltrim(user_key, 0, MAX_HISTORY - 1);
             cluster_->expire(user_key, std::chrono::seconds(CALL_HISTORY_TTL_SECONDS));
             cluster_->sadd("call_history:users", username);
+            cluster_->expire("call_history:users", std::chrono::seconds(CALL_HISTORY_TTL_SECONDS));
         }
         return true;
     } catch (const sw::redis::Error& e) {
@@ -76,8 +72,7 @@ std::vector<std::string> RedisClient::GetCallEntries(int limit, int offset,
                                                       const std::string& username) const {
     if (!cluster_) return {};
     try {
-        const std::string key = username.empty() ? "call_history:global"
-                                                 : "call_history:" + username;
+        const std::string key = "call_history:" + username;
         std::vector<std::string> entries;
         cluster_->lrange(key, offset, offset + limit - 1, std::back_inserter(entries));
         return entries;
@@ -90,8 +85,7 @@ std::vector<std::string> RedisClient::GetCallEntries(int limit, int offset,
 int64_t RedisClient::GetCallCount(const std::string& username) const {
     if (!cluster_) return 0;
     try {
-        const std::string key = username.empty() ? "call_history:global"
-                                                 : "call_history:" + username;
+        const std::string key = "call_history:" + username;
         return cluster_->llen(key);
     } catch (const sw::redis::Error& e) {
         return 0;
@@ -148,7 +142,9 @@ bool RedisClient::DeleteKey(const std::string& key) {
 int64_t RedisClient::Increment(const std::string& key) {
     if (!cluster_) return 0;
     try {
-        return cluster_->incr(key);
+        auto val = cluster_->incr(key);
+        cluster_->expire(key, std::chrono::seconds(7 * 86400));  // 7 day TTL
+        return val;
     } catch (const sw::redis::Error& e) {
         fprintf(stderr, "[Redis] Increment(%s) failed: %s\n", key.c_str(), e.what());
         return 0;
@@ -167,6 +163,45 @@ int64_t RedisClient::IncrementWithTTL(const std::string& key, int ttl) {
     } catch (const sw::redis::Error& e) {
         fprintf(stderr, "[Redis] IncrementWithTTL(%s) failed: %s\n", key.c_str(), e.what());
         return 0;
+    }
+}
+
+bool RedisClient::ExpireKey(const std::string& key, int ttl) {
+    if (!cluster_) return false;
+    try {
+        cluster_->expire(key, std::chrono::seconds(ttl));
+        return true;
+    } catch (const sw::redis::Error& e) {
+        fprintf(stderr, "[Redis] ExpireKey(%s) failed: %s\n", key.c_str(), e.what());
+        return false;
+    }
+}
+
+bool RedisClient::HSetJSON(const std::string& key, const std::string& field, const std::string& value) {
+    if (!cluster_) return false;
+    try {
+        cluster_->hset(key, field, value);
+        return true;
+    } catch (const sw::redis::Error& e) {
+        fprintf(stderr, "[Redis] HSetJSON(%s) failed: %s\n", key.c_str(), e.what());
+        return false;
+    }
+}
+
+bool RedisClient::HSetJSON(const std::string& key, const std::string& field, const std::string& value, int ttl) {
+    if (!HSetJSON(key, field, value)) return false;
+    return ExpireKey(key, ttl);
+}
+
+std::unordered_map<std::string, std::string> RedisClient::HGetAll(const std::string& key) const {
+    if (!cluster_) return {};
+    try {
+        std::unordered_map<std::string, std::string> result;
+        cluster_->hgetall(key, std::inserter(result, result.begin()));
+        return result;
+    } catch (const sw::redis::Error& e) {
+        fprintf(stderr, "[Redis] HGetAll(%s) failed: %s\n", key.c_str(), e.what());
+        return {};
     }
 }
 

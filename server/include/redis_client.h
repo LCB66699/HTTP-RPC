@@ -3,6 +3,7 @@
 #pragma once
 #include <string>
 #include <vector>
+#include <unordered_map>
 #include <memory>
 #include <cstdlib>
 
@@ -30,12 +31,16 @@ public:
     bool SetJSON(const std::string& key, const std::string& value, int ttl_seconds);
     bool SetNX(const std::string& key, const std::string& value, int ttl_seconds);
     bool DeleteKey(const std::string& key);
+    bool ExpireKey(const std::string& key, int ttl_seconds);
     int64_t Increment(const std::string& key);
     int64_t IncrementWithTTL(const std::string& key, int ttl_seconds);
+    bool HSetJSON(const std::string& key, const std::string& field, const std::string& value);
+    bool HSetJSON(const std::string& key, const std::string& field, const std::string& value, int ttl_seconds);
 
     // Cache reads
     bool GetJSON(const std::string& key, std::string& value);
     int64_t GetInt(const std::string& key);
+    std::unordered_map<std::string, std::string> HGetAll(const std::string& key) const;
 
     // Health check managed internally by the library — no explicit Start/Stop needed.
     // Kept for backward compatibility (no-ops).

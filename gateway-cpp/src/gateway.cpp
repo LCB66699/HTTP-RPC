@@ -618,10 +618,10 @@ RpcResult Gateway::HandleHealth(std::string& response) {
     result["channels"]["file"]["state"]   = state_str(file_ch_ ? file_ch_->GetState(true) : GRPC_CHANNEL_SHUTDOWN);
     result["channels"]["file"]["breaker"] = cb_file_.StateStr();
 
-    // 从 Redis 聚合所有节点心跳
+    // 从 Redis Hash 聚合所有节点心跳
     int online = 0, offline = 0;
     if (redis_ && redis_->IsConnected()) {
-        // 已知的节点 ID 列表（硬编码，后续可改为 Redis SCAN）
+        auto hb_map = redis_->HGetAll("heartbeats");
         static const char* kKnownNodes[] = {
             "auth-50051", "auth-50052",
             "spreadsheet-50051", "spreadsheet-50052", "spreadsheet-50053",
@@ -630,9 +630,9 @@ RpcResult Gateway::HandleHealth(std::string& response) {
         };
         nlohmann::json nodes = nlohmann::json::array();
         for (auto* nid : kKnownNodes) {
-            std::string val;
-            if (redis_->GetJSON("hb:" + std::string(nid), val)) {
-                auto hb = nlohmann::json::parse(val);
+            auto it = hb_map.find(nid);
+            if (it != hb_map.end()) {
+                auto hb = nlohmann::json::parse(it->second);
                 hb["status"] = "ONLINE";
                 nodes.push_back(hb);
                 online++;

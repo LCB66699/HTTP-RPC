@@ -28,7 +28,7 @@ grpc::Status HealthMonitorImpl::Report(grpc::ServerContext*,
     hb["version"]  = req->version();
     hb["status"]   = "ONLINE";
     resp->set_success(
-        redis_->SetJSON("hb:" + req->node_id(), hb.dump(), 30));
+        redis_->HSetJSON("heartbeats", req->node_id(), hb.dump(), 30));
     return grpc::Status::OK;
 }
 
@@ -64,7 +64,7 @@ void HealthMonitorImpl::HeartbeatLoop() {
             hb["port"]    = port_;
             hb["version"] = "1.0";
             hb["status"]  = "ONLINE";
-            redis_->SetJSON("hb:" + node_id_, hb.dump(), 30);
+            redis_->HSetJSON("heartbeats", node_id_, hb.dump(), 30);
         }
         std::this_thread::sleep_for(std::chrono::seconds(10));
     }

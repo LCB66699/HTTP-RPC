@@ -7,6 +7,7 @@
 #include <cstdio>
 #include <chrono>
 #include <thread>
+#include <atomic>
 
 
 
@@ -20,10 +21,10 @@ static std::string UsernameFromMeta(grpc::ServerContext* ctx) {
 
 // Redis key helpers — keyed by user_id so username changes never corrupt cache.
 static std::string VersionKey(int64_t user_id) {
-    return "user:" + std::to_string(user_id) + ":sheets:version";
+    return "u:" + std::to_string(user_id) + ":sheets:version";
 }
 static std::string ListCacheKey(int64_t user_id, int64_t version, int page, int page_size) {
-    std::string key = "user:" + std::to_string(user_id) + ":sheets:v" + std::to_string(version);
+    std::string key = "u:" + std::to_string(user_id) + ":sheets:v" + std::to_string(version);
     if (page_size > 0) key += ":p" + std::to_string(page) + ":ps" + std::to_string(page_size);
     return key;
 }
@@ -100,9 +101,10 @@ grpc::Status SpreadsheetServiceImpl::GetSpreadsheet(
     auto start = std::chrono::high_resolution_clock::now();
     std::string username = UsernameFromMeta(context);
 
-    const std::string cache_key = "sheet:" + std::to_string(req->id());
+    int64_t req_uid = req->user_id();
+    const std::string cache_key = "u:" + std::to_string(req_uid) + ":sheet:" + std::to_string(req->id());
     const std::string ts_key    = cache_key + ":ts";
-    const std::string lock_key  = "lock:sheet:" + std::to_string(req->id());
+    const std::string lock_key  = "lock:u:" + std::to_string(req_uid) + ":sheet:" + std::to_string(req->id());
     const std::string kNullMarker = "__NULL__";
     const int  LOGICAL_TTL  = 300;   // 逻辑过期 5min，超时触发异步刷新
     const int  PHYSICAL_TTL = 3600;  // 物理过期 1h，防止内存无限增长
@@ -110,7 +112,6 @@ grpc::Status SpreadsheetServiceImpl::GetSpreadsheet(
     const int  LOCK_TTL     = 10;    // 刷新锁 10s，防死锁
 
     // 异步刷新函数：查 MySQL → 回写 Redis(data+ts) → 释放锁
-    int64_t req_uid = req->user_id();
     auto async_refresh = [this, kNullMarker](int64_t id, int64_t uid, std::string ck, std::string tk, std::string lk) {
         SpreadsheetRow row;
         if (db_ && db_->GetSpreadsheet(id, uid, row)) {
@@ -178,7 +179,18 @@ grpc::Status SpreadsheetServiceImpl::GetSpreadsheet(
                 // 1d) Trigger async refresh if logically expired (non-blocking)
                 if (need_refresh && redis_->SetNX(lock_key, "1", LOCK_TTL)) {
                     if (slog_) LOG_DEBUG(*slog_, "Get id=" + std::to_string(req->id()) + " STALE (logical-expire), async refresh triggered");
-                    std::thread(async_refresh, req->id(), req_uid, cache_key, ts_key, lock_key).detach();
+                    std::thread([this, async_refresh, id=req->id(), uid=req_uid, ck=cache_key, tk=ts_key, lk=lock_key]() {
+                        std::atomic<bool> done{false};
+                        std::thread wd([this, &done, &lk]() {
+                            while (!done) {
+                                std::this_thread::sleep_for(std::chrono::seconds(5));
+                                if (!done && redis_) redis_->ExpireKey(lk, 10);
+                            }
+                        });
+                        async_refresh(id, uid, ck, tk, lk);
+                        done = true;
+                        wd.join();
+                    }).detach();
                 }
 
                 if (slog_) LOG_DEBUG(*slog_, "Get id=" + std::to_string(req->id())
@@ -385,8 +397,8 @@ grpc::Status SpreadsheetServiceImpl::UpdateSpreadsheet(
 
         if (ok) {
             if (redis_ && redis_->IsConnected()) {
-                redis_->DeleteKey("sheet:" + std::to_string(req->id()));
-                redis_->DeleteKey("sheet:" + std::to_string(req->id()) + ":ts");
+                redis_->DeleteKey("u:" + std::to_string(req->user_id()) + ":sheet:" + std::to_string(req->id()));
+                redis_->DeleteKey("u:" + std::to_string(req->user_id()) + ":sheet:" + std::to_string(req->id()) + ":ts");
                 redis_->Increment(VersionKey(req->user_id()));
                 if (slog_) LOG_DEBUG(*slog_, "Update id=" + std::to_string(req->id()) + " INVALIDATED + INCR version uid=" + std::to_string(req->user_id()));
             }

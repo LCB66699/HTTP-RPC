@@ -7,6 +7,7 @@
 #include <cstdio>
 #include <chrono>
 #include <thread>
+#include <atomic>
 
 
 
@@ -18,10 +19,10 @@ static std::string UsernameFromMeta(grpc::ServerContext* ctx) {
 }
 
 static std::string FileVersionKey(int64_t user_id) {
-    return "user:" + std::to_string(user_id) + ":files:version";
+    return "u:" + std::to_string(user_id) + ":files:version";
 }
 static std::string FileListCacheKey(int64_t user_id, int64_t version, int page, int page_size) {
-    std::string key = "user:" + std::to_string(user_id) + ":files:v" + std::to_string(version);
+    std::string key = "u:" + std::to_string(user_id) + ":files:v" + std::to_string(version);
     if (page_size > 0) key += ":p" + std::to_string(page) + ":ps" + std::to_string(page_size);
     return key;
 }
@@ -104,17 +105,15 @@ grpc::Status FileServiceImpl::GetFile(grpc::ServerContext* context,
     auto start = std::chrono::high_resolution_clock::now();
     std::string username = UsernameFromMeta(context);
 
-    // Bump key so old entries (presigned-only, no body) are never reused.
-    const std::string cache_key = "file:body:" + std::to_string(req->id());
+    int64_t req_uid = req->user_id();
+    const std::string cache_key = "u:" + std::to_string(req_uid) + ":file:" + std::to_string(req->id());
     const std::string ts_key    = cache_key + ":ts";
-    const std::string lock_key  = "lock:file:body:" + std::to_string(req->id());
+    const std::string lock_key  = "lock:u:" + std::to_string(req_uid) + ":file:" + std::to_string(req->id());
     const std::string kNullMarker = "__NULL__";
     const int  LOGICAL_TTL  = 300;
     const int  PHYSICAL_TTL = 3600;
     const int  NULL_TTL     = 60;
     const int  LOCK_TTL     = 10;
-
-    int64_t req_uid = req->user_id();
 
     // 异步刷新函数
     auto async_refresh = [this, kNullMarker](int64_t id, int64_t uid, std::string ck, std::string tk, std::string lk) {
@@ -183,7 +182,18 @@ grpc::Status FileServiceImpl::GetFile(grpc::ServerContext* context,
                 }
                 if (need_refresh && redis_->SetNX(lock_key, "1", LOCK_TTL)) {
                     if (slog_) LOG_DEBUG(*slog_, "Get id=" + std::to_string(req->id()) + " STALE async refresh triggered");
-                    std::thread(async_refresh, req->id(), req_uid, cache_key, ts_key, lock_key).detach();
+                    std::thread([this, async_refresh, id=req->id(), uid=req_uid, ck=cache_key, tk=ts_key, lk=lock_key]() {
+                        std::atomic<bool> done{false};
+                        std::thread wd([this, &done, &lk]() {
+                            while (!done) {
+                                std::this_thread::sleep_for(std::chrono::seconds(5));
+                                if (!done && redis_) redis_->ExpireKey(lk, 10);
+                            }
+                        });
+                        async_refresh(id, uid, ck, tk, lk);
+                        done = true;
+                        wd.join();
+                    }).detach();
                 }
                 return grpc::Status::OK;
             }
@@ -373,7 +383,8 @@ grpc::Status FileServiceImpl::DeleteFile(grpc::ServerContext* context,
     resp->set_success(true);
 
     if (redis_ && redis_->IsConnected()) {
-        redis_->DeleteKey("file:" + std::to_string(req->id()));
+        redis_->DeleteKey("u:" + std::to_string(req->user_id()) + ":file:" + std::to_string(req->id()));
+        redis_->DeleteKey("u:" + std::to_string(req->user_id()) + ":file:" + std::to_string(req->id()) + ":ts");
         redis_->Increment(FileVersionKey(req->user_id()));
     }
 
