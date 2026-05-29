@@ -361,7 +361,7 @@ RpcResult Gateway::HandleSheetCreate(const std::string& username, int64_t user_i
     req.set_data_json(JsonGet(body, "data_json"));
     req.set_idempotency_key(idempotency_key);
     std::string peer;
-    bool ok = RepRetry(rep, username, raw_token, 2,
+    bool ok = RepRetry(rep, username, raw_token, 1,
         [&](grpc::ClientContext* ctx) {
             auto st = sheet_stub_->CreateSpreadsheet(ctx, req, &resp);
             return std::pair{st, st.ok() && resp.success()};
@@ -507,7 +507,7 @@ RpcResult Gateway::HandleSheetUpdate(const std::string& username, int64_t user_i
     req.set_name(JsonGet(body, "name")); req.set_description(JsonGet(body, "description"));
     req.set_headers_json(JsonGet(body, "headers_json")); req.set_data_json(JsonGet(body, "data_json"));
     std::string peer;
-    bool ok = RepRetry(rep, username, raw_token, 2,
+    bool ok = RepRetry(rep, username, raw_token, 1,
         [&](grpc::ClientContext* ctx) {
             auto st = sheet_stub_->UpdateSpreadsheet(ctx, req, &resp);
             return std::pair{st, st.ok() && resp.success()};
@@ -523,7 +523,7 @@ RpcResult Gateway::HandleSheetDelete(const std::string& username, int64_t user_i
     rpc::DeleteSpreadsheetRequest req; rpc::DeleteSpreadsheetResponse resp;
     req.set_id(id); req.set_user_id(user_id);
     std::string peer;
-    bool ok = RepRetry(rep, username, raw_token, 2,
+    bool ok = RepRetry(rep, username, raw_token, 1,
         [&](grpc::ClientContext* ctx) {
             auto st = sheet_stub_->DeleteSpreadsheet(ctx, req, &resp);
             return std::pair{st, st.ok() && resp.success()};
@@ -566,7 +566,7 @@ RpcResult Gateway::HandleFileDelete(const std::string& username, int64_t user_id
     rpc::DeleteFileRequest req; rpc::DeleteFileResponse resp;
     req.set_id(id); req.set_user_id(user_id);
     std::string peer;
-    bool ok = RepRetry(rep, username, raw_token, 2,
+    bool ok = RepRetry(rep, username, raw_token, 1,
         [&](grpc::ClientContext* ctx) {
             auto st = file_stub_->DeleteFile(ctx, req, &resp);
             return std::pair{st, st.ok() && resp.success()};

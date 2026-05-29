@@ -169,23 +169,25 @@ if docker exec http-rpc-nginx-1-1 which ab &>/dev/null 2>&1 || { docker exec htt
 
         printf "  QPS=%-8s  P50=%-8s  P99=%-8s" "$QPS" "${P50:-?}" "${P99:-?}"
 
-        # 拐点检测: P99 突增 > 3x 前一档 或 QPS 不再增长 (<10% 增幅)
+        # 拐点检测: P99 突增 > 2x 或 QPS 不增长 (<5%) 或 QPS 下降
+        KNEE_FLAG=""
         if [ -n "$P99" ] && [ -n "$PREV_P99" ] && [ "$PREV_P99" != "0" ]; then
             P99_RATIO=$(echo "scale=2; $P99 / $PREV_P99" | bc -l 2>/dev/null || echo "1")
-            if [ "$(echo "$P99_RATIO > 3.0" | bc -l 2>/dev/null)" = "1" ]; then
-                echo -e "  \033[33m← P99 突增 ${P99_RATIO}x，拐点!\033[0m"
-                [ "$KNEE_CONC" = "N/A" ] && KNEE_CONC="$conc" && KNEE_QPS="$PREV_QPS"
-            else
-                echo ""
+            if [ "$(echo "$P99_RATIO > 2.0" | bc -l 2>/dev/null)" = "1" ]; then
+                KNEE_FLAG="P99突增${P99_RATIO}x"
             fi
-        elif [ -n "$QPS" ] && [ -n "$PREV_QPS" ] && [ "$PREV_QPS" != "0" ]; then
+        fi
+        if [ -n "$QPS" ] && [ -n "$PREV_QPS" ] && [ "$PREV_QPS" != "0" ]; then
             QPS_GROWTH=$(echo "scale=2; ($QPS - $PREV_QPS) / $PREV_QPS" | bc -l 2>/dev/null || echo "0")
-            if [ "$(echo "$QPS_GROWTH < 0.05" | bc -l 2>/dev/null)" = "1" ]; then
-                echo -e "  \033[33m← QPS 增幅仅 $(echo "scale=0; $QPS_GROWTH*100" | bc)% ，接近饱和\033[0m"
-                [ "$KNEE_CONC" = "N/A" ] && KNEE_CONC="$conc" && KNEE_QPS="$QPS"
-            else
-                echo ""
+            if [ "$(echo "$QPS_GROWTH < 0" | bc -l 2>/dev/null)" = "1" ]; then
+                KNEE_FLAG="${KNEE_FLAG:+${KNEE_FLAG}+}QPS下降$(echo "scale=0; $QPS_GROWTH*100" | bc)%"
+            elif [ "$(echo "$QPS_GROWTH < 0.05" | bc -l 2>/dev/null)" = "1" ]; then
+                KNEE_FLAG="${KNEE_FLAG:+${KNEE_FLAG}+}QPS增幅仅$(echo "scale=0; $QPS_GROWTH*100" | bc)%"
             fi
+        fi
+        if [ -n "$KNEE_FLAG" ]; then
+            echo -e "  \033[33m← 拐点! ${KNEE_FLAG}\033[0m"
+            [ "$KNEE_CONC" = "N/A" ] && KNEE_CONC="$conc" && KNEE_QPS="$PREV_QPS"
         else
             echo ""
         fi
