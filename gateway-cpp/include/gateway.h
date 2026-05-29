@@ -63,11 +63,11 @@ private:
     std::unique_ptr<Database> tx_db_;
     std::unique_ptr<TxManager> tx_manager_;
 
-    CircuitBreaker cb_auth_{"auth", 5, 10};
-    CircuitBreaker cb_sheet_{"sheet", 5, 30};
-    CircuitBreaker cb_file_{"file", 5, 30};
-    PerReplicaTracker rep_sheet_{"sheet", 5, 30};  // 副本级追踪
-    PerReplicaTracker rep_file_{"file", 5, 30};
+    CircuitBreaker cb_auth_{"auth", 5, 15};
+    CircuitBreaker cb_sheet_{"sheet", 5, 15};
+    CircuitBreaker cb_file_{"file", 5, 15};
+    PerReplicaTracker rep_sheet_{"sheet", 5, 15};  // 副本级追踪
+    PerReplicaTracker rep_file_{"file", 5, 15};
 
     // CQ 协程调度 — 每后端一个 CompletionQueue 事件循环
     CqLoop auth_cq_, sheet_cq_, file_cq_;

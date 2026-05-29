@@ -263,7 +263,7 @@ RpcResult Gateway::HandleLogin(const std::string& body, std::string& response,
                                 std::string& at_out, std::string& rt_out) {
     std::string u = JsonGet(body, "username"), p = JsonGet(body, "password");
     if (u.empty() || p.empty()) { response = R"({"success":false,"error":"Username and password required"})"; return RpcResult::BAD_REQUEST; }
-    grpc::ClientContext ctx; ctx.set_deadline(std::chrono::system_clock::now() + std::chrono::seconds(5));
+    grpc::ClientContext ctx; ctx.set_deadline(std::chrono::system_clock::now() + std::chrono::seconds(1));
     rpc::LoginRequest req; rpc::LoginResponse resp;
     req.set_username(u); req.set_password(p);
     auto st = auth_stub_->Login(&ctx, req, &resp);
@@ -309,7 +309,7 @@ RpcResult Gateway::HandleRegister(const std::string& body, std::string& response
                                    std::string& at_out, std::string& rt_out) {
     std::string u = JsonGet(body, "username"), p = JsonGet(body, "password");
     if (u.empty() || p.empty()) { response = R"({"success":false,"error":"Username and password required"})"; return RpcResult::BAD_REQUEST; }
-    grpc::ClientContext ctx; ctx.set_deadline(std::chrono::system_clock::now() + std::chrono::seconds(5));
+    grpc::ClientContext ctx; ctx.set_deadline(std::chrono::system_clock::now() + std::chrono::seconds(1));
     rpc::RegisterRequest req; rpc::RegisterResponse resp;
     req.set_username(u); req.set_password(p);
     auto st = auth_stub_->Register(&ctx, req, &resp);
@@ -361,7 +361,7 @@ RpcResult Gateway::HandleSheetCreate(const std::string& username, int64_t user_i
     req.set_data_json(JsonGet(body, "data_json"));
     req.set_idempotency_key(idempotency_key);
     std::string peer;
-    bool ok = RepRetry(rep, username, raw_token, 5,
+    bool ok = RepRetry(rep, username, raw_token, 2,
         [&](grpc::ClientContext* ctx) {
             auto st = sheet_stub_->CreateSpreadsheet(ctx, req, &resp);
             return std::pair{st, st.ok() && resp.success()};
@@ -449,7 +449,7 @@ RpcResult Gateway::HandleSheetGet(const std::string& username, int64_t user_id,
     rpc::GetSpreadsheetRequest req; rpc::GetSpreadsheetResponse resp;
     req.set_id(id); req.set_user_id(user_id);
     std::string peer;
-    bool ok = RepRetry(rep, username, raw_token, 5,
+    bool ok = RepRetry(rep, username, raw_token, 1,
         [&](grpc::ClientContext* ctx) {
             auto st = sheet_stub_->GetSpreadsheet(ctx, req, &resp);
             return std::pair{st, st.ok() && resp.success()};
@@ -477,7 +477,7 @@ RpcResult Gateway::HandleSheetList(const std::string& username, int64_t user_id,
     req.set_page(page);
     req.set_page_size(page_size);
     std::string peer;
-    bool ok = RepRetry(rep, username, raw_token, 5,
+    bool ok = RepRetry(rep, username, raw_token, 1,
         [&](grpc::ClientContext* ctx) {
             auto st = sheet_stub_->ListSpreadsheets(ctx, req, &resp);
             return std::pair{st, st.ok() && resp.success()};
@@ -507,7 +507,7 @@ RpcResult Gateway::HandleSheetUpdate(const std::string& username, int64_t user_i
     req.set_name(JsonGet(body, "name")); req.set_description(JsonGet(body, "description"));
     req.set_headers_json(JsonGet(body, "headers_json")); req.set_data_json(JsonGet(body, "data_json"));
     std::string peer;
-    bool ok = RepRetry(rep, username, raw_token, 5,
+    bool ok = RepRetry(rep, username, raw_token, 2,
         [&](grpc::ClientContext* ctx) {
             auto st = sheet_stub_->UpdateSpreadsheet(ctx, req, &resp);
             return std::pair{st, st.ok() && resp.success()};
@@ -523,7 +523,7 @@ RpcResult Gateway::HandleSheetDelete(const std::string& username, int64_t user_i
     rpc::DeleteSpreadsheetRequest req; rpc::DeleteSpreadsheetResponse resp;
     req.set_id(id); req.set_user_id(user_id);
     std::string peer;
-    bool ok = RepRetry(rep, username, raw_token, 5,
+    bool ok = RepRetry(rep, username, raw_token, 2,
         [&](grpc::ClientContext* ctx) {
             auto st = sheet_stub_->DeleteSpreadsheet(ctx, req, &resp);
             return std::pair{st, st.ok() && resp.success()};
@@ -541,7 +541,7 @@ RpcResult Gateway::HandleFileList(const std::string& username, int64_t user_id,
     req.set_page(page);
     req.set_page_size(page_size);
     std::string peer;
-    bool ok = RepRetry(rep, username, raw_token, 5,
+    bool ok = RepRetry(rep, username, raw_token, 1,
         [&](grpc::ClientContext* ctx) {
             auto st = file_stub_->ListFiles(ctx, req, &resp);
             return std::pair{st, st.ok() && resp.success()};
@@ -566,7 +566,7 @@ RpcResult Gateway::HandleFileDelete(const std::string& username, int64_t user_id
     rpc::DeleteFileRequest req; rpc::DeleteFileResponse resp;
     req.set_id(id); req.set_user_id(user_id);
     std::string peer;
-    bool ok = RepRetry(rep, username, raw_token, 5,
+    bool ok = RepRetry(rep, username, raw_token, 2,
         [&](grpc::ClientContext* ctx) {
             auto st = file_stub_->DeleteFile(ctx, req, &resp);
             return std::pair{st, st.ok() && resp.success()};
@@ -1086,7 +1086,7 @@ bool Gateway::Start() {
         for (int attempt = 0; attempt < 2; ++attempt) {
             grpc::ClientContext ctx; ctx.AddMetadata("username", u);
             ctx.AddMetadata("authorization", "Bearer " + tok);
-            ctx.set_deadline(std::chrono::system_clock::now() + std::chrono::seconds(600));
+            ctx.set_deadline(std::chrono::system_clock::now() + std::chrono::seconds(60));
             st = file_stub_->GetFile(&ctx, freq, &fresp);
             peer = ctx.peer();
             if (st.ok() && fresp.success()) break;

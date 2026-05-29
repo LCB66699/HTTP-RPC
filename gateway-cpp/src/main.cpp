@@ -27,7 +27,7 @@ int main(int argc, char* argv[]) {
     std::string redis_password;
     int redis_pool_size = 4;
     int max_concurrent = 256;
-    int queue_timeout_ms = 3000;
+    int queue_timeout_ms = 500;
 
     for (int i = 1; i < argc; ++i) {
         std::string arg = argv[i];
