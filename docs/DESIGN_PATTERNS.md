@@ -4,17 +4,18 @@
 
 1. [Strategy（策略）](#1-strategy策略)
 2. [Observer（观察者）](#2-observer观察者)
-3. [Decorator（装饰器）](#4-decorator装饰器)
-4. [Proxy（代理）](#5-proxy代理)
-5. [Repository（仓库）](#6-repository仓库)
-6. [Object Pool（对象池）](#7-object-pool对象池)
-7. [Factory Method（工厂方法）](#8-factory-method工厂方法)
-8. [Circuit Breaker（熔断器）](#9-circuit-breaker熔断器)
-9. [Cache-Aside（缓存旁路）](#10-cache-aside缓存旁路)
-10. [Write Invalidation + Versioned Cache（写失效+版本化缓存）](#11-write-invalidation--versioned-cache写失效版本化缓存)
-11. [Two-Phase Commit（两阶段提交）](#12-two-phase-commit两阶段提交)
-12. [Idempotency Key（幂等键）](#13-idempotency-key幂等键)
-13. [Sharding（分片）](#14-sharding分片)
+3. [Template Method（模板方法）](#3-template-method模板方法)
+4. [Decorator（装饰器）](#4-decorator装饰器)
+5. [Proxy（代理）](#5-proxy代理)
+6. [Repository（仓库）](#6-repository仓库)
+7. [Object Pool（对象池）](#7-object-pool对象池)
+8. [Factory Method（工厂方法）](#8-factory-method工厂方法)
+9. [Circuit Breaker（熔断器）](#9-circuit-breaker熔断器)
+10. [Cache-Aside（缓存旁路）](#10-cache-aside缓存旁路)
+11. [Write Invalidation + Versioned Cache（写失效+版本化缓存）](#11-write-invalidation--versioned-cache写失效版本化缓存)
+12. [Two-Phase Commit（两阶段提交）](#12-two-phase-commit两阶段提交)
+13. [Idempotency Key（幂等键）](#13-idempotency-key幂等键)
+14. [Sharding（分片）](#14-sharding分片)
 
 ---
 
@@ -150,22 +151,20 @@ void PushError(const std::string& level, const std::string& msg) {
 
 ---
 
-## 3. Strategy 扩展：RepRetry — 函数注入版策略
+## 3. Template Method（模板方法）
+
 
 ### 意图
 
-定义算法骨架，子步骤由调用方注入。
+定义算法骨架，某些步骤延迟到调用方实现。RepRetry 的骨架（for 循环 + metadata + deadline + 重试 + 副本隔离）固定，唯一钩子是"调哪个 RPC"。
 
-### 应用：RepRetry — 统一 RPC 调用模板
+| | Strategy（三层 LB） | Template Method（RepRetry） |
+|---|---|---|
+| 替换粒度 | 整个算法 | 算法中的**一个步骤** |
+| 骨架 | 框架提供，不可见 | `RepRetry` 自己写死 |
+| 钩子 | 无 | `rpc_fn` — 调哪个 RPC |
 
-**骨架固定** — authna header 注入、deadline 设置、失败重试、副本切换：
-```cpp
-// gateway-cpp/src/gateway.cpp:78-94
-template<typename F>
-static bool RepRetry(PerReplicaTracker& rep,
-                     const std::string& username,
-                     const std::string& raw_token,
-                     int timeout_sec,
+> 如果用 Strategy 实现，调用方可以换"不重试"策略。但 `RepRetry` 的重试逻辑不可替换——只能填"调哪个 RPC"这一个坑。所以是模板方法。
                      F&& rpc_fn,                    // ← 变化的部分
                      std::string& out_peer) {
     for (int attempt = 0; attempt < 2; ++attempt) {
