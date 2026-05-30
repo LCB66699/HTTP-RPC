@@ -4,19 +4,17 @@
 
 1. [Strategy（策略）](#1-strategy策略)
 2. [Observer（观察者）](#2-observer观察者)
-3. [Template Method（模板方法）](#3-template-method模板方法)
-4. [Chain of Responsibility（责任链）](#4-chain-of-responsibility责任链)
-5. [Decorator（装饰器）](#5-decorator装饰器)
-6. [Proxy（代理）](#6-proxy代理)
-7. [Repository（仓库）](#7-repository仓库)
-8. [Object Pool（对象池）](#8-object-pool对象池)
-9. [Factory Method（工厂方法）](#9-factory-method工厂方法)
-10. [Circuit Breaker（熔断器）](#10-circuit-breaker熔断器)
-11. [Cache-Aside（缓存旁路）](#11-cache-aside缓存旁路)
-12. [Write Invalidation + Versioned Cache（写失效+版本化缓存）](#12-write-invalidation--versioned-cache写失效版本化缓存)
-13. [Two-Phase Commit（两阶段提交）](#13-two-phase-commit两阶段提交)
-14. [Idempotency Key（幂等键）](#14-idempotency-key幂等键)
-15. [Sharding（分片）](#15-sharding分片)
+3. [Decorator（装饰器）](#4-decorator装饰器)
+4. [Proxy（代理）](#5-proxy代理)
+5. [Repository（仓库）](#6-repository仓库)
+6. [Object Pool（对象池）](#7-object-pool对象池)
+7. [Factory Method（工厂方法）](#8-factory-method工厂方法)
+8. [Circuit Breaker（熔断器）](#9-circuit-breaker熔断器)
+9. [Cache-Aside（缓存旁路）](#10-cache-aside缓存旁路)
+10. [Write Invalidation + Versioned Cache（写失效+版本化缓存）](#11-write-invalidation--versioned-cache写失效版本化缓存)
+11. [Two-Phase Commit（两阶段提交）](#12-two-phase-commit两阶段提交)
+12. [Idempotency Key（幂等键）](#13-idempotency-key幂等键)
+13. [Sharding（分片）](#14-sharding分片)
 
 ---
 
@@ -152,7 +150,7 @@ void PushError(const std::string& level, const std::string& msg) {
 
 ---
 
-## 3. Template Method（模板方法）
+## 3. Strategy 扩展：RepRetry — 函数注入版策略
 
 ### 意图
 
@@ -212,67 +210,7 @@ RepRetry(rep, username, raw_token, 1,
 
 ---
 
-## 4. Chain of Responsibility（责任链）
-
-### 意图
-
-请求经过一系列独立处理器，任一失败即终止。
-
-### 应用：请求处理管道
-
-`gateway-cpp/src/gateway.cpp:1128-1170`:
-```cpp
-auto with_cb = [this](CircuitBreaker& cb, auto inner) {
-    return [this, &cb, inner = std::move(inner)](auto& req, auto& res) {
-        // ← Handler 1: 熔断器检查
-        if (!cb.AllowRequest()) {
-            res.status = 503;
-            res.set_header("Retry-After", cb.TimeoutSec());
-            res.set_content(R"({"error":"circuit_breaker_open"})",
-                            "application/json");
-            return;   // ← 终止
-        }
-
-        // ← Handler 2: 舱壁隔离（信号量排队）
-        auto deadline = steady_clock::now() + milliseconds(queue_timeout_ms_);
-        if (!sem_->try_acquire_until(deadline)) {
-            res.status = 503;
-            res.set_header("Retry-After", "5");
-            res.set_content(R"({"error":"server overloaded"})",
-                            "application/json");
-            return;   // ← 终止
-        }
-
-        // ← Handler 3: 实际业务处理
-        auto t0 = steady_clock::now();
-        auto result = inner(req, r);
-        auto elapsed = duration_cast<milliseconds>(steady_clock::now() - t0).count();
-        sem_->release();
-
-        // ← Handler 4: 熔断器反馈
-        switch (result) {
-            case SUCCESS: cb.RecordResult(true, elapsed); break;
-            case TRANSPORT_FAILURE: cb.RecordResult(false, elapsed); break;
-            case AUTH_FAILURE: res.status = 401; break;
-            case BAD_REQUEST: res.status = 400; break;
-        }
-    };
-};
-```
-
-### 完整请求链路
-
-```
-浏览器 → nginx 令牌桶(429) → Gateway JWT 验签(401) → with_cb
-  ├── 熔断器 AllowRequest(503)
-  ├── 信号量排队 try_acquire(503)
-  ├── inner(req) → RepRetry → gRPC stub → Service → MySQL/Redis
-  └── RecordResult(熔断反馈)
-```
-
----
-
-## 5. Decorator（装饰器）
+## 4. Decorator（装饰器）
 
 ### 意图
 
@@ -280,18 +218,50 @@ auto with_cb = [this](CircuitBreaker& cb, auto inner) {
 
 ### 应用：with_cb 包装路由处理器
 
+纯业务 handler 不知道熔断和信号量：
+
 ```cpp
-// gateway-cpp/src/gateway.cpp:1204-1205
-svr.Get("/api/sheets",      with_cb(cb_sheet_, sh_list));
-svr.Put("/api/sheets",      with_cb(cb_sheet_, sh_update));
-svr.Post("/api/sheets/get", with_cb(cb_sheet_, sh_get));
+auto sh_list = [this](auto& req, std::string& r) {
+    VerifyAuth(...);
+    return HandleSheetList(u, uid, page, page_size, tok, rep_sheet_, r);
+};
 ```
 
-`sh_list` / `sh_update` / `sh_get` 是纯业务处理器——只关心"接到请求 → 调 gRPC → 返回 JSON"。`with_cb` 在外面包了一层：熔断检查 + 并发控制 + 结果反馈。两个职责**正交**，可以独立修改和测试。
+`with_cb` 包一层，不改 `sh_list` 一行代码：
+
+```cpp
+// gateway-cpp/src/gateway.cpp:1215-1221
+svr.Get("/api/sheets",       with_cb(cb_sheet_, sh_list));
+svr.Post("/api/sheets",      with_cb(cb_sheet_, sh_create));
+svr.Put("/api/sheets",       with_cb(cb_sheet_, sh_update));
+svr.Post("/api/sheets/get",  with_cb(cb_sheet_, sh_get));
+// file、file upload 等同理
+```
+
+内部加了四个步骤（`gateway.cpp:1128-1170`）：
+
+```
+① cb.AllowRequest()        → 503 终止
+② sem_->try_acquire_until() → 503 终止
+③ inner(req, r)            → 真正干活
+④ cb.RecordResult()        → 反馈熔断器
+```
+
+> `with_cb` 不是 Chain of Responsibility——四个步骤写死在一个 lambda 里，不可插拔。真正的"链"在跨层请求路径上（见下方）。
+
+### 跨层请求链（Chain of Responsibility 的体现）
+
+每个节点位于不同组件，独立判断，失败即终止：
+
+```
+nginx 令牌桶(429) → Gateway JWT 验签(401) → with_cb 熔断+排队(503) → RepRetry(副本切换)
+     ↑                      ↑                       ↑                      ↑
+  限流策略              认证策略               韧性策略               传输策略
+```
 
 ---
 
-## 6. Proxy（代理）
+## 5. Proxy（代理）
 
 ### 意图
 
@@ -329,7 +299,7 @@ Service 完全不感知 HTTP，只处理 Protobuf → MySQL。代理层屏蔽了
 
 ---
 
-## 7. Repository（仓库）
+## 6. Repository（仓库）
 
 ### 意图
 
@@ -364,7 +334,7 @@ if (mysql_query(conn, sql.c_str()) == 0) ...;
 
 ---
 
-## 8. Object Pool（对象池）
+## 7. Object Pool（对象池）
 
 ### 意图
 
@@ -408,7 +378,7 @@ std::shared_ptr<grpc::Channel> file_ch_;
 
 ---
 
-## 9. Factory Method（工厂方法）
+## 8. Factory Method（工厂方法）
 
 ### 意图
 
@@ -440,7 +410,7 @@ health_ch_= MakeChannel("rpc-sheet:50051");   // gateway.cpp:128
 
 ---
 
-## 10. Circuit Breaker（熔断器）
+## 9. Circuit Breaker（熔断器）
 
 ### 意图
 
@@ -478,7 +448,7 @@ CircuitBreaker cb_file_{"file", 5, 15};
 
 ---
 
-## 11. Cache-Aside（缓存旁路）
+## 10. Cache-Aside（缓存旁路）
 
 ### 意图
 
@@ -532,7 +502,7 @@ if (db_->GetSpreadsheet(id, uid, row)) {
 
 ---
 
-## 12. Write Invalidation + Versioned Cache（写失效+版本化缓存）
+## 11. Write Invalidation + Versioned Cache（写失效+版本化缓存）
 
 ### 实体缓存：懒删除
 
@@ -563,7 +533,7 @@ redis_->Increment(VersionKey(req->user_id()));   // version+1 → 旧 key 自然
 
 ---
 
-## 13. Two-Phase Commit（两阶段提交）
+## 12. Two-Phase Commit（两阶段提交）
 
 ### 意图
 
@@ -597,7 +567,7 @@ service TxResource { rpc Prepare(PrepareRequest) returns (PrepareResponse);
 
 ---
 
-## 14. Idempotency Key（幂等键）
+## 13. Idempotency Key（幂等键）
 
 ### 意图
 
@@ -621,7 +591,7 @@ CreateSheet/CreateFile 的 gRPC retry policy 被排除（`gateway.cpp:43-46`）�
 
 ---
 
-## 15. Sharding（分片）
+## 14. Sharding（分片）
 
 ### 意图
 
