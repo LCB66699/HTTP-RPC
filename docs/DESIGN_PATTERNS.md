@@ -414,7 +414,7 @@ std::shared_ptr<grpc::Channel> file_ch_;
 
 将对象创建封装为方法，隔离创建逻辑。
 
-### 应用：MakeChannel 工厂
+### 应用：MakeChannel — 唯一真正的工厂方法
 
 `gateway-cpp/src/gateway.cpp:36-73`:
 ```cpp
@@ -422,25 +422,21 @@ static std::shared_ptr<grpc::Channel> MakeChannel(const std::string& addr) {
     grpc::ChannelArguments args;
     args.SetLoadBalancingPolicyName("round_robin");
     args.SetServiceConfigJSON(kRetryPolicy);
-    // keepalive, DNS, message size, backoff...
+    // keepalive, DNS, message size, backoff 共 8 个参数...
     return grpc::CreateCustomChannel(addr,
                 grpc::InsecureChannelCredentials(), args);
 }
 ```
 
-调用方不关心 Channel 怎么配置的，只传地址：
+调用方不 new Channel（不配置 8 个参数），只传地址：
 ```cpp
-auth_ch_  = MakeChannel("rpc-auth:50051");
+auth_ch_  = MakeChannel("rpc-auth:50051");   // gateway.cpp:116
+sheet_ch_ = MakeChannel("rpc-sheet:50051");   // gateway.cpp:120
+file_ch_  = MakeChannel("rpc-file:50051");    // gateway.cpp:124
+health_ch_= MakeChannel("rpc-sheet:50051");   // gateway.cpp:128
 ```
 
-### JWT 生成工厂
-
-`gateway-cpp/src/gateway.cpp:179-190,192-206`:
-```cpp
-std::string CreateAccessToken(const std::string& username, int64_t uid);
-std::string CreateRefreshToken(const std::string& username, int64_t uid);
-// 调用方不需要知道 JWT 的 HMAC 算法、payload 结构、过期时间
-```
+> 注意：`CreateAccessToken`/`CreateRefreshToken` 返回的是 `std::string`（基础类型），不是复杂对象，不属于工厂方法。
 
 ---
 
