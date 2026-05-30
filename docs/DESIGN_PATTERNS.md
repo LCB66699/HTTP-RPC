@@ -160,7 +160,7 @@ void PushError(const std::string& level, const std::string& msg) {
 
 ### 应用：RepRetry — 统一 RPC 调用模板
 
-**骨架固定** — auth header 注入、deadline 设置、失败重试、副本切换：
+**骨架固定** — authna header 注入、deadline 设置、失败重试、副本切换：
 ```cpp
 // gateway-cpp/src/gateway.cpp:78-94
 template<typename F>
