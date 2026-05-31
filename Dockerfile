@@ -6,10 +6,11 @@ RUN apt update && apt install -y \
     libmysqlclient-dev libhiredis-dev libssl-dev zlib1g-dev \
     libnghttp2-dev
 
-# Build and install redis-plus-plus (use mirror if GitHub unreachable)
-ARG REDIS_PP_REPO=https://github.com/sewenew/redis-plus-plus.git
-RUN git clone --depth 1 ${REDIS_PP_REPO} /tmp/redis-plus-plus \
-    && cd /tmp/redis-plus-plus \
+# Build and install redis-plus-plus from local source (offline-safe)
+# Put the source tree in third_party/redis-plus-plus/ before building:
+#   git clone --depth 1 https://github.com/sewenew/redis-plus-plus.git third_party/redis-plus-plus
+COPY third_party/redis-plus-plus/ /tmp/redis-plus-plus/
+RUN cd /tmp/redis-plus-plus \
     && mkdir build && cd build \
     && cmake -DCMAKE_BUILD_TYPE=Release \
              -DREDIS_PLUS_PLUS_CXX_STANDARD=20 \
