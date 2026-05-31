@@ -7,6 +7,7 @@
 #pragma once
 #include <string>
 #include <vector>
+#include <atomic>
 #include <memory>
 #include <semaphore>
 #include <grpcpp/grpcpp.h>
@@ -69,6 +70,10 @@ private:
     PerReplicaTracker rep_sheet_{"sheet", 5, 15};  // 副本级追踪
     PerReplicaTracker rep_file_{"file", 5, 15};
 
+    // Prometheus metrics counters (atomic, lock-free increment)
+    mutable std::atomic<int64_t> metrics_requests_total_{0};
+    mutable std::atomic<int64_t> metrics_requests_errors_{0};
+
     // CQ 协程调度 — 每后端一个 CompletionQueue 事件循环
     CqLoop auth_cq_, sheet_cq_, file_cq_;
 
@@ -120,6 +125,7 @@ private:
     bool HandleSystemStatus(std::string& response);
     RpcResult HandleBreakerStats(std::string& response);
     bool HandleStressRun(std::string& response, const std::string& token);
+    std::string HandleMetrics() const;
 
     // ---- 协程 handler (h2c 8080 使用, co_await gRPC) ----
     Task<void> HandleLoginCoro(std::string body, std::string& response);

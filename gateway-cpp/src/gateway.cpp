@@ -676,6 +676,31 @@ RpcResult Gateway::HandleHistoryUsers(std::string& response) {
     return RpcResult::SUCCESS;
 }
 
+std::string Gateway::HandleMetrics() const {
+    auto cb_state = [](const CircuitBreaker& cb) -> int {
+        auto s = cb.StateStr();
+        if (s == "OPEN") return 1;
+        if (s == "HALF_OPEN") return 2;
+        return 0;  // CLOSED
+    };
+    int64_t total = metrics_requests_total_.load();
+    int64_t errors = metrics_requests_errors_.load();
+
+    std::string out;
+    out += "# HELP gateway_requests_total Total HTTP requests processed.\n";
+    out += "# TYPE gateway_requests_total counter\n";
+    out += "gateway_requests_total " + std::to_string(total) + "\n";
+    out += "# HELP gateway_requests_errors_total Total HTTP request errors (4xx/5xx).\n";
+    out += "# TYPE gateway_requests_errors_total counter\n";
+    out += "gateway_requests_errors_total " + std::to_string(errors) + "\n";
+    out += "# HELP circuit_breaker_state Circuit breaker state (0=CLOSED,1=OPEN,2=HALF_OPEN).\n";
+    out += "# TYPE circuit_breaker_state gauge\n";
+    out += "circuit_breaker_state{name=\"auth\"} " + std::to_string(cb_state(cb_auth_)) + "\n";
+    out += "circuit_breaker_state{name=\"sheet\"} " + std::to_string(cb_state(cb_sheet_)) + "\n";
+    out += "circuit_breaker_state{name=\"file\"} " + std::to_string(cb_state(cb_file_)) + "\n";
+    return out;
+}
+
 bool Gateway::HandleSystemStatus(std::string& response) {
     auto state_str = [](grpc_connectivity_state s) -> const char* {
         switch (s) {
@@ -1156,15 +1181,21 @@ bool Gateway::Start() {
                 std::chrono::steady_clock::now() - t0).count();
             sem_->release();
 
-            // ④ 熔断反馈
+            // ④ 熔断反馈 + Prometheus 计数
+            metrics_requests_total_.fetch_add(1, std::memory_order_relaxed);
             switch (result) {
                 case RpcResult::SUCCESS:
                     cb.RecordResult(true, elapsed); break;
                 case RpcResult::TRANSPORT_FAILURE:
+                    metrics_requests_errors_.fetch_add(1, std::memory_order_relaxed);
                     cb.RecordResult(false, elapsed); break;
                 case RpcResult::BUSINESS_FAILURE:  break;
-                case RpcResult::AUTH_FAILURE:      res.status = 401; break;
-                case RpcResult::BAD_REQUEST:       res.status = 400; break;
+                case RpcResult::AUTH_FAILURE:
+                    metrics_requests_errors_.fetch_add(1, std::memory_order_relaxed);
+                    res.status = 401; break;
+                case RpcResult::BAD_REQUEST:
+                    metrics_requests_errors_.fetch_add(1, std::memory_order_relaxed);
+                    res.status = 400; break;
             }
             res.set_content(r, "application/json");
         };
@@ -1223,6 +1254,9 @@ bool Gateway::Start() {
     svr.Get("/api/files/download", file_down);
     svr.Post("/api/tx/begin", tx_begin);
     svr.Get("/api/health", health);
+    svr.Get("/metrics", [this](auto&, auto& res) {
+        res.set_content(HandleMetrics(), "text/plain; version=0.0.4");
+    });
     svr.Get("/api/history", history);
     svr.Get("/api/history/users", history_users);
     svr.Get("/api/system/status", sys_status);
@@ -1262,6 +1296,9 @@ bool Gateway::Start() {
     http_svr->Get("/api/files/download", file_down);
     http_svr->Post("/api/tx/begin", tx_begin);
     http_svr->Get("/api/health", health);
+    http_svr->Get("/metrics", [this](auto&, auto& res) {
+        res.set_content(HandleMetrics(), "text/plain; version=0.0.4");
+    });
     http_svr->Get("/api/history", history);
     http_svr->Get("/api/history/users", history_users);
     http_svr->Get("/api/system/status", sys_status);
