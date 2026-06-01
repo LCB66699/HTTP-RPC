@@ -264,6 +264,10 @@ bool Database::Initialize() {
     mysql_query(c, "CREATE INDEX idx_undo_xid_id ON undo_log(xid, id DESC)");
     mysql_query(c, "CREATE INDEX idx_undo_created ON undo_log(created_at)");
 
+    // 覆盖索引 — SELECT token_version FROM users WHERE username=X 避免回表
+    mysql_query(c, "ALTER TABLE users DROP INDEX IF EXISTS username");
+    mysql_query(c, "ALTER TABLE users ADD UNIQUE INDEX idx_users_user_ver (username, token_version)");
+
     // INT → BIGINT 升级：兼容已有表，MySQL 8.0 支持 ALGORITHM=INSTANT
     mysql_query(c, "ALTER TABLE users MODIFY COLUMN id BIGINT AUTO_INCREMENT");
     mysql_query(c, "ALTER TABLE spreadsheets MODIFY COLUMN id BIGINT AUTO_INCREMENT");
