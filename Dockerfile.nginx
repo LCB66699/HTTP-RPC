@@ -5,3 +5,12 @@ RUN apt-get update && apt-get install -y openssl apache2-utils curl && \
       -keyout /certs/server.key -out /certs/server.crt \
       -subj "/CN=luochuanbaiRPC" && \
     rm -rf /var/lib/apt/lists/*
+RUN echo '#!/bin/sh' > /usr/local/bin/realserver.sh && \
+    echo 'VIP=${VIP:-192.168.1.100}' >> /usr/local/bin/realserver.sh && \
+    echo 'ip addr add $VIP/32 dev lo 2>/dev/null || true' >> /usr/local/bin/realserver.sh && \
+    echo 'echo 1 > /proc/sys/net/ipv4/conf/lo/arp_ignore 2>/dev/null || true' >> /usr/local/bin/realserver.sh && \
+    echo 'echo 2 > /proc/sys/net/ipv4/conf/lo/arp_announce 2>/dev/null || true' >> /usr/local/bin/realserver.sh && \
+    echo 'echo 1 > /proc/sys/net/ipv4/conf/all/arp_ignore 2>/dev/null || true' >> /usr/local/bin/realserver.sh && \
+    echo 'echo 2 > /proc/sys/net/ipv4/conf/all/arp_announce 2>/dev/null || true' >> /usr/local/bin/realserver.sh && \
+    echo 'echo "[LVS] real server ready — VIP=$VIP bound to lo"' >> /usr/local/bin/realserver.sh && \
+    chmod +x /usr/local/bin/realserver.sh
