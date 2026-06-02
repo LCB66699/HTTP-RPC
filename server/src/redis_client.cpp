@@ -255,8 +255,8 @@ void RedisClient::SubscribeStandalone(const std::string& channel, SubCallback cb
             opts.connect_timeout = std::chrono::milliseconds(500);
             opts.socket_timeout = std::chrono::milliseconds(0); // blocking
 
-            sw::redis::Connection conn(opts);
-            auto sub = std::make_unique<sw::redis::Subscriber>(std::move(conn));
+            auto standalone = std::make_unique<sw::redis::Redis>(opts);
+            auto sub = std::make_unique<sw::redis::Subscriber>(standalone->subscriber());
             sub->on_message([cb](std::string ch, std::string msg) { cb(ch, msg); });
             sub->subscribe(channel);
             // blocks until subscriber is destroyed
