@@ -9,6 +9,8 @@
 #include "health_service_impl.h"
 #include "database.h"
 #include "redis_client.h"
+#include "l1_cache.h"
+#include "l1_invalidator.h"
 #include "system_logger.h"
 #include "minio_client.h"
 #include "snowflake.h"
@@ -181,6 +183,12 @@ int main(int argc, char* argv[]) {
     slog->SetRedis(redis.get());
     printf("[main] Log level: %s\n", log_level.c_str());
 
+    // L1 local cache + Pub/Sub invalidator
+    auto l1_cache = std::make_unique<L1Cache>(10000, 30);
+    auto l1_invalidator = std::make_unique<L1CacheInvalidator>(l1_cache.get(), redis.get());
+    l1_invalidator->Start();
+    printf("[main] L1 cache initialized (max=10000, ttl=30s)\n");
+
     // ---- gRPC Server Setup ----
     grpc::EnableDefaultHealthCheckService(true);
     std::string addr = host + ":" + std::to_string(port);
@@ -255,6 +263,7 @@ int main(int argc, char* argv[]) {
         spreadsheet_service.SetAuthInterceptor(sheet_auth.get());
         spreadsheet_service.SetDatabase(db.get());
         spreadsheet_service.SetRedis(redis.get());
+        spreadsheet_service.SetL1Cache(l1_cache.get());
         spreadsheet_service.SetLogger(logger.get());
         spreadsheet_service.SetSysLog(slog.get());
 
@@ -300,6 +309,7 @@ int main(int argc, char* argv[]) {
         file_service.SetAuthInterceptor(file_auth.get());
         file_service.SetDatabase(db.get());
         file_service.SetRedis(redis.get());
+        file_service.SetL1Cache(l1_cache.get());
         file_service.SetLogger(logger.get());
         file_service.SetSysLog(slog.get());
         if (minio_client) file_service.SetMinio(minio_client.get());

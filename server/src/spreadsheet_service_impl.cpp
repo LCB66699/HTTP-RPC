@@ -2,6 +2,7 @@
 #include "auth_interceptor.h"
 #include "database.h"
 #include "redis_client.h"
+#include "l1_cache.h"
 #include "call_logger.h"
 #include "system_logger.h"
 #include <cstdio>
@@ -145,7 +146,23 @@ grpc::Status SpreadsheetServiceImpl::GetSpreadsheet(
         }
     };
 
-    // 1) Try Redis cache
+    // 1) Try L1 local cache
+    if (l1_) {
+        auto l1_val = l1_->Get(cache_key);
+        if (l1_val) {
+            if (*l1_val == kNullMarker) {
+                resp->set_success(false); resp->set_error("Not found");
+                resp->set_cache_source("l1"); return grpc::Status::OK;
+            }
+            if (resp->ParseFromString(*l1_val)) {
+                resp->set_cache_source("l1");
+                if (slog_) LOG_DEBUG(*slog_, "Get id=" + std::to_string(req->id()) + " L1-HIT");
+                return grpc::Status::OK;
+            }
+        }
+    }
+
+    // 2) Try Redis cache
     if (redis_ && redis_->IsConnected()) {
         std::string cached;
         if (redis_->GetJSON(cache_key, cached)) {
@@ -160,6 +177,7 @@ grpc::Status SpreadsheetServiceImpl::GetSpreadsheet(
             // 1b) Data cache hit
             if (resp->ParseFromString(cached)) {
                 resp->set_cache_source("redis");
+                if (l1_) l1_->Set(cache_key, cached);  // L1 backfill
 
                 // 1c) Check logical expiration
                 std::string ts_str;
@@ -260,6 +278,7 @@ grpc::Status SpreadsheetServiceImpl::GetSpreadsheet(
         if (resp->SerializeToString(&serialized)) {
             redis_->SetJSON(cache_key, serialized, RedisClient::JitteredTTL(PHYSICAL_TTL, 600));
             redis_->SetJSON(ts_key, std::to_string(std::time(nullptr)), RedisClient::JitteredTTL(PHYSICAL_TTL, 600));
+            if (l1_) l1_->Set(cache_key, serialized);   // L1 backfill
             if (slog_) LOG_DEBUG(*slog_, "Get id=" + std::to_string(req->id()) + " POPULATED key=" + cache_key + " ttl=" + std::to_string(PHYSICAL_TTL) + "s");
         }
     }

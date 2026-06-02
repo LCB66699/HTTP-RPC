@@ -8,6 +8,7 @@ class ShardedDatabase;
 class RedisClient;
 class CallLogger;
 class SystemLogger;
+class L1Cache;
 
 class AuthInterceptor;
 
@@ -15,6 +16,7 @@ class SpreadsheetServiceImpl final : public rpc::SpreadsheetService::Service {
 public:
     void SetDatabase(ShardedDatabase* db) { db_ = db; }
     void SetRedis(RedisClient* redis) { redis_ = redis; }
+    void SetL1Cache(L1Cache* cache) { l1_ = cache; }
     void SetLogger(CallLogger* logger) { logger_ = logger; }
     void SetSysLog(SystemLogger* slog) { slog_ = slog; }
     void SetAuthInterceptor(AuthInterceptor* interceptor) { auth_ = interceptor; }
@@ -38,6 +40,7 @@ public:
 private:
     ShardedDatabase* db_    = nullptr;
     RedisClient*    redis_ = nullptr;
+    L1Cache*        l1_    = nullptr;
     CallLogger*     logger_ = nullptr;
     SystemLogger*   slog_  = nullptr;
     AuthInterceptor* auth_ = nullptr;

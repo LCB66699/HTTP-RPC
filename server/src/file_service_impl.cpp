@@ -2,6 +2,7 @@
 #include "auth_interceptor.h"
 #include "database.h"
 #include "redis_client.h"
+#include "l1_cache.h"
 #include "call_logger.h"
 #include "system_logger.h"
 #include <cstdio>
@@ -155,7 +156,22 @@ grpc::Status FileServiceImpl::GetFile(grpc::ServerContext* context,
         }
     };
 
-    // 1) Try Redis cache
+    // 1) Try L1 local cache
+    if (l1_) {
+        auto l1_val = l1_->Get(cache_key);
+        if (l1_val) {
+            if (*l1_val == kNullMarker) {
+                resp->set_success(false); resp->set_error("Not found");
+                resp->set_cache_source("l1"); return grpc::Status::OK;
+            }
+            if (resp->ParseFromString(*l1_val)) {
+                resp->set_cache_source("l1");
+                return grpc::Status::OK;
+            }
+        }
+    }
+
+    // 2) Try Redis cache
     if (redis_ && redis_->IsConnected()) {
         std::string cached;
         if (redis_->GetJSON(cache_key, cached)) {
@@ -167,6 +183,7 @@ grpc::Status FileServiceImpl::GetFile(grpc::ServerContext* context,
             }
             if (resp->ParseFromString(cached)) {
                 resp->set_cache_source("redis");
+                if (l1_) l1_->Set(cache_key, cached);  // L1 backfill
                 // Check logical expiration
                 std::string ts_str;
                 int64_t now_ts = std::time(nullptr);
@@ -247,6 +264,7 @@ grpc::Status FileServiceImpl::GetFile(grpc::ServerContext* context,
             if (resp->SerializeToString(&serialized)) {
                 redis_->SetJSON(cache_key, serialized, RedisClient::JitteredTTL(PHYSICAL_TTL, 600));
                 redis_->SetJSON(ts_key, std::to_string(std::time(nullptr)), RedisClient::JitteredTTL(PHYSICAL_TTL, 600));
+                if (l1_) l1_->Set(cache_key, serialized);  // L1 backfill
                 if (slog_) LOG_DEBUG(*slog_, "Get id=" + std::to_string(req->id()) + " POPULATED key=" + cache_key);
             }
         }

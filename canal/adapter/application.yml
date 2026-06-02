@@ -1,0 +1,47 @@
+# Canal Adapter — consumes Canal Server events, writes to Redis
+server:
+  port: 8089
+
+canal.conf:
+  canalServerHost: canal-server:11111
+  flatMessage: true
+
+  srcDataSources:
+    spreadsheetDS:
+      url: jdbc:mysql://mysql-spreadsheet-0:3306/rpc_spreadsheet
+      username: root
+      password: ${MYSQL_ROOT_PASSWORD:123456}
+
+  canalAdapters:
+    - instance: spreadsheet
+      groups:
+        - groupId: g1
+          outerAdapters:
+            # Redis key deletion
+            - name: redis
+              key: ${schema}_${table}_${id}@${user_id}
+              hosts: redis-cluster-7000:7000,redis-cluster-7001:7001,redis-cluster-7002:7002
+              password: ${REDIS_PASSWORD:rpc-redis-123456}
+              mode: cluster
+              timeout: 3000
+              properties:
+                cacheKeys:
+                  - u:${user_id}:sheet:${id}
+                  - u:${user_id}:sheet:${id}:ts
+                  - u:${user_id}:sheets:version
+                  - u:${user_id}:file:${id}
+                  - u:${user_id}:file:${id}:ts
+                  - u:${user_id}:files:version
+            # Redis Pub/Sub notification for L1 cache invalidation
+            - name: redis
+              key: ${schema}_${table}_${id}@${user_id}
+              hosts: redis-cluster-7000:7000,redis-cluster-7001:7001,redis-cluster-7002:7002
+              password: ${REDIS_PASSWORD:rpc-redis-123456}
+              mode: cluster
+              event: |
+                if event.type in ('UPDATE','DELETE','INSERT') then
+                  -- notify service processes to evict L1
+                  redis.publish('cache:invalidate', 'u:'..event.user_id..':sheet:'..event.id)
+                  redis.publish('cache:invalidate', 'u:'..event.user_id..':sheet:'..event.id..':ts')
+                  redis.publish('cache:invalidate', 'u:'..event.user_id..':sheets:version')
+                end

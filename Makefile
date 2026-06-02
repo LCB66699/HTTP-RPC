@@ -41,7 +41,9 @@ SERVER_SRCS := $(SERVER_DIR)/src/main.cpp \
                $(SERVER_DIR)/src/tx_resource.cpp \
                $(SERVER_DIR)/src/call_logger.cpp \
                $(SERVER_DIR)/src/database.cpp \
-               $(SERVER_DIR)/src/redis_client.cpp
+               $(SERVER_DIR)/src/redis_client.cpp \
+               $(SERVER_DIR)/src/l1_cache.cpp \
+               $(SERVER_DIR)/src/l1_invalidator.cpp
 
 # ---- Gateway + TM ----
 GATEWAY_SRCS := $(GATEWAY_DIR)/src/main.cpp \

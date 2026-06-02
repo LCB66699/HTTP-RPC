@@ -7,6 +7,7 @@
 
 class ShardedDatabase;
 class RedisClient;
+class L1Cache;
 class CallLogger;
 class SystemLogger;
 
@@ -16,6 +17,7 @@ class FileServiceImpl final : public rpc::FileService::Service {
 public:
     void SetDatabase(ShardedDatabase* db) { db_ = db; }
     void SetRedis(RedisClient* redis) { redis_ = redis; }
+    void SetL1Cache(L1Cache* cache) { l1_ = cache; }
     void SetLogger(CallLogger* logger) { logger_ = logger; }
     void SetSysLog(SystemLogger* slog) { slog_ = slog; }
     // Optional: when set, file bodies go to MinIO instead of MySQL LONGBLOB.
@@ -38,6 +40,7 @@ public:
 private:
     ShardedDatabase* db_    = nullptr;
     RedisClient*    redis_ = nullptr;
+    L1Cache*        l1_    = nullptr;
     CallLogger*     logger_ = nullptr;
     SystemLogger*   slog_  = nullptr;
     minio::Client*  minio_ = nullptr;

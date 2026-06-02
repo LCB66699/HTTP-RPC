@@ -243,6 +243,35 @@ services:
       "
     restart: "no"
 
+  # ===== Canal — binlog subscription → Redis cache delete + L1 invalidation =====
+  canal-server:
+    image: canal/canal-server:v1.1.7
+    ports: ["11111:11111"]
+    environment:
+      - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD:-123456}
+    volumes:
+      - ./canal/server/canal.properties:/home/admin/canal-server/conf/canal.properties:ro
+      - ./canal/server/instance.properties:/home/admin/canal-server/conf/spreadsheet/instance.properties:ro
+      - ./data/canal-server/conf:/home/admin/canal-server/conf/spreadsheet
+    restart: always
+    depends_on:
+      mysql-spreadsheet-0:
+        condition: service_healthy
+      redis-cluster-1:
+        condition: service_healthy
+
+  canal-adapter:
+    image: canal/canal-adapter:v1.1.7
+    ports: ["8089:8089"]
+    environment:
+      - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD:-123456}
+      - REDIS_PASSWORD=${REDIS_PASSWORD:-rpc-redis-123456}
+    volumes:
+      - ./canal/adapter/application.yml:/opt/canal-adapter/conf/application.yml:ro
+    restart: always
+    depends_on:
+      canal-server:
+        condition: service_started
   # ===== 应用服务 =====
   auth-1:
     build: .

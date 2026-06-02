@@ -6,6 +6,7 @@
 #include <unordered_map>
 #include <memory>
 #include <cstdlib>
+#include <functional>
 
 namespace sw { namespace redis { class RedisCluster; } }
 
@@ -41,6 +42,14 @@ public:
     bool GetJSON(const std::string& key, std::string& value);
     int64_t GetInt(const std::string& key);
     std::unordered_map<std::string, std::string> HGetAll(const std::string& key) const;
+
+    // Pub/Sub — Publish is cluster-safe; Subscribe needs standalone connection
+    bool Publish(const std::string& channel, const std::string& message);
+
+    // Subscribe helper: returns a standalone subscriber to one cluster node.
+    // Caller is responsible for lifecycle. Callback runs in a dedicated thread.
+    using SubCallback = std::function<void(const std::string& channel, const std::string& msg)>;
+    void SubscribeStandalone(const std::string& channel, SubCallback cb);
 
     // Health check managed internally by the library — no explicit Start/Stop needed.
     // Kept for backward compatibility (no-ops).

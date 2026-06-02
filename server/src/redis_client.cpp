@@ -229,3 +229,48 @@ int64_t RedisClient::GetInt(const std::string& key) {
         return 0;
     }
 }
+
+// ---- Pub/Sub ----
+
+bool RedisClient::Publish(const std::string& channel, const std::string& message) {
+    if (!cluster_) return false;
+    try {
+        cluster_->publish(channel, message);
+        return true;
+    } catch (const sw::redis::Error& e) {
+        fprintf(stderr, "[Redis] Publish(%s) failed: %s\n", channel.c_str(), e.what());
+        return false;
+    }
+}
+
+void RedisClient::SubscribeStandalone(const std::string& channel, SubCallback cb) {
+    if (cluster_seeds_.empty()) return;
+    std::thread([this, channel, cb = std::move(cb)]() {
+        try {
+            auto colon = cluster_seeds_[0].find(':');
+            sw::redis::ConnectionOptions opts;
+            opts.host = cluster_seeds_[0].substr(0, colon);
+            opts.port = std::stoi(cluster_seeds_[0].substr(colon + 1));
+            if (!password_.empty()) opts.password = password_;
+            opts.connect_timeout = std::chrono::milliseconds(500);
+            opts.socket_timeout = std::chrono::milliseconds(0); // blocking
+
+            auto sub = std::make_unique<sw::redis::Subscriber>(opts);
+            sub->on_message([cb](std::string ch, std::string msg) { cb(ch, msg); });
+            sub->subscribe(channel);
+            // blocks until subscriber is destroyed
+            while (true) {
+                try { sub->consume(); }
+                catch (const sw::redis::TimeoutError&) { continue; }
+                catch (const std::exception& e) {
+                    fprintf(stderr, "[Redis] Subscriber error: %s, reconnecting in 1s\n", e.what());
+                    std::this_thread::sleep_for(std::chrono::seconds(1));
+                    try { sub->subscribe(channel); }
+                    catch (...) { break; }
+                }
+            }
+        } catch (const std::exception& e) {
+            fprintf(stderr, "[Redis] SubscribeStandalone failed: %s\n", e.what());
+        }
+    }).detach();
+}
