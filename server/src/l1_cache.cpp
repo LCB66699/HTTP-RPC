@@ -1,5 +1,6 @@
 #include "l1_cache.h"
 #include <algorithm>
+#include <mutex>
 
 L1Cache::L1Cache(size_t max_entries, int ttl_seconds)
     : max_entries_(max_entries), ttl_seconds_(ttl_seconds) {}
