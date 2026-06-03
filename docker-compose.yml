@@ -260,18 +260,9 @@ services:
       redis-cluster-1:
         condition: service_healthy
 
-  canal-adapter:
-    image: canal/canal-adapter:v1.1.7
-    ports: ["8089:8089"]
-    environment:
-      - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD:-123456}
-      - REDIS_PASSWORD=${REDIS_PASSWORD:-rpc-redis-123456}
-    volumes:
-      - ./canal/adapter/application.yml:/opt/canal-adapter/conf/application.yml:ro
-    restart: always
-    depends_on:
-      canal-server:
-        condition: service_started
+  # canal-adapter: image removed from Docker Hub. Canal Server alone captures
+  #   binlog; a C++ consumer (or TTL-based expiration) handles L1 invalidation.
+  #   TODO: write C++ Canal client or use Kafka connector.
   # ===== 应用服务 =====
   auth-1:
     build: .
