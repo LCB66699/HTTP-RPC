@@ -1,6 +1,6 @@
-# HTTP-RPC 分布式事务系统
+# HTTP-RPC 微服务分布式系统
 
-基于 gRPC + 2PC 协议的数据表格存储与查询系统，Docker 多节点部署，演示分布式事务和 Cache-Aside 缓存。
+基于 gRPC + Envoy + gRPC-Gateway 的微服务数据表格系统，Docker Compose 单机多容器部署，演示灰度发布、事件驱动、全文搜索和 Cache-Aside 缓存。
 
 ## 架构
 
@@ -8,308 +8,175 @@
 浏览器 (Web UI)
    │  HTTPS
    ▼
-LVS + Keepalived (VIP浮动)      ← 4层 DR 模式 wlc 调度
-   │  /api/*  → TCP 负载均衡
-   ├──────────┬──────────┐
-   ▼          ▼          ▼
-nginx-1 :443 nginx-2 :443 nginx-3 :443  ← TLS 终结 + 限流(100r/s+burst50) + 静态文件
-   │  upstream least_conn → gateway_pool
-   ├──────────┐
-   ▼          ▼
-Gateway-1 :8081 Gateway-2 :8081   ← 双Token鉴权 + TM(2PC) + 多维熔断(滑动窗口/P99)
-   │  gRPC/HTTP/2  round_robin (DNS aliases, 5s 重解析)
-   ├──→ Auth  (rpc-auth:50051)   副本 x2  DB: rpc_auth
-   ├──→ Sheet (rpc-sheet:50051)  副本 x3  DB: rpc_spreadsheet (可 hash 分片)  Redis 缓存
-   └──→ File  (rpc-file:50051)   副本 x2  DB: rpc_file (可 hash 分片)         MinIO
+nginx :443                        ← TLS 终结 + 令牌桶限流 + 静态文件
+   │  upstream → envoy_pool
+   ▼
+Envoy Proxy :8080                 ← JWT Cookie 鉴权 (HS256) + 反向代理
+   │
+   ▼
+gRPC-Gateway (Go) :8080          ← HTTP/JSON ↔ gRPC 转译 + JWT 中间件
+   │  gRPC round_robin + keepalive
+   ├──→ Auth   (rpc-auth:50051)    副本 ×2   DB: rpc_auth           Redis
+   ├──→ Sheet  (rpc-sheet:50051)   副本 ×2   DB: rpc_spreadsheet     Redis + L1 缓存 + Canal
+   ├──→ File   (rpc-file:50051)    副本 ×2   DB: rpc_file            Redis + L1 缓存
+   └──→ Search (rpc-search:50051)  副本 ×1   Elasticsearch
 
-          ├── MySQL 分片: auth×1 + spreadsheet×2 + file×2 (每片1主1从)
-          └── Redis Cluster 6节点 (3M+3S)
+Notify Service (Go)               ← RabbitMQ 消费 → MongoDB + ES 索引
+
+基础设施:
+  MySQL ×9  (auth×1 + spreadsheet×4 + file×4, 每片1主1从)
+  Redis Cluster ×6 (3M+3S)
+  Elasticsearch ×1 (IK 中文分词)
+  MongoDB ×1 (文档存储)
+  RabbitMQ ×1 (事件总线 + 死信队列)
+  Consul ×1  (服务注册与健康检查)
+  Canal ×1   (binlog 订阅 → L1 缓存失效)
 ```
 
-**容器总数：27 个**（LVS×2 + nginx×3 + gateway×2 + auth×2 + sheet×3 + file×2 + MySQL×5 + Redis×7 + MinIO×1）
+### 容器清单 (~31个)
 
-### 协议栈
-
-```
-浏览器 ──HTTPS──→ nginx ──HTTP/1.1 keepalive──→ Gateway(httplib 8081) ──gRPC/HTTP/2──→ 各 Service
-                   least_conn 双实例均衡        HttpOnly Cookie 鉴权         Protobuf/MySQL/Redis
-                   同时支持 h2c 8080（协程版）
-```
-
-### 数据流
-
-```
-写入: 客户端 → Gateway(生成XID) → [Prepare → Commit/Rollback]
-      写操作: MySQL INSERT + undo_log → 失效 Redis 缓存
-
-读取: 查 Redis → 命中返回 → 未命中查 MySQL → 回填 Redis
-      逻辑过期(300s) → SetNX 加锁 → 后台线程异步刷新 → 返回旧值
-```
-
-### 缓存策略 — 防穿透/击穿/雪崩
-
-| 问题 | 机制 | 实现 | 关键参数 |
-|------|------|------|----------|
-| **缓存穿透** | 空值缓存 | MySQL 查不到时写 `"__NULL__"` 标记；命中空值直接返回 Not found | `NULL_TTL = 60s + jitter(0~30s)` |
-| **缓存击穿** | 逻辑过期 + 分布式锁 | 热点 key 逻辑过期后返回旧值，`SetNX` 只让 1 个线程异步刷新 | `LOGICAL_TTL = 300s`，`LOCK_TTL = 10s` |
-| **缓存雪崩** | TTL 随机偏移 | `JitteredTTL(base, jitter)` 给每个 key 物理 TTL 加随机偏移，分散过期窗口 | 物理 TTL `3600s + jitter(0~600s)`，空值 TTL `60s + jitter(0~30s)` |
-| **写后失效** | 懒删除 + 版本自增 | 写操作 `DeleteKey` 单实体缓存 + `INCR version` 使列表缓存过期 | 列表缓存 `TTL = 120s` |
-
-```
-读路径:
-  Redis命中
-    ├── 空值标记 "__NULL__" → 返回 Not found          ← 防穿透
-    ├── 逻辑未过期(≤300s) → 返回缓存                  ← 正常命中
-    └── 逻辑已过期(>300s) → 返回旧值 + SetNX 异步刷新   ← 防击穿
-  Redis未命中 → MySQL → 回写 Redis(JitteredTTL)        ← 防雪崩
-
-写路径:
-  CAS 乐观锁 UPDATE(version) → 成功
-    ├── DeleteKey("sheet:{id}")    懒删除单实体缓存
-    └── INCR version              使列表缓存过期
-```
+| 层 | 容器 | 数量 |
+|----|------|------|
+| 入口 | nginx | 1 |
+| 网关 | envoy, grpc-gateway | 2 |
+| C++ 服务 | auth, sheet, file, search | 7 |
+| Go 服务 | notify-service | 1 |
+| 存储 | MySQL, Redis, ES, MongoDB | 17 |
+| 消息 | RabbitMQ | 1 |
+| 治理 | Consul, Canal | 2 |
 
 ## 项目结构
 
 ```
-├── gateway-cpp/                 HTTP 网关 + TM
+├── gateway-grpc/              Go gRPC-Gateway (HTTP→gRPC 转译)
+│   ├── main.go                   路由 + JWT 鉴权 + Cookie 管理
+│   └── Dockerfile
+├── envoy/                     Envoy API 网关
+│   ├── envoy.yaml                JWT 鉴权 + 反向代理
+│   ├── entrypoint.sh             JWT_SECRET 注入
+│   ├── Dockerfile
+│   └── protos/                   Go proto 定义
+├── server/                    C++ gRPC 后端服务
 │   ├── include/
-│   │   ├── gateway.h              路由、JWT、gRPC 代理、TM 协调
-│   │   ├── circuit_breaker.h      多维熔断器（滑动窗口 + P99 + 慢调用率）
-│   │   ├── coro_grpc.h            co_await gRPC (CompletionQueue)
-│   │   ├── coro_task.h            C++20 Task<T> 协程
-│   │   └── coro_sched.h           协程调度
+│   │   ├── database.h            MySQL 读写分离 + ShardedDatabase 分片
+│   │   ├── redis_client.h        Redis Cluster (redis-plus-plus)
+│   │   ├── jwt.h                 JWT HS256 签名/验签 (OpenSSL HMAC)
+│   │   ├── auth_interceptor.h    gRPC JWT 拦截器
+│   │   ├── l1_cache.h            L1 LRU 本地缓存 (10K容量/30min TTL)
+│   │   ├── l1_invalidator.h      Canal binlog → L1 缓存失效
+│   │   ├── rabbit_publisher.h    RabbitMQ 事件发布
+│   │   ├── snowflake.h           Snowflake 分布式 ID
+│   │   ├── call_logger.h         调用日志 + Redis 异步 flush
+│   │   └── *_service_impl.h      各服务实现头文件
 │   └── src/
-│       ├── main.cpp               网关入口
-│       ├── gateway.cpp            路由 + 鉴权 + 熔断 + 协议转换
-│       └── http2_server.cpp       nghttp2 h2c 服务器
-├── server/                      gRPC 后端服务
-│   ├── include/
-│   │   ├── database.h             MySQL 读写分离 + ShardedDatabase 分片路由
-│   │   ├── redis_client.h         Redis Cluster 客户端 (redis-plus-plus)
-│   │   ├── tx_manager.h           2PC 事务管理器
-│   │   ├── tx_resource.h          2PC 资源管理器基类
-│   │   ├── auth_service_impl.h    认证服务
-│   │   ├── spreadsheet_service_impl.h  表格 CRUD
-│   │   ├── file_service_impl.h    文件管理
-│   │   ├── health_service_impl.h  集群健康监控
-│   │   ├── call_logger.h          调用日志
-│   │   ├── system_logger.h        结构化日志 + 错误聚合
-│   │   ├── auth_interceptor.h     gRPC JWT 拦截器
-│   │   ├── jwt.h / sha256.h       安全工具
-│   │   ├── minio_client.h         MinIO 对象存储客户端
-│   │   └── snowflake.h            Snowflake 分布式 ID 生成
-│   └── src/
-│       ├── main.cpp               --service 参数启动不同角色
-│       ├── database.cpp           MySQL 连接池 + 健康检查 + ShardedDatabase
-│       ├── redis_client.cpp       RedisCluster 封装
-│       ├── tx_manager.cpp         TM Begin() + 超时恢复
-│       ├── tx_resource.cpp        RM Prepare/Commit/Rollback + undo_log
+│       ├── main_auth.cpp         Auth 独立入口
+│       ├── main_sheet.cpp        Sheet 独立入口
+│       ├── main_file.cpp         File 独立入口
+│       ├── main_search.cpp       Search 独立入口
 │       └── ...
-├── proto/                       Protobuf 定义
-│   ├── rpc_auth.proto             AuthService
-│   ├── rpc_spreadsheet.proto      SpreadsheetService
-│   ├── rpc_file.proto             FileService
-│   ├── rpc_tx.proto               TxManager + TxResource (2PC)
-│   └── rpc_health.proto           HealthMonitor
-├── web-ui/                       Web 管理界面
-├── redis/cluster/               Redis Cluster 配置
-├── mysql/                       MySQL 主从配置
-├── lvs/                          LVS DR + Keepalived 4层LB
-├── k8s/                          Kubernetes 部署清单
-├── Dockerfile                   多阶段构建 (含 redis-plus-plus 源码编译)
-├── docker-compose.yml           27 容器一键部署
-├── init.sql                     MySQL 初始建库
-└── Makefile
+├── services/                  各服务独立 Dockerfile
+│   ├── notify-service/           Go RabbitMQ 消费者
+│   ├── auth-service/             (预留)
+│   └── ...
+├── proto/                     Protobuf 定义 (C++ 用)
+├── consul/                    Consul 注册脚本
+├── es/                        Elasticsearch Dockerfile + IK 分词
+├── mongo/                     MongoDB 初始化脚本
+├── redis/cluster/             Redis Cluster 配置
+├── mysql/                     MySQL 主从配置
+├── Dockerfile                 多阶段构建 (ubuntu → runtime)
+├── docker-compose.yml         全栈部署
+├── Makefile                   独立编译目标 (auth/sheet/file/search)
+└── nginx.conf                 TLS + 限流 + DNS 自动刷新
 ```
 
-## 依赖模块
+## 独立编译 & 灰度更新
 
-| 模块 | 协议 | 用途 | 来源 |
-|------|------|------|------|
-| **gRPC + Protobuf** | HTTP/2 | RPC 框架 | `apt install libgrpc++-dev` |
-| **OpenSSL** | TLS/Crypto | JWT / SHA-256 / PBKDF2 | `apt install libssl-dev` |
-| **libmysqlclient** | MySQL/TCP | MySQL 8.0 | `apt install libmysqlclient-dev` |
-| **redis-plus-plus** | RESP/TCP | Redis Cluster 客户端 (含 slot 路由/MOVED) | 源码编译 (v1.3.15) |
-| **hiredis** | RESP/TCP | redis-plus-plus 底层协议 | `apt install libhiredis-dev` |
-| **nlohmann/json** | — | JSON 解析/序列化 | 单头文件 v3.11.3 |
-| **nghttp2** | HTTP/2 h2c | 自定义 HTTP/2 服务器 | `apt install libnghttp2-dev` |
-| **cpp-httplib** | HTTP/1.1 | 网关 HTTP/1.1 服务 | header-only |
-| **SheetJS** | CDN | 前端 xlsx | cdn.sheetjs.com |
+每个 C++ 服务只编译自己的代码：
 
-## gRPC 机制
-
-| 机制 | 实现 | 位置 |
-|------|------|------|
-| **服务发现** | Docker DNS aliases（rpc-auth/rpc-sheet/rpc-file） | `docker-compose.yml` |
-| **负载均衡** | gRPC `round_robin` + nginx `least_conn` | `gateway.cpp` / `nginx.conf` |
-| **DNS 缓存** | 5s 重解析 | `gateway.cpp` |
-| **Keepalive** | 客户端 60s，服务端 30s | 双向 |
-| **超时** | `set_deadline(5s)` (upload=30s, download=600s) | 每次 RPC |
-| **重试** | UNAVAILABLE 自动重试 3 次，退避 0.1s~5s；副本级重试 1 次 | `gateway.cpp` |
-| **健康检查** | 内置 gRPC health check + HealthMonitor 服务 | 双检 |
-| **熔断器** | 多维：连续失败 + 错误率 + 慢调用率 + P99 延迟；增强半开多探测 | `circuit_breaker.h` |
-| **限流** | nginx 令牌桶 100r/s + burst 50 + 账号级封禁(Redis) | `nginx.conf` / `gateway.cpp` |
-| **MySQL 重连** | CR_SERVER_LOST 自动重连 + 30s 健康检查 | `database.cpp` |
-
-## Redis Cluster 水平扩展
-
-已从 Redis Sentinel (1M+2S+3Sentinel) 迁移至 Redis Cluster (6节点: 3M+3S)：
-
-| 特性 | Sentinel (改前) | Cluster (改后) |
-|------|------|------|
-| **客户端库** | hiredis C 直连 | redis-plus-plus C++ 封装 |
-| **路由方式** | 写→master / 读→slave (手动) | CRC16 slot 自动路由 + MOVED 重定向 |
-| **故障转移** | 外部 Sentinel 进程 | 内置 gossip 协议，replica 自动选举 |
-| **水平扩展** | 垂直（加内存） | 水平（加节点 + reshard） |
-| **代码量** | 620 行（连接池 + Sentinel + 健康检查） | 225 行（委托到 RedisCluster） |
-
-## 熔断器增强
-
-| 维度 | 改前 | 改后 |
-|------|------|------|
-| **触发条件** | 连续失败 5 次 | 连续失败(快速) + 错误率≥50% + 慢调用率≥50% + P99≥2000ms |
-| **统计方式** | 简单计数器 | 滑动窗口 (6桶×10s=60s) + 9桶延迟直方图 |
-| **半开探测** | 单次探针 SetNX | 5 次探针，≥80%成功率 → CLOSED |
-| **状态共享** | 同已 | Redis `cb:*:state` / `cb:*:fails` / `cb:*:window:*` |
-| **延迟测量** | 无 | 5 个注入点 (with_cb / login / register / file_up / file_down) |
-
-## MySQL 分库设计
-
-通过 `ShardedDatabase` 支持按 `user_id % N` 水平分片：
-
-```
---mysql-shards 1   → 单 MySQL 实例 (默认，向后兼容)
---mysql-shards 4   → 4 分片: mysql-host-0~3 / rpc_db_0~3
-
-路由规则:
-  - CreateSpreadsheet(user_id, ...) → user_id % N
-  - GetSpreadsheet(id, user_id)    → user_id % N
-  - ListSpreadsheets(user_id, ...) → user_id % N
-  - DeleteSpreadsheet(id)          → 广播 (id 全局唯一)
-  - GetSpreadsheetOwner(id)        → 广播 (无可用的 user_id)
-  - Auth 系列                        → shard 0 (不分片)
+```bash
+make auth     # → rpc_auth   (5 cpp)
+make sheet    # → rpc_sheet  (9 cpp)
+make file     # → rpc_file   (8 cpp)
+make search   # → rpc_search (4 cpp)
 ```
 
-## 分布式事务 (2PC)
+Docker 构建同样独立：
 
+```bash
+docker compose build auth-1     # 只编 auth, 20s
+docker compose build sheet-1    # 只编 sheet
+docker compose up -d auth-1     # 滚动重启, 其他服务无影响
 ```
-TM.Begin("tx-001")
-  ├─ Prepare → SpreadsheetService (CreateSheet)
-  │     ├─ INSERT + 写 undo_log({}) → YES
-  │     └─ 失败 → NO
-  ├─ Prepare → FileService (CreateFile)
-  │     ├─ INSERT + 写 undo_log({}) → YES
-  │     └─ 失败 → NO
-  └─ 判定
-       ├─ 全 YES → Commit 全部（清 undo_log）
-       └─ 任一 NO → Rollback 全部（恢复快照 + 删数据）
-```
-
-## 集群健康监控
-
-每个节点每 10s 心跳上报至 MySQL `health_status` 表，Gateway 通过 `/api/health` 查询所有节点在线状态，30s 无心跳判定为 OFFLINE。
 
 ## API 接口
 
 ### 认证
 
-| 方法 | 路径 | 说明 |
-|------|------|------|
-| POST | `/api/login` | 登录，Cookie `rpc_at=<AT>` 15min + body `_rt=<RT>` 7d |
-| POST | `/api/register` | 注册，同上双 Token |
-| POST | `/api/refresh` | 换票：RT → 新 AT（无需鉴权） |
-| POST | `/api/logout` | 登出，清除 Cookie（Set-Cookie Max-Age=0） |
+| 方法 | 路径 | 鉴权 | 说明 |
+|------|------|------|------|
+| POST | `/api/register` | 否 | 注册，返回 JWT Cookie |
+| POST | `/api/login` | 否 | 登录，返回 `rpc_at` (15min) + `rpc_rt` (7d) Cookie |
+| POST | `/api/refresh` | 否 | 刷新令牌 |
+| GET | `/api/health` | 否 | 健康检查 |
 
 ### 数据表格
 
-| 方法 | 路径 | 说明 |
-|------|------|------|
-| GET | `/api/sheets` | 列表（Redis 缓存；支持 `?page=0&page_size=20` 分页） |
-| POST | `/api/sheets` | 创建，body: `{name, description, headers_json, data_json}` |
-| POST | `/api/sheets/get` | 获取单表，body: `{id}` |
-| PUT | `/api/sheets` | 更新，body: `{id, name, description, headers_json, data_json}` |
-| POST | `/api/sheets/delete` | 删除，body: `{id}` |
+| 方法 | 路径 | 鉴权 | 说明 |
+|------|------|------|------|
+| GET | `/api/sheets` | 是 | 列表 (Redis 缓存, 支持分页) |
+| POST | `/api/sheets` | 是 | 创建 |
+| GET | `/api/sheets/{id}` | 是 | 获取单表 |
+| PUT | `/api/sheets/{id}` | 是 | 更新 |
+| DELETE | `/api/sheets/{id}` | 是 | 删除 |
 
 ### 文件管理
 
-| 方法 | 路径 | 说明 |
-|------|------|------|
-| POST | `/api/files/upload` | 上传（multipart，文件存 MinIO，元数据存 MySQL） |
-| GET | `/api/files` | 列表（支持 `?page=0&page_size=20` 分页） |
-| GET | `/api/files/download?id=1` | 下载 |
-| POST | `/api/files/delete` | 删除，body: `{id}` |
+| 方法 | 路径 | 鉴权 | 说明 |
+|------|------|------|------|
+| POST | `/api/files/upload` | 是 | 上传 (multipart) |
+| GET | `/api/files` | 是 | 列表 |
+| GET | `/api/files/{id}` | 是 | 下载 |
+| DELETE | `/api/files/{id}` | 是 | 删除 |
 
-### 系统
+## 核心机制
 
-| 方法 | 路径 | 说明 |
-|------|------|------|
-| POST | `/api/tx/begin` | 发起分布式事务 |
-| GET | `/api/health` | 集群健康 + 熔断器状态 |
-| GET | `/api/system/status` | 系统状态 (含 P99 / 错误数) |
-| GET | `/api/services` | 服务列表 |
-| GET | `/api/history` | 调用历史 |
+| 机制 | 实现 |
+|------|------|
+| JWT 鉴权 | Envoy Cookie 提取 + gRPC-Gateway HS256 验签 → gRPC metadata 注入 |
+| L1 缓存 | 进程内 LRU (10K, 30min), Canal binlog 驱动失效 |
+| L2 缓存 | Redis Cluster Cache-Aside, JitteredTTL 防雪崩 |
+| 事件驱动 | C++ RabbitMQ 发布 → Go Notify 消费 → MongoDB + ES |
+| 全文搜索 | Elasticsearch IK 分词, scope 过滤, 分页, 高亮 |
+| 分布式 ID | Snowflake (worker_id = hash(host:port) & 0x1F) |
+| 服务发现 | Docker DNS + Consul 注册/心跳 |
+| 2PC 事务 | TM.Begin → Prepare → Commit/Rollback + undo_log |
 
-## 配置参数
-
-### Gateway
-
-| 参数 | 默认值 | 说明 |
-|------|--------|------|
-| `--port` | 8080 | HTTP 端口 |
-| `--grpc-auth` | rpc-auth:50051 | AuthService 地址 |
-| `--grpc-sheet` | rpc-sheet:50051 | SpreadsheetService 地址 |
-| `--grpc-file` | rpc-file:50051 | FileService 地址 |
-| `--redis-cluster` | — | Redis Cluster 种子节点 (可重复多次) |
-| `--redis-password` | — | Redis AUTH 密码 |
-| `--redis-pool-size` | 4 | 每节点连接数 |
-| `--max-concurrent` | 256 | 信号量并发上限 |
-| `--queue-timeout-ms` | 3000 | 并发排队超时 (ms) |
-
-### Server
-
-| 参数 | 默认值 | 说明 |
-|------|--------|------|
-| `--service` | all | 启动角色: auth / spreadsheet / file / all |
-| `--port` | 50051 | gRPC 端口 |
-| `--mysql-write-host` | — | MySQL 写库 |
-| `--mysql-read-hosts` | — | MySQL 读库 (逗号分隔) |
-| `--mysql-db` | rpc_demo | 数据库名 |
-| `--mysql-shards` | 1 | 分片数 (>1 时 host 加 `-{i}` 后缀) |
-| `--redis-cluster` | — | Redis Cluster 种子节点 |
-| `--log-level` | info | off / error / warn / info / debug |
-
-## Kubernetes 部署（可选）
+## 测试
 
 ```bash
-# 一键部署至 K8s 集群
-kubectl apply -k k8s/
-
-# 查看状态
-kubectl get pods -n http-rpc
-
-# 扩缩容
-kubectl scale deployment gateway -n http-rpc --replicas=5
-
-# HPA 自动伸缩（2-10 副本，CPU 70% 触发）
-kubectl get hpa gateway -n http-rpc
+bash test/functional_test.sh      # 功能测试 (21项)
+bash test/performance_test.sh     # 性能测试 (延迟分位 + QPS)
+bash test/stress_test.sh          # 逐层压测 (L1-L4)
+bash test/docker_health.sh        # 容器健康检查
 ```
 
-K8s manifest 文件位于 `k8s/` 目录，包含 Deployment、StatefulSet、Service、Ingress、HPA 完整部署。详见 `docs/OPS.md`。
+## CI/CD
 
-## 线程安全
+push main/PR → GitHub Actions 自动构建 + 测试。
 
-| 层级 | 并发原语 | 说明 |
-|------|------|------|
-| LVS | VRRP + wlc | 主备 VIP 漂移，TCP 四层无锁 |
-| Gateway 信号量 | `counting_semaphore<256>` | 并发上限，排队 3s 超时 503 |
-| Gateway HTTP | 无共享状态 | 每请求独立线程上下文 |
-| 熔断器读路径 | `atomic<State>` | 每请求调 AllowRequest，无锁 |
-| 熔断器写路径 | `mutex` | 状态变迁时加锁，微秒级 |
-| SlidingWindow | `mutex` | 3 个 int++，O(1) |
-| 数据库写池 | `mutex × 4` | 每连接独立锁，4 路并行 |
-| 数据库读池 | `mutex × N` | 每连接独立锁 |
-| Redis Cluster | redis-plus-plus 内置 | 库保证线程安全 |
-| PerReplicaTracker | `shared_mutex` | 读共享，写排他 |
-| CallLogger | `mutex` + 后台线程 | 业务线程只操作内存（微秒），Redis 写入由后台 flush 线程异步完成 |
-| 协程 CqLoop | 单线程 | 无竞争 |
+## 启动
+
+```bash
+docker compose build
+docker compose up -d
+bash test/docker_health.sh
+```
+
+## 配置
+
+| 变量 | 默认值 | 说明 |
+|------|--------|------|
+| `JWT_SECRET` | `default-secret-32bytes-here!!!!!` | JWT 签名密钥 (生产环境必须覆盖) |
+| `MYSQL_ROOT_PASSWORD` | `123456` | MySQL root 密码 |
+| `REDIS_PASSWORD` | `rpc-redis-123456` | Redis 密码 |
