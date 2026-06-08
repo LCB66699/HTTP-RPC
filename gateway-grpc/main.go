@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/redis/go-redis/v9"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/keepalive"
@@ -75,6 +76,24 @@ func main() {
 	})
 	mux.HandleFunc("GET /api/health", func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, map[string]string{"gateway": "READY"})
+	})
+
+	// Redis 客户端 — 读调用日志
+	redisAddr := getenv("REDIS_ADDR", "redis-cluster-7000:7000")
+	redisPass := getenv("REDIS_PASSWORD", "rpc-redis-123456")
+	rdb := redis.NewClient(&redis.Options{Addr: redisAddr, Password: redisPass})
+
+	mux.HandleFunc("GET /api/history", func(w http.ResponseWriter, r *http.Request) {
+		user := getUserFromCookie(r)
+		if user == "" {
+			writeJSON(w, map[string]string{"error": "login required"})
+			return
+		}
+		entries, _ := rdb.LRange(r.Context(), "call_logs:"+user, -20, -1).Result()
+		if entries == nil {
+			entries = []string{}
+		}
+		writeJSON(w, map[string]interface{}{"user": user, "count": len(entries), "entries": entries})
 	})
 
 	// === Sheet CRUD ===
@@ -176,6 +195,19 @@ func injectToken(r *http.Request) context.Context {
 func writeJSON(w http.ResponseWriter, v interface{}) {
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(v)
+}
+
+func getUserFromCookie(r *http.Request) string {
+	for _, c := range r.Cookies() {
+		if c.Name == "rpc_at" {
+			claims := jwt.MapClaims{}
+			jwt.ParseWithClaims(c.Value, &claims, func(t *jwt.Token) (interface{}, error) { return jwtSecret, nil })
+			if u, ok := claims["username"].(string); ok {
+				return u
+			}
+		}
+	}
+	return ""
 }
 
 func parseInt64(s string) int64 {
