@@ -309,7 +309,7 @@ services:
       dockerfile: Dockerfile
       args:
         SERVICE: auth
-    image: http-rpc-auth:latest
+    image: ${DOCKER_USER:-http-rpc}/auth:latest
     environment:
       JWT_SECRET: "${JWT_SECRET:-default-secret-32bytes-here!!!!!}"
     volumes:
@@ -332,7 +332,7 @@ services:
       start_period: 10s
 
   auth-2:
-    image: http-rpc-auth:latest
+    image: ${DOCKER_USER:-http-rpc}/auth:latest
     environment:
       JWT_SECRET: "${JWT_SECRET:-default-secret-32bytes-here!!!!!}"
     volumes:
@@ -361,7 +361,7 @@ services:
       dockerfile: Dockerfile
       args:
         SERVICE: sheet
-    image: http-rpc-sheet:latest
+    image: ${DOCKER_USER:-http-rpc}/sheet:latest
     environment:
       JWT_SECRET: "${JWT_SECRET:-default-secret-32bytes-here!!!!!}"
       RABBITMQ_HOST: "rabbitmq"
@@ -387,7 +387,7 @@ services:
       start_period: 10s
 
   sheet-2:
-    image: http-rpc-sheet:latest
+    image: ${DOCKER_USER:-http-rpc}/sheet:latest
     environment:
       JWT_SECRET: "${JWT_SECRET:-default-secret-32bytes-here!!!!!}"
       RABBITMQ_HOST: "rabbitmq"
@@ -419,7 +419,7 @@ services:
       dockerfile: Dockerfile
       args:
         SERVICE: file
-    image: http-rpc-file:latest
+    image: ${DOCKER_USER:-http-rpc}/file:latest
     environment:
       JWT_SECRET: "${JWT_SECRET:-default-secret-32bytes-here!!!!!}"
       RABBITMQ_HOST: "rabbitmq"
@@ -445,7 +445,7 @@ services:
       start_period: 10s
 
   file-2:
-    image: http-rpc-file:latest
+    image: ${DOCKER_USER:-http-rpc}/file:latest
     environment:
       JWT_SECRET: "${JWT_SECRET:-default-secret-32bytes-here!!!!!}"
       RABBITMQ_HOST: "rabbitmq"
@@ -477,6 +477,7 @@ services:
       dockerfile: Dockerfile
       args:
         SERVICE: search
+    image: ${DOCKER_USER:-http-rpc}/search:latest
     environment:
       ES_HOST: "http://elasticsearch:9200"
     volumes:
@@ -501,6 +502,7 @@ services:
     build:
       context: .
       dockerfile: gateway-grpc/Dockerfile
+    image: ${DOCKER_USER:-http-rpc}/gateway:latest
     environment:
       JWT_SECRET: "${JWT_SECRET:-default-secret-32bytes-here!!!!!}"
       AUTH_ADDR: "rpc-auth:50051"
@@ -529,6 +531,7 @@ services:
     build:
       context: ./services/notify-service
       dockerfile: Dockerfile
+    image: ${DOCKER_USER:-http-rpc}/notify:latest
     environment:
       RABBITMQ_HOST: "rabbitmq"
       RABBITMQ_USER: "rpc"
