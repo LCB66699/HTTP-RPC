@@ -33,13 +33,19 @@ func main() {
 	})
 	creds := grpc.WithTransportCredentials(insecure.NewCredentials())
 
-	authConn, _ := grpc.NewClient("rpc-auth:50051", creds, kp)
+	authAddr := getenv("AUTH_ADDR", "rpc-auth:50051")
+	sheetAddr := getenv("SHEET_ADDR", "rpc-sheet:50051")
+	fileAddr := getenv("FILE_ADDR", "rpc-file:50051")
+
+	log.Printf("Auth=%s Sheet=%s File=%s", authAddr, sheetAddr, fileAddr)
+
+	authConn, _ := grpc.NewClient(authAddr, creds, kp)
 	authClient := pb.NewAuthServiceClient(authConn)
 
-	sheetConn, _ := grpc.NewClient("rpc-sheet:50051", creds, kp)
+	sheetConn, _ := grpc.NewClient(sheetAddr, creds, kp)
 	sheetClient := pb.NewSpreadsheetServiceClient(sheetConn)
 
-	fileConn, _ := grpc.NewClient("rpc-file:50051", creds, kp)
+	fileConn, _ := grpc.NewClient(fileAddr, creds, kp)
 	fileClient := pb.NewFileServiceClient(fileConn)
 
 	// === Auth ===
