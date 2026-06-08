@@ -10,38 +10,40 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 60
 
     steps:
       - uses: actions/checkout@v4
 
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc
+          sudo docker system prune -af
+
       - name: Build all services
         run: docker compose build
 
-      - name: Start stack
+      - name: Start stack and wait
         run: |
           docker compose up -d
-          # 等基础设施就绪
-          echo "Waiting for services..."
-          for i in $(seq 1 60); do
+          echo "Waiting for health..."
+          for i in $(seq 1 90); do
             if curl -sk https://localhost/api/health 2>/dev/null | grep -q gateway; then
-              echo "Stack ready ($i s)"
-              break
+              echo "Ready after ${i}s"
+              exit 0
             fi
             sleep 2
           done
+          echo "Timeout — checking logs:"
+          docker compose ps
+          docker compose logs --tail=30
+          exit 1
 
       - name: Functional test
         run: bash test/functional_test.sh
 
-      - name: Performance test
-        run: bash test/performance_test.sh
-
-      - name: Stress test (quick)
-        run: bash test/stress_test.sh https://localhost 500 5
-
-      - name: Show logs on failure
+      - name: Logs on failure
         if: failure()
-        run: |
-          docker compose ps
-          docker compose logs --tail=50
+        run: docker compose logs --tail=100

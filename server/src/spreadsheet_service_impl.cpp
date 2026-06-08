@@ -20,6 +20,36 @@ static std::string UsernameFromMeta(grpc::ServerContext* ctx) {
     return "";
 }
 
+// 调用 Auth 服务验证调用者身份
+bool SpreadsheetServiceImpl::ValidateCaller(grpc::ServerContext* ctx, int64_t user_id,
+                                             std::string& out_username, std::string& out_role) const {
+    if (!auth_stub_) return true; // 未配置 Auth 通道时跳过验证（向后兼容）
+
+    std::string token;
+    auto it = ctx->client_metadata().find("authorization");
+    if (it != ctx->client_metadata().end()) {
+        std::string val(it->second.data(), it->second.length());
+        const std::string prefix = "Bearer ";
+        if (val.rfind(prefix, 0) == 0) token = val.substr(prefix.size());
+        else token = val;
+    }
+    if (token.empty()) return false;
+
+    rpc::ValidateUserRequest vu_req;
+    rpc::ValidateUserResponse vu_resp;
+    vu_req.set_token(token);
+    vu_req.set_user_id(user_id);
+
+    grpc::ClientContext vu_ctx;
+    vu_ctx.set_deadline(std::chrono::system_clock::now() + std::chrono::seconds(2));
+    auto st = auth_stub_->ValidateUser(&vu_ctx, vu_req, &vu_resp);
+
+    if (!st.ok() || !vu_resp.valid()) return false;
+    out_username = vu_resp.username();
+    out_role = vu_resp.role();
+    return true;
+}
+
 // Redis key helpers — keyed by user_id so username changes never corrupt cache.
 static std::string VersionKey(int64_t user_id) {
     return "u:" + std::to_string(user_id) + ":sheets:version";
@@ -37,6 +67,12 @@ grpc::Status SpreadsheetServiceImpl::CreateSpreadsheet(
         AuthContext ac = auth_->Authenticate(context);
         if (!ac.authenticated) return grpc::Status(grpc::StatusCode::UNAUTHENTICATED, "Invalid or missing token");
     }
+
+    // 服务间调用: 向 Auth 服务二次验证用户身份
+    std::string vu_user, vu_role;
+    if (auth_stub_ && !ValidateCaller(context, req->user_id(), vu_user, vu_role))
+        return grpc::Status(grpc::StatusCode::UNAUTHENTICATED, "Auth service rejected");
+
     auto start = std::chrono::high_resolution_clock::now();
     std::string username = UsernameFromMeta(context);
 
@@ -75,6 +111,15 @@ grpc::Status SpreadsheetServiceImpl::CreateSpreadsheet(
     if (redis_ && redis_->IsConnected()) {
         redis_->Increment(VersionKey(req->user_id()));
         if (slog_) LOG_DEBUG(*slog_, "Create id=" + std::to_string(id) + " INCR version for uid=" + std::to_string(req->user_id()));
+    }
+
+    if (rabbit_) {
+        nlohmann::json ev;
+        ev["type"] = "sheet.created";
+        ev["id"] = id;
+        ev["user_id"] = req->user_id();
+        ev["name"] = req->name();
+        rabbit_->Publish("rpc.events", "sheet.created", ev.dump());
     }
 
     resp->set_success(true);
@@ -422,6 +467,16 @@ grpc::Status SpreadsheetServiceImpl::UpdateSpreadsheet(
                 if (slog_) LOG_DEBUG(*slog_, "Update id=" + std::to_string(req->id()) + " INVALIDATED + INCR version uid=" + std::to_string(req->user_id()));
             }
 
+            if (rabbit_) {
+                nlohmann::json ev;
+                ev["type"] = "sheet.updated";
+                ev["id"] = req->id();
+                ev["user_id"] = req->user_id();
+                ev["name"] = req->name();
+                ev["description"] = req->description();
+                rabbit_->Publish("rpc.events", "sheet.updated", ev.dump());
+            }
+
             resp->set_success(true);
 
             if (logger_) {
@@ -495,6 +550,14 @@ grpc::Status SpreadsheetServiceImpl::DeleteSpreadsheet(
         redis_->DeleteKey("sheet:" + std::to_string(req->id()) + ":ts");
         redis_->Increment(VersionKey(req->user_id()));
         if (slog_) LOG_DEBUG(*slog_, "Delete id=" + std::to_string(req->id()) + " INVALIDATED + INCR version uid=" + std::to_string(req->user_id()));
+    }
+
+    if (rabbit_) {
+        nlohmann::json ev;
+        ev["type"] = "sheet.deleted";
+        ev["id"] = req->id();
+        ev["user_id"] = req->user_id();
+        rabbit_->Publish("rpc.events", "sheet.deleted", ev.dump());
     }
 
     resp->set_success(true);

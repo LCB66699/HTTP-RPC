@@ -3,6 +3,9 @@
 #include <grpcpp/grpcpp.h>
 #include "generated/rpc_spreadsheet.grpc.pb.h"
 #include "generated/rpc_spreadsheet.pb.h"
+#include "generated/rpc_auth.grpc.pb.h"
+#include "generated/rpc_auth.pb.h"
+#include "rabbit_publisher.h"
 
 class ShardedDatabase;
 class RedisClient;
@@ -20,6 +23,14 @@ public:
     void SetLogger(CallLogger* logger) { logger_ = logger; }
     void SetSysLog(SystemLogger* slog) { slog_ = slog; }
     void SetAuthInterceptor(AuthInterceptor* interceptor) { auth_ = interceptor; }
+    void SetRabbitMQ(RabbitPublisher* rb) { rabbit_ = rb; }
+    void SetAuthChannel(std::shared_ptr<grpc::Channel> ch) {
+        auth_stub_ = rpc::AuthService::NewStub(ch);
+    }
+
+    // 从 gRPC metadata 提取 token 并调用 Auth.ValidateUser
+    bool ValidateCaller(grpc::ServerContext* ctx, int64_t user_id,
+                        std::string& out_username, std::string& out_role) const;
 
     grpc::Status CreateSpreadsheet(grpc::ServerContext* ctx,
                                    const rpc::CreateSpreadsheetRequest* req,
@@ -44,4 +55,6 @@ private:
     CallLogger*     logger_ = nullptr;
     SystemLogger*   slog_  = nullptr;
     AuthInterceptor* auth_ = nullptr;
+    std::unique_ptr<rpc::AuthService::Stub> auth_stub_;
+    RabbitPublisher* rabbit_ = nullptr;
 };

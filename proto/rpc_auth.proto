@@ -7,6 +7,8 @@ option go_package = "rpc-server/proto/rpc";
 service AuthService {
   rpc Login(LoginRequest) returns (LoginResponse);
   rpc Register(RegisterRequest) returns (RegisterResponse);
+  rpc RefreshToken(RefreshTokenRequest) returns (RefreshTokenResponse);
+  rpc ValidateUser(ValidateUserRequest) returns (ValidateUserResponse);
 }
 
 message LoginRequest {
@@ -16,9 +18,11 @@ message LoginRequest {
 
 message LoginResponse {
   bool success = 1;
-  string token = 2;
   string error = 3;
   int64 user_id = 4;
+  string access_token = 5;      // JWT, 15min
+  string refresh_token = 6;     // UUID, 7d
+  string role = 7;              // admin / user
 }
 
 message RegisterRequest {
@@ -28,7 +32,34 @@ message RegisterRequest {
 
 message RegisterResponse {
   bool success = 1;
-  string token = 2;
   string error = 3;
   int64 user_id = 4;
+  string access_token = 5;
+  string refresh_token = 6;
+  string role = 7;
+}
+
+message RefreshTokenRequest {
+  string username = 1;
+  string refresh_token = 2;
+}
+
+message RefreshTokenResponse {
+  bool success = 1;
+  string error = 2;
+  string access_token = 3;
+}
+
+message ValidateUserRequest {
+  int64 user_id = 1;
+  string username = 2;
+  string token = 3;
+}
+
+message ValidateUserResponse {
+  bool valid = 1;
+  string username = 2;
+  int64 user_id = 3;
+  string role = 4;
+  string error = 5;
 }

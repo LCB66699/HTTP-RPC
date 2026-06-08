@@ -4,9 +4,11 @@
 #include "spreadsheet_service_impl.h"
 #include "file_service_impl.h"
 #include "auth_service_impl.h"
+#include "rabbit_publisher.h"
 #include "auth_interceptor.h"
 #include "call_logger.h"
 #include "health_service_impl.h"
+#include "search_service_impl.h"
 #include "database.h"
 #include "redis_client.h"
 #include "l1_cache.h"
@@ -258,9 +260,30 @@ int main(int argc, char* argv[]) {
         }
     };
 
+    // 创建到 Auth 服务的 gRPC 通道（供 Sheet/File 服务间调用）
+    std::shared_ptr<grpc::Channel> auth_svc_ch;
+    if (service != "auth") {
+        grpc::ChannelArguments args;
+        args.SetInt(GRPC_ARG_KEEPALIVE_TIME_MS, 60000);
+        args.SetInt(GRPC_ARG_KEEPALIVE_TIMEOUT_MS, 20000);
+        auth_svc_ch = grpc::CreateCustomChannel(
+            "rpc-auth:50051", grpc::InsecureChannelCredentials(), args);
+    }
+
+    std::unique_ptr<RabbitPublisher> rabbit_pub;
+    const char* rb_host = std::getenv("RABBITMQ_HOST");
+    if (rb_host) {
+        rabbit_pub = std::make_unique<RabbitPublisher>(
+            rb_host, 5672,
+            std::getenv("RABBITMQ_USER") ? std::getenv("RABBITMQ_USER") : "rpc",
+            std::getenv("RABBITMQ_PASS") ? std::getenv("RABBITMQ_PASS") : "rpc-rabbit-123456");
+    }
+
     if (service == "all" || service == "spreadsheet") {
         sheet_auth = std::make_unique<AuthInterceptor>(jwt_secret);
         spreadsheet_service.SetAuthInterceptor(sheet_auth.get());
+        if (auth_svc_ch) spreadsheet_service.SetAuthChannel(auth_svc_ch);
+        if (rabbit_pub) spreadsheet_service.SetRabbitMQ(rabbit_pub.get());
         spreadsheet_service.SetDatabase(db.get());
         spreadsheet_service.SetRedis(redis.get());
         spreadsheet_service.SetL1Cache(l1_cache.get());
@@ -307,6 +330,8 @@ int main(int argc, char* argv[]) {
     if (service == "all" || service == "file") {
         file_auth = std::make_unique<AuthInterceptor>(jwt_secret);
         file_service.SetAuthInterceptor(file_auth.get());
+        if (auth_svc_ch) file_service.SetAuthChannel(auth_svc_ch);
+        if (rabbit_pub) file_service.SetRabbitMQ(rabbit_pub.get());
         file_service.SetDatabase(db.get());
         file_service.SetRedis(redis.get());
         file_service.SetL1Cache(l1_cache.get());
@@ -352,6 +377,13 @@ int main(int argc, char* argv[]) {
         builder.RegisterService(&file_service);
         builder.RegisterService(&tx_resource);
         printf("[main] FileService + TxResource registered\n");
+    }
+
+    if (service == "all" || service == "search") {
+        const char* es_host = std::getenv("ES_HOST");
+        SearchServiceImpl search_service(es_host ? es_host : "http://elasticsearch:9200");
+        builder.RegisterService(&search_service);
+        printf("[main] SearchService registered (ES: %s)\n", es_host ? es_host : "default");
     }
 
     g_server = builder.BuildAndStart();

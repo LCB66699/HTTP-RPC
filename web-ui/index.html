@@ -75,6 +75,7 @@
     <button class="tab active" data-tab="services">服务列表</button>
     <button class="tab" data-tab="sheets">数据表格</button>
     <button class="tab" data-tab="files">文件管理</button>
+    <button class="tab" data-tab="search">🔍 搜索</button>
     <button class="tab" data-tab="stress">压测</button>
     <button class="tab" data-tab="monitor">系统监控</button>
     <button class="tab" data-tab="profile">个人中心</button>
@@ -389,6 +390,54 @@
     <div id="history-detail" class="card hidden" style="margin-top:16px;">
       <h3>调用详情</h3>
       <div id="history-detail-content"></div>
+    </div>
+  </section>
+
+  <!-- Search Panel -->
+  <section id="panel-search" class="panel">
+    <div class="search-hero">
+      <div class="search-input-group">
+        <span class="search-icon">🔍</span>
+        <input type="text" id="search-input" class="search-input" placeholder="搜索表格、文件、文档内容..." autocomplete="off">
+        <button id="btn-search" class="btn btn-primary">搜索</button>
+      </div>
+      <div class="search-filters">
+        <div class="filter-chip-group">
+          <span style="color:var(--text-muted);font-size:0.85rem;margin-right:8px;">范围:</span>
+          <label class="chip"><input type="checkbox" class="scope-chk" value="sheets" checked> 表格</label>
+          <label class="chip"><input type="checkbox" class="scope-chk" value="files" checked> 文件</label>
+        </div>
+        <div class="filter-chip-group">
+          <span style="color:var(--text-muted);font-size:0.85rem;margin-right:8px;">排序:</span>
+          <select id="search-sort" class="chip-select">
+            <option value="relevance">相关度</option>
+            <option value="date_desc">最新优先</option>
+            <option value="date_asc">最早优先</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <div id="search-suggestion" class="search-suggestion hidden"></div>
+
+    <div class="toolbar">
+      <h2 id="search-summary">输入关键词开始搜索</h2>
+      <div id="search-loading" class="hidden" style="display:flex;align-items:center;gap:8px;color:var(--text-muted);">
+        <span class="spinner"></span> 搜索中...
+      </div>
+    </div>
+
+    <div id="search-results-container" class="search-results-container">
+      <div id="search-empty" class="search-empty">
+        <p>📭 输入关键词搜索您的表格和文件内容</p>
+        <p style="font-size:0.85rem;color:var(--text-muted);">支持中文分词、模糊匹配和拼音搜索</p>
+      </div>
+    </div>
+
+    <div id="search-pagination" class="pagination-row hidden">
+      <button id="btn-search-prev" class="btn">上一页</button>
+      <span id="search-page-info">第 1 页</span>
+      <button id="btn-search-next" class="btn">下一页</button>
     </div>
   </section>
 </main>

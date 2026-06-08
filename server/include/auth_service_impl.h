@@ -26,9 +26,20 @@ public:
     grpc::Status Register(grpc::ServerContext* ctx, const rpc::RegisterRequest* req,
                           rpc::RegisterResponse* resp) override;
 
+    grpc::Status ValidateUser(grpc::ServerContext* ctx, const rpc::ValidateUserRequest* req,
+                               rpc::ValidateUserResponse* resp) override;
+
+    grpc::Status RefreshToken(grpc::ServerContext* ctx, const rpc::RefreshTokenRequest* req,
+                               rpc::RefreshTokenResponse* resp) override;
+
+    bool IsAdminUser(const std::string& username) const;
+
 private:
+    std::string CreateAccessToken(const std::string& username, int64_t uid, const std::string& role) const;
+    std::string CreateRefreshToken(const std::string& username, int64_t uid) const;
+
     std::string jwt_secret_;
-    std::map<std::string, std::string> users_; // username -> base64(password)
+    std::map<std::string, std::string> users_;
     std::mutex mtx_;
     ShardedDatabase* db_ = nullptr;
     CallLogger* logger_ = nullptr;

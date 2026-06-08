@@ -421,9 +421,178 @@ document.querySelectorAll('.tab').forEach(btn => {
     if (btn.dataset.tab === 'sheets') loadSheets();
     if (btn.dataset.tab === 'files') loadFiles();
     if (btn.dataset.tab === 'monitor') loadMonitor();
+    if (btn.dataset.tab === 'search') initSearch();
     if (btn.dataset.tab === 'profile') initProfile();
   });
 });
+
+// ============================================================
+//  SEARCH
+// ============================================================
+
+let searchPage = 1;
+let searchTotal = 0;
+let searchTimer = null;
+
+function initSearch() {
+  const input = document.getElementById('search-input');
+  if (input) {
+    input.focus();
+    input.addEventListener('input', () => {
+      clearTimeout(searchTimer);
+      searchTimer = setTimeout(doSearch, 300);
+    });
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') { clearTimeout(searchTimer); doSearch(); }
+    });
+  }
+  const btn = document.getElementById('btn-search');
+  if (btn) btn.addEventListener('click', doSearch);
+  const btnPrev = document.getElementById('btn-search-prev');
+  if (btnPrev) btnPrev.addEventListener('click', () => {
+    if (searchPage > 1) { searchPage--; doSearch(); }
+  });
+  const btnNext = document.getElementById('btn-search-next');
+  if (btnNext) btnNext.addEventListener('click', () => {
+    if (searchPage * PAGE_SIZE < searchTotal) { searchPage++; doSearch(); }
+  });
+}
+
+async function doSearch() {
+  const input = document.getElementById('search-input');
+  if (!input) return;
+  const q = input.value.trim();
+  if (!q) return;
+
+  // 收集 scope
+  const scopes = [];
+  document.querySelectorAll('.scope-chk:checked').forEach(cb => scopes.push(cb.value));
+  const sortEl = document.getElementById('search-sort');
+  const sort = sortEl ? sortEl.value : 'relevance';
+
+  const loading = document.getElementById('search-loading');
+  const emptyEl = document.getElementById('search-empty');
+  const container = document.getElementById('search-results-container');
+  const summary = document.getElementById('search-summary');
+  if (!container) return;
+
+  if (loading) loading.classList.remove('hidden');
+  if (emptyEl) emptyEl.classList.add('hidden');
+  container.innerHTML = '';
+
+  try {
+    const res = await apiPost('/search', {
+      q, scope: scopes.join(','), sort,
+      page: searchPage, page_size: PAGE_SIZE
+    });
+    if (loading) loading.classList.add('hidden');
+    if (res.error) {
+      if (summary) summary.textContent = '搜索出错: ' + res.error;
+      return;
+    }
+    searchTotal = res.total || 0;
+    if (summary) summary.textContent = `"${q}" — 找到 ${searchTotal} 条结果`;
+
+    const sugg = document.getElementById('search-suggestion');
+    if (sugg) {
+      if (res.suggestion && res.suggestion !== q) {
+        sugg.classList.remove('hidden');
+        sugg.innerHTML = `您是不是要找：<a href="#" onclick="var inp=document.getElementById('search-input');if(inp)inp.value='${res.suggestion}';searchPage=1;doSearch();return false;">${res.suggestion}</a>`;
+      } else {
+        sugg.classList.add('hidden');
+      }
+    }
+
+    renderSearchResults(res.results || []);
+
+    const pageInfo = document.getElementById('search-page-info');
+    const btnPrev = document.getElementById('btn-search-prev');
+    const btnNext = document.getElementById('btn-search-next');
+    const pagination = document.getElementById('search-pagination');
+    if (pageInfo) pageInfo.textContent = `第 ${searchPage} 页 / 共 ${Math.ceil(searchTotal / PAGE_SIZE) || 1} 页`;
+    if (btnPrev) btnPrev.disabled = (searchPage <= 1);
+    if (btnNext) btnNext.disabled = (searchPage * PAGE_SIZE >= searchTotal);
+    if (pagination) pagination.classList.toggle('hidden', searchTotal <= PAGE_SIZE);
+
+  } catch (e) {
+    if (loading) loading.classList.add('hidden');
+    if (summary) summary.textContent = '搜索请求失败，请稍后重试';
+  }
+}
+
+function renderSearchResults(results) {
+  const container = document.getElementById('search-results-container');
+  if (!results.length) {
+    container.innerHTML = '<div class="search-empty"><p>😕 没有找到相关结果</p><p style="font-size:0.85rem;color:var(--text-muted);">尝试其他关键词</p></div>';
+    return;
+  }
+  container.innerHTML = results.map(r => {
+    const isSheet = r.type === 'sheet';
+    const title = isSheet ? (r.name || '未命名表格') : (r.original_name || '未知文件');
+    const subtitle = isSheet
+      ? `表格 · ${r.username} · ${r.row_count || 0}行 × ${r.col_count || 0}列`
+      : `文件 · ${r.username} · ${formatFileSize(r.size)} · ${r.mime_type || ''}`;
+    const date = isSheet ? r.updated_at : r.created_at;
+
+    // 高亮片段
+    let snippet = '';
+    if (r.highlight) {
+      const parts = [];
+      for (const [field, hl] of Object.entries(r.highlight)) {
+        if (Array.isArray(hl)) parts.push(...hl);
+      }
+      snippet = parts.slice(0, 3).join(' ... ');
+    }
+
+    return `
+      <div class="search-result-card">
+        <div class="search-result-type">${isSheet ? '📊' : '📄'} ${isSheet ? '表格' : '文件'}</div>
+        <div class="search-result-title">
+          ${isSheet
+            ? `<a href="#" onclick="window.openSheetById('${r.id}');return false;">${highlightText(title)}</a>`
+            : `<span>${highlightText(title)}</span>`}
+        </div>
+        <div class="search-result-meta">${subtitle} · ${formatSearchDate(date)}</div>
+        ${snippet ? `<div class="search-result-snippet">${snippet}</div>` : ''}
+      </div>
+    `;
+  }).join('');
+}
+
+function highlightText(text) {
+  return String(text).replace(/<em>/g, '<em class="search-highlight">').replace(/<\/em>/g, '</em>');
+}
+
+function formatSearchDate(d) {
+  if (!d) return '';
+  try { return new Date(d).toLocaleDateString('zh-CN'); } catch(e) { return d; }
+}
+
+function formatFileSize(bytes) {
+  if (!bytes) return '0 B';
+  const units = ['B', 'KB', 'MB', 'GB'];
+  let i = 0, s = bytes;
+  while (s >= 1024 && i < units.length-1) { s /= 1024; i++; }
+  return s.toFixed(i > 0 ? 1 : 0) + ' ' + units[i];
+}
+
+// 从搜索结果跳转到表格详情
+window.openSheetById = function(sheetId) {
+  document.querySelectorAll('.tab').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  const sheetTab = document.querySelector('[data-tab="sheets"]');
+  if (sheetTab) sheetTab.classList.add('active');
+  document.getElementById('panel-sheets').classList.add('active');
+  localStorage.setItem('rpc_last_tab', 'sheets');
+  loadSheets().then(() => {
+    // 尝试定位到该表格
+    setTimeout(() => {
+      if (typeof window.currentSheetId !== 'undefined') {
+        window.currentSheetId = sheetId;
+      }
+    }, 500);
+  });
+};
 
 // ============================================================
 //  TOKEN REFRESH

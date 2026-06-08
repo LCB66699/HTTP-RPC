@@ -1,42 +1,62 @@
 # HTTP-RPC 测试套件
 
-## 系统架构（当前版本）
+## 测试目标
+
+在单台 2核4GB 云服务器上，验证一个由 20+ 容器、6 个独立微服务、5 种数据存储组成的分布式系统是否**正确、稳定、可观测**。测试体系围绕四个维度设计：
+
+| 维度 | 目标 | 对应测试 |
+|------|------|---------|
+| **功能正确性** | 每个 API 的行为符合预期，边界条件有防御 | functional_test, search_test, grpc_test |
+| **系统完整性** | 所有服务能正常启动、互连、协同完成一个完整业务流程 | docker_health, integration_test |
+| **性能基线** | 在已知硬件条件下建立性能参考值，后续变更可对比 | performance_test |
+| **稳定性边界** | 找到系统的吞吐上限和故障恢复能力，知道什么时候该扩容 | stress_test |
+
+测试执行顺序：**先确认活着（docker_health）→ 再确认能跑通（integration）→ 然后逐个功能验证（functional/search/grpc）→ 最后压测**。任何一步失败，后续测试结果都不可信。
+
+## 系统架构（当前版本 v2）
 
 ```
-浏览器 → nginx(TLS+keepalive)
-           ├─ /api/* → proxy_pass gateway:8081 (HTTP/1.1)
+浏览器 → Nginx (TLS+限流)
+           ├─ /api/* → Envoy:8080 (JWT Cookie 验签)
+           │              └→ gRPC-Gateway:8082 (HTTP→gRPC 自动转码)
+           │                   └→ gRPC → Auth(x2) / Sheet(x3) / File(x2) / Search
            └─ /*     → serve /app/web-ui 静态文件
-                         │
-                    Gateway (双端口)
-                      ├─ 8081: httplib HTTP/1.1 (nginx 用)
-                      └─ 8080: nghttp2 h2c + ThreadPool (预留)
-                         │
-                      JWT 鉴权 + 多维熔断 + RESTful 路由
-                         │
-                      gRPC(round_robin) → Auth(x2) / Sheet(x3) / File(x2)
-                         └→ MySQL(1主2从, 可hash分片) + Redis Cluster(6节点,3M+3S) + MinIO
+
+微服务集群:
+  Auth Service ×2   (C++, 认证+Token签发, 独立镜像 176MB)
+  Sheet Service ×3  (C++, 表格CRUD, RabbitMQ发布)
+  File Service ×2   (C++, 文件CRUD, RabbitMQ发布)
+  Search Service     (C++, ES查询)
+  Notify Service     (Go, RabbitMQ消费 → MongoDB + ES 索引)
+  gRPC-Gateway      (Go, HTTP→gRPC 转码 + JWT校验, 42MB)
+
+数据层:
+  MySQL×5(分库主从) + Redis Cluster×6 + MongoDB + Elasticsearch + RabbitMQ + Consul
 ```
 
 | 层 | 核心技术 | 测试关注点 |
 |----|---------|----------|
-| 边缘代理 | nginx TLS + keepalive 128 + 静态文件 serve | 连接复用、TLS 开销 |
-| 网关 8081 | httplib + 同步 gRPC + JWT + 多维熔断(滑动窗口/P99/慢调用率) | 并发能力、JWT 验证 |
-| 网关 8080 | nghttp2 h2c + ThreadPool(eventfd唤醒) + poll I/O | stream 多路复用 |
-| 负载均衡 | gRPC round_robin + Docker DNS 别名多 IP + PerReplicaTracker 副本隔离 | 副本故障不中断 |
-| 缓存 | Cache-Aside + 逻辑过期异步刷新 + 版本号失效 + 空值防穿透 | 命中率、一致性 |
-| 数据库 | MySQL 主从读写分离 + ShardedDatabase(user_id%N hash分片) | 分片路由、并发冲突 |
-| Redis HA | Redis Cluster 6节点 (3M+3S, gossip协议自动故障转移) | 故障转移 RTO |
-| 安全 | JWT HS256 + token_version 吊销 (Redis) + Gateway+Server 双验签 | Token 有效期、吊销 |
-| 分布式事务 | 2PC TM + RM + undo_log 补偿 | Prepare/Commit/Rollback |
-| 对象存储 | MinIO S3-compatible | 文件上传下载完整性 |
+| 边缘代理 | Nginx TLS + least_conn + 令牌桶限流 | 连接复用、TLS 开销、429 速率限制 |
+| API 网关 | Envoy JWT Auth Filter (Cookie→HS256验签) | Token 有效期、401 拦截 |
+| 协议转码 | gRPC-Gateway (Go, proto 注解自动转码) | JSON↔Protobuf 正确性 |
+| 服务间通信 | gRPC round_robin + Consul 服务注册 | 副本故障切换、健康检查 |
+| 事件驱动 | RabbitMQ Topic 交换机 + Notify 消费者 | 消息可达性、死信队列 |
+| 缓存 | Cache-Aside + L1 LRU + Canal binlog 失效 | 命中率、近实时一致性 |
+| 搜索 | Elasticsearch + IK 中文分词 | 索引延迟、高亮、分词 |
+| 文档存储 | MongoDB (解析后文本) + ES (搜索索引) | 查询性能 |
+| 安全 | JWT HS256 双 Token (Access 15min + Refresh 7d) + 盗用检测 | Token 刷新、吊销 |
 
 ## 文件说明
 
 | 文件 | 用途 | 耗时 |
 |------|------|------|
-| `functional_test.sh` | 功能正确性：认证、鉴权、CRUD、缓存、Token 吊销、文件完整性、熔断器/健康状态 | ~30s |
-| `performance_test.sh` | 性能基准：预热 → 单请求延迟 → 并发(P50/P95/P99) → 缓存命中率 → 写入压测 → ab/wrk2 QPS | ~90s |
-| `stress_test.sh` | 逐层压测：L0 阶梯加压 → L1 内网 → L2 TLS → L3 公网 → L4 故障转移 → L5 稳定性(需 --long) | ~2-37min |
+| `docker_health.sh` | 全容器健康检查，逐个验证 healthy 状态 | ~2min |
+| `functional_test.sh` | 功能正确性：认证、鉴权、CRUD、缓存、Token 刷新、文件完整性 | ~45s |
+| `search_test.sh` | 搜索服务：创建→索引→搜索、scope 过滤、分页、高亮、模糊匹配 | ~40s |
+| `grpc_test.sh` | gRPC 直调：TxManager 2PC、HealthMonitor、Auth.ValidateUser、Search | ~30s |
+| `integration_test.sh` | E2E 集成：Docker 健康 + 注册→登录→创建→上传→索引→搜索→刷新→清理 | ~2min |
+| `performance_test.sh` | 性能基准：预热 → 单请求延迟 → 并发(P50/P95/P99) → 缓存命中率 → ab/wrk2 QPS | ~90s |
+| `stress_test.sh` | 逐层压测：L0 阶梯加压 → L1 内网 → L2 TLS → L3 公网 → L4 故障转移 → L5 稳定性 | ~2-37min |
 | `wrk_scripts/health.lua` | wrk2 GET 基准：纯网关吞吐，含自定义延迟分布报告 | — |
 | `wrk_scripts/mixed.lua` | wrk2 读写混合：70%列表/20%获取/10%创建，模拟真实流量 | — |
 
@@ -44,9 +64,12 @@
 
 | 方法 | 路径 | 说明 |
 |------|------|------|
-| GET | /api/health | 健康检查（gRPC Channel 状态 + 熔断器） |
+| GET | /api/health | 健康检查 |
 | POST | /api/login | 登录 |
 | POST | /api/register | 注册 |
+| POST | /api/refresh | Token 刷新（ATT→新AT） |
+| POST | /api/search | 全文搜索（ES） |
+| GET | /api/me | 当前用户信息 |
 | GET | /api/services | 服务列表 |
 | GET | /api/history | 调用历史 |
 | POST | /api/tx/begin | 分布式事务 |
@@ -59,6 +82,8 @@
 | POST | /api/files/upload | 上传文件 |
 | GET | /api/files/download | 下载文件 |
 | POST | /api/files/delete | 删除文件 |
+| GET | /api/files/preview | 文件预览（MongoDB 读取文本） |
+| GET | /metrics | Prometheus 指标 |
 
 ## 前置条件
 
@@ -72,6 +97,27 @@ sudo apt install -y curl bc apache2-utils python3
 sudo apt install -y wrk
 # 或手动编译 wrk2（支持 -R 恒定速率）:
 # git clone https://github.com/giltene/wrk2 && cd wrk2 && make && sudo cp wrk /usr/local/bin/wrk2
+```
+
+## Quick Start（推荐）
+
+```bash
+# 全量测试（按顺序执行）
+make test-all
+
+# 快速冒烟（5min内完成）
+make test-smoke
+
+# 单独测试
+make test-search          # 搜索功能
+make test-grpc            # gRPC 直调
+make test-integration     # E2E 集成
+make test-functional      # 功能正确性
+make test-performance     # 性能基准
+make test-docker-health   # 容器健康检查
+
+# 清理测试日志
+make test-clean
 ```
 
 ## 功能测试

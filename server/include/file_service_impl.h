@@ -3,7 +3,10 @@
 #include <grpcpp/grpcpp.h>
 #include "generated/rpc_file.grpc.pb.h"
 #include "generated/rpc_file.pb.h"
+#include "generated/rpc_auth.grpc.pb.h"
+#include "generated/rpc_auth.pb.h"
 #include "minio_client.h"
+#include "rabbit_publisher.h"
 
 class ShardedDatabase;
 class RedisClient;
@@ -20,9 +23,15 @@ public:
     void SetL1Cache(L1Cache* cache) { l1_ = cache; }
     void SetLogger(CallLogger* logger) { logger_ = logger; }
     void SetSysLog(SystemLogger* slog) { slog_ = slog; }
-    // Optional: when set, file bodies go to MinIO instead of MySQL LONGBLOB.
     void SetMinio(minio::Client* mc) { minio_ = mc; }
     void SetAuthInterceptor(AuthInterceptor* interceptor) { auth_ = interceptor; }
+    void SetRabbitMQ(RabbitPublisher* rb) { rabbit_ = rb; }
+    void SetAuthChannel(std::shared_ptr<grpc::Channel> ch) {
+        auth_stub_ = rpc::AuthService::NewStub(ch);
+    }
+
+    bool ValidateCaller(grpc::ServerContext* ctx, int64_t user_id,
+                        std::string& out_username, std::string& out_role) const;
 
     grpc::Status CreateFile(grpc::ServerContext* ctx,
                             const rpc::CreateFileRequest* req,
@@ -45,4 +54,6 @@ private:
     SystemLogger*   slog_  = nullptr;
     minio::Client*  minio_ = nullptr;
     AuthInterceptor* auth_ = nullptr;
+    std::unique_ptr<rpc::AuthService::Stub> auth_stub_;
+    RabbitPublisher* rabbit_ = nullptr;
 };

@@ -64,12 +64,62 @@ docker compose up -d --build --no-deps file-2
 # 需停服场景：docker-compose.yml 结构性变更、MySQL schema 破坏性变更、proto 字段编号修改
 ```
 
+### Docker 磁盘清理（谨慎操作）
+
+**安全原则：永远不要在日常清理中使用 `-a` 参数。**
+
+| 命令 | 清理范围 | 风险 |
+|------|---------|------|
+| `docker image prune -f` | 仅 `<none>:<none>` 悬空镜像 | 零风险 |
+| `docker system prune -f` | 悬空镜像 + 停止的容器 + 未用网络 | 零风险 |
+| `docker image prune -a -f` | **所有**未被容器使用的镜像 | ⚠️ 会删预构建镜像 |
+| `docker system prune -a -f --volumes` | 所有未用镜像 + 卷 + 构建缓存 | 🔴 清空一切 |
+
+**日常清理（推荐）：**
+
+```bash
+# 查看占用
+docker system df                          # 总览
+docker images --format '{{.Size}}\t{{.Repository}}' | sort -rh | head -10
+
+# 清理悬空镜像和停止容器
+docker system prune -f                    # 安全，只删无用层
+docker image prune -f                     # 最安全，只删 <none>:<none>
+
+# 构建前清缓存（不影响现有镜像）
+docker builder prune -f
+```
+
+**不要做：**
+```bash
+docker system prune -a -f --volumes      # 🔴 会删掉所有预构建镜像！
+# 上一行执行后需要全部重新编译（5+ 小时）
+```
+
+**磁盘快满时的正确处理：**
+
+```bash
+# 1. 先看谁占空间
+docker system df -v
+
+# 2. 清理构建缓存（安全）
+docker builder prune -af
+
+# 3. 删停止的容器（安全）
+docker container prune -f
+
+# 4. 清理悬空镜像（安全）
+docker image prune -f
+
+# 5. 确认释放了多少
+df -h /
+```
+
 ### 清理重建
 
 ```bash
 docker compose down && docker compose build --no-cache
 docker compose build --no-cache --progress=plain  # 完整构建日志
-docker system prune -a -f --volumes               # ⚠️ 清所有缓存+数据卷
 docker network prune -f
 ```
 
@@ -435,7 +485,96 @@ STRESS_LONG=1 bash test/stress_test.sh
 
 ---
 
-## 十、Kubernetes 部署（可选）
+## 十、Docker 磁盘清理与构建优化
+
+### 为什么 Docker 吃磁盘这么快
+
+```
+每次 docker build（尤其 --no-cache）都会产生:
+  1. 中间层镜像（apt install, make 等每步一个 layer）
+  2. 旧的镜像 tag 被覆盖后原镜像变成 <none>:<none>
+  3. 编译产物 (117MB build context + obj 文件)
+  
+反复调试 proto/CMake/Dockerfile → 10+ 次重建 → 很快占满 50GB
+```
+
+### 清理命令（从安全到危险）
+
+```bash
+# 1. 查看占用
+docker system df                    # 总览
+docker images --format '{{.Size}}\t{{.Repository}}' | sort -rh | head -10
+docker system df -v                 # 详细到每个镜像/容器/卷
+
+# 2. 清理悬空镜像 (<none>:<none>) — 安全
+docker image prune -f               # 只删无 tag 的旧镜像
+docker image prune -a -f            # 删所有未被容器使用的镜像
+
+# 3. 清理构建缓存 — 安全
+docker builder prune -f             # 清理 BuildKit 缓存
+docker buildx prune -f
+
+# 4. 清理停止的容器 + 网络 — 安全
+docker container prune -f
+docker network prune -f
+
+# 5. 一键全清（含数据卷） — ⚠️ 危险
+docker system prune -a -f --volumes  # 删所有未用镜像+容器+卷+网络
+
+# 6. 彻底重置（项目重建）
+docker compose down -v              # 停止+删容器+删卷
+docker system prune -a -f --volumes
+rm -rf ./data/                      # 删持久化数据（MySQL/Redis/MinIO/ES）
+```
+
+### 构建前必做
+
+```bash
+# 编译前先清理（释放空间 + 避免旧镜像残留）
+docker system prune -a -f           # 清所有无用镜像
+df -h /                             # 确认 >10GB 空闲
+
+# 然后再构建
+docker compose build <service>
+```
+
+### 限制编译内存
+
+```makefile
+# Makefile 中默认 make -j$(nproc) 会并行编译
+# 3.6GB 内存下必须改为单线程，否则 OOM
+make -j1        # 单线程编译，内存占用 ~800MB
+make -j2        # 双线程，内存占用 ~1.5GB（需先停容器）
+```
+
+### 镜像大小对比
+
+| 镜像 | 构建方式 | 大小 |
+|------|----------|------|
+| C++ 服务 (auth/sheet/file/search) | ubuntu:24.04 + gRPC + MySQL + Redis | ~176MB |
+| Gateway | 同上 + httplib | ~189MB |
+| Go Notify | alpine + 静态编译 | ~47MB |
+| Envoy | envoyproxy 官方 + 自定义配置 | ~400MB |
+| ES + IK | elasticsearch 官方 + 插件 | ~2GB |
+
+### 构建技巧
+
+```bash
+# 避免服务器 OOM: 先停所有容器再编译
+docker compose stop
+docker compose build <service>
+
+# 避免 SSH 超时: 服务器后台编译
+nohup docker build -t img -f Dockerfile . > /tmp/build.log 2>&1 &
+# 检查进度: tail -f /tmp/build.log
+
+# 利用缓存加速（只重建变更的服务）
+docker compose build gateway-1    # 只编 Gateway
+docker compose build auth-1       # 只编 Auth
+# 而不是 docker compose build     # 全编
+```
+
+## 十一、Kubernetes 部署（可选）
 
 ```bash
 # 一键部署（需要 K8s 集群 + kubectl + kustomize）
