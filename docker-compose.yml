@@ -507,6 +507,8 @@ services:
       JWT_SECRET: "${JWT_SECRET:-default-secret-32bytes-here!!!!!}"
       AUTH_ADDR: "rpc-auth:50051"
       SHEET_ADDR: "rpc-sheet:50051"
+      REDIS_ADDR: "redis-cluster-7000:7000"
+      REDIS_PASSWORD: "${REDIS_PASSWORD:-rpc-redis-123456}"
       FILE_ADDR: "rpc-file:50051"
       SEARCH_ADDR: "rpc-search:50051"
     ports:
