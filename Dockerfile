@@ -4,11 +4,9 @@ RUN apt update && apt install -y \
     g++ make cmake git \
     protobuf-compiler-grpc libgrpc++-dev \
     libmysqlclient-dev libhiredis-dev libssl-dev zlib1g-dev \
-    libnghttp2-dev
+    libnghttp2-dev librabbitmq-dev
 
-# Build and install redis-plus-plus from local source (offline-safe)
-# Put the source tree in third_party/redis-plus-plus/ before building:
-#   git clone --depth 1 https://github.com/sewenew/redis-plus-plus.git third_party/redis-plus-plus
+# Build and install redis-plus-plus from local source
 COPY third_party/redis-plus-plus/ /tmp/redis-plus-plus/
 RUN cd /tmp/redis-plus-plus \
     && mkdir build && cd build \
@@ -22,24 +20,27 @@ RUN cd /tmp/redis-plus-plus \
     && ldconfig \
     && rm -rf /tmp/redis-plus-plus
 
+ARG SERVICE=auth
 WORKDIR /src
 COPY . .
-RUN make clean && make
+RUN make clean && make ${SERVICE}
 
 FROM ubuntu:24.04
 
 RUN apt update && apt install -y \
     libgrpc++1.51t64 libmysqlclient21 libhiredis-dev libssl3t64 zlib1g \
-    libnghttp2-14 apache2-utils \
+    libnghttp2-14 librabbitmq4 apache2-utils curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy redis-plus-plus runtime library
 COPY --from=builder /usr/local/lib/libredis++.so* /usr/local/lib/
 RUN ldconfig
 
+ARG SERVICE=auth
 WORKDIR /app
-COPY --from=builder /src/rpc_server /app/rpc_server
-COPY --from=builder /src/rpc_gateway /app/rpc_gateway
+COPY --from=builder /src/rpc_${SERVICE} /app/rpc_server
 COPY --from=builder /src/web-ui /app/web-ui
+COPY consul/register-inline.sh /app/register-inline.sh
+RUN chmod +x /app/register-inline.sh
 
-EXPOSE 50051 8080
+EXPOSE 50051
+ENTRYPOINT ["/app/register-inline.sh"]

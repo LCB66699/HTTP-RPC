@@ -596,6 +596,19 @@ bool Database::CreateFile(int64_t user_id, const std::string& username,
     return ExecWriteInsert(sql, out_id);
 }
 
+bool Database::UpdateFileContent(int64_t id, const std::string& content) {
+    if (write_conns_.empty()) return false;
+    size_t idx = write_idx_.fetch_add(1, std::memory_order_relaxed) % write_conns_.size();
+    auto& wc = write_conns_[idx];
+    std::lock_guard<std::mutex> lock(wc->mtx);
+    if (!wc->conn) return false;
+    char* esc = (char*)malloc(content.size() * 2 + 1);
+    mysql_real_escape_string(wc->conn, esc, content.data(), (unsigned long)content.size());
+    std::string sql = "UPDATE files SET file_content='" + std::string(esc) + "' WHERE id=" + std::to_string(id);
+    free(esc);
+    return mysql_query(wc->conn, sql.c_str()) == 0;
+}
+
 bool Database::GetFile(int64_t id, int64_t user_id, FileRow& out) {
     // storage_path is col 7: if non-empty, caller should fetch content from object storage
     // instead of reading the legacy file_content LONGBLOB (col 6)
@@ -908,6 +921,9 @@ bool ShardedDatabase::CreateFile(int64_t user_id, const std::string& username,
                                   int64_t& out_id, const std::string& idempotency_key) {
     return ShardFor(user_id)->CreateFile(user_id, username, original_name, size,
                                           mime_type, storage_key, out_id, idempotency_key);
+}
+bool ShardedDatabase::UpdateFileContent(int64_t id, const std::string& content) {
+    return ShardFor(id)->UpdateFileContent(id, content);
 }
 bool ShardedDatabase::GetFile(int64_t id, int64_t user_id, FileRow& out) {
     return ShardFor(user_id)->GetFile(id, user_id, out);

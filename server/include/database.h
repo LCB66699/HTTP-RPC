@@ -89,6 +89,7 @@ public:
                     const std::string& original_name, int64_t size,
                     const std::string& mime_type, const std::string& storage_key,
                     int64_t& out_id, const std::string& idempotency_key = "");
+    bool UpdateFileContent(int64_t id, const std::string& content);
     bool GetFile(int64_t id, int64_t user_id, FileRow& out);
     // page is 0-based; page_size=0 disables pagination and returns all rows (backward compat)
     bool ListFiles(int64_t user_id, std::vector<FileRow>& out, int& total,
@@ -196,6 +197,7 @@ public:
                     const std::string& original_name, int64_t size,
                     const std::string& mime_type, const std::string& storage_key,
                     int64_t& out_id, const std::string& idempotency_key = "");
+    bool UpdateFileContent(int64_t id, const std::string& content);
     bool GetFile(int64_t id, int64_t user_id, FileRow& out);
     bool ListFiles(int64_t user_id, std::vector<FileRow>& out, int& total,
                    int page = 0, int page_size = 0);

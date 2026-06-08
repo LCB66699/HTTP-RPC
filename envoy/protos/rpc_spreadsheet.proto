@@ -1,0 +1,100 @@
+syntax = "proto3";
+
+package rpc;
+
+option go_package = "gateway-grpc/gen/rpc";
+
+service SpreadsheetService {
+  rpc CreateSpreadsheet(CreateSpreadsheetRequest) returns (CreateSpreadsheetResponse);
+  rpc GetSpreadsheet(GetSpreadsheetRequest) returns (GetSpreadsheetResponse);
+  rpc ListSpreadsheets(ListSpreadsheetsRequest) returns (ListSpreadsheetsResponse);
+  rpc UpdateSpreadsheet(UpdateSpreadsheetRequest) returns (UpdateSpreadsheetResponse);
+  rpc DeleteSpreadsheet(DeleteSpreadsheetRequest) returns (DeleteSpreadsheetResponse);
+}
+
+message Spreadsheet {
+  int64 id = 1;
+  string username = 2;
+  string name = 3;
+  string description = 4;
+  string headers_json = 5;
+  string data_json = 6;
+  int32 row_count = 7;
+  int32 col_count = 8;
+  string created_at = 9;
+  string updated_at = 10;
+}
+
+message SpreadsheetSummary {
+  int64 id = 1;
+  string name = 2;
+  string description = 3;
+  int32 row_count = 4;
+  int32 col_count = 5;
+  string updated_at = 6;
+}
+
+message CreateSpreadsheetRequest {
+  int64 user_id = 1;
+  string name = 2;
+  string description = 3;
+  string headers_json = 4;
+  string data_json = 5;
+  string idempotency_key = 6;
+}
+
+message CreateSpreadsheetResponse {
+  bool success = 1;
+  int64 id = 2;
+  string error = 3;
+}
+
+message GetSpreadsheetRequest {
+  int64 id = 1;
+  int64 user_id = 2;
+}
+
+message GetSpreadsheetResponse {
+  bool success = 1;
+  Spreadsheet spreadsheet = 2;
+  string cache_source = 3;
+  string error = 4;
+}
+
+message ListSpreadsheetsRequest {
+  int64 user_id = 1;
+  int32 page = 2;
+  int32 page_size = 3;
+}
+
+message ListSpreadsheetsResponse {
+  bool success = 1;
+  repeated SpreadsheetSummary sheets = 2;
+  int32 total = 3;
+  string cache_source = 4;
+  string error = 5;
+}
+
+message UpdateSpreadsheetRequest {
+  int64 id = 1;
+  int64 user_id = 2;
+  string name = 3;
+  string description = 4;
+  string headers_json = 5;
+  string data_json = 6;
+}
+
+message UpdateSpreadsheetResponse {
+  bool success = 1;
+  string error = 2;
+}
+
+message DeleteSpreadsheetRequest {
+  int64 id = 1;
+  int64 user_id = 2;
+}
+
+message DeleteSpreadsheetResponse {
+  bool success = 1;
+  string error = 2;
+}

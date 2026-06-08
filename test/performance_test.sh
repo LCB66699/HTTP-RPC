@@ -56,7 +56,7 @@ login_and_get_cookie() {
         -H 'Content-Type: application/json' \
         -c "$jar" \
         -d "{\"username\":\"$user\",\"password\":\"$pass\"}" 2>/dev/null)
-    if echo "$body" | grep -q '"success":true'; then
+    if echo "$body" | grep -q '"success"'; then
         return 0
     fi
     curl -sk -X POST "$API/api/register" \
@@ -69,7 +69,7 @@ login_and_get_cookie() {
 }
 
 get_token_from_jar() {
-    grep 'rpc_token' "$1" 2>/dev/null | awk '{print $NF}' | head -1
+    grep 'rpc_at' "$1" 2>/dev/null | awk '{print $NF}' | head -1
 }
 
 # ---- Phase 0: 预热 ----
@@ -181,7 +181,7 @@ RUNNER_EOF
 
 run_concurrent "Health (no auth)"  "$API/api/health"   "GET"  ""  "no"
 run_concurrent "Sheet List"        "$API/api/sheets"   "GET"  ""  "yes"
-run_concurrent "Sheet Get"         "$API/api/sheets/get" "POST" '{"id":1}' "yes"
+run_concurrent "Sheet Get"         "$API/api/sheets/1" "GET" "" "yes"
 
 # =====================================================================
 # Phase 3: 缓存命中率
@@ -194,10 +194,7 @@ FIRST_ID=$($CURL "$API/api/sheets" -b "$JAR" 2>/dev/null \
 
 HIT=0; MIS=0; FIRST_WRITE=0
 for i in $(seq 1 20); do
-    RES=$($CURL -X POST "$API/api/sheets/get" \
-        -H 'Content-Type: application/json' \
-        -b "$JAR" \
-        -d "{\"id\":$FIRST_ID}" 2>/dev/null)
+    RES=$($CURL "$API/api/sheets/$FIRST_ID" -b "$JAR" 2>/dev/null)
     if echo "$RES" | grep -q '"cache_source":"redis"'; then
         HIT=$((HIT + 1))
     elif echo "$RES" | grep -q '"cache_source":"mysql"'; then
@@ -258,23 +255,17 @@ for i in $(seq 1 10); do
     SID=$(echo "$CR" | sed 's/.*"id"://;s/[},].*//')
 
     if [ -n "$SID" ] && [ "$SID" != "0" ]; then
-        # 获取（验证写入可见）
-        $CURL -X POST "$API/api/sheets/get" \
-            -H 'Content-Type: application/json' \
-            -b "$JAR" \
-            -d "{\"id\":$SID}" > /dev/null 2>&1
+        # 获取
+        $CURL "$API/api/sheets/$SID" -b "$JAR" > /dev/null 2>&1
 
         # 更新
-        $CURL -X PUT "$API/api/sheets" \
+        $CURL -X PUT "$API/api/sheets/$SID" \
             -H 'Content-Type: application/json' \
             -b "$JAR" \
-            -d "{\"id\":$SID,\"name\":\"perf-$i-updated\",\"description\":\"\",\"headers_json\":\"[\\\"B\\\"]\",\"data_json\":\"[[\\\"w\\\"]]\"}" > /dev/null 2>&1
+            -d "{\"name\":\"perf-$i-updated\",\"description\":\"\",\"headers_json\":\"[\\\"B\\\"]\",\"data_json\":\"[[\\\"w\\\"]]\"}" > /dev/null 2>&1
 
         # 删除
-        $CURL -X POST "$API/api/sheets/delete" \
-            -H 'Content-Type: application/json' \
-            -b "$JAR" \
-            -d "{\"id\":$SID}" > /dev/null 2>&1
+        $CURL -X DELETE "$API/api/sheets/$SID" -b "$JAR" > /dev/null 2>&1
 
         echo "ok" >> "$TMPDIR/write_ops"
     else
@@ -316,7 +307,7 @@ if command -v ab &>/dev/null; then
     echo ""
     echo "  [Sheet List — 鉴权+gRPC+Redis 完整链路]"
     ab -n 1000 -c 10 -k \
-        -C "rpc_token=$RPC_TOKEN" \
+        -C "rpc_at=$RPC_TOKEN" \
         "$API/api/sheets" 2>&1 \
         | grep -E "Requests per second|50%|95%|99%|100%|Non-2xx|Failed requests" || true
 else

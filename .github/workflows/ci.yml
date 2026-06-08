@@ -1,0 +1,47 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build all services
+        run: docker compose build
+
+      - name: Start stack
+        run: |
+          docker compose up -d
+          # 等基础设施就绪
+          echo "Waiting for services..."
+          for i in $(seq 1 60); do
+            if curl -sk https://localhost/api/health 2>/dev/null | grep -q gateway; then
+              echo "Stack ready ($i s)"
+              break
+            fi
+            sleep 2
+          done
+
+      - name: Functional test
+        run: bash test/functional_test.sh
+
+      - name: Performance test
+        run: bash test/performance_test.sh
+
+      - name: Stress test (quick)
+        run: bash test/stress_test.sh https://localhost 500 5
+
+      - name: Show logs on failure
+        if: failure()
+        run: |
+          docker compose ps
+          docker compose logs --tail=50

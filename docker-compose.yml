@@ -1,27 +1,6 @@
 services:
-  # ===== LVS + Keepalived (4层负载均衡, DR模式) =====
-  lvs-master:
-    build:
-      context: ./lvs
-    cap_add: [NET_ADMIN, SYS_MODULE]
-    network_mode: host
-    environment:
-      - VIP=${LVS_VIP:-192.168.1.100}
-      - ROLE=MASTER
-      - PRIORITY=100
-
-  lvs-backup:
-    build:
-      context: ./lvs
-    cap_add: [NET_ADMIN, SYS_MODULE]
-    network_mode: host
-    environment:
-      - VIP=${LVS_VIP:-192.168.1.100}
-      - ROLE=BACKUP
-      - PRIORITY=90
-
-  # ===== nginx ×3 (LVS real servers) =====
-  nginx-1:
+  # ===== Nginx (TLS termination + rate limiting) =====
+  nginx:
     build: { dockerfile: Dockerfile.nginx }
     ports:
       - "80:80"
@@ -29,31 +8,12 @@ services:
     volumes:
       - ./nginx.conf:/etc/nginx/nginx.conf:ro
       - ./web-ui:/app/web-ui:ro
-    command: >
-      sh -c "/usr/local/bin/realserver.sh && nginx -g 'daemon off;'"
-    depends_on: [gateway-1, gateway-2]
+    depends_on: [envoy]
 
-  nginx-2:
-    build: { dockerfile: Dockerfile.nginx }
-    volumes:
-      - ./nginx.conf:/etc/nginx/nginx.conf:ro
-      - ./web-ui:/app/web-ui:ro
-    command: >
-      sh -c "/usr/local/bin/realserver.sh && nginx -g 'daemon off;'"
-    depends_on: [gateway-1, gateway-2]
-
-  nginx-3:
-    build: { dockerfile: Dockerfile.nginx }
-    volumes:
-      - ./nginx.conf:/etc/nginx/nginx.conf:ro
-      - ./web-ui:/app/web-ui:ro
-    command: >
-      sh -c "/usr/local/bin/realserver.sh && nginx -g 'daemon off;'"
-    depends_on: [gateway-1, gateway-2]
-
-  # ===== MySQL Auth (不分片) =====
+  # ===== MySQL Auth =====
   mysql-auth:
     image: mysql:8.0
+    command: --innodb-buffer-pool-size=32M --innodb-log-buffer-size=4M --innodb-log-file-size=16M --performance-schema=OFF --skip-innodb-doublewrite
     environment:
       MYSQL_ROOT_PASSWORD: "${MYSQL_ROOT_PASSWORD:-123456}"
     volumes:
@@ -66,9 +26,10 @@ services:
       timeout: 3s
       retries: 10
 
-  # ===== MySQL Spreadsheet (双分片, 每片1主1从) =====
+  # ===== MySQL Spreadsheet (双分片) =====
   mysql-spreadsheet-0:
     image: mysql:8.0
+    command: --innodb-buffer-pool-size=32M --innodb-log-buffer-size=4M --innodb-log-file-size=16M --performance-schema=OFF --skip-innodb-doublewrite
     environment: { MYSQL_ROOT_PASSWORD: "${MYSQL_ROOT_PASSWORD:-123456}" }
     volumes: ["./init.sql:/docker-entrypoint-initdb.d/init.sql", "./data/mysql-sp-0:/var/lib/mysql"]
     networks:
@@ -82,12 +43,14 @@ services:
 
   mysql-spreadsheet-0-slave:
     image: mysql:8.0
+    command: --innodb-buffer-pool-size=32M --innodb-log-buffer-size=4M --innodb-log-file-size=16M --performance-schema=OFF --skip-innodb-doublewrite
     environment: { MYSQL_ROOT_PASSWORD: "${MYSQL_ROOT_PASSWORD:-123456}" }
     volumes: ["./mysql/slave/conf.d:/etc/mysql/conf.d", "./data/mysql-sp-0s:/var/lib/mysql"]
     depends_on: [mysql-spreadsheet-0]
 
   mysql-spreadsheet-1:
     image: mysql:8.0
+    command: --innodb-buffer-pool-size=32M --innodb-log-buffer-size=4M --innodb-log-file-size=16M --performance-schema=OFF --skip-innodb-doublewrite
     environment: { MYSQL_ROOT_PASSWORD: "${MYSQL_ROOT_PASSWORD:-123456}" }
     volumes: ["./init.sql:/docker-entrypoint-initdb.d/init.sql", "./data/mysql-sp-1:/var/lib/mysql"]
     networks:
@@ -101,13 +64,15 @@ services:
 
   mysql-spreadsheet-1-slave:
     image: mysql:8.0
+    command: --innodb-buffer-pool-size=32M --innodb-log-buffer-size=4M --innodb-log-file-size=16M --performance-schema=OFF --skip-innodb-doublewrite
     environment: { MYSQL_ROOT_PASSWORD: "${MYSQL_ROOT_PASSWORD:-123456}" }
     volumes: ["./mysql/slave/conf.d:/etc/mysql/conf.d", "./data/mysql-sp-1s:/var/lib/mysql"]
     depends_on: [mysql-spreadsheet-1]
 
-  # ===== MySQL File (双分片, 每片1主1从) =====
+  # ===== MySQL File (双分片) =====
   mysql-file-0:
     image: mysql:8.0
+    command: --innodb-buffer-pool-size=32M --innodb-log-buffer-size=4M --innodb-log-file-size=16M --performance-schema=OFF --skip-innodb-doublewrite
     environment: { MYSQL_ROOT_PASSWORD: "${MYSQL_ROOT_PASSWORD:-123456}" }
     volumes: ["./init.sql:/docker-entrypoint-initdb.d/init.sql", "./data/mysql-f-0:/var/lib/mysql"]
     networks:
@@ -121,12 +86,14 @@ services:
 
   mysql-file-0-slave:
     image: mysql:8.0
+    command: --innodb-buffer-pool-size=32M --innodb-log-buffer-size=4M --innodb-log-file-size=16M --performance-schema=OFF --skip-innodb-doublewrite
     environment: { MYSQL_ROOT_PASSWORD: "${MYSQL_ROOT_PASSWORD:-123456}" }
     volumes: ["./mysql/slave/conf.d:/etc/mysql/conf.d", "./data/mysql-f-0s:/var/lib/mysql"]
     depends_on: [mysql-file-0]
 
   mysql-file-1:
     image: mysql:8.0
+    command: --innodb-buffer-pool-size=32M --innodb-log-buffer-size=4M --innodb-log-file-size=16M --performance-schema=OFF --skip-innodb-doublewrite
     environment: { MYSQL_ROOT_PASSWORD: "${MYSQL_ROOT_PASSWORD:-123456}" }
     volumes: ["./init.sql:/docker-entrypoint-initdb.d/init.sql", "./data/mysql-f-1:/var/lib/mysql"]
     networks:
@@ -140,6 +107,7 @@ services:
 
   mysql-file-1-slave:
     image: mysql:8.0
+    command: --innodb-buffer-pool-size=32M --innodb-log-buffer-size=4M --innodb-log-file-size=16M --performance-schema=OFF --skip-innodb-doublewrite
     environment: { MYSQL_ROOT_PASSWORD: "${MYSQL_ROOT_PASSWORD:-123456}" }
     volumes: ["./mysql/slave/conf.d:/etc/mysql/conf.d", "./data/mysql-f-1s:/var/lib/mysql"]
     depends_on: [mysql-file-1]
@@ -150,7 +118,7 @@ services:
     volumes:
       - ./redis/cluster/redis.conf:/usr/local/etc/redis/redis.conf
       - ./data/redis-cluster-1:/data
-    command: redis-server /usr/local/etc/redis/redis.conf --port 7000 --requirepass ${REDIS_PASSWORD:-rpc-redis-123456} --masterauth ${REDIS_PASSWORD:-rpc-redis-123456}
+    command: redis-server /usr/local/etc/redis/redis.conf --port 7000 --requirepass ${REDIS_PASSWORD:-rpc-redis-123456} --masterauth ${REDIS_PASSWORD:-rpc-redis-123456} --maxmemory 32mb --maxmemory-policy allkeys-lru
     networks:
       default:
         aliases: [redis-cluster, redis-cluster-7000]
@@ -165,33 +133,31 @@ services:
     volumes:
       - ./redis/cluster/redis.conf:/usr/local/etc/redis/redis.conf
       - ./data/redis-cluster-2:/data
-    command: redis-server /usr/local/etc/redis/redis.conf --port 7001 --requirepass ${REDIS_PASSWORD:-rpc-redis-123456} --masterauth ${REDIS_PASSWORD:-rpc-redis-123456}
-    networks:
-      default:
-        aliases: [redis-cluster, redis-cluster-7001]
+    command: redis-server /usr/local/etc/redis/redis.conf --port 7001 --requirepass ${REDIS_PASSWORD:-rpc-redis-123456} --masterauth ${REDIS_PASSWORD:-rpc-redis-123456} --maxmemory 32mb --maxmemory-policy allkeys-lru
+    networks: { default: { aliases: [redis-cluster, redis-cluster-7001] } }
 
   redis-cluster-3:
     image: redis:7-alpine
     volumes: [./redis/cluster/redis.conf:/usr/local/etc/redis/redis.conf, ./data/redis-cluster-3:/data]
-    command: redis-server /usr/local/etc/redis/redis.conf --port 7002 --requirepass ${REDIS_PASSWORD:-rpc-redis-123456} --masterauth ${REDIS_PASSWORD:-rpc-redis-123456}
+    command: redis-server /usr/local/etc/redis/redis.conf --port 7002 --requirepass ${REDIS_PASSWORD:-rpc-redis-123456} --masterauth ${REDIS_PASSWORD:-rpc-redis-123456} --maxmemory 32mb --maxmemory-policy allkeys-lru
     networks: { default: { aliases: [redis-cluster, redis-cluster-7002] } }
 
   redis-cluster-4:
     image: redis:7-alpine
     volumes: [./redis/cluster/redis.conf:/usr/local/etc/redis/redis.conf, ./data/redis-cluster-4:/data]
-    command: redis-server /usr/local/etc/redis/redis.conf --port 7003 --requirepass ${REDIS_PASSWORD:-rpc-redis-123456} --masterauth ${REDIS_PASSWORD:-rpc-redis-123456}
+    command: redis-server /usr/local/etc/redis/redis.conf --port 7003 --requirepass ${REDIS_PASSWORD:-rpc-redis-123456} --masterauth ${REDIS_PASSWORD:-rpc-redis-123456} --maxmemory 32mb --maxmemory-policy allkeys-lru
     networks: { default: { aliases: [redis-cluster, redis-cluster-7003] } }
 
   redis-cluster-5:
     image: redis:7-alpine
     volumes: [./redis/cluster/redis.conf:/usr/local/etc/redis/redis.conf, ./data/redis-cluster-5:/data]
-    command: redis-server /usr/local/etc/redis/redis.conf --port 7004 --requirepass ${REDIS_PASSWORD:-rpc-redis-123456} --masterauth ${REDIS_PASSWORD:-rpc-redis-123456}
+    command: redis-server /usr/local/etc/redis/redis.conf --port 7004 --requirepass ${REDIS_PASSWORD:-rpc-redis-123456} --masterauth ${REDIS_PASSWORD:-rpc-redis-123456} --maxmemory 32mb --maxmemory-policy allkeys-lru
     networks: { default: { aliases: [redis-cluster, redis-cluster-7004] } }
 
   redis-cluster-6:
     image: redis:7-alpine
     volumes: [./redis/cluster/redis.conf:/usr/local/etc/redis/redis.conf, ./data/redis-cluster-6:/data]
-    command: redis-server /usr/local/etc/redis/redis.conf --port 7005 --requirepass ${REDIS_PASSWORD:-rpc-redis-123456} --masterauth ${REDIS_PASSWORD:-rpc-redis-123456}
+    command: redis-server /usr/local/etc/redis/redis.conf --port 7005 --requirepass ${REDIS_PASSWORD:-rpc-redis-123456} --masterauth ${REDIS_PASSWORD:-rpc-redis-123456} --maxmemory 32mb --maxmemory-policy allkeys-lru
     networks: { default: { aliases: [redis-cluster, redis-cluster-7005] } }
 
   redis-cluster-init:
@@ -210,40 +176,7 @@ services:
     entrypoint: ["/bin/sh", "/init.sh"]
     restart: "no"
 
-  # ===== MinIO 对象存储 =====
-  minio:
-    image: minio/minio:latest
-    command: server /data --console-address ":9001"
-    environment:
-      MINIO_ROOT_USER: "${MINIO_ACCESS_KEY:-minio-rpc-admin}"
-      MINIO_ROOT_PASSWORD: "${MINIO_ROOT_PASSWORD:-minio-rpc-123456}"
-    ports:
-      - "9000:9000"   # S3 API (presigned URLs reachable from browser)
-      - "9001:9001"   # MinIO Web Console
-    volumes:
-      - ./data/minio:/data
-    healthcheck:
-      test: ["CMD", "mc", "ready", "local"]
-      interval: 5s
-      timeout: 3s
-      retries: 10
-
-  # Creates the bucket on first start; exits 0 so compose doesn't wait forever.
-  minio-init:
-    image: minio/mc:latest
-    depends_on:
-      minio:
-        condition: service_healthy
-    entrypoint: >
-      /bin/sh -c "
-        mc alias set local http://minio:9000 ${MINIO_ACCESS_KEY:-minio-rpc-admin} ${MINIO_ROOT_PASSWORD:-minio-rpc-123456} &&
-        mc mb --ignore-existing local/rpc-files &&
-        mc anonymous set download local/rpc-files &&
-        echo 'MinIO bucket ready'
-      "
-    restart: "no"
-
-  # ===== Canal — binlog subscription → Redis cache delete + L1 invalidation =====
+  # ===== Canal — binlog subscription =====
   canal-server:
     image: canal/canal-server:v1.1.7
     ports: ["11111:11111"]
@@ -260,18 +193,131 @@ services:
       redis-cluster-1:
         condition: service_healthy
 
-  # canal-adapter: image removed from Docker Hub. Canal Server alone captures
-  #   binlog; a C++ consumer (or TTL-based expiration) handles L1 invalidation.
-  #   TODO: write C++ Canal client or use Kafka connector.
-  # ===== 应用服务 =====
-  auth-1:
-    build: .
+  # ===== Consul — 服务注册与发现 =====
+  consul:
+    image: hashicorp/consul:1.18
+    volumes:
+      - ./data/consul:/consul/data
+      - ./consul/consul-config.hcl:/consul/config/config.hcl:ro
+    command: agent -config-file=/consul/config/config.hcl
+    ports:
+      - "8500:8500"
+      - "8600:8600/udp"
+    networks:
+      default:
+        aliases: [consul, consul.service.consul]
+    healthcheck:
+      test: ["CMD", "consul", "members"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+  # ===== RabbitMQ — 事件总线 =====
+  rabbitmq:
+    image: rabbitmq:3.13-management-alpine
     environment:
-      JWT_SECRET: "${JWT_SECRET}"
+      RABBITMQ_DEFAULT_USER: rpc
+      RABBITMQ_DEFAULT_PASS: rpc-rabbit-123456
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    volumes:
+      - ./data/rabbitmq:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "check_port_connectivity"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  # ===== Envoy Proxy — API 网关 (gRPC-JSON 转码 + JWT 鉴权 + 熔断) =====
+  envoy:
+    build:
+      context: .
+      dockerfile: envoy/Dockerfile
+    ports:
+      - "8080:8080"
+      - "9901:9901"
+    environment:
+      JWT_SECRET: "${JWT_SECRET:-default-secret-32bytes-here!!!!!}"
+    depends_on:
+      - auth-1
+      - sheet-1
+      - file-1
+    restart: unless-stopped
+
+  # ===== Elasticsearch =====
+  elasticsearch:
+    build:
+      context: ./es
+      dockerfile: Dockerfile
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - "ES_JAVA_OPTS=-Xms256m -Xmx256m"
+      - bootstrap.memory_lock=false
+      - cluster.routing.allocation.disk.threshold_enabled=false
+    ulimits:
+      memlock: { soft: -1, hard: -1 }
+      nofile: { soft: 65536, hard: 65536 }
+    volumes:
+      - es_data:/usr/share/elasticsearch/data
+    ports:
+      - "9200:9200"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -s http://localhost:9200/_cluster/health | grep -qE 'green|yellow'"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 60s
+    restart: unless-stopped
+
+  # ===== MongoDB =====
+  mongodb:
+    image: mongo:7.0
+    command: mongod --wiredTigerCacheSizeGB 0.25
+    environment:
+      MONGO_INITDB_DATABASE: rpc_search
+    volumes:
+      - ./data/mongodb:/data/db
+      - ./mongo/init.js:/docker-entrypoint-initdb.d/init.js:ro
+    ports:
+      - "27017:27017"
+    healthcheck:
+      test: ["CMD-SHELL", "mongosh --eval 'db.adminCommand(\"ping\")'"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+  # ===== ES 索引初始化 =====
+  es-init:
+    image: curlimages/curl:latest
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+    volumes:
+      - ./es/init.sh:/init.sh:ro
+    entrypoint: ["/bin/sh", "/init.sh"]
+    restart: "no"
+
+  # ===== Auth Service (2 instances) =====
+  auth-1:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        SERVICE: auth
+    image: http-rpc-auth:latest
+    environment:
+      JWT_SECRET: "${JWT_SECRET:-default-secret-32bytes-here!!!!!}"
+    volumes:
+      - ./consul/entrypoint-wrapper.sh:/entrypoint-wrapper.sh:ro
     command: >
-      /app/rpc_server --service auth --port 50051
+      sh -c "/entrypoint-wrapper.sh auth-service auth-1 50051 /app/rpc_server --service auth --port 50051
       --mysql-write-host mysql-auth --mysql-read-hosts mysql-auth --mysql-password ${MYSQL_ROOT_PASSWORD:-123456} --mysql-db rpc_auth --mysql-shards 1
-      --redis-cluster redis-cluster-7000:7000 --redis-cluster redis-cluster-7001:7001 --redis-cluster redis-cluster-7002:7002 --redis-password ${REDIS_PASSWORD:-rpc-redis-123456}
+      --redis-cluster redis-cluster-7000:7000 --redis-cluster redis-cluster-7001:7001 --redis-cluster redis-cluster-7002:7002 --redis-password ${REDIS_PASSWORD:-rpc-redis-123456}"
     networks:
       default:
         aliases: [rpc-auth]
@@ -286,13 +332,15 @@ services:
       start_period: 10s
 
   auth-2:
-    build: .
+    image: http-rpc-auth:latest
     environment:
-      JWT_SECRET: "${JWT_SECRET}"
+      JWT_SECRET: "${JWT_SECRET:-default-secret-32bytes-here!!!!!}"
+    volumes:
+      - ./consul/entrypoint-wrapper.sh:/entrypoint-wrapper.sh:ro
     command: >
-      /app/rpc_server --service auth --port 50051
+      sh -c "/entrypoint-wrapper.sh auth-service auth-2 50051 /app/rpc_server --service auth --port 50051
       --mysql-write-host mysql-auth --mysql-read-hosts mysql-auth --mysql-password ${MYSQL_ROOT_PASSWORD:-123456} --mysql-db rpc_auth --mysql-shards 1
-      --redis-cluster redis-cluster-7000:7000 --redis-cluster redis-cluster-7001:7001 --redis-cluster redis-cluster-7002:7002 --redis-password ${REDIS_PASSWORD:-rpc-redis-123456}
+      --redis-cluster redis-cluster-7000:7000 --redis-cluster redis-cluster-7001:7001 --redis-cluster redis-cluster-7002:7002 --redis-password ${REDIS_PASSWORD:-rpc-redis-123456}"
     networks:
       default:
         aliases: [rpc-auth]
@@ -306,14 +354,23 @@ services:
       retries: 12
       start_period: 10s
 
+  # ===== Sheet Service (2 instances) =====
   sheet-1:
-    build: .
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        SERVICE: sheet
+    image: http-rpc-sheet:latest
     environment:
-      JWT_SECRET: "${JWT_SECRET}"
+      JWT_SECRET: "${JWT_SECRET:-default-secret-32bytes-here!!!!!}"
+      RABBITMQ_HOST: "rabbitmq"
+    volumes:
+      - ./consul/entrypoint-wrapper.sh:/entrypoint-wrapper.sh:ro
     command: >
-      /app/rpc_server --service spreadsheet --port 50051
+      sh -c "/entrypoint-wrapper.sh sheet-service sheet-1 50051 /app/rpc_server --service spreadsheet --port 50051
       --mysql-write-host mysql-spreadsheet --mysql-read-hosts mysql-spreadsheet --mysql-password ${MYSQL_ROOT_PASSWORD:-123456} --mysql-db rpc_spreadsheet --mysql-shards 2
-      --redis-cluster redis-cluster-7000:7000 --redis-cluster redis-cluster-7001:7001 --redis-cluster redis-cluster-7002:7002 --redis-password ${REDIS_PASSWORD:-rpc-redis-123456}
+      --redis-cluster redis-cluster-7000:7000 --redis-cluster redis-cluster-7001:7001 --redis-cluster redis-cluster-7002:7002 --redis-password ${REDIS_PASSWORD:-rpc-redis-123456}"
     networks:
       default:
         aliases: [rpc-sheet]
@@ -330,13 +387,16 @@ services:
       start_period: 10s
 
   sheet-2:
-    build: .
+    image: http-rpc-sheet:latest
     environment:
-      JWT_SECRET: "${JWT_SECRET}"
+      JWT_SECRET: "${JWT_SECRET:-default-secret-32bytes-here!!!!!}"
+      RABBITMQ_HOST: "rabbitmq"
+    volumes:
+      - ./consul/entrypoint-wrapper.sh:/entrypoint-wrapper.sh:ro
     command: >
-      /app/rpc_server --service spreadsheet --port 50051
+      sh -c "/entrypoint-wrapper.sh sheet-service sheet-2 50051 /app/rpc_server --service spreadsheet --port 50051
       --mysql-write-host mysql-spreadsheet --mysql-read-hosts mysql-spreadsheet --mysql-password ${MYSQL_ROOT_PASSWORD:-123456} --mysql-db rpc_spreadsheet --mysql-shards 2
-      --redis-cluster redis-cluster-7000:7000 --redis-cluster redis-cluster-7001:7001 --redis-cluster redis-cluster-7002:7002 --redis-password ${REDIS_PASSWORD:-rpc-redis-123456}
+      --redis-cluster redis-cluster-7000:7000 --redis-cluster redis-cluster-7001:7001 --redis-cluster redis-cluster-7002:7002 --redis-password ${REDIS_PASSWORD:-rpc-redis-123456}"
     networks:
       default:
         aliases: [rpc-sheet]
@@ -352,52 +412,31 @@ services:
       retries: 12
       start_period: 10s
 
-  sheet-3:
-    build: .
-    environment:
-      JWT_SECRET: "${JWT_SECRET}"
-    command: >
-      /app/rpc_server --service spreadsheet --port 50051
-      --mysql-write-host mysql-spreadsheet --mysql-read-hosts mysql-spreadsheet --mysql-password ${MYSQL_ROOT_PASSWORD:-123456} --mysql-db rpc_spreadsheet --mysql-shards 2
-      --redis-cluster redis-cluster-7000:7000 --redis-cluster redis-cluster-7001:7001 --redis-cluster redis-cluster-7002:7002 --redis-password ${REDIS_PASSWORD:-rpc-redis-123456}
-    networks:
-      default:
-        aliases: [rpc-sheet]
-    depends_on:
-      mysql-spreadsheet-0:
-        condition: service_healthy
-      redis-cluster-init:
-        condition: service_completed_successfully
-    healthcheck:
-      test: ["CMD-SHELL", "bash -c 'echo > /dev/tcp/localhost/50051' 2>/dev/null"]
-      interval: 5s
-      timeout: 3s
-      retries: 12
-      start_period: 10s
-
+  # ===== File Service (2 instances) =====
   file-1:
-    build: .
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        SERVICE: file
+    image: http-rpc-file:latest
     environment:
-      JWT_SECRET: "${JWT_SECRET}"
-      # MinIO S3 endpoint (inside Docker network) and credentials
-      MINIO_ENDPOINT: "minio:9000"
-      # Browser hits Nginx HTTPS and /minio-s3/ proxy (same Host as site); do not use :9000.
-      MINIO_PUBLIC_URL: "https://localhost/minio-s3"
-      MINIO_ACCESS_KEY: "${MINIO_ACCESS_KEY:-minio-rpc-admin}"
-      MINIO_SECRET_KEY: "${MINIO_SECRET_KEY:-minio-rpc-123456}"
-      MINIO_BUCKET: "rpc-files"
+      JWT_SECRET: "${JWT_SECRET:-default-secret-32bytes-here!!!!!}"
+      RABBITMQ_HOST: "rabbitmq"
+    volumes:
+      - ./consul/entrypoint-wrapper.sh:/entrypoint-wrapper.sh:ro
     command: >
-      /app/rpc_server --service file --port 50051
+      sh -c "/entrypoint-wrapper.sh file-service file-1 50051 /app/rpc_server --service file --port 50051
       --mysql-write-host mysql-file --mysql-read-hosts mysql-file --mysql-password ${MYSQL_ROOT_PASSWORD:-123456} --mysql-db rpc_file --mysql-shards 2
-      --redis-cluster redis-cluster-7000:7000 --redis-cluster redis-cluster-7001:7001 --redis-cluster redis-cluster-7002:7002 --redis-password ${REDIS_PASSWORD:-rpc-redis-123456}
+      --redis-cluster redis-cluster-7000:7000 --redis-cluster redis-cluster-7001:7001 --redis-cluster redis-cluster-7002:7002 --redis-password ${REDIS_PASSWORD:-rpc-redis-123456}"
     networks:
       default:
         aliases: [rpc-file]
     depends_on:
-      mysql-auth:
+      mysql-file-0:
         condition: service_healthy
-      minio-init:
-        condition: service_completed_successfully
+      rabbitmq:
+        condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "bash -c 'echo > /dev/tcp/localhost/50051' 2>/dev/null"]
       interval: 5s
@@ -406,26 +445,24 @@ services:
       start_period: 10s
 
   file-2:
-    build: .
+    image: http-rpc-file:latest
     environment:
-      JWT_SECRET: "${JWT_SECRET}"
-      MINIO_ENDPOINT: "minio:9000"
-      MINIO_PUBLIC_URL: "https://localhost/minio-s3"
-      MINIO_ACCESS_KEY: "${MINIO_ACCESS_KEY:-minio-rpc-admin}"
-      MINIO_SECRET_KEY: "${MINIO_SECRET_KEY:-minio-rpc-123456}"
-      MINIO_BUCKET: "rpc-files"
+      JWT_SECRET: "${JWT_SECRET:-default-secret-32bytes-here!!!!!}"
+      RABBITMQ_HOST: "rabbitmq"
+    volumes:
+      - ./consul/entrypoint-wrapper.sh:/entrypoint-wrapper.sh:ro
     command: >
-      /app/rpc_server --service file --port 50051
+      sh -c "/entrypoint-wrapper.sh file-service file-2 50051 /app/rpc_server --service file --port 50051
       --mysql-write-host mysql-file --mysql-read-hosts mysql-file --mysql-password ${MYSQL_ROOT_PASSWORD:-123456} --mysql-db rpc_file --mysql-shards 2
-      --redis-cluster redis-cluster-7000:7000 --redis-cluster redis-cluster-7001:7001 --redis-cluster redis-cluster-7002:7002 --redis-password ${REDIS_PASSWORD:-rpc-redis-123456}
+      --redis-cluster redis-cluster-7000:7000 --redis-cluster redis-cluster-7001:7001 --redis-cluster redis-cluster-7002:7002 --redis-password ${REDIS_PASSWORD:-rpc-redis-123456}"
     networks:
       default:
         aliases: [rpc-file]
     depends_on:
-      mysql-auth:
+      mysql-file-0:
         condition: service_healthy
-      minio-init:
-        condition: service_completed_successfully
+      rabbitmq:
+        condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "bash -c 'echo > /dev/tcp/localhost/50051' 2>/dev/null"]
       interval: 5s
@@ -433,76 +470,81 @@ services:
       retries: 12
       start_period: 10s
 
-  gateway-1:
-    build: .
+  # ===== Search Service (C++) =====
+  search:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        SERVICE: search
     environment:
-      JWT_SECRET: "${JWT_SECRET}"
-      ADMIN_USERS: "${ADMIN_USERS:-}"
+      ES_HOST: "http://elasticsearch:9200"
+    volumes:
+      - ./consul/entrypoint-wrapper.sh:/entrypoint-wrapper.sh:ro
     command: >
-      /app/rpc_gateway --port 8080
-      --grpc-auth rpc-auth:50051
-      --grpc-sheet rpc-sheet:50051
-      --grpc-file rpc-file:50051
-      --redis-cluster redis-cluster-7000:7000 --redis-cluster redis-cluster-7001:7001 --redis-cluster redis-cluster-7002:7002 --redis-password ${REDIS_PASSWORD:-rpc-redis-123456}
+      sh -c "/entrypoint-wrapper.sh search-service search-1 50051 /app/rpc_server --service search --port 50051"
+    networks:
+      default:
+        aliases: [rpc-search]
     depends_on:
-      mysql-spreadsheet-0:
-        condition: service_healthy
-      redis-cluster-init:
-        condition: service_completed_successfully
-      auth-1:
-        condition: service_healthy
-      auth-2:
-        condition: service_healthy
-      sheet-1:
-        condition: service_healthy
-      sheet-2:
-        condition: service_healthy
-      sheet-3:
-        condition: service_healthy
-      file-1:
-        condition: service_healthy
-      file-2:
+      elasticsearch:
         condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "bash -c 'echo > /dev/tcp/localhost/8081' 2>/dev/null"]
+      test: ["CMD-SHELL", "bash -c 'echo > /dev/tcp/localhost/50051' 2>/dev/null"]
       interval: 5s
       timeout: 3s
-      retries: 10
-      start_period: 5s
+      retries: 12
+      start_period: 10s
 
-  gateway-2:
-    build: .
+  # ===== gRPC-Gateway (Go) =====
+  grpc-gateway:
+    build:
+      context: .
+      dockerfile: gateway-grpc/Dockerfile
     environment:
-      JWT_SECRET: "${JWT_SECRET}"
-      ADMIN_USERS: "${ADMIN_USERS:-}"
-    command: >
-      /app/rpc_gateway --port 8080
-      --grpc-auth rpc-auth:50051
-      --grpc-sheet rpc-sheet:50051
-      --grpc-file rpc-file:50051
-      --redis-cluster redis-cluster-7000:7000 --redis-cluster redis-cluster-7001:7001 --redis-cluster redis-cluster-7002:7002 --redis-password ${REDIS_PASSWORD:-rpc-redis-123456}
+      JWT_SECRET: "${JWT_SECRET:-default-secret-32bytes-here!!!!!}"
+      AUTH_ADDR: "rpc-auth:50051"
+      SHEET_ADDR: "rpc-sheet:50051"
+      FILE_ADDR: "rpc-file:50051"
+      SEARCH_ADDR: "rpc-search:50051"
+    ports:
+      - "8082:8080"
     depends_on:
-      mysql-spreadsheet-0:
-        condition: service_healthy
-      redis-cluster-init:
-        condition: service_completed_successfully
       auth-1:
-        condition: service_healthy
-      auth-2:
         condition: service_healthy
       sheet-1:
         condition: service_healthy
-      sheet-2:
-        condition: service_healthy
-      sheet-3:
-        condition: service_healthy
       file-1:
         condition: service_healthy
-      file-2:
-        condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "bash -c 'echo > /dev/tcp/localhost/8081' 2>/dev/null"]
-      interval: 5s
-      timeout: 3s
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/api/health || exit 1"]
+      interval: 10s
+      timeout: 5s
       retries: 10
-      start_period: 5s
+      start_period: 10s
+    restart: unless-stopped
+
+  # ===== Notify Service (Go consumer: RabbitMQ → MongoDB + ES) =====
+  notify-service:
+    build:
+      context: ./services/notify-service
+      dockerfile: Dockerfile
+    environment:
+      RABBITMQ_HOST: "rabbitmq"
+      RABBITMQ_USER: "rpc"
+      RABBITMQ_PASS: "rpc-rabbit-123456"
+      MONGO_URI: "mongodb://mongodb:27017"
+      MONGO_DB: "rpc_search"
+      ES_HOST: "http://elasticsearch:9200"
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      mongodb:
+        condition: service_healthy
+      elasticsearch:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  es_data:
+    driver: local

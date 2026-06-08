@@ -19,6 +19,31 @@ static std::string UsernameFromMeta(grpc::ServerContext* ctx) {
     return "";
 }
 
+bool FileServiceImpl::ValidateCaller(grpc::ServerContext* ctx, int64_t user_id,
+                                      std::string& out_username, std::string& out_role) const {
+    if (!auth_stub_) return true;
+    std::string token;
+    auto it = ctx->client_metadata().find("authorization");
+    if (it != ctx->client_metadata().end()) {
+        std::string val(it->second.data(), it->second.length());
+        const std::string prefix = "Bearer ";
+        if (val.rfind(prefix, 0) == 0) token = val.substr(prefix.size());
+        else token = val;
+    }
+    if (token.empty()) return false;
+    rpc::ValidateUserRequest vu_req;
+    rpc::ValidateUserResponse vu_resp;
+    vu_req.set_token(token);
+    vu_req.set_user_id(user_id);
+    grpc::ClientContext vu_ctx;
+    vu_ctx.set_deadline(std::chrono::system_clock::now() + std::chrono::seconds(2));
+    auto st = auth_stub_->ValidateUser(&vu_ctx, vu_req, &vu_resp);
+    if (!st.ok() || !vu_resp.valid()) return false;
+    out_username = vu_resp.username();
+    out_role = vu_resp.role();
+    return true;
+}
+
 static std::string FileVersionKey(int64_t user_id) {
     return "u:" + std::to_string(user_id) + ":files:version";
 }
@@ -35,6 +60,9 @@ grpc::Status FileServiceImpl::CreateFile(grpc::ServerContext* context,
         AuthContext ac = auth_->Authenticate(context);
         if (!ac.authenticated) return grpc::Status(grpc::StatusCode::UNAUTHENTICATED, "Invalid or missing token");
     }
+    std::string vu_user, vu_role;
+    if (auth_stub_ && !ValidateCaller(context, req->user_id(), vu_user, vu_role))
+        return grpc::Status(grpc::StatusCode::UNAUTHENTICATED, "Auth service rejected");
     auto start = std::chrono::high_resolution_clock::now();
     std::string username = UsernameFromMeta(context);
 
@@ -44,37 +72,22 @@ grpc::Status FileServiceImpl::CreateFile(grpc::ServerContext* context,
         return grpc::Status::OK;
     }
 
-    // 文件内容强制走 MinIO，禁止降级 MySQL LONGBLOB（防 Buffer Pool 污染）
-    std::string storage_key;
-    if (!req->file_content().empty()) {
-        if (!minio_ || !minio_->IsConfigured()) {
-            resp->set_success(false);
-            resp->set_error("Object storage not available — upload rejected");
-            return grpc::Status::OK;
-        }
-
-        std::string ikey = req->idempotency_key();
-        if (ikey.empty()) ikey = std::to_string(std::chrono::duration_cast<std::chrono::milliseconds>(
-            start.time_since_epoch()).count());
-        storage_key = std::to_string(req->user_id()) + "/" + ikey + "/" + req->original_name();
-
-        if (!minio_->PutObject(storage_key, req->file_content(), req->mime_type())) {
-            resp->set_success(false);
-            resp->set_error("Object storage upload failed");
-            return grpc::Status::OK;
-        }
-        if (slog_) LOG_INFO(*slog_, "Uploaded to MinIO key='" + storage_key + "'");
-    }
+    // 文件内容直接存 MySQL LONGBLOB（MinIO 已移除）
 
     int64_t id = 0;
     bool ok = db_->CreateFile(req->user_id(), username, req->original_name(),
                               req->size(), req->mime_type(),
-                              storage_key, id, req->idempotency_key());
+                              "", id, req->idempotency_key());
 
     if (!ok) {
         resp->set_success(false);
         resp->set_error("Failed to create file record");
         return grpc::Status::OK;
+    }
+
+    // 文件内容写入 MySQL
+    if (!req->file_content().empty()) {
+        db_->UpdateFileContent(id, req->file_content());
     }
 
     if (redis_ && redis_->IsConnected()) {
@@ -84,6 +97,18 @@ grpc::Status FileServiceImpl::CreateFile(grpc::ServerContext* context,
     resp->set_success(true);
     resp->set_id(id);
 
+    // 发布 RabbitMQ 事件 → Notify 异步解析文档内容
+    if (rabbit_) {
+        nlohmann::json ev;
+        ev["type"] = "file.uploaded";
+        ev["file_id"] = id;
+        ev["user_id"] = req->user_id();
+        ev["original_name"] = req->original_name();
+        ev["mime_type"] = req->mime_type();
+        ev["size"] = req->size();
+        rabbit_->Publish("rpc.events", "file.uploaded", ev.dump());
+    }
+
     if (logger_) {
         auto dur = std::chrono::duration_cast<std::chrono::microseconds>(
             std::chrono::high_resolution_clock::now() - start).count();
@@ -92,7 +117,7 @@ grpc::Status FileServiceImpl::CreateFile(grpc::ServerContext* context,
         r["id"] = json(static_cast<double>(id));
         logger_->Log(username, "FileService", "Create", p, r, true, dur);
     }
-    if (slog_) LOG_INFO(*slog_, "Created id=" + std::to_string(id) + " '" + req->original_name() + "' by " + username + " (uid=" + std::to_string(req->user_id()) + ") storage=" + (storage_key.empty() ? "mysql-blob" : "minio"));
+    if (slog_) LOG_INFO(*slog_, "Created id=" + std::to_string(id) + " '" + req->original_name() + "' by " + username + " (uid=" + std::to_string(req->user_id()) + ") storage=mysql-blob");
     return grpc::Status::OK;
 }
 
@@ -103,6 +128,9 @@ grpc::Status FileServiceImpl::GetFile(grpc::ServerContext* context,
         AuthContext ac = auth_->Authenticate(context);
         if (!ac.authenticated) return grpc::Status(grpc::StatusCode::UNAUTHENTICATED, "Invalid or missing token");
     }
+    std::string vu_user, vu_role;
+    if (auth_stub_ && !ValidateCaller(context, req->user_id(), vu_user, vu_role))
+        return grpc::Status(grpc::StatusCode::UNAUTHENTICATED, "Auth service rejected");
     auto start = std::chrono::high_resolution_clock::now();
     std::string username = UsernameFromMeta(context);
 
@@ -129,15 +157,7 @@ grpc::Status FileServiceImpl::GetFile(grpc::ServerContext* context,
             f->set_mime_type(row.mime_type);
             f->set_created_at(row.created_at);
             fresh.set_success(true);
-            // Read file content
-            if (!row.storage_path.empty() && minio_ && minio_->IsConfigured()) {
-                std::string bytes;
-                if (minio_->GetObject(row.storage_path, bytes)) {
-                    fresh.set_file_content(std::move(bytes));
-                }
-            } else {
-                fresh.set_file_content(row.file_content);
-            }
+            fresh.set_file_content(row.file_content);
             // Cache only if < 1MB
             if (fresh.file_content().size() < 1024 * 1024) {
                 std::string ser;
@@ -245,17 +265,7 @@ grpc::Status FileServiceImpl::GetFile(grpc::ServerContext* context,
     resp->set_success(true);
     resp->set_cache_source("mysql");
 
-    if (!row.storage_path.empty() && minio_ && minio_->IsConfigured()) {
-        std::string bytes;
-        if (!minio_->GetObject(row.storage_path, bytes)) {
-            resp->set_success(false);
-            resp->set_error("Object storage read failed");
-            return grpc::Status::OK;
-        }
-        resp->set_file_content(std::move(bytes));
-    } else {
-        resp->set_file_content(row.file_content);
-    }
+    resp->set_file_content(row.file_content);
 
     // 3) Populate cache (skip if >1MB)
     if (redis_ && redis_->IsConnected()) {
@@ -288,6 +298,9 @@ grpc::Status FileServiceImpl::ListFiles(grpc::ServerContext* context,
         AuthContext ac = auth_->Authenticate(context);
         if (!ac.authenticated) return grpc::Status(grpc::StatusCode::UNAUTHENTICATED, "Invalid or missing token");
     }
+    std::string vu_user, vu_role;
+    if (auth_stub_ && !ValidateCaller(context, req->user_id(), vu_user, vu_role))
+        return grpc::Status(grpc::StatusCode::UNAUTHENTICATED, "Auth service rejected");
     auto start = std::chrono::high_resolution_clock::now();
     std::string username = UsernameFromMeta(context);
     int64_t uid = req->user_id();
@@ -365,6 +378,9 @@ grpc::Status FileServiceImpl::DeleteFile(grpc::ServerContext* context,
         AuthContext ac = auth_->Authenticate(context);
         if (!ac.authenticated) return grpc::Status(grpc::StatusCode::UNAUTHENTICATED, "Invalid or missing token");
     }
+    std::string vu_user, vu_role;
+    if (auth_stub_ && !ValidateCaller(context, req->user_id(), vu_user, vu_role))
+        return grpc::Status(grpc::StatusCode::UNAUTHENTICATED, "Auth service rejected");
     auto start = std::chrono::high_resolution_clock::now();
     std::string username = UsernameFromMeta(context);
 
@@ -381,16 +397,6 @@ grpc::Status FileServiceImpl::DeleteFile(grpc::ServerContext* context,
         return grpc::Status::OK;
     }
 
-    // Delete MinIO object before removing the MySQL row, so we can abort if
-    // object storage is unreachable (data stays consistent).
-    std::string storage_path;
-    db_->GetFileStoragePath(req->id(), storage_path);
-    if (!storage_path.empty() && minio_ && minio_->IsConfigured()) {
-        if (!minio_->DeleteObject(storage_path)) {
-            if (slog_) LOG_WARN(*slog_, "Delete id=" + std::to_string(req->id()) + " MinIO DeleteObject failed for key=" + storage_path);
-        }
-    }
-
     bool ok = db_->DeleteFile(req->id(), req->user_id());
     if (!ok) {
         resp->set_success(false);
@@ -399,6 +405,14 @@ grpc::Status FileServiceImpl::DeleteFile(grpc::ServerContext* context,
     }
 
     resp->set_success(true);
+
+    if (rabbit_) {
+        nlohmann::json ev;
+        ev["type"] = "file.deleted";
+        ev["file_id"] = req->id();
+        ev["user_id"] = req->user_id();
+        rabbit_->Publish("rpc.events", "file.deleted", ev.dump());
+    }
 
     if (redis_ && redis_->IsConnected()) {
         redis_->DeleteKey("u:" + std::to_string(req->user_id()) + ":file:" + std::to_string(req->id()));

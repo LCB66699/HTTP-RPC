@@ -29,6 +29,8 @@ AuthContext AuthInterceptor::Authenticate(grpc::ServerContext* ctx) {
 
     std::string token = val.substr(prefix.size());
     std::string payload;
+    fprintf(stderr, "[Auth] verify: secret_len=%zu token_len=%zu token_head=%.20s\n",
+            jwt_secret_.size(), token.size(), token.data());
     if (!jwt::verify(token, jwt_secret_, payload)) {
         fprintf(stderr, "[Auth] JWT verification failed\n");
         return auth;
