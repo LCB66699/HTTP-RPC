@@ -530,7 +530,7 @@ function renderSearchResults(results) {
     return;
   }
   container.innerHTML = results.map(r => {
-    const isSheet = r.type === 'sheet';
+    const isSheet = !!(r.name);
     const title = isSheet ? (r.name || '未命名表格') : (r.original_name || '未知文件');
     const subtitle = isSheet
       ? `表格 · ${r.username} · ${r.row_count || 0}行 × ${r.col_count || 0}列`

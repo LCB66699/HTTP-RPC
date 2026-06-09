@@ -121,6 +121,11 @@ func main() {
 		var req map[string]interface{}
 		q, _ := req["q"].(string)
 		uid := extractUID(r)
+		log.Printf("[search] uid=%d q=%q", uid, q)
+		if uid == 0 {
+			http.Error(w, `{"error":"Jwt is missing"}`, http.StatusUnauthorized)
+			return
+		}
 		must := []interface{}{}
 		if q != "" {
 			must = append(must, map[string]interface{}{
