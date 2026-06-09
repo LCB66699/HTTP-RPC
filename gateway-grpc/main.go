@@ -322,7 +322,7 @@ func httpGet(url string) ([]byte, error) {
 		return nil, err
 	}
 	defer resp.Body.Close()
-	return io.ReadAll(resp)
+	return io.ReadAll(resp.Body)
 }
 
 func base64urlEncode(s string) string {
