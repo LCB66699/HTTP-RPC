@@ -119,12 +119,23 @@ func main() {
 	// === Search ===
 	mux.HandleFunc("POST /api/search", func(w http.ResponseWriter, r *http.Request) {
 		var req map[string]interface{}
-		json.NewDecoder(r.Body).Decode(&req)
 		q, _ := req["q"].(string)
-		body, _ := json.Marshal(map[string]interface{}{
-			"query": map[string]interface{}{
+		uid := extractUID(r)
+		must := []interface{}{}
+		if q != "" {
+			must = append(must, map[string]interface{}{
 				"multi_match": map[string]interface{}{
 					"query": q, "fields": []string{"name^2", "description", "original_name"},
+				},
+			})
+		} else {
+			must = append(must, map[string]interface{}{"match_all": map[string]interface{}{}})
+		}
+		body, _ := json.Marshal(map[string]interface{}{
+			"query": map[string]interface{}{
+				"bool": map[string]interface{}{
+					"must": must,
+					"filter": map[string]interface{}{"term": map[string]interface{}{"user_id": uid}},
 				},
 			},
 			"size": 20,
@@ -134,8 +145,23 @@ func main() {
 			writeJSON(w, map[string]interface{}{"error": "search unavailable"})
 			return
 		}
-		w.Header().Set("Content-Type", "application/json")
-		w.Write(resp)
+		var esResp struct {
+			Hits struct {
+				Total struct{ Value int } `json:"total"`
+				Hits  []struct {
+					Source map[string]interface{} `json:"_source"`
+				} `json:"hits"`
+			} `json:"hits"`
+		}
+		json.Unmarshal(resp, &esResp)
+		results := []map[string]interface{}{}
+		for _, h := range esResp.Hits.Hits {
+			results = append(results, h.Source)
+		}
+		writeJSON(w, map[string]interface{}{
+			"total":   esResp.Hits.Total.Value,
+			"results": results,
+		})
 	})
 
 	// === Sheet CRUD ===
