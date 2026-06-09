@@ -125,6 +125,7 @@ func main() {
 		if q != "" {
 			must = append(must, map[string]interface{}{
 				"multi_match": map[string]interface{}{
+					"operator": "and",
 					"query": q, "fields": []string{"name^2", "description", "original_name"},
 				},
 			})
