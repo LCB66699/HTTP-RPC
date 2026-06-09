@@ -252,8 +252,20 @@ else
     red "Skipped: no refresh_token available"
 fi
 
-# ---- 6. Health ----
-title "6. 健康检查"
+# ---- 6. 搜索 ----
+title "6. 搜索 (Elasticsearch)"
+
+SEARCH_REQ='{"q":"tester_fn","scope":"sheets"}'
+SEARCH_RES=$($CURL -X POST "$API/api/search" \
+    -H 'Content-Type: application/json' \
+    -b "$JAR" \
+    -d "$SEARCH_REQ")
+echo "$SEARCH_RES" | grep -q '"hits"' \
+    && green "Search API OK" \
+    || red "Search failed: $SEARCH_RES"
+
+# ---- 7. Health ----
+title "7. 健康检查"
 
 HEALTH=$($CURL "$API/api/health")
 echo "$HEALTH" | grep -q '"gateway"' \

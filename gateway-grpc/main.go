@@ -78,6 +78,52 @@ func main() {
 		writeJSON(w, map[string]string{"gateway": "READY"})
 	})
 
+	mux.HandleFunc("GET /api/services", func(w http.ResponseWriter, r *http.Request) {
+		resp, err := httpGet("http://consul:8500/v1/catalog/services")
+		if err != nil {
+			writeJSON(w, map[string]interface{}{"services": []string{}})
+			return
+		}
+		var raw map[string][]string
+		json.Unmarshal(resp, &raw)
+		writeJSON(w, map[string]interface{}{"services": raw})
+	})
+
+	// 搜索（前端格式 → Elasticsearch）
+	mux.HandleFunc("POST /api/search", func(w http.ResponseWriter, r *http.Request) {
+		var req map[string]interface{}
+		json.NewDecoder(r.Body).Decode(&req)
+		q, _ := req["q"].(string)
+		scope, _ := req["scope"].(string)
+		if scope == "" {
+			scope = "sheets_search,files_search"
+		} else {
+			scope = strings.ReplaceAll(scope, ",", ",_") + "_search"
+			if !strings.Contains(scope, "sheets") && !strings.Contains(scope, "files") {
+				scope = "sheets_search,files_search"
+			} else {
+				scope = strings.ReplaceAll(strings.ReplaceAll(scope, "sheets", "sheets_search"), "files", "files_search")
+				scope = strings.ReplaceAll(scope, "__", "_")
+			}
+		}
+		esQuery := map[string]interface{}{
+			"query": map[string]interface{}{
+				"multi_match": map[string]interface{}{
+					"query": q, "fields": []string{"name^2", "description", "original_name"},
+				},
+			},
+			"size": 20,
+		}
+		body, _ := json.Marshal(esQuery)
+		resp, err := httpPost("http://elasticsearch:9200/"+scope+"/_search", body)
+		if err != nil {
+			writeJSON(w, map[string]string{"error": "search unavailable"})
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.Write(resp)
+	})
+
 	// Redis 客户端 — 读调用日志
 	redisAddr := getenv("REDIS_ADDR", "redis-cluster-7000:7000")
 	redisPass := getenv("REDIS_PASSWORD", "rpc-redis-123456")
@@ -261,6 +307,22 @@ func corsMiddleware(next http.Handler) http.Handler {
 func getenv(key, fallback string) string {
 	if v := os.Getenv(key); v != "" { return v }
 	return fallback
+}
+
+func httpPost(url string, body []byte) ([]byte, error) {
+	resp, err := http.Post(url, "application/json", strings.NewReader(string(body)))
+	if err != nil { return nil, err }
+	defer resp.Body.Close()
+	return io.ReadAll(resp.Body)
+}
+
+func httpGet(url string) ([]byte, error) {
+	resp, err := http.Get(url)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	return io.ReadAll(resp)
 }
 
 func base64urlEncode(s string) string {

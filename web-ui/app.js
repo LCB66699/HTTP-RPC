@@ -210,10 +210,13 @@ async function checkAuth() {
       localStorage.setItem('rpc_user', JSON.stringify(currentUser));
       authToken = '1';
       showMainApp();
-      const lastTab = localStorage.getItem('rpc_last_tab') || 'services';
+      const lastTab = localStorage.getItem('rpc_last_tab') || 'sheets';
+      if (currentUser.role === 'admin') {
+        document.querySelectorAll('.admin-only').forEach(el => el.style.display = '');
+      }
       const tab = document.querySelector(`[data-tab="${lastTab}"]`);
       if (tab) tab.click();
-      else loadServices();
+      else loadSheets();
     } else {
       // Cookie 无效 → 清除本地状态，显示登录页
       localStorage.removeItem('rpc_user');
@@ -1391,6 +1394,13 @@ async function apiPut(path, body) {
   return res.json();
 }
 
+async function apiDelete(path) {
+  if (!authToken) { showLoginModal(); throw new Error('未登录'); }
+  const res = await fetch(API + path, { method: 'DELETE', credentials: 'same-origin' });
+  if (res.status === 401) { logout(); throw new Error('会话已过期'); }
+  return res.json();
+}
+
 
 // ---- Load sheet list ----
 async function loadSheets(page = 0) {
@@ -1574,7 +1584,7 @@ async function openSheet(id) {
   window.currentSheetId = id;
   console.log('[sheets] openSheet id:', id, 'authToken:', !!authToken);
   try {
-    const data = await apiPost('/sheets/get', { id });
+    const data = await apiGet('/sheets/' + id);
     console.log('[sheets] openSheet response:', data);
     if (!data.success) { alert('获取表格失败: ' + (data.error || '')); return; }
 
@@ -1746,7 +1756,7 @@ function exportXlsx() {
 async function deleteSheet(id, name) {
   if (!confirm('确定删除表格 "' + name + '" 吗？此操作不可恢复。')) return;
   try {
-    const res = await apiPost('/sheets/delete', { id });
+    const res = await apiDelete('/sheets/' + id);
     if (!res.success) { alert('删除失败: ' + (res.error || '未知错误')); return; }
   } catch (e) { alert('网络错误'); return; }
   // Stay on current page; fall back to previous page if it becomes empty
@@ -1871,7 +1881,7 @@ async function downloadFile(id, filename) {
 async function deleteFile(id, name) {
   if (!confirm('确定删除文件 "' + name + '" 吗？此操作不可恢复。')) return;
   try {
-    const res = await apiPost('/files/delete', { id });
+    const res = await apiDelete('/files/' + id);
     if (!res.success) { alert('删除失败: ' + (res.error || '未知错误')); return; }
   } catch (e) { alert('网络错误: ' + e.message); return; }
   const totalAfter = filesTotal - 1;
