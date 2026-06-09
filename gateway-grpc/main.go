@@ -124,9 +124,13 @@ func main() {
 		must := []interface{}{}
 		if q != "" {
 			must = append(must, map[string]interface{}{
-				"multi_match": map[string]interface{}{
-					"operator": "and",
-					"query": q, "fields": []string{"name^2", "description", "original_name"},
+				"bool": map[string]interface{}{
+					"should": []interface{}{
+						map[string]interface{}{"match_phrase": map[string]interface{}{"name": q}},
+						map[string]interface{}{"match_phrase": map[string]interface{}{"description": q}},
+						map[string]interface{}{"match_phrase": map[string]interface{}{"original_name": q}},
+					},
+					"minimum_should_match": 1,
 				},
 			})
 		} else {
