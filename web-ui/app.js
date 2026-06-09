@@ -1131,9 +1131,10 @@ let stressRunning = false;
 let stressAbort = null;
 let stressStats = { total: 0, success: 0, fail: 0, latencies: [], errors: [], startTime: 0 };
 
-document.querySelector('[data-tab="stress"]').addEventListener('click', () => {
-  loadStressServices();
-});
+let stressTab = document.querySelector('[data-tab="stress"]');
+if (stressTab) {
+  stressTab.addEventListener('click', () => { loadStressServices(); });
+}
 
 async function loadStressServices() {
   const data = await apiGet('/services');
@@ -1716,8 +1717,7 @@ async function saveSheet() {
   if (btn) { btn.disabled = true; btn.textContent = '保存中…'; }
 
   try {
-    const res = await apiPut('/sheets', {
-      id: window.currentSheetId,
+    const res = await apiPut('/sheets/' + window.currentSheetId, {
       name: document.getElementById('sheet-edit-name').value.trim(),
       description: document.getElementById('sheet-edit-desc').value.trim(),
       headers_json: JSON.stringify(window.currentSheetHeaders),
@@ -1725,7 +1725,7 @@ async function saveSheet() {
     });
     if (res.success) {
       // Re-fetch to display cache source badge
-      const data = await apiPost('/sheets/get', { id: window.currentSheetId });
+      const data = await apiGet('/sheets/' + window.currentSheetId);
       if (data.success) {
         document.getElementById('cache-source-text').textContent = data.cache_source === 'redis' ? 'Redis 缓存' : 'MySQL 数据库';
         document.getElementById('cache-source-text').style.color = data.cache_source === 'redis' ? '#10b981' : '#f59e0b';
@@ -1814,6 +1814,7 @@ function renderFileList(data) {
         </div>
       </div>
       <div class="sheet-card-actions">
+        <button class="btn btn-sm" onclick="previewFile('${f.id}', '${esc(f.original_name)}', '${esc(f.mime_type)}')">预览</button>
         <button class="btn btn-sm" onclick="downloadFile('${f.id}', '${esc(f.original_name)}')">下载</button>
         <button class="btn btn-sm" onclick="deleteFile('${f.id}', '${esc(f.original_name)}')">删除</button>
       </div>
@@ -1859,7 +1860,7 @@ async function uploadFile(file) {
 async function downloadFile(id, filename) {
   try {
     // 用 fetch 触发自动刷新，拿到 blob 后通过 URL 下载
-    var res = await fetch(API + '/files/download?id=' + encodeURIComponent(id), { credentials: 'same-origin' });
+    var res = await fetch(API + '/files/' + encodeURIComponent(id), { credentials: 'same-origin' });
     if (res.status === 401) { logout(); return; }
     if (!res.ok) { alert('下载失败 (HTTP ' + res.status + ')'); return; }
     var blob = await res.blob();
@@ -1876,6 +1877,43 @@ async function downloadFile(id, filename) {
   } catch (e) {
     alert('下载失败: ' + e.message);
   }
+}
+
+async function previewFile(id, name, mime) {
+  try {
+    const res = await fetch(API + '/files/' + id, { credentials: 'same-origin' });
+    if (!res.ok) { alert('预览失败'); return; }
+    const textTypes = ['text/', 'application/json', 'application/javascript', 'application/xml', 'image/svg'];
+    const isText = textTypes.some(t => mime.startsWith(t)) || name.match(/\.(txt|md|json|xml|csv|log|yml|yaml|ini|cfg|sh|py|js|ts|html|css|java|cpp|h|go|rs|env)$/i);
+    const isImage = mime.startsWith('image/');
+
+    let html = `<div style="padding:24px;max-width:900px;margin:0 auto"><h2>${esc(name)}</h2><p style="color:#94a3b8">${mime}</p><hr style="border-color:#334155;margin:16px 0">`;
+    if (isImage) {
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      html += `<img src="${url}" style="max-width:100%;border-radius:8px" onload="URL.revokeObjectURL('${url}')">`;
+    } else if (isText) {
+      const text = await res.text();
+      html += `<pre style="background:#0f172a;color:#e2e8f0;padding:16px;border-radius:8px;overflow:auto;max-height:70vh;white-space:pre-wrap;font-size:0.85rem">${esc(text)}</pre>`;
+    } else {
+      html += `<p>此文件类型不支持在线预览。<br><button class="btn" onclick="downloadFile('${id}','${esc(name)}')" style="margin-top:12px">下载查看</button></p>`;
+    }
+    html += '</div>';
+    showModal(html);
+  } catch (e) { alert('预览失败: ' + e.message); }
+}
+
+function showModal(html) {
+  let m = document.getElementById('preview-modal');
+  if (!m) {
+    m = document.createElement('div');
+    m.id = 'preview-modal';
+    m.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.8);z-index:9999;overflow:auto';
+    m.onclick = function(e) { if (e.target === m) m.remove(); };
+    document.body.appendChild(m);
+  }
+  m.innerHTML = html + '<button onclick="document.getElementById(\'preview-modal\').remove()" style="position:fixed;top:16px;right:16px;background:#ef4444;color:#fff;border:none;border-radius:50%;width:36px;height:36px;font-size:18px;cursor:pointer">×</button>';
+  m.style.display = 'block';
 }
 
 async function deleteFile(id, name) {

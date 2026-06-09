@@ -8,12 +8,17 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/redis/go-redis/v9"
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/keepalive"
@@ -37,7 +42,6 @@ func main() {
 	authAddr := getenv("AUTH_ADDR", "rpc-auth:50051")
 	sheetAddr := getenv("SHEET_ADDR", "rpc-sheet:50051")
 	fileAddr := getenv("FILE_ADDR", "rpc-file:50051")
-
 	log.Printf("Auth=%s Sheet=%s File=%s", authAddr, sheetAddr, fileAddr)
 
 	authConn, _ := grpc.NewClient(authAddr, creds, kp)
@@ -48,6 +52,18 @@ func main() {
 
 	fileConn, _ := grpc.NewClient(fileAddr, creds, kp)
 	fileClient := pb.NewFileServiceClient(fileConn)
+
+	// MongoDB
+	mongoURI := getenv("MONGO_URI", "mongodb://mongodb:27017")
+	mongoClient, _ := mongo.Connect(context.Background(), options.Client().ApplyURI(mongoURI))
+	db := mongoClient.Database("rpc_search")
+	filesColl := db.Collection("doc_contents")
+	sheetsColl := db.Collection("sheet_contents")
+
+	// Redis
+	redisAddr := getenv("REDIS_ADDR", "redis-cluster-7000:7000")
+	redisPass := getenv("REDIS_PASSWORD", "rpc-redis-123456")
+	rdb := redis.NewClient(&redis.Options{Addr: redisAddr, Password: redisPass})
 
 	// === Auth ===
 	mux.HandleFunc("POST /api/register", func(w http.ResponseWriter, r *http.Request) {
@@ -77,7 +93,6 @@ func main() {
 	mux.HandleFunc("GET /api/health", func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, map[string]string{"gateway": "READY"})
 	})
-
 	mux.HandleFunc("GET /api/services", func(w http.ResponseWriter, r *http.Request) {
 		resp, err := httpGet("http://consul:8500/v1/catalog/services")
 		if err != nil {
@@ -88,47 +103,6 @@ func main() {
 		json.Unmarshal(resp, &raw)
 		writeJSON(w, map[string]interface{}{"services": raw})
 	})
-
-	// 搜索（前端格式 → Elasticsearch）
-	mux.HandleFunc("POST /api/search", func(w http.ResponseWriter, r *http.Request) {
-		var req map[string]interface{}
-		json.NewDecoder(r.Body).Decode(&req)
-		q, _ := req["q"].(string)
-		scope, _ := req["scope"].(string)
-		if scope == "" {
-			scope = "sheets_search,files_search"
-		} else {
-			scope = strings.ReplaceAll(scope, ",", ",_") + "_search"
-			if !strings.Contains(scope, "sheets") && !strings.Contains(scope, "files") {
-				scope = "sheets_search,files_search"
-			} else {
-				scope = strings.ReplaceAll(strings.ReplaceAll(scope, "sheets", "sheets_search"), "files", "files_search")
-				scope = strings.ReplaceAll(scope, "__", "_")
-			}
-		}
-		esQuery := map[string]interface{}{
-			"query": map[string]interface{}{
-				"multi_match": map[string]interface{}{
-					"query": q, "fields": []string{"name^2", "description", "original_name"},
-				},
-			},
-			"size": 20,
-		}
-		body, _ := json.Marshal(esQuery)
-		resp, err := httpPost("http://elasticsearch:9200/"+scope+"/_search", body)
-		if err != nil {
-			writeJSON(w, map[string]string{"error": "search unavailable"})
-			return
-		}
-		w.Header().Set("Content-Type", "application/json")
-		w.Write(resp)
-	})
-
-	// Redis 客户端 — 读调用日志
-	redisAddr := getenv("REDIS_ADDR", "redis-cluster-7000:7000")
-	redisPass := getenv("REDIS_PASSWORD", "rpc-redis-123456")
-	rdb := redis.NewClient(&redis.Options{Addr: redisAddr, Password: redisPass})
-
 	mux.HandleFunc("GET /api/history", func(w http.ResponseWriter, r *http.Request) {
 		user := getUserFromCookie(r)
 		if user == "" {
@@ -142,45 +116,111 @@ func main() {
 		writeJSON(w, map[string]interface{}{"user": user, "count": len(entries), "entries": entries})
 	})
 
+	// === Search ===
+	mux.HandleFunc("POST /api/search", func(w http.ResponseWriter, r *http.Request) {
+		var req map[string]interface{}
+		json.NewDecoder(r.Body).Decode(&req)
+		q, _ := req["q"].(string)
+		body, _ := json.Marshal(map[string]interface{}{
+			"query": map[string]interface{}{
+				"multi_match": map[string]interface{}{
+					"query": q, "fields": []string{"name^2", "description", "original_name"},
+				},
+			},
+			"size": 20,
+		})
+		resp, err := httpPost("http://elasticsearch:9200/sheets_search,files_search/_search", body)
+		if err != nil {
+			writeJSON(w, map[string]interface{}{"error": "search unavailable"})
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.Write(resp)
+	})
+
 	// === Sheet CRUD ===
 	mux.HandleFunc("POST /api/sheets", func(w http.ResponseWriter, r *http.Request) {
 		var req pb.CreateSpreadsheetRequest
 		json.NewDecoder(r.Body).Decode(&req)
-		resp, _ := sheetClient.CreateSpreadsheet(injectToken(r), &req)
+		uid := extractUID(r)
+		req.UserId = uid
+		resp, err := sheetClient.CreateSpreadsheet(injectToken(r), &req)
+		if err != nil {
+			writeJSON(w, map[string]interface{}{"success": false, "error": err.Error()})
+			return
+		}
+		if resp.Success {
+			sheetsColl.UpdateOne(r.Context(),
+				bson.M{"sheet_id": resp.Id},
+				bson.M{"$set": bson.M{
+					"sheet_id": resp.Id, "user_id": uid,
+					"name": req.Name, "description": req.Description,
+					"headers_json": req.HeadersJson, "data_json": req.DataJson,
+					"updated_at": time.Now().UTC().Format(time.RFC3339),
+				}},
+				options.Update().SetUpsert(true))
+		}
 		writeJSON(w, resp)
 	})
 	mux.HandleFunc("GET /api/sheets", func(w http.ResponseWriter, r *http.Request) {
-		resp, _ := sheetClient.ListSpreadsheets(injectToken(r), &pb.ListSpreadsheetsRequest{})
+		resp, _ := sheetClient.ListSpreadsheets(injectToken(r), &pb.ListSpreadsheetsRequest{UserId: extractUID(r)})
 		writeJSON(w, resp)
 	})
 	mux.HandleFunc("GET /api/sheets/{id}", func(w http.ResponseWriter, r *http.Request) {
 		id := parseInt64(r.PathValue("id"))
-		resp, _ := sheetClient.GetSpreadsheet(injectToken(r), &pb.GetSpreadsheetRequest{Id: id})
+		resp, err := sheetClient.GetSpreadsheet(injectToken(r), &pb.GetSpreadsheetRequest{Id: id, UserId: extractUID(r)})
+		if err != nil || resp == nil || !resp.Success {
+			writeJSON(w, map[string]interface{}{"success": false, "error": "Not found"})
+			return
+		}
+		if resp.Spreadsheet != nil {
+			var doc bson.M
+			if sheetsColl.FindOne(r.Context(), bson.M{"sheet_id": id}).Decode(&doc) == nil {
+				if v, ok := doc["headers_json"].(string); ok { resp.Spreadsheet.HeadersJson = v }
+				if v, ok := doc["data_json"].(string); ok { resp.Spreadsheet.DataJson = v }
+				resp.CacheSource = "mongodb"
+			}
+		}
 		writeJSON(w, resp)
 	})
 	mux.HandleFunc("PUT /api/sheets/{id}", func(w http.ResponseWriter, r *http.Request) {
 		var req pb.UpdateSpreadsheetRequest
 		json.NewDecoder(r.Body).Decode(&req)
 		req.Id = parseInt64(r.PathValue("id"))
-		resp, _ := sheetClient.UpdateSpreadsheet(injectToken(r), &req)
+		req.UserId = extractUID(r)
+		resp, err := sheetClient.UpdateSpreadsheet(injectToken(r), &req)
+		if err != nil || resp == nil || !resp.Success {
+			writeJSON(w, map[string]interface{}{"success": false, "error": "update failed"})
+			return
+		}
+		sheetsColl.UpdateOne(r.Context(),
+				bson.M{"sheet_id": req.Id},
+				bson.M{"$set": bson.M{
+					"name": req.Name, "description": req.Description,
+					"headers_json": req.HeadersJson, "data_json": req.DataJson,
+					"updated_at": time.Now().UTC().Format(time.RFC3339),
+				}})
 		writeJSON(w, resp)
 	})
 	mux.HandleFunc("DELETE /api/sheets/{id}", func(w http.ResponseWriter, r *http.Request) {
 		id := parseInt64(r.PathValue("id"))
-		resp, err := sheetClient.DeleteSpreadsheet(injectToken(r), &pb.DeleteSpreadsheetRequest{Id: id})
+		resp, err := sheetClient.DeleteSpreadsheet(injectToken(r), &pb.DeleteSpreadsheetRequest{Id: id, UserId: extractUID(r)})
 		if err != nil {
 			writeJSON(w, map[string]interface{}{"success": false, "error": err.Error()})
 			return
 		}
+		sheetsColl.DeleteOne(r.Context(), bson.M{"sheet_id": id})
 		writeJSON(w, resp)
 	})
 
 	// === File CRUD ===
 	mux.HandleFunc("GET /api/files", func(w http.ResponseWriter, r *http.Request) {
-		resp, _ := fileClient.ListFiles(injectToken(r), &pb.ListFilesRequest{})
+		resp, _ := fileClient.ListFiles(injectToken(r), &pb.ListFilesRequest{UserId: extractUID(r)})
 		writeJSON(w, resp)
 	})
 	mux.HandleFunc("POST /api/files/upload", func(w http.ResponseWriter, r *http.Request) {
+		uid := extractUID(r)
+		log.Printf("[upload] uid=%d", uid)
 		r.ParseMultipartForm(50 << 20)
 		f, h, _ := r.FormFile("file")
 		if f == nil {
@@ -189,17 +229,38 @@ func main() {
 		}
 		defer f.Close()
 		data, _ := io.ReadAll(f)
-		resp, _ := fileClient.CreateFile(injectToken(r), &pb.CreateFileRequest{
-			UserId: 0, OriginalName: h.Filename, Size: int64(len(data)),
+		resp, err := fileClient.CreateFile(injectToken(r), &pb.CreateFileRequest{
+			UserId: uid, OriginalName: h.Filename, Size: int64(len(data)),
 			MimeType: h.Header.Get("Content-Type"), FileContent: data,
 		})
-		writeJSON(w, map[string]interface{}{"success": true, "id": resp.Id})
+		if err != nil || resp == nil || !resp.Success {
+			writeJSON(w, map[string]interface{}{"success": false, "error": "upload failed"})
+			return
+		}
+		filesColl.UpdateOne(r.Context(),
+			bson.M{"file_id": resp.Id},
+			bson.M{"$set": bson.M{
+				"file_id": resp.Id, "user_id": uid,
+				"original_name": h.Filename, "mime_type": h.Header.Get("Content-Type"),
+				"size": len(data), "file_content": data,
+				"parsed_at": time.Now().UTC(),
+			}},
+			options.Update().SetUpsert(true))
+		writeJSON(w, map[string]interface{}{"success": resp.Success, "id": resp.Id})
 	})
 	mux.HandleFunc("GET /api/files/{id}", func(w http.ResponseWriter, r *http.Request) {
 		id := parseInt64(r.PathValue("id"))
-		resp, _ := fileClient.GetFile(injectToken(r), &pb.GetFileRequest{Id: id})
+		resp, _ := fileClient.GetFile(injectToken(r), &pb.GetFileRequest{Id: id, UserId: extractUID(r)})
+		if resp.Success && resp.File != nil {
+			var doc bson.M
+			if filesColl.FindOne(r.Context(), bson.M{"file_id": id}).Decode(&doc) == nil {
+				if raw, ok := doc["file_content"].(primitive.Binary); ok {
+					resp.FileContent = raw.Data
+				}
+			}
+		}
 		if resp.GetFileContent() != nil {
-			w.Header().Set("Content-Type", resp.File.MimeType)
+			w.Header().Set("Content-Type", resp.File.GetMimeType())
 			w.Write(resp.FileContent)
 			return
 		}
@@ -207,7 +268,12 @@ func main() {
 	})
 	mux.HandleFunc("DELETE /api/files/{id}", func(w http.ResponseWriter, r *http.Request) {
 		id := parseInt64(r.PathValue("id"))
-		resp, _ := fileClient.DeleteFile(injectToken(r), &pb.DeleteFileRequest{Id: id})
+		resp, err := fileClient.DeleteFile(injectToken(r), &pb.DeleteFileRequest{Id: id, UserId: extractUID(r)})
+		if err != nil {
+			writeJSON(w, map[string]interface{}{"success": false, "error": err.Error()})
+			return
+		}
+		filesColl.DeleteOne(r.Context(), bson.M{"file_id": id})
 		writeJSON(w, resp)
 	})
 
@@ -240,7 +306,34 @@ func injectToken(r *http.Request) context.Context {
 
 func writeJSON(w http.ResponseWriter, v interface{}) {
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(v)
+	data, _ := json.Marshal(v)
+	// Snowflake IDs (17+ digits) exceed JS precision, quote as strings
+	re := regexp.MustCompile(`:(\d{16,})`)
+	data = re.ReplaceAll(data, []byte(`:"$1"`))
+	w.Write(data)
+}
+
+func stringifyIDs(v interface{}) interface{} { return v }
+
+func extractUID(r *http.Request) int64 {
+	for _, c := range r.Cookies() {
+		if c.Name == "rpc_at" {
+			parts := strings.SplitN(c.Value, ".", 3)
+			if len(parts) != 3 {
+				break
+			}
+			raw, _ := base64.RawURLEncoding.DecodeString(parts[1])
+			var claims map[string]interface{}
+			dec := json.NewDecoder(strings.NewReader(string(raw)))
+			dec.UseNumber()
+			dec.Decode(&claims)
+			if num, ok := claims["uid"].(json.Number); ok {
+				n, _ := num.Int64()
+				return n
+			}
+		}
+	}
+	return 0
 }
 
 func getUserFromCookie(r *http.Request) string {
@@ -304,18 +397,6 @@ func corsMiddleware(next http.Handler) http.Handler {
 	})
 }
 
-func getenv(key, fallback string) string {
-	if v := os.Getenv(key); v != "" { return v }
-	return fallback
-}
-
-func httpPost(url string, body []byte) ([]byte, error) {
-	resp, err := http.Post(url, "application/json", strings.NewReader(string(body)))
-	if err != nil { return nil, err }
-	defer resp.Body.Close()
-	return io.ReadAll(resp.Body)
-}
-
 func httpGet(url string) ([]byte, error) {
 	resp, err := http.Get(url)
 	if err != nil {
@@ -323,6 +404,20 @@ func httpGet(url string) ([]byte, error) {
 	}
 	defer resp.Body.Close()
 	return io.ReadAll(resp.Body)
+}
+
+func httpPost(url string, body []byte) ([]byte, error) {
+	resp, err := http.Post(url, "application/json", strings.NewReader(string(body)))
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	return io.ReadAll(resp.Body)
+}
+
+func getenv(key, fallback string) string {
+	if v := os.Getenv(key); v != "" { return v }
+	return fallback
 }
 
 func base64urlEncode(s string) string {
