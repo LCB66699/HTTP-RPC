@@ -35,7 +35,6 @@ CONTAINERS=(
     "http-rpc-elasticsearch-1"
     "http-rpc-mongodb-1"
     "http-rpc-rabbitmq-1"
-    "http-rpc-consul-1"
     "http-rpc-auth-1-1"
     "http-rpc-auth-2-1"
     "http-rpc-sheet-1-1"
@@ -100,14 +99,6 @@ if curl -s -u rpc:rpc-rabbit-123456 "http://$HOST:15672/api/overview" 2>/dev/nul
 else
     warn "RabbitMQ Management not responding"
 fi
-
-# Consul
-if curl -s "http://$HOST:8500/v1/status/leader" 2>/dev/null | grep -q '"[0-9.]*:[0-9]*"'; then
-    green "Consul (8500)"
-else
-    warn "Consul not responding"
-fi
-
 echo ""
 echo "============================================"
 echo "  Health Summary: $PASS passed, $FAIL failed"

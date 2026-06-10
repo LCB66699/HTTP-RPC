@@ -263,11 +263,14 @@ int main(int argc, char* argv[]) {
     // 创建到 Auth 服务的 gRPC 通道（供 Sheet/File 服务间调用）
     std::shared_ptr<grpc::Channel> auth_svc_ch;
     if (service != "auth") {
+        const char* env_auth = std::getenv("AUTH_SVC_ADDR");
+        std::string auth_addr = env_auth ? env_auth : "rpc-auth:50051";
         grpc::ChannelArguments args;
+        args.SetLoadBalancingPolicyName("round_robin");
         args.SetInt(GRPC_ARG_KEEPALIVE_TIME_MS, 60000);
         args.SetInt(GRPC_ARG_KEEPALIVE_TIMEOUT_MS, 20000);
         auth_svc_ch = grpc::CreateCustomChannel(
-            "rpc-auth:50051", grpc::InsecureChannelCredentials(), args);
+            "dns:///" + auth_addr, grpc::InsecureChannelCredentials(), args);
     }
 
     std::unique_ptr<RabbitPublisher> rabbit_pub;

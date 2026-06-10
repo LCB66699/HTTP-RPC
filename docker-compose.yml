@@ -8,7 +8,7 @@ services:
     volumes:
       - ./nginx.conf:/etc/nginx/nginx.conf:ro
       - ./web-ui:/app/web-ui:ro
-    depends_on: [envoy]
+    depends_on: [envoy-1, envoy-2]
 
   # ===== MySQL Auth =====
   mysql-auth:
@@ -26,7 +26,7 @@ services:
       timeout: 3s
       retries: 10
 
-  # ===== MySQL Spreadsheet (双分片) =====
+  # ===== MySQL Spreadsheet (???) =====
   mysql-spreadsheet-0:
     image: mysql:8.0
     command: --innodb-buffer-pool-size=32M --innodb-log-buffer-size=4M --innodb-log-file-size=16M --performance-schema=OFF --skip-innodb-doublewrite
@@ -69,7 +69,7 @@ services:
     volumes: ["./mysql/slave/conf.d:/etc/mysql/conf.d", "./data/mysql-sp-1s:/var/lib/mysql"]
     depends_on: [mysql-spreadsheet-1]
 
-  # ===== MySQL File (双分片) =====
+  # ===== MySQL File (???) =====
   mysql-file-0:
     image: mysql:8.0
     command: --innodb-buffer-pool-size=32M --innodb-log-buffer-size=4M --innodb-log-file-size=16M --performance-schema=OFF --skip-innodb-doublewrite
@@ -176,7 +176,7 @@ services:
     entrypoint: ["/bin/sh", "/init.sh"]
     restart: "no"
 
-  # ===== Canal — binlog subscription =====
+  # ===== Canal ? binlog subscription =====
   canal-server:
     image: canal/canal-server:v1.1.7
     ports: ["11111:11111"]
@@ -193,27 +193,8 @@ services:
       redis-cluster-1:
         condition: service_healthy
 
-  # ===== Consul — 服务注册与发现 =====
-  consul:
-    image: hashicorp/consul:1.18
-    volumes:
-      - ./data/consul:/consul/data
-      - ./consul/consul-config.hcl:/consul/config/config.hcl:ro
-    command: agent -config-file=/consul/config/config.hcl
-    ports:
-      - "8500:8500"
-      - "8600:8600/udp"
-    networks:
-      default:
-        aliases: [consul, consul.service.consul]
-    healthcheck:
-      test: ["CMD", "consul", "members"]
-      interval: 5s
-      timeout: 3s
-      retries: 10
-    restart: unless-stopped
 
-  # ===== RabbitMQ — 事件总线 =====
+  # ===== RabbitMQ ? ???? =====
   rabbitmq:
     image: rabbitmq:3.13-management-alpine
     environment:
@@ -231,8 +212,8 @@ services:
       retries: 10
     restart: unless-stopped
 
-  # ===== Envoy Proxy — API 网关 (gRPC-JSON 转码 + JWT 鉴权 + 熔断) =====
-  envoy:
+  # ===== Envoy Proxy (2 instances, Nginx LB upstream) =====
+  envoy-1:
     build:
       context: .
       dockerfile: envoy/Dockerfile
@@ -241,6 +222,26 @@ services:
       - "9901:9901"
     environment:
       JWT_SECRET: "${JWT_SECRET:-default-secret-32bytes-here!!!!!}"
+    networks:
+      default:
+        aliases: [envoy]
+    depends_on:
+      - auth-1
+      - sheet-1
+      - file-1
+    restart: unless-stopped
+
+  envoy-2:
+    build:
+      context: .
+      dockerfile: envoy/Dockerfile
+    ports:
+      - "9902:9901"
+    environment:
+      JWT_SECRET: "${JWT_SECRET:-default-secret-32bytes-here!!!!!}"
+    networks:
+      default:
+        aliases: [envoy]
     depends_on:
       - auth-1
       - sheet-1
@@ -291,7 +292,7 @@ services:
       retries: 10
     restart: unless-stopped
 
-  # ===== ES 索引初始化 =====
+  # ===== ES ????? =====
   es-init:
     image: curlimages/curl:latest
     depends_on:
@@ -310,15 +311,12 @@ services:
       args:
         SERVICE: auth
     image: ${DOCKER_USER:-http-rpc}/auth:latest
-    dns: consul
     environment:
       JWT_SECRET: "${JWT_SECRET:-default-secret-32bytes-here!!!!!}"
-    volumes:
-      - ./consul/entrypoint-wrapper.sh:/entrypoint-wrapper.sh:ro
     command: >
-      sh -c "/entrypoint-wrapper.sh auth-service auth-1 50051 /app/rpc_server --service auth --port 50051
+      /app/rpc_server --service auth --port 50051
       --mysql-write-host mysql-auth --mysql-read-hosts mysql-auth --mysql-password ${MYSQL_ROOT_PASSWORD:-123456} --mysql-db rpc_auth --mysql-shards 1
-      --redis-cluster redis-cluster-7000:7000 --redis-cluster redis-cluster-7001:7001 --redis-cluster redis-cluster-7002:7002 --redis-password ${REDIS_PASSWORD:-rpc-redis-123456}"
+      --redis-cluster redis-cluster-7000:7000 --redis-cluster redis-cluster-7001:7001 --redis-cluster redis-cluster-7002:7002 --redis-password ${REDIS_PASSWORD:-rpc-redis-123456}
     networks:
       default:
         aliases: [rpc-auth]
@@ -334,15 +332,12 @@ services:
 
   auth-2:
     image: ${DOCKER_USER:-http-rpc}/auth:latest
-    dns: consul
     environment:
       JWT_SECRET: "${JWT_SECRET:-default-secret-32bytes-here!!!!!}"
-    volumes:
-      - ./consul/entrypoint-wrapper.sh:/entrypoint-wrapper.sh:ro
     command: >
-      sh -c "/entrypoint-wrapper.sh auth-service auth-2 50051 /app/rpc_server --service auth --port 50051
+      /app/rpc_server --service auth --port 50051
       --mysql-write-host mysql-auth --mysql-read-hosts mysql-auth --mysql-password ${MYSQL_ROOT_PASSWORD:-123456} --mysql-db rpc_auth --mysql-shards 1
-      --redis-cluster redis-cluster-7000:7000 --redis-cluster redis-cluster-7001:7001 --redis-cluster redis-cluster-7002:7002 --redis-password ${REDIS_PASSWORD:-rpc-redis-123456}"
+      --redis-cluster redis-cluster-7000:7000 --redis-cluster redis-cluster-7001:7001 --redis-cluster redis-cluster-7002:7002 --redis-password ${REDIS_PASSWORD:-rpc-redis-123456}
     networks:
       default:
         aliases: [rpc-auth]
@@ -364,17 +359,14 @@ services:
       args:
         SERVICE: sheet
     image: ${DOCKER_USER:-http-rpc}/sheet:latest
-    dns: consul
     environment:
-      AUTH_SVC_ADDR: "auth-service.service.consul:50051"
+      AUTH_SVC_ADDR: "rpc-auth:50051"
       JWT_SECRET: "${JWT_SECRET:-default-secret-32bytes-here!!!!!}"
       RABBITMQ_HOST: "rabbitmq"
-    volumes:
-      - ./consul/entrypoint-wrapper.sh:/entrypoint-wrapper.sh:ro
     command: >
-      sh -c "/entrypoint-wrapper.sh sheet-service sheet-1 50051 /app/rpc_server --service spreadsheet --port 50051
+      /app/rpc_server --service spreadsheet --port 50051
       --mysql-write-host mysql-spreadsheet --mysql-read-hosts mysql-spreadsheet --mysql-password ${MYSQL_ROOT_PASSWORD:-123456} --mysql-db rpc_spreadsheet --mysql-shards 2
-      --redis-cluster redis-cluster-7000:7000 --redis-cluster redis-cluster-7001:7001 --redis-cluster redis-cluster-7002:7002 --redis-password ${REDIS_PASSWORD:-rpc-redis-123456}"
+      --redis-cluster redis-cluster-7000:7000 --redis-cluster redis-cluster-7001:7001 --redis-cluster redis-cluster-7002:7002 --redis-password ${REDIS_PASSWORD:-rpc-redis-123456}
     networks:
       default:
         aliases: [rpc-sheet]
@@ -392,17 +384,14 @@ services:
 
   sheet-2:
     image: ${DOCKER_USER:-http-rpc}/sheet:latest
-    dns: consul
     environment:
-      AUTH_SVC_ADDR: "auth-service.service.consul:50051"
+      AUTH_SVC_ADDR: "rpc-auth:50051"
       JWT_SECRET: "${JWT_SECRET:-default-secret-32bytes-here!!!!!}"
       RABBITMQ_HOST: "rabbitmq"
-    volumes:
-      - ./consul/entrypoint-wrapper.sh:/entrypoint-wrapper.sh:ro
     command: >
-      sh -c "/entrypoint-wrapper.sh sheet-service sheet-2 50051 /app/rpc_server --service spreadsheet --port 50051
+      /app/rpc_server --service spreadsheet --port 50051
       --mysql-write-host mysql-spreadsheet --mysql-read-hosts mysql-spreadsheet --mysql-password ${MYSQL_ROOT_PASSWORD:-123456} --mysql-db rpc_spreadsheet --mysql-shards 2
-      --redis-cluster redis-cluster-7000:7000 --redis-cluster redis-cluster-7001:7001 --redis-cluster redis-cluster-7002:7002 --redis-password ${REDIS_PASSWORD:-rpc-redis-123456}"
+      --redis-cluster redis-cluster-7000:7000 --redis-cluster redis-cluster-7001:7001 --redis-cluster redis-cluster-7002:7002 --redis-password ${REDIS_PASSWORD:-rpc-redis-123456}
     networks:
       default:
         aliases: [rpc-sheet]
@@ -426,17 +415,14 @@ services:
       args:
         SERVICE: file
     image: ${DOCKER_USER:-http-rpc}/file:latest
-    dns: consul
     environment:
-      AUTH_SVC_ADDR: "auth-service.service.consul:50051"
+      AUTH_SVC_ADDR: "rpc-auth:50051"
       JWT_SECRET: "${JWT_SECRET:-default-secret-32bytes-here!!!!!}"
       RABBITMQ_HOST: "rabbitmq"
-    volumes:
-      - ./consul/entrypoint-wrapper.sh:/entrypoint-wrapper.sh:ro
     command: >
-      sh -c "/entrypoint-wrapper.sh file-service file-1 50051 /app/rpc_server --service file --port 50051
+      /app/rpc_server --service file --port 50051
       --mysql-write-host mysql-file --mysql-read-hosts mysql-file --mysql-password ${MYSQL_ROOT_PASSWORD:-123456} --mysql-db rpc_file --mysql-shards 2
-      --redis-cluster redis-cluster-7000:7000 --redis-cluster redis-cluster-7001:7001 --redis-cluster redis-cluster-7002:7002 --redis-password ${REDIS_PASSWORD:-rpc-redis-123456}"
+      --redis-cluster redis-cluster-7000:7000 --redis-cluster redis-cluster-7001:7001 --redis-cluster redis-cluster-7002:7002 --redis-password ${REDIS_PASSWORD:-rpc-redis-123456}
     networks:
       default:
         aliases: [rpc-file]
@@ -454,17 +440,14 @@ services:
 
   file-2:
     image: ${DOCKER_USER:-http-rpc}/file:latest
-    dns: consul
     environment:
-      AUTH_SVC_ADDR: "auth-service.service.consul:50051"
+      AUTH_SVC_ADDR: "rpc-auth:50051"
       JWT_SECRET: "${JWT_SECRET:-default-secret-32bytes-here!!!!!}"
       RABBITMQ_HOST: "rabbitmq"
-    volumes:
-      - ./consul/entrypoint-wrapper.sh:/entrypoint-wrapper.sh:ro
     command: >
-      sh -c "/entrypoint-wrapper.sh file-service file-2 50051 /app/rpc_server --service file --port 50051
+      /app/rpc_server --service file --port 50051
       --mysql-write-host mysql-file --mysql-read-hosts mysql-file --mysql-password ${MYSQL_ROOT_PASSWORD:-123456} --mysql-db rpc_file --mysql-shards 2
-      --redis-cluster redis-cluster-7000:7000 --redis-cluster redis-cluster-7001:7001 --redis-cluster redis-cluster-7002:7002 --redis-password ${REDIS_PASSWORD:-rpc-redis-123456}"
+      --redis-cluster redis-cluster-7000:7000 --redis-cluster redis-cluster-7001:7001 --redis-cluster redis-cluster-7002:7002 --redis-password ${REDIS_PASSWORD:-rpc-redis-123456}
     networks:
       default:
         aliases: [rpc-file]
@@ -490,10 +473,8 @@ services:
     image: ${DOCKER_USER:-http-rpc}/search:latest
     environment:
       ES_HOST: "http://elasticsearch:9200"
-    volumes:
-      - ./consul/entrypoint-wrapper.sh:/entrypoint-wrapper.sh:ro
     command: >
-      sh -c "/entrypoint-wrapper.sh search-service search-1 50051 /app/rpc_server --service search --port 50051"
+      /app/rpc_server --service search --port 50051
     networks:
       default:
         aliases: [rpc-search]
@@ -539,7 +520,39 @@ services:
       start_period: 10s
     restart: unless-stopped
 
-  # ===== Notify Service (Go consumer: RabbitMQ → MongoDB + ES) =====
+  grpc-gateway-2:
+    build:
+      context: .
+      dockerfile: gateway-grpc/Dockerfile
+    image: ${DOCKER_USER:-http-rpc}/gateway:latest
+    environment:
+      JWT_SECRET: "${JWT_SECRET:-default-secret-32bytes-here!!!!!}"
+      AUTH_ADDR: "rpc-auth:50051"
+      SHEET_ADDR: "rpc-sheet:50051"
+      REDIS_ADDR: "redis-cluster-7000:7000"
+      REDIS_PASSWORD: "${REDIS_PASSWORD:-rpc-redis-123456}"
+      MONGO_URI: "mongodb://mongodb:27017"
+      FILE_ADDR: "rpc-file:50051"
+      SEARCH_ADDR: "rpc-search:50051"
+    networks:
+      default:
+        aliases: [grpc-gateway]
+    depends_on:
+      auth-1:
+        condition: service_healthy
+      sheet-1:
+        condition: service_healthy
+      file-1:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/api/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    restart: unless-stopped
+
+  # ===== Notify Service (Go consumer: RabbitMQ ? MongoDB + ES) =====
   notify-service:
     build:
       context: ./services/notify-service

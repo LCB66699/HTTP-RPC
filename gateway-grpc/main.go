@@ -36,19 +36,20 @@ func main() {
 		Time: 10 * time.Second, Timeout: 3 * time.Second,
 	})
 	creds := grpc.WithTransportCredentials(insecure.NewCredentials())
+	lb := grpc.WithDefaultServiceConfig(`{"loadBalancingConfig":[{"round_robin":{}}]}`)
 
 	authAddr := getenv("AUTH_ADDR", "rpc-auth:50051")
 	sheetAddr := getenv("SHEET_ADDR", "rpc-sheet:50051")
 	fileAddr := getenv("FILE_ADDR", "rpc-file:50051")
 	log.Printf("Auth=%s Sheet=%s File=%s", authAddr, sheetAddr, fileAddr)
 
-	authConn, _ := grpc.NewClient(authAddr, creds, kp)
+	authConn, _ := grpc.NewClient("dns:///"+authAddr, creds, kp, lb)
 	authClient := pb.NewAuthServiceClient(authConn)
 
-	sheetConn, _ := grpc.NewClient(sheetAddr, creds, kp)
+	sheetConn, _ := grpc.NewClient("dns:///"+sheetAddr, creds, kp, lb)
 	sheetClient := pb.NewSpreadsheetServiceClient(sheetConn)
 
-	fileConn, _ := grpc.NewClient(fileAddr, creds, kp)
+	fileConn, _ := grpc.NewClient("dns:///"+fileAddr, creds, kp, lb)
 	fileClient := pb.NewFileServiceClient(fileConn)
 
 	// Redis
@@ -96,14 +97,9 @@ func main() {
 		writeJSON(w, map[string]interface{}{"username": user, "user_id": uid})
 	})
 	mux.HandleFunc("GET /api/services", func(w http.ResponseWriter, r *http.Request) {
-		resp, err := httpGet("http://consul:8500/v1/catalog/services")
-		if err != nil {
-			writeJSON(w, map[string]interface{}{"services": []string{}})
-			return
-		}
-		var raw map[string][]string
-		json.Unmarshal(resp, &raw)
-		writeJSON(w, map[string]interface{}{"services": raw})
+		writeJSON(w, map[string]interface{}{"services": map[string][]string{
+			"auth-service": {}, "sheet-service": {}, "file-service": {}, "search-service": {},
+		}})
 	})
 	mux.HandleFunc("GET /api/history", func(w http.ResponseWriter, r *http.Request) {
 		user := getUserFromCookie(r)
@@ -188,15 +184,30 @@ func main() {
 		uid := extractUID(r)
 		req.UserId = uid
 		resp, err := sheetClient.CreateSpreadsheet(injectToken(r), &req)
-		if err != nil {
-			writeJSON(w, map[string]interface{}{"success": false, "error": err.Error()})
+		if err != nil || resp == nil || !resp.Success {
+			msg := "create failed"
+			if err != nil {
+				msg = err.Error()
+			} else if resp != nil && resp.GetError() != "" {
+				msg = resp.GetError()
+			}
+			writeJSON(w, map[string]interface{}{"success": false, "error": msg})
 			return
 		}
 		writeJSON(w, resp)
 	})
 	mux.HandleFunc("GET /api/sheets", func(w http.ResponseWriter, r *http.Request) {
-		resp, _ := sheetClient.ListSpreadsheets(injectToken(r), &pb.ListSpreadsheetsRequest{UserId: extractUID(r)})
-		writeJSON(w, resp)
+		resp, err := sheetClient.ListSpreadsheets(injectToken(r), &pb.ListSpreadsheetsRequest{UserId: extractUID(r)})
+		if err != nil || resp == nil || !resp.Success {
+			msg := "list failed"
+			if err != nil {
+				msg = err.Error()
+			} else if resp != nil && resp.GetError() != "" {
+				msg = resp.GetError()
+			}
+			writeJSON(w, map[string]interface{}{"success": false, "error": msg})
+			return
+		}
 	})
 	mux.HandleFunc("GET /api/sheets/{id}", func(w http.ResponseWriter, r *http.Request) {
 		id := parseInt64(r.PathValue("id"))
@@ -220,7 +231,8 @@ func main() {
 			return
 		}
 		if resp.Spreadsheet != nil {
-		writeJSON(w, resp)
+			writeJSON(w, resp)
+		}
 	})
 	mux.HandleFunc("PUT /api/sheets/{id}", func(w http.ResponseWriter, r *http.Request) {
 		var req pb.UpdateSpreadsheetRequest
@@ -229,15 +241,28 @@ func main() {
 		req.UserId = extractUID(r)
 		resp, err := sheetClient.UpdateSpreadsheet(injectToken(r), &req)
 		if err != nil || resp == nil || !resp.Success {
-			writeJSON(w, map[string]interface{}{"success": false, "error": "update failed"})
+			msg := "update failed"
+			if err != nil {
+				msg = err.Error()
+			} else if resp != nil && resp.GetError() != "" {
+				msg = resp.GetError()
+			}
+			writeJSON(w, map[string]interface{}{"success": false, "error": msg})
 			return
 		}
+		writeJSON(w, resp)
 	})
 	mux.HandleFunc("DELETE /api/sheets/{id}", func(w http.ResponseWriter, r *http.Request) {
 		id := parseInt64(r.PathValue("id"))
 		resp, err := sheetClient.DeleteSpreadsheet(injectToken(r), &pb.DeleteSpreadsheetRequest{Id: id, UserId: extractUID(r)})
-		if err != nil {
-			writeJSON(w, map[string]interface{}{"success": false, "error": err.Error()})
+		if err != nil || resp == nil || !resp.Success {
+			msg := "delete failed"
+			if err != nil {
+				msg = err.Error()
+			} else if resp != nil && resp.GetError() != "" {
+				msg = resp.GetError()
+			}
+			writeJSON(w, map[string]interface{}{"success": false, "error": msg})
 			return
 		}
 		writeJSON(w, resp)
@@ -245,7 +270,17 @@ func main() {
 
 	// === File CRUD ===
 	mux.HandleFunc("GET /api/files", func(w http.ResponseWriter, r *http.Request) {
-		resp, _ := fileClient.ListFiles(injectToken(r), &pb.ListFilesRequest{UserId: extractUID(r)})
+		resp, err := fileClient.ListFiles(injectToken(r), &pb.ListFilesRequest{UserId: extractUID(r)})
+		if err != nil || resp == nil || !resp.Success {
+			msg := "list failed"
+			if err != nil {
+				msg = err.Error()
+			} else if resp != nil && resp.GetError() != "" {
+				msg = resp.GetError()
+			}
+			writeJSON(w, map[string]interface{}{"success": false, "error": msg})
+			return
+		}
 		writeJSON(w, resp)
 	})
 	mux.HandleFunc("POST /api/files/upload", func(w http.ResponseWriter, r *http.Request) {
@@ -264,9 +299,18 @@ func main() {
 			MimeType: h.Header.Get("Content-Type"), FileContent: data,
 		})
 		if err != nil || resp == nil || !resp.Success {
-			writeJSON(w, map[string]interface{}{"success": false, "error": "upload failed"})
+			msg := "upload failed"
+			if err != nil {
+				msg = err.Error()
+			} else if resp != nil && resp.GetError() != "" {
+				msg = resp.GetError()
+			}
+			writeJSON(w, map[string]interface{}{"success": false, "error": msg})
 			return
 		}
+		writeJSON(w, resp)
+	})
+	mux.HandleFunc("GET /api/files/{id}", func(w http.ResponseWriter, r *http.Request) {
 		id := parseInt64(r.PathValue("id"))
 		uid := extractUID(r)
 		if uid == 0 {
@@ -292,8 +336,14 @@ func main() {
 	mux.HandleFunc("DELETE /api/files/{id}", func(w http.ResponseWriter, r *http.Request) {
 		id := parseInt64(r.PathValue("id"))
 		resp, err := fileClient.DeleteFile(injectToken(r), &pb.DeleteFileRequest{Id: id, UserId: extractUID(r)})
-		if err != nil {
-			writeJSON(w, map[string]interface{}{"success": false, "error": err.Error()})
+		if err != nil || resp == nil || !resp.Success {
+			msg := "delete failed"
+			if err != nil {
+				msg = err.Error()
+			} else if resp != nil && resp.GetError() != "" {
+				msg = resp.GetError()
+			}
+			writeJSON(w, map[string]interface{}{"success": false, "error": msg})
 			return
 		}
 		writeJSON(w, resp)
@@ -347,7 +397,7 @@ func writeGRPCError(w http.ResponseWriter, err error, fallback string) {
 		switch st.Code() {
 		case codes.PermissionDenied, codes.Unauthenticated:
 			code = http.StatusForbidden
-			msg = "Forbidden"
+			msg = st.Message()
 		}
 	}
 	writeJSONStatus(w, code, map[string]interface{}{"success": false, "error": msg})

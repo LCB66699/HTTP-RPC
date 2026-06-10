@@ -75,8 +75,11 @@ int main(int argc, char* argv[]) {
     FileServiceImpl file_service;
     AuthInterceptor auth_interceptor(jwt_secret);
     file_service.SetAuthInterceptor(&auth_interceptor);
-    const char* auth_addr = std::getenv("AUTH_SVC_ADDR");
-    file_service.SetAuthChannel(grpc::CreateChannel(auth_addr ? auth_addr : "rpc-auth:50051", grpc::InsecureChannelCredentials()));
+    const char* env_auth = std::getenv("AUTH_SVC_ADDR");
+    std::string auth_addr = env_auth ? env_auth : "rpc-auth:50051";
+    grpc::ChannelArguments args;
+    args.SetLoadBalancingPolicyName("round_robin");
+    file_service.SetAuthChannel(grpc::CreateCustomChannel("dns:///" + auth_addr, grpc::InsecureChannelCredentials(), args));
     file_service.SetDatabase(db.get()); file_service.SetRedis(redis.get());
     file_service.SetL1Cache(l1_cache.get()); file_service.SetLogger(logger.get());
     file_service.SetSysLog(slog.get());

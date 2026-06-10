@@ -20,9 +20,7 @@ RUN apt update && apt install -y \
 COPY --from=builder /usr/local/lib/libredis++.so* /usr/local/lib/
 RUN ldconfig
 COPY --from=builder /src/rpc_server /app/rpc_server
-COPY consul/register-inline.sh /app/register-inline.sh
-RUN chmod +x /app/register-inline.sh
 EXPOSE 50051
 ENV ES_HOST=http://elasticsearch:9200
-ENTRYPOINT ["/app/register-inline.sh"]
+CMD ["/app/rpc_server"]
 CMD ["/app/rpc_server", "--service", "search", "--port", "50051"]

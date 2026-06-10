@@ -1,0 +1,38 @@
+# 开发环境 overlay — 暴露基础服务端口到 localhost
+# 用法: docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d
+# 之后 C++ 和 Go 服务在宿主机原生运行，直连这些端口
+
+services:
+  mysql-auth:
+    ports: ["3306:3306"]
+
+  mysql-spreadsheet-0:
+    ports: ["3307:3306"]
+
+  mysql-file-0:
+    ports: ["3308:3306"]
+
+  # Redis Cluster — 暴露所有 6 个节点
+  # 注意: 集群模式会返回 Docker 内网 IP 重定向，宿主机直连需配置 cluster-announce-ip
+  # 简单场景可注释掉 cluster 配置，单机模式用 redis-cluster-1:7000
+  redis-cluster-1:
+    ports: ["7000:7000"]
+  redis-cluster-2:
+    ports: ["7001:7001"]
+  redis-cluster-3:
+    ports: ["7002:7002"]
+  redis-cluster-4:
+    ports: ["7003:7003"]
+  redis-cluster-5:
+    ports: ["7004:7004"]
+  redis-cluster-6:
+    ports: ["7005:7005"]
+
+  rabbitmq:
+    ports: ["5672:5672", "15672:15672"]
+
+  elasticsearch:
+    ports: ["9200:9200"]
+
+  mongodb:
+    ports: ["27017:27017"]

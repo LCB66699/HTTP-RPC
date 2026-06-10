@@ -29,7 +29,6 @@ Notify Service (Go)               ← RabbitMQ 消费 → MongoDB + ES 索引
   Elasticsearch ×1 (IK 中文分词)
   MongoDB ×1 (文档存储)
   RabbitMQ ×1 (事件总线 + 死信队列)
-  Consul ×1  (服务注册与健康检查)
   Canal ×1   (binlog 订阅 → L1 缓存失效)
 ```
 
@@ -43,7 +42,7 @@ Notify Service (Go)               ← RabbitMQ 消费 → MongoDB + ES 索引
 | Go 服务 | notify-service | 1 |
 | 存储 | MySQL, Redis, ES, MongoDB | 17 |
 | 消息 | RabbitMQ | 1 |
-| 治理 | Consul, Canal | 2 |
+| 治理 | Canal | 1 |
 
 ## 项目结构
 
@@ -79,7 +78,6 @@ Notify Service (Go)               ← RabbitMQ 消费 → MongoDB + ES 索引
 │   ├── auth-service/             (预留)
 │   └── ...
 ├── proto/                     Protobuf 定义 (C++ 用)
-├── consul/                    Consul 注册脚本
 ├── es/                        Elasticsearch Dockerfile + IK 分词
 ├── mongo/                     MongoDB 初始化脚本
 ├── redis/cluster/             Redis Cluster 配置
@@ -157,7 +155,7 @@ docker compose up -d auth-1     # 滚动重启, 其他服务无影响
 | 事件驱动 | C++ RabbitMQ 发布 → Go Notify 消费 → MongoDB + ES |
 | 全文搜索 | Elasticsearch IK 分词, scope 过滤, 分页, 高亮 |
 | 分布式 ID | Snowflake (worker_id = hash(host:port) & 0x1F) |
-| 服务发现 | Docker DNS + Consul 注册/心跳 |
+| 服务发现 | Docker DNS (本地) / K8s Service DNS (生产) |
 | 2PC 事务 | TM.Begin → Prepare → Commit/Rollback + undo_log |
 
 ## 测试

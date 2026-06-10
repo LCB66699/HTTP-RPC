@@ -1,0 +1,243 @@
+# K8s Deployments & Services — HTTP-RPC
+# 用法: kubectl apply -f k8s/base/
+
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: http-rpc
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: rpc-secrets
+  namespace: http-rpc
+stringData:
+  jwt-secret: "default-secret-32bytes-here!!!!!"
+  mysql-password: "123456"
+  redis-password: "rpc-redis-123456"
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: rpc-config
+  namespace: http-rpc
+data:
+  rabbitmq-host: "rabbitmq"
+  es-host: "http://elasticsearch:9200"
+  mongo-uri: "mongodb://mongodb:27017"
+---
+# ===== Auth =====
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: auth
+  namespace: http-rpc
+spec:
+  replicas: 2
+  selector:
+    matchLabels: { app: auth }
+  template:
+    metadata:
+      labels: { app: auth }
+    spec:
+      containers:
+      - name: auth
+        image: ghcr.io/lcb66699/http-rpc/auth:latest
+        ports: [{ containerPort: 50051 }]
+        env:
+        - name: JWT_SECRET
+          valueFrom: { secretKeyRef: { name: rpc-secrets, key: jwt-secret } }
+        readinessProbe:
+          tcpSocket: { port: 50051 }
+          initialDelaySeconds: 5
+          periodSeconds: 5
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: auth
+  namespace: http-rpc
+spec:
+  selector: { app: auth }
+  ports: [{ port: 50051, targetPort: 50051 }]
+---
+# ===== Sheet =====
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sheet
+  namespace: http-rpc
+spec:
+  replicas: 2
+  selector:
+    matchLabels: { app: sheet }
+  template:
+    metadata:
+      labels: { app: sheet }
+    spec:
+      containers:
+      - name: sheet
+        image: ghcr.io/lcb66699/http-rpc/sheet:latest
+        ports: [{ containerPort: 50051 }]
+        env:
+        - name: JWT_SECRET
+          valueFrom: { secretKeyRef: { name: rpc-secrets, key: jwt-secret } }
+        - name: AUTH_SVC_ADDR
+          value: "auth:50051"
+        - name: RABBITMQ_HOST
+          valueFrom: { configMapKeyRef: { name: rpc-config, key: rabbitmq-host } }
+        readinessProbe:
+          tcpSocket: { port: 50051 }
+          initialDelaySeconds: 5
+          periodSeconds: 5
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: sheet
+  namespace: http-rpc
+spec:
+  selector: { app: sheet }
+  ports: [{ port: 50051, targetPort: 50051 }]
+---
+# ===== File =====
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: file
+  namespace: http-rpc
+spec:
+  replicas: 2
+  selector:
+    matchLabels: { app: file }
+  template:
+    metadata:
+      labels: { app: file }
+    spec:
+      containers:
+      - name: file
+        image: ghcr.io/lcb66699/http-rpc/file:latest
+        ports: [{ containerPort: 50051 }]
+        env:
+        - name: JWT_SECRET
+          valueFrom: { secretKeyRef: { name: rpc-secrets, key: jwt-secret } }
+        - name: AUTH_SVC_ADDR
+          value: "auth:50051"
+        - name: RABBITMQ_HOST
+          valueFrom: { configMapKeyRef: { name: rpc-config, key: rabbitmq-host } }
+        readinessProbe:
+          tcpSocket: { port: 50051 }
+          initialDelaySeconds: 5
+          periodSeconds: 5
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: file
+  namespace: http-rpc
+spec:
+  selector: { app: file }
+  ports: [{ port: 50051, targetPort: 50051 }]
+---
+# ===== Search =====
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: search
+  namespace: http-rpc
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: search }
+  template:
+    metadata:
+      labels: { app: search }
+    spec:
+      containers:
+      - name: search
+        image: ghcr.io/lcb66699/http-rpc/search:latest
+        ports: [{ containerPort: 50051 }]
+        env:
+        - name: ES_HOST
+          valueFrom: { configMapKeyRef: { name: rpc-config, key: es-host } }
+        readinessProbe:
+          tcpSocket: { port: 50051 }
+          initialDelaySeconds: 5
+          periodSeconds: 5
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: search
+  namespace: http-rpc
+spec:
+  selector: { app: search }
+  ports: [{ port: 50051, targetPort: 50051 }]
+---
+# ===== gRPC-Gateway =====
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: grpc-gateway
+  namespace: http-rpc
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: grpc-gateway }
+  template:
+    metadata:
+      labels: { app: grpc-gateway }
+    spec:
+      containers:
+      - name: grpc-gateway
+        image: ghcr.io/lcb66699/http-rpc/gateway:latest
+        ports: [{ containerPort: 8080 }]
+        env:
+        - name: JWT_SECRET
+          valueFrom: { secretKeyRef: { name: rpc-secrets, key: jwt-secret } }
+        - name: AUTH_ADDR
+          value: "auth:50051"
+        - name: SHEET_ADDR
+          value: "sheet:50051"
+        - name: FILE_ADDR
+          value: "file:50051"
+        - name: SEARCH_ADDR
+          value: "search:50051"
+        readinessProbe:
+          httpGet: { path: /api/health, port: 8080 }
+          initialDelaySeconds: 5
+          periodSeconds: 5
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: grpc-gateway
+  namespace: http-rpc
+spec:
+  selector: { app: grpc-gateway }
+  ports: [{ port: 8080, targetPort: 8080 }]
+---
+# ===== Notify =====
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: notify-service
+  namespace: http-rpc
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: notify-service }
+  template:
+    metadata:
+      labels: { app: notify-service }
+    spec:
+      containers:
+      - name: notify-service
+        image: ghcr.io/lcb66699/http-rpc/notify:latest
+        env:
+        - name: RABBITMQ_HOST
+          valueFrom: { configMapKeyRef: { name: rpc-config, key: rabbitmq-host } }
+        - name: MONGO_URI
+          valueFrom: { configMapKeyRef: { name: rpc-config, key: mongo-uri } }
+        - name: ES_HOST
+          valueFrom: { configMapKeyRef: { name: rpc-config, key: es-host } }

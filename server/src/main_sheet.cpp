@@ -78,8 +78,11 @@ int main(int argc, char* argv[]) {
     AuthInterceptor auth_interceptor(jwt_secret);
     SpreadsheetServiceImpl sheet_service;
     sheet_service.SetAuthInterceptor(&auth_interceptor);
-    const char* auth_addr = std::getenv("AUTH_SVC_ADDR");
-    sheet_service.SetAuthChannel(grpc::CreateChannel(auth_addr ? auth_addr : "rpc-auth:50051", grpc::InsecureChannelCredentials()));
+    const char* env_auth = std::getenv("AUTH_SVC_ADDR");
+    std::string auth_addr = env_auth ? env_auth : "rpc-auth:50051";
+    grpc::ChannelArguments args;
+    args.SetLoadBalancingPolicyName("round_robin");
+    sheet_service.SetAuthChannel(grpc::CreateCustomChannel("dns:///" + auth_addr, grpc::InsecureChannelCredentials(), args));
     sheet_service.SetDatabase(db.get()); sheet_service.SetRedis(redis.get());
     sheet_service.SetL1Cache(l1_cache.get()); sheet_service.SetLogger(logger.get());
     sheet_service.SetSysLog(slog.get());

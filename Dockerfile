@@ -39,8 +39,6 @@ ARG SERVICE=auth
 WORKDIR /app
 COPY --from=builder /src/rpc_${SERVICE} /app/rpc_server
 COPY --from=builder /src/web-ui /app/web-ui
-COPY consul/register-inline.sh /app/register-inline.sh
-RUN chmod +x /app/register-inline.sh
 
 EXPOSE 50051
-ENTRYPOINT ["/app/register-inline.sh"]
+CMD ["/app/rpc_server"]
