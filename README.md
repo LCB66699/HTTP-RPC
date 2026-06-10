@@ -117,7 +117,8 @@ docker compose up -d auth-1     # 滚动重启, 其他服务无影响
 |------|------|------|------|
 | POST | `/api/register` | 否 | 注册，返回 JWT Cookie |
 | POST | `/api/login` | 否 | 登录，返回 `rpc_at` (15min) + `rpc_rt` (7d) Cookie |
-| POST | `/api/refresh` | 否 | 刷新令牌 |
+| POST | `/api/refresh` | 否 | 刷新令牌（`rpc_rt` Cookie 驱动，无需 body） |
+| GET | `/api/me` | 否 | 当前用户信息（username + user_id） |
 | GET | `/api/health` | 否 | 健康检查 |
 
 ### 数据表格
@@ -138,6 +139,13 @@ docker compose up -d auth-1     # 滚动重启, 其他服务无影响
 | GET | `/api/files` | 是 | 列表 |
 | GET | `/api/files/{id}` | 是 | 下载 |
 | DELETE | `/api/files/{id}` | 是 | 删除 |
+
+### 搜索
+
+| 方法 | 路径 | 鉴权 | 说明 |
+|------|------|------|------|
+| POST | `/api/search` | 是 | 全文搜索 (ES IK 分词 + user_id 过滤) |
+| GET | `/api/history` | 是 | 调用日志 (Redis) |
 
 ## 核心机制
 

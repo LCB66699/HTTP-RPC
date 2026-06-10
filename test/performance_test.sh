@@ -367,6 +367,6 @@ fi
 
 echo ""
 echo "=========================================="
-echo "  Performance Test Complete"
-echo "  curl 测量冷连接延迟 | ab 测量 keep-alive QPS | wrk2 测量恒定速率"
+echo "  Performance Test Complete ($PASS pass, $FAIL fail)"
 echo "=========================================="
+[ "$FAIL" -eq 0 ] || exit 1

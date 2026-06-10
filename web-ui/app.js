@@ -605,8 +605,6 @@ let refreshUsername = null;
 let refreshPromise = null;  // 防并发刷新
 
 async function tryRefreshToken() {
-  if (!refreshToken || !refreshUsername) return false;
-  // 已有刷新在进行中，等它完成
   if (refreshPromise) {
     await refreshPromise;
     return true;
@@ -617,7 +615,7 @@ async function tryRefreshToken() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'same-origin',
-        body: JSON.stringify({ username: refreshUsername, refresh_token: refreshToken })
+        body: JSON.stringify({})
       });
       if (res.ok) {
         authToken = '1';
@@ -1100,9 +1098,17 @@ function updateProfileStats(history) {
   document.getElementById('pstat-top-service').textContent = topService;
 }
 
-function initProfile() {
+async function initProfile() {
   document.getElementById('profile-username').textContent = currentUser?.username || '--';
   document.getElementById('profile-join-date').textContent = currentUser?.joinDate || new Date().toLocaleDateString('zh-CN');
+  // 从 /api/me 获取用户 ID
+  try {
+    const res = await fetch(API + '/me', { credentials: 'same-origin' });
+    if (res.ok) {
+      const data = await res.json();
+      document.getElementById('profile-uid').textContent = data.user_id || '--';
+    }
+  } catch(e) {}
   loadAvatar();
   loadHistory();
 }

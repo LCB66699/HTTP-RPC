@@ -40,11 +40,12 @@ CONTAINERS=(
     "http-rpc-auth-2-1"
     "http-rpc-sheet-1-1"
     "http-rpc-sheet-2-1"
-    "http-rpc-sheet-3-1"
     "http-rpc-file-1-1"
     "http-rpc-file-2-1"
     "http-rpc-grpc-gateway-1"
     "http-rpc-envoy-1"
+    "http-rpc-search-1"
+    "http-rpc-notify-service-1"
     "http-rpc-nginx-1-1"
 )
 

@@ -131,6 +131,19 @@ grpc::Status FileServiceImpl::GetFile(grpc::ServerContext* context,
     std::string vu_user, vu_role;
     if (auth_stub_ && !ValidateCaller(context, req->user_id(), vu_user, vu_role))
         return grpc::Status(grpc::StatusCode::UNAUTHENTICATED, "Auth service rejected");
+
+    if (req->user_id() <= 0) {
+        resp->set_success(false);
+        resp->set_error("Not found");
+        return grpc::Status::OK;
+    }
+    int64_t owner_uid = 0;
+    if (!db_ || !db_->GetFileOwner(req->id(), owner_uid) || owner_uid != req->user_id()) {
+        resp->set_success(false);
+        resp->set_error("Not found");
+        return grpc::Status::OK;
+    }
+
     auto start = std::chrono::high_resolution_clock::now();
     std::string username = UsernameFromMeta(context);
 

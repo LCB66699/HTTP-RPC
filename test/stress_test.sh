@@ -149,5 +149,6 @@ fi
 
 echo ""
 echo "=========================================="
-echo "  Stress Test Complete"
+echo "  Stress Test Complete (write: $WRITE_OK/$((WRITE_OK+WRITE_FAIL)), read: $TOTAL_OK/$((TOTAL_OK+TOTAL_401+TOTAL_429)))"
 echo "=========================================="
+[ "$WRITE_FAIL" -gt "$((WRITE_OK/2))" ] && exit 1 || exit 0

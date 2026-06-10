@@ -144,6 +144,21 @@ grpc::Status SpreadsheetServiceImpl::GetSpreadsheet(
         AuthContext ac = auth_->Authenticate(context);
         if (!ac.authenticated) return grpc::Status(grpc::StatusCode::UNAUTHENTICATED, "Invalid or missing token");
     }
+    std::string vu_user, vu_role;
+    if (auth_stub_ && !ValidateCaller(context, req->user_id(), vu_user, vu_role))
+        return grpc::Status(grpc::StatusCode::UNAUTHENTICATED, "Auth service rejected");
+    // 校验资源归属：user_id 必须匹配 sheet 所有者
+    if (req->user_id() <= 0) {
+        resp->set_success(false);
+        resp->set_error("Not found");
+        return grpc::Status::OK;
+    }
+    int64_t owner_uid = 0;
+    if (!db_ || !db_->GetSpreadsheetOwner(req->id(), owner_uid) || owner_uid != req->user_id()) {
+        resp->set_success(false);
+        resp->set_error("Not found");
+        return grpc::Status::OK;
+    }
     auto start = std::chrono::high_resolution_clock::now();
     std::string username = UsernameFromMeta(context);
 
@@ -346,6 +361,9 @@ grpc::Status SpreadsheetServiceImpl::ListSpreadsheets(
         AuthContext ac = auth_->Authenticate(context);
         if (!ac.authenticated) return grpc::Status(grpc::StatusCode::UNAUTHENTICATED, "Invalid or missing token");
     }
+    std::string vu_user, vu_role;
+    if (auth_stub_ && !ValidateCaller(context, req->user_id(), vu_user, vu_role))
+        return grpc::Status(grpc::StatusCode::UNAUTHENTICATED, "Auth service rejected");
     auto start = std::chrono::high_resolution_clock::now();
     std::string username = UsernameFromMeta(context);
     int64_t uid = req->user_id();
@@ -436,6 +454,9 @@ grpc::Status SpreadsheetServiceImpl::UpdateSpreadsheet(
         AuthContext ac = auth_->Authenticate(context);
         if (!ac.authenticated) return grpc::Status(grpc::StatusCode::UNAUTHENTICATED, "Invalid or missing token");
     }
+    std::string vu_user, vu_role;
+    if (auth_stub_ && !ValidateCaller(context, req->user_id(), vu_user, vu_role))
+        return grpc::Status(grpc::StatusCode::UNAUTHENTICATED, "Auth service rejected");
     auto start = std::chrono::high_resolution_clock::now();
     std::string username = UsernameFromMeta(context);
 
@@ -513,6 +534,9 @@ grpc::Status SpreadsheetServiceImpl::DeleteSpreadsheet(
         AuthContext ac = auth_->Authenticate(context);
         if (!ac.authenticated) return grpc::Status(grpc::StatusCode::UNAUTHENTICATED, "Invalid or missing token");
     }
+    std::string vu_user, vu_role;
+    if (auth_stub_ && !ValidateCaller(context, req->user_id(), vu_user, vu_role))
+        return grpc::Status(grpc::StatusCode::UNAUTHENTICATED, "Auth service rejected");
     auto start = std::chrono::high_resolution_clock::now();
     std::string username = UsernameFromMeta(context);
 

@@ -309,3 +309,112 @@ bool ShouldTripService() const {
 **问题**：反复 `--no-cache` 构建 gateway 产生多版 188MB 的悬空镜像，占满磁盘空间。
 
 **预防**：构建后 `docker image prune -f` 清理无用镜像层。
+
+---
+
+## 十三、C++ Gateway → gRPC-Gateway (Go) 迁移 (2026-06-07 ~ 06-09)
+
+### 13.1 JWT base64url 多 padding `=` 导致 Go 验签失败
+
+**根因**：`server/include/jwt.h` 的 `base64url_encode` 加了 `while (out.size() % 4) out.push_back('=')` —— JWT RFC 7515 要求无 padding。C++ 签发和验签都用同一函数，内部一致。Go 标准库验签时报 `Invalid token`。
+
+**修复**：删掉 padding 行，两边签名对齐。
+
+### 13.2 AuthInterceptor use-after-free — `make_unique().get()` 野指针
+
+**根因**：`main_sheet.cpp`/`main_file.cpp` 中 `sheet_service.SetAuthInterceptor(std::make_unique<AuthInterceptor>(...).get())` —— `.get()` 返回裸指针后 unique_ptr 立即析构，AuthInterceptor 被释放。服务持有野指针，访问 `jwt_secret_` 读到垃圾值（secret_len=109 万亿），JWT 验签全失败。
+
+**修复**：改为局部变量 `AuthInterceptor auth_interceptor(jwt_secret); service.SetAuthInterceptor(&auth_interceptor);`，生命周期跟随 main()。
+
+### 13.3 MinIO 硬依赖，已删除但代码残留
+
+**根因**：`file_service_impl.cpp` CreateFile 强制检查 `minio_ && minio_->IsConfigured()`，MinIO 不满足时拒绝上传。但 MinIO 已从架构中移除，所有文件上传返回 `id=0`。
+
+**修复**：清除所有 MinIO 分支（Create/Get/Delete），文件内容直存 MySQL LONGBLOB + 后续 MongoDB。
+
+### 13.4 Cookie 未设置 — gateway 登录/注册无 Set-Cookie
+
+**根因**：grpc-gateway 的 login/register handler 只返回 JSON，未写 `Set-Cookie: rpc_at=...`。测试脚本和前端无法自动带 Cookie。
+
+**修复**：登录/注册成功后 `http.SetCookie(w, &http.Cookie{Name:"rpc_at", Value: resp.AccessToken, HttpOnly:true, Secure:true, SameSite:Strict})`。
+
+### 13.5 Envoy upstream 指向已删除的旧 gateway
+
+**根因**：envoy.yaml 路由到 `gateway-1:8081` + `gateway-2:8081`，但旧 C++ gateway 已删除。
+
+**修复**：改为 `grpc-gateway:8080`。同时加 `/api/health` 白名单。
+
+### 13.6 Snowflake ID 在 JavaScript 精度丢失（17 位）
+
+**根因**：Snowflake ID 17 位（如 `57741524858908672`）> JS `Number.MAX_SAFE_INTEGER`（16 位）。`JSON.parse` 将精度丢失后的值返回前端，ID 尾数对不上，打开/删除全失败。
+
+**修复**：gateway `writeJSON` 用正则全量替换 16+ 位数字为字符串 `:(\d{16,})` → `:"$1"`。
+
+### 13.7 UserId 始终为 0 — 未从 JWT 提取
+
+**根因**：网关创建/获取/更新/删除文件表格时全部 `UserId: 0`，C++ 鉴权校验不过（owner mismatch），报 "Not found or permission denied"。List API 也因 user_id=0 返回全量数据。
+
+**修复**：实现 `extractUID(r)` 从 Cookie JWT 解码 `uid` claim（用 `json.Number` 防精度丢失），所有 gRPC handler 注入 `UserId: extractUID(r)`。
+
+### 13.8 ES match query JSON 结构错误
+
+**根因**：Go 代码输出 `{"match":{"name":"测试","operator":"and"}}`，但 ES 要求 `operator` 嵌套在 field 对象下：`{"match":{"name":{"query":"测试","operator":"and"}}}`。
+
+**修复**：改为三层 map 嵌套，`"name": map[string]interface{}{"query":q, "operator":"and"}`。
+
+### 13.9 protoc-gen-grpc-gateway 插件 `body:"*"` 崩溃
+
+**根因**：proto 文件加 `option (google.api.http) = { body: "*" }` 后 protoc-gen-grpc-gateway 报 `cannot parse invalid wire-format data`，三版插件（v2.23.0 / v2.26.3 / v2.27.1）均复现。
+
+**最终方案**：放弃 grpc-gateway 自动代码生成，全部改用 Go `http.ServeMux` + `HandleFunc("METHOD /path", ...)` 手动实现 18 个端点的 HTTP↔gRPC 转译。
+
+### 13.10 MongoDB 作为 body 主存储
+
+**原因**：MySQL 不适合存 LONGBLOB，MongoDB 原生文档模型适合存表格数据和文件内容。
+
+**实现**：gateway 直连 MongoDB，Create/PUT 写 body 到 `doc_contents`/`sheet_contents`，GET 从 MongoDB 读取合并到 gRPC 响应。
+
+### 13.11 Consul 服务 60s 自动注销
+
+**根因**：`entrypoint-wrapper.sh` 用 gRPC 健康检查，但 C++ 服务实现的是自定义 `HealthMonitor` 而非标准 gRPC Health 协议，Consul 健康检查永远失败，60s 后自动注销（`DeregisterCriticalServiceAfter: 60s`）。
+
+**修复**：改 TCP 端口检查替代 gRPC 协议检查，去掉自动注销。
+
+### 13.12 搜索链路三条联调
+
+| 问题 | 修复 |
+|------|------|
+| 空 query 返回全量（`match_all`） | 空 `q` 直接返回 `{total:0, results:[]}` |
+| uid=0 filter 匹配旧 user_id=0 数据 | uid=0 时返回 401 触发 token 刷新 |
+| `match_phrase` 对中文太严格 | 换 `match_phrase_prefix` + `wildcard` 组合 |
+| 前端期望 `{total, results}` 但 ES 返回 `{hits:{total, hits}}` | gateway 做格式转换 |
+| 缺 `json.NewDecoder(r.Body).Decode(&req)` | 补上 |
+| IK 分词器 `match` 无法单字搜多字词 | wildcard `*强*` 通配匹配 |
+
+### 13.13 nginx DNS 不自动刷新
+
+**根因**：容器重启后 IP 变化，nginx upstream 缓存了解析结果，返回 502。
+
+**修复**：`nginx.conf` 加 `resolver 127.0.0.11 valid=10s ipv6=off` + upstream `resolve` 关键字。
+
+### 13.14 前端残留旧 RPC 风格 API 路径
+
+**根因**：`app.js` 中 6 处仍用 `POST /api/sheets/get`、`POST /api/sheets/delete`、`POST /api/files/delete`、`PUT /api/sheets`（body 传 id）、`GET /api/files/download?id=X` 等旧路径。
+
+**修复**：全部改为 RESTful 路径（`GET/DELETE /api/sheets/{id}`、`GET /api/files/{id}` 等），新增 `apiDelete` 函数。
+
+### 13.15 内存优化
+
+| 组件 | 优化 | 省内存 |
+|------|------|--------|
+| MySQL ×9 | `--innodb-buffer-pool-size=32M --performance-schema=OFF` | ~3.4GB |
+| Elasticsearch | `-Xms256m -Xmx256m` | ~256MB |
+| Redis ×6 | `--maxmemory 32mb` | ~100MB |
+| MongoDB | `--wiredTigerCacheSizeGB 0.25` | ~150MB |
+| **总计** | | **~4GB → ~1.5GB** |
+
+### 13.16 JWT Secret 三个组件不一致
+
+**根因**：C++ Auth、gRPC-Gateway (Go)、Envoy (Shell) 三个组件各写各的默认 JWT_SECRET fallback（`default-secret-32bytes-here!!!!!` / `rpc-jwt-secret-key-32bytes!!`），Docker Compose 中 `'${JWT_SECRET}'` 解析为空。
+
+**修复**：统一 fallback + Compose 用 `${JWT_SECRET:-default-secret-32bytes-here!!!!!}`。

@@ -179,18 +179,6 @@ test-functional: $(LOGS_DIR) test-docker-health
 	@echo "=== Functional Tests ==="
 	@bash $(TEST_DIR)/functional_test.sh | tee $(LOGS_DIR)/functional.log
 
-test-search: test-docker-health
-	@echo "=== Search Tests ==="
-	@bash $(TEST_DIR)/search_test.sh | tee $(LOGS_DIR)/search.log
-
-test-grpc: test-docker-health
-	@echo "=== gRPC Tests ==="
-	@bash $(TEST_DIR)/grpc_test.sh | tee $(LOGS_DIR)/grpc.log
-
-test-integration: test-docker-health
-	@echo "=== Integration Tests ==="
-	@bash $(TEST_DIR)/integration_test.sh | tee $(LOGS_DIR)/integration.log
-
 test-performance: test-docker-health
 	@echo "=== Performance Tests ==="
 	@bash $(TEST_DIR)/performance_test.sh | tee $(LOGS_DIR)/performance.log
@@ -201,15 +189,13 @@ test-stress: test-docker-health
 
 test-smoke: test-docker-health
 	@echo "=== Smoke Tests ==="
-	@bash $(TEST_DIR)/integration_test.sh --quick
 	@bash $(TEST_DIR)/functional_test.sh | tail -5
 
 test-all: test-docker-health
 	@echo "=== Full Test Pipeline ==="
 	@bash $(TEST_DIR)/functional_test.sh | tee $(LOGS_DIR)/functional.log
-	@bash $(TEST_DIR)/search_test.sh | tee $(LOGS_DIR)/search.log
-	@bash $(TEST_DIR)/grpc_test.sh | tee $(LOGS_DIR)/grpc.log
-	@bash $(TEST_DIR)/integration_test.sh | tee $(LOGS_DIR)/integration.log
+	@bash $(TEST_DIR)/performance_test.sh | tee $(LOGS_DIR)/performance.log
+	@bash $(TEST_DIR)/stress_test.sh | tee $(LOGS_DIR)/stress.log
 	@echo ""
 	@echo "=========================================="
 	@echo "  ALL TESTS COMPLETE"

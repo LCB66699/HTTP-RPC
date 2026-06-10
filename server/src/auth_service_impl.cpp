@@ -332,6 +332,7 @@ grpc::Status AuthServiceImpl::ValidateUser(grpc::ServerContext*,
                                             rpc::ValidateUserResponse* resp) {
     std::string username;
     int64_t uid = req->user_id();
+    int64_t token_uid = 0;
 
     // 从 token 中验证身份
     if (!req->token().empty()) {
@@ -340,10 +341,18 @@ grpc::Status AuthServiceImpl::ValidateUser(grpc::ServerContext*,
             try {
                 auto j = nlohmann::json::parse(payload);
                 username = j.value("username", "");
-                if (uid == 0) uid = j.value("uid", 0LL);
+                token_uid = j.value("uid", 0LL);
             } catch (...) {}
         }
     }
+
+    // 身份比对：请求的 user_id 必须与 JWT 中的 uid 一致（0 表示不限定）
+    if (uid != 0 && token_uid != 0 && uid != token_uid) {
+        resp->set_valid(false);
+        resp->set_error("user_id mismatch token uid");
+        return grpc::Status::OK;
+    }
+    if (uid == 0) uid = token_uid;
 
     // 如果 token 无效或没传，用 username/user_id 查数据库
     if (username.empty() && !req->username().empty()) {

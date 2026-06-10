@@ -31,16 +31,15 @@ request = function()
     local headers = {}
     headers["Content-Type"] = "application/json"
     if token ~= "" then
-        headers["Cookie"] = "rpc_token=" .. token
+        headers["Cookie"] = "rpc_at=" .. token
     end
 
     if r < list_threshold then
         -- 70%: list spreadsheets (GET)
         return wrk.format("GET", "/api/sheets?page=0&page_size=20", headers)
     elseif r < get_threshold then
-        -- 20%: get single sheet (POST /api/sheets/get)
-        local body = string.format('{"id":%d}', sheet_id)
-        return wrk.format("POST", "/api/sheets/get", headers, body)
+        -- 20%: get single sheet (GET /api/sheets/{id})
+        return wrk.format("GET", "/api/sheets/" .. sheet_id, headers)
     else
         -- 10%: create a new sheet (POST /api/sheets)
         local body = string.format('{"name":"wrk-%d","headers_json":"[\\"A\\"]","data_json":"[[\\"x\\"]]"}', counter)

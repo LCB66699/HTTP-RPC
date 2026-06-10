@@ -7,7 +7,10 @@ bootstrap_expect = 1
 ui_config { enabled = true }
 
 ports {
-  dns = 8600
+  dns = 53
   http = 8500
   grpc = 8502
 }
+
+# 非 .consul 查询转发到 Docker DNS
+recursors = ["127.0.0.11"]

@@ -310,6 +310,7 @@ services:
       args:
         SERVICE: auth
     image: ${DOCKER_USER:-http-rpc}/auth:latest
+    dns: consul
     environment:
       JWT_SECRET: "${JWT_SECRET:-default-secret-32bytes-here!!!!!}"
     volumes:
@@ -333,6 +334,7 @@ services:
 
   auth-2:
     image: ${DOCKER_USER:-http-rpc}/auth:latest
+    dns: consul
     environment:
       JWT_SECRET: "${JWT_SECRET:-default-secret-32bytes-here!!!!!}"
     volumes:
@@ -362,7 +364,9 @@ services:
       args:
         SERVICE: sheet
     image: ${DOCKER_USER:-http-rpc}/sheet:latest
+    dns: consul
     environment:
+      AUTH_SVC_ADDR: "auth-service.service.consul:50051"
       JWT_SECRET: "${JWT_SECRET:-default-secret-32bytes-here!!!!!}"
       RABBITMQ_HOST: "rabbitmq"
     volumes:
@@ -388,7 +392,9 @@ services:
 
   sheet-2:
     image: ${DOCKER_USER:-http-rpc}/sheet:latest
+    dns: consul
     environment:
+      AUTH_SVC_ADDR: "auth-service.service.consul:50051"
       JWT_SECRET: "${JWT_SECRET:-default-secret-32bytes-here!!!!!}"
       RABBITMQ_HOST: "rabbitmq"
     volumes:
@@ -420,7 +426,9 @@ services:
       args:
         SERVICE: file
     image: ${DOCKER_USER:-http-rpc}/file:latest
+    dns: consul
     environment:
+      AUTH_SVC_ADDR: "auth-service.service.consul:50051"
       JWT_SECRET: "${JWT_SECRET:-default-secret-32bytes-here!!!!!}"
       RABBITMQ_HOST: "rabbitmq"
     volumes:
@@ -446,7 +454,9 @@ services:
 
   file-2:
     image: ${DOCKER_USER:-http-rpc}/file:latest
+    dns: consul
     environment:
+      AUTH_SVC_ADDR: "auth-service.service.consul:50051"
       JWT_SECRET: "${JWT_SECRET:-default-secret-32bytes-here!!!!!}"
       RABBITMQ_HOST: "rabbitmq"
     volumes:
