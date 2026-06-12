@@ -44,11 +44,20 @@ title "1. 认证 (Auth)"
 
 title "1.1 注册新用户（或登录已有）"
 echo "DEBUG: TEST_USER=$TEST_USER"
-REG=$($CURL -X POST "$API/api/register" \
-    -H 'Content-Type: application/json' \
-    -c "$JAR" -D "/tmp/rpc_hdr_$$" \
-    -d "{\"username\":\"$TEST_USER\",\"password\":\"test1234\"}")
-echo "DEBUG: REG=$REG"
+# CI runner 慢，MySQL 就绪需要更长时间，最多重试 5 次
+for retry in 1 2 3 4 5; do
+    REG=$($CURL -X POST "$API/api/register" \
+        -H 'Content-Type: application/json' \
+        -c "$JAR" -D "/tmp/rpc_hdr_$$" \
+        -d "{\"username\":\"$TEST_USER\",\"password\":\"test1234\"}")
+    echo "DEBUG: REG=$REG"
+    echo "$REG" | grep -q '"success":true' && break
+    if [ $retry -lt 5 ]; then
+        warn "Register attempt $retry failed, retrying in 3s..."
+        rm -f "$JAR"
+        sleep 3
+    fi
+done
 if echo "$REG" | grep -q '"success":true'; then
     green "Register OK"
 else
