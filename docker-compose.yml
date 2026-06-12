@@ -627,12 +627,16 @@
       MONGO_URI: "mongodb://mongodb:27017"
       MONGO_DB: "rpc_search"
       ES_HOST: "http://elasticsearch:9200"
+      CANAL_MYSQL_HOST: "mysql-spreadsheet-0"
+      MYSQL_ROOT_PASSWORD: "${MYSQL_ROOT_PASSWORD:-123456}"
     depends_on:
       rabbitmq:
         condition: service_healthy
       mongodb:
         condition: service_healthy
       elasticsearch:
+        condition: service_healthy
+      mysql-spreadsheet-0:
         condition: service_healthy
     restart: unless-stopped
 
