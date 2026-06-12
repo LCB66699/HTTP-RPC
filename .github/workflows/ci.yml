@@ -69,7 +69,15 @@ jobs:
 
       - name: Container logs on failure
         if: failure()
-        run: docker compose logs --tail=100
+        run: |
+          echo "=== sheet-1 ==="
+          docker compose logs sheet-1 --tail=40
+          echo "=== mysql-spreadsheet-0 ==="
+          docker compose logs mysql-spreadsheet-0 --tail=10
+          echo "=== mysql-spreadsheet-1 ==="
+          docker compose logs mysql-spreadsheet-1 --tail=10
+          echo "=== nginx ==="
+          docker compose logs nginx --tail=20
 
   # ===== Stage 3: 推送镜像到 ghcr.io (仅 main 分支) =====
   push:
