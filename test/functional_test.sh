@@ -7,6 +7,8 @@ API="${1:-https://localhost}"
 CURL="curl -sk --connect-timeout 5 --max-time 15 --retry 2"
 JAR="/tmp/rpc_functional_cookies_$$"
 PASS=0; FAIL=0
+TEST_USER="tester_$(date +%s)"   # CI 重跑不走旧数据
+TEST_PASS="test1234"
 
 LOG_DIR="$(cd "$(dirname "$0")" && pwd)/logs"
 mkdir -p "$LOG_DIR"
@@ -44,7 +46,7 @@ title "1.1 注册新用户（或登录已有）"
 REG=$($CURL -X POST "$API/api/register" \
     -H 'Content-Type: application/json' \
     -c "$JAR" -D "/tmp/rpc_hdr_$$" \
-    -d '{"username":"tester_fn","password":"test1234"}')
+    -d "{\"username\":\"$TEST_USER\",\"password\":\"test1234\"}")
 if echo "$REG" | grep -q '"success":true'; then
     green "Register OK"
 else
@@ -53,7 +55,7 @@ else
     REG=$($CURL -X POST "$API/api/login" \
         -H 'Content-Type: application/json' \
         -c "$JAR" -D "/tmp/rpc_hdr_$$" \
-        -d '{"username":"tester_fn","password":"test1234"}')
+        -d "{\"username\":\"$TEST_USER\",\"password\":\"test1234\"}")
     echo "$REG" | grep -q '"success":true' \
         && green "Login OK (reused existing user)" \
         || red "Login also failed: $REG"
@@ -68,7 +70,7 @@ REJECTED=0
 for i in 1 2 3; do
     REG2=$($CURL -X POST "$API/api/register" \
         -H 'Content-Type: application/json' \
-        -d '{"username":"tester_fn","password":"test1234"}')
+        -d "{\"username\":\"$TEST_USER\",\"password\":\"test1234\"}")
     if echo "$REG2" | grep -q '"error"'; then
         REJECTED=1; break
     fi
@@ -83,7 +85,7 @@ rm -f "$JAR"
 LOGIN=$($CURL -X POST "$API/api/login" \
     -H 'Content-Type: application/json' \
     -c "$JAR" -D "/tmp/rpc_hdr_$$" \
-    -d '{"username":"tester_fn","password":"test1234"}')
+    -d "{\"username\":\"$TEST_USER\",\"password\":\"test1234\"}")
 echo "$LOGIN" | grep -q '"success":true' \
     && green "Login OK" \
     || red "Login failed: $LOGIN"
@@ -101,7 +103,7 @@ grep -i 'set-cookie' "/tmp/rpc_hdr_$$" | grep -qi 'samesite=strict' \
 title "1.4 错误密码（应拒绝）"
 LOGIN2=$($CURL -X POST "$API/api/login" \
     -H 'Content-Type: application/json' \
-    -d '{"username":"tester_fn","password":"wrongpass"}')
+    -d '{"username":"$TEST_USER","password":"wrongpass"}')
 echo "$LOGIN2" | grep -q '"success":false' \
     && green "Bad password rejected" \
     || red "Bad password should fail"
@@ -228,7 +230,7 @@ sleep 3
 
 REFRESH_LOGIN=$(curl -sk -X POST "$API/api/login" \
     -H 'Content-Type: application/json' \
-    -d '{"username":"tester_fn","password":"test1234"}')
+    -d "{\"username\":\"$TEST_USER\",\"password\":\"test1234\"}")
 REFRESH_TOKEN=$(echo "$REFRESH_LOGIN" | python3 -c "import sys,json; print(json.load(sys.stdin).get('refresh_token',''))" 2>/dev/null)
 [ -n "$REFRESH_TOKEN" ] \
     && green "Refresh token captured: ${REFRESH_TOKEN:0:8}..." \
@@ -239,7 +241,7 @@ if [ -n "$REFRESH_TOKEN" ]; then
     REFRESH_RESP=$($CURL -X POST "$API/api/refresh" \
         -H 'Content-Type: application/json' \
         -b "$JAR" \
-        -d "{\"username\":\"tester_fn\",\"refresh_token\":\"$REFRESH_TOKEN\"}")
+        -d "{\"username\":\"$TEST_USER\",\"refresh_token\":\"$REFRESH_TOKEN\"}")
     NEW_AT=$(echo "$REFRESH_RESP" | python3 -c "import sys,json; print(json.load(sys.stdin).get('access_token',''))" 2>/dev/null)
     if [ -n "$NEW_AT" ]; then
         green "Token refresh OK (new access_token: ${NEW_AT:0:8}...)"
@@ -254,7 +256,7 @@ if [ -n "$REFRESH_TOKEN" ]; then
     title "5.2 无效 refresh_token 应被拒绝"
     BAD_REFRESH=$($CURL -X POST "$API/api/refresh" \
         -H 'Content-Type: application/json' \
-        -d '{"username":"tester_fn","refresh_token":"00000000-0000-0000-0000-000000000000"}')
+        -d '{"username":"$TEST_USER","refresh_token":"00000000-0000-0000-0000-000000000000"}')
     echo "$BAD_REFRESH" | grep -q '"error"' \
         && green "Invalid refresh_token rejected" \
         || red "Should reject invalid refresh_token"
@@ -265,7 +267,7 @@ fi
 # ---- 6. 搜索 ----
 title "6. 搜索 (Elasticsearch)"
 
-SEARCH_REQ='{"q":"tester_fn","scope":"sheets"}'
+SEARCH_REQ="{\"q\":\"$TEST_USER\",\"scope\":\"sheets\"}"
 SEARCH_RES=$($CURL -X POST "$API/api/search" \
     -H 'Content-Type: application/json' \
     -b "$JAR" \
@@ -279,10 +281,11 @@ title "7. 跨用户隔离"
 
 # 注册第二个用户
 JAR2="/tmp/rpc_func_jar2_$$"
+TEST_USER2="tester2_$(date +%s)"
 $CURL -X POST "$API/api/register" -H 'Content-Type: application/json' \
-    -d '{"username":"tester_fn2","password":"test1234"}' > /dev/null 2>&1
+    -d "{\"username\":\"$TEST_USER2\",\"password\":\"test1234\"}" > /dev/null 2>&1
 $CURL -X POST "$API/api/login" -H 'Content-Type: application/json' \
-    -c "$JAR2" -d '{"username":"tester_fn2","password":"test1234"}' > /dev/null 2>&1
+    -c "$JAR2" -d "{\"username\":\"$TEST_USER2\",\"password\":\"test1234\"}" > /dev/null 2>&1
 
 # user2 创建自己的表
 CREATE2=$($CURL -X POST "$API/api/sheets" -H 'Content-Type: application/json' \
