@@ -1,0 +1,339 @@
+Log: /home/ubuntu/HTTP-RPC/test/logs/stress_20260526_222947.log
+
+[32mCookie ready[0m
+[32mTest data ready[0m
+
+==============================================
+  HTTP-RPC 逐层压测 (v5)
+  并发: 20c × 250req = 5000 total
+  双 Gateway: gateway-1 + gateway-2
+==============================================
+
+[1;36m=== L0: 阶梯加压 (stepwise ramp-up, 找拐点) ===[0m
+
+  --- 10c × 100req/conn = 1000 total ---
+  QPS=27530.77  P50=0         P99=1       
+
+  --- 20c × 100req/conn = 2000 total ---
+  QPS=41280.52  P50=0         P99=1       
+
+  --- 50c × 100req/conn = 5000 total ---
+  QPS=22433.29  P50=2         P99=7         [33m← P99 突增 7.00x，拐点![0m
+
+  --- 100c × 100req/conn = 10000 total ---
+  QPS=35040.14  P50=2         P99=6       
+
+  --- 200c × 100req/conn = 20000 total ---
+  QPS=24434.20  P50=2         P99=10      
+[32m  拐点: 并发=50c, QPS≈41280.52 req/s[0m
+
+[1;36m=== L1a: 内网直连 gateway-1:8081 (无 TLS) ===[0m
+[32m  gateway-1 reachable[0m
+
+[1;36m=== gateway-1 健康基线 (无鉴权) (5000 req × 20c — ab keep-alive) ===[0m
+This is ApacheBench, Version 2.3 <$Revision: 1923142 $>
+Copyright 1996 Adam Twiss, Zeus Technology Ltd, http://www.zeustech.net/
+Licensed to The Apache Software Foundation, http://www.apache.org/
+
+Benchmarking gateway-1 (be patient)
+Completed 500 requests
+Completed 1000 requests
+Completed 1500 requests
+Completed 2000 requests
+Completed 2500 requests
+Completed 3000 requests
+Completed 3500 requests
+Completed 4000 requests
+Completed 4500 requests
+Completed 5000 requests
+Finished 5000 requests
+
+
+Server Software:        
+Server Hostname:        gateway-1
+Server Port:            8081
+
+Document Path:          /api/health
+Document Length:        19 bytes
+
+Concurrency Level:      20
+Time taken for tests:   0.124 seconds
+Complete requests:      5000
+Failed requests:        0
+Keep-Alive requests:    4960
+Total transferred:      1559480 bytes
+HTML transferred:       95000 bytes
+Requests per second:    40417.76 [#/sec] (mean)
+Time per request:       0.495 [ms] (mean)
+Time per request:       0.025 [ms] (mean, across all concurrent requests)
+Transfer rate:          12310.68 [Kbytes/sec] received
+
+Connection Times (ms)
+              min  mean[+/-sd] median   max
+Connect:        0    0   0.1      0       1
+Processing:     0    0   0.2      1       2
+Waiting:        0    0   0.2      0       2
+Total:          0    0   0.3      1       2
+ERROR: The median and mean for the processing time are more than twice the standard
+       deviation apart. These results are NOT reliable.
+ERROR: The median and mean for the total time are more than twice the standard
+       deviation apart. These results are NOT reliable.
+
+Percentage of the requests served within a certain time (ms)
+  50%      1
+  66%      1
+  75%      1
+  80%      1
+  90%      1
+  95%      1
+  98%      1
+  99%      1
+ 100%      2 (longest request)
+Requests per second:    40417.76 [#/sec] (mean)
+  50%      1
+  95%      1
+  99%      1
+ 100%      2 (longest request)
+  Failed: 0  |  Non-2xx: 
+
+[1;36m=== gateway-1 Sheet List (Cookie+gRPC) (5000 req × 20c — ab keep-alive) ===[0m
+This is ApacheBench, Version 2.3 <$Revision: 1923142 $>
+Copyright 1996 Adam Twiss, Zeus Technology Ltd, http://www.zeustech.net/
+Licensed to The Apache Software Foundation, http://www.apache.org/
+
+Benchmarking gateway-1 (be patient)
+Completed 500 requests
+Completed 1000 requests
+Completed 1500 requests
+Completed 2000 requests
+Completed 2500 requests
+Completed 3000 requests
+Completed 3500 requests
+Completed 4000 requests
+Completed 4500 requests
+Completed 5000 requests
+Finished 5000 requests
+
+
+Server Software:        
+Server Hostname:        gateway-1
+Server Port:            8081
+
+Document Path:          /api/sheets
+Document Length:        805 bytes
+
+Concurrency Level:      20
+Time taken for tests:   12.375 seconds
+Complete requests:      5000
+Failed requests:        0
+Keep-Alive requests:    4960
+Total transferred:      5494480 bytes
+HTML transferred:       4025000 bytes
+Requests per second:    404.04 [#/sec] (mean)
+Time per request:       49.500 [ms] (mean)
+Time per request:       2.475 [ms] (mean, across all concurrent requests)
+Transfer rate:          433.59 [Kbytes/sec] received
+
+Connection Times (ms)
+              min  mean[+/-sd] median   max
+Connect:        0    0   0.0      0       1
+Processing:     6   49  17.8     47     149
+Waiting:        6   49  17.8     47     149
+Total:          6   49  17.8     47     149
+
+Percentage of the requests served within a certain time (ms)
+  50%     47
+  66%     54
+  75%     59
+  80%     63
+  90%     73
+  95%     83
+  98%     94
+  99%    100
+ 100%    149 (longest request)
+Requests per second:    404.04 [#/sec] (mean)
+  50%     47
+  95%     83
+  99%    100
+ 100%    149 (longest request)
+  Failed: 0  |  Non-2xx: 
+
+[1;36m=== L1b: 内网直连 gateway-2:8081 (无 TLS) ===[0m
+[32m  gateway-2 reachable[0m
+
+[1;36m=== gateway-2 健康基线 (无鉴权) (5000 req × 20c — ab keep-alive) ===[0m
+This is ApacheBench, Version 2.3 <$Revision: 1923142 $>
+Copyright 1996 Adam Twiss, Zeus Technology Ltd, http://www.zeustech.net/
+Licensed to The Apache Software Foundation, http://www.apache.org/
+
+Benchmarking gateway-2 (be patient)
+Completed 500 requests
+Completed 1000 requests
+Completed 1500 requests
+Completed 2000 requests
+Completed 2500 requests
+Completed 3000 requests
+Completed 3500 requests
+Completed 4000 requests
+Completed 4500 requests
+Completed 5000 requests
+Finished 5000 requests
+
+
+Server Software:        
+Server Hostname:        gateway-2
+Server Port:            8081
+
+Document Path:          /api/health
+Document Length:        19 bytes
+
+Concurrency Level:      20
+Time taken for tests:   0.159 seconds
+Complete requests:      5000
+Failed requests:        0
+Keep-Alive requests:    4956
+Total transferred:      1559428 bytes
+HTML transferred:       95000 bytes
+Requests per second:    31386.14 [#/sec] (mean)
+Time per request:       0.637 [ms] (mean)
+Time per request:       0.032 [ms] (mean, across all concurrent requests)
+Transfer rate:          9559.46 [Kbytes/sec] received
+
+Connection Times (ms)
+              min  mean[+/-sd] median   max
+Connect:        0    0   0.1      0       1
+Processing:     0    1   0.5      0       4
+Waiting:        0    1   0.5      0       4
+Total:          0    1   0.5      0       4
+ERROR: The median and mean for the processing time are more than twice the standard
+       deviation apart. These results are NOT reliable.
+ERROR: The median and mean for the waiting time are more than twice the standard
+       deviation apart. These results are NOT reliable.
+ERROR: The median and mean for the total time are more than twice the standard
+       deviation apart. These results are NOT reliable.
+
+Percentage of the requests served within a certain time (ms)
+  50%      0
+  66%      1
+  75%      1
+  80%      1
+  90%      1
+  95%      2
+  98%      2
+  99%      2
+ 100%      4 (longest request)
+Requests per second:    31386.14 [#/sec] (mean)
+  50%      0
+  95%      2
+  99%      2
+ 100%      4 (longest request)
+  Failed: 0  |  Non-2xx: 
+
+[1;36m=== gateway-2 Sheet List (Cookie+gRPC) (5000 req × 20c — ab keep-alive) ===[0m
+This is ApacheBench, Version 2.3 <$Revision: 1923142 $>
+Copyright 1996 Adam Twiss, Zeus Technology Ltd, http://www.zeustech.net/
+Licensed to The Apache Software Foundation, http://www.apache.org/
+
+Benchmarking gateway-2 (be patient)
+Completed 500 requests
+Completed 1000 requests
+Completed 1500 requests
+Completed 2000 requests
+Completed 2500 requests
+Completed 3000 requests
+Completed 3500 requests
+Completed 4000 requests
+Completed 4500 requests
+Completed 5000 requests
+Finished 5000 requests
+
+
+Server Software:        
+Server Hostname:        gateway-2
+Server Port:            8081
+
+Document Path:          /api/sheets
+Document Length:        805 bytes
+
+Concurrency Level:      20
+Time taken for tests:   12.585 seconds
+Complete requests:      5000
+Failed requests:        0
+Keep-Alive requests:    4960
+Total transferred:      5494480 bytes
+HTML transferred:       4025000 bytes
+Requests per second:    397.30 [#/sec] (mean)
+Time per request:       50.340 [ms] (mean)
+Time per request:       2.517 [ms] (mean, across all concurrent requests)
+Transfer rate:          426.36 [Kbytes/sec] received
+
+Connection Times (ms)
+              min  mean[+/-sd] median   max
+Connect:        0    0   0.1      0       1
+Processing:     7   50  16.9     48     137
+Waiting:        6   50  16.9     48     137
+Total:          7   50  16.9     48     137
+
+Percentage of the requests served within a certain time (ms)
+  50%     48
+  66%     55
+  75%     60
+  80%     64
+  90%     73
+  95%     82
+  98%     92
+  99%     98
+ 100%    137 (longest request)
+Requests per second:    397.30 [#/sec] (mean)
+  50%     48
+  95%     82
+  99%     98
+ 100%    137 (longest request)
+  Failed: 0  |  Non-2xx: 
+
+[1;36m=== L1d: 内网写入压测 (容器内 curl, 10c 并发创建→获取→更新→删除) ===[0m
+  10c 并发 × 5 轮 = 50 次写入循环
+  每循环: POST create → GET → PUT update → POST delete
+OK_COUNT=50
+ERR_COUNT=0
+0
+ELAPSED_MS=2155
+OPS_SEC=92.8
+[32m  写入成功率: 50/50[0m
+  [33m  总耗时: 2155ms[0m 
+  [33m  写入吞吐: 92.8 ops/s (每 op = 4 次 HTTP 调用)[0m 
+
+[1;36m=== L2: 本地 nginx TLS (localhost:443 → least_conn → gateway-1/2) ===[0m
+
+[33m[WARN][0m   nginx api_limit (rate=100r/s burst=50) 可能触发 429 — 压测时建议注释 limit_req
+  [健康基线]
+Failed requests:        3982
+Requests per second:    9714.09 [#/sec] (mean)
+  50%      2
+  95%      4
+  99%      5
+ 100%     40 (longest request)
+
+  [Sheet List — Cookie+gRPC+Redis 完整链路]
+Failed requests:        0
+Requests per second:    357.10 [#/sec] (mean)
+  50%     53
+  95%     88
+  99%    110
+ 100%    175 (longest request)
+
+[1;36m=== L3: 公网全链路 (https://106.53.100.198) ===[0m
+
+Requests per second:    6296.40 [#/sec] (mean)
+  50%      2
+  95%      6
+  99%     12
+ 100%     83 (longest request)
+
+[1;36m=== L4: gateway 故障转移 (停 gateway-1，流量应切到 gateway-2) ===[0m
+
+  暂停 gateway-1...
+http-rpc-gateway-1-1
+  gateway-1 已暂停，发送 20 个请求（期望全部成功，走 gateway-2）
+  强制恢复 gateway-1...
+http-rpc-gateway-1-1

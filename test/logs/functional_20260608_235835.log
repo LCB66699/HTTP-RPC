@@ -1,0 +1,5 @@
+Log: /home/ubuntu/HTTP-RPC/test/logs/functional_20260608_235835.log
+
+
+[1;36m=== 0. API 连通性 ===[0m
+[31m[FAIL][0m API unreachable at https://localhost

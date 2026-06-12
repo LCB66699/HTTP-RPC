@@ -1,0 +1,42 @@
+syntax = "proto3";
+
+package rpc;
+
+option go_package = "github.com/lcb66699/http-rpc/test-proto/gen";
+
+import "google/api/annotations.proto";
+
+service AuthService {
+  rpc Login(LoginRequest) returns (LoginResponse) {
+    option (google.api.http) = { post: "/api/login"; body: "*"; };
+  }
+  rpc Register(RegisterRequest) returns (RegisterResponse) {
+    option (google.api.http) = { post: "/api/register"; body: "*"; };
+  }
+  rpc ValidateUser(ValidateUserRequest) returns (ValidateUserResponse) {
+    option (google.api.http) = { post: "/api/auth/validate"; body: "*"; };
+  }
+}
+
+message LoginRequest {
+  string username = 1;
+  string password = 2;
+}
+message LoginResponse {
+  bool success = 1; string token = 2; string error = 3; int64 user_id = 4;
+}
+
+message RegisterRequest {
+  string username = 1;
+  string password = 2;
+}
+message RegisterResponse {
+  bool success = 1; string token = 2; string error = 3; int64 user_id = 4;
+}
+
+message ValidateUserRequest {
+  int64 user_id = 1; string username = 2; string token = 3;
+}
+message ValidateUserResponse {
+  bool valid = 1; string username = 2; int64 user_id = 3; string role = 4; string error = 5;
+}

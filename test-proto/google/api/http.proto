@@ -1,0 +1,24 @@
+// google/api/http.proto — HTTP 路由规则定义 (精简版)
+syntax = "proto3";
+
+package google.api;
+
+option go_package = "google.golang.org/genproto/googleapis/api/annotations;annotations";
+
+message HttpRule {
+  string selector = 1;
+  oneof pattern {
+    string get     = 2;
+    string put     = 3;
+    string post    = 4;
+    string delete  = 5;
+    string patch   = 6;
+    string custom  = 7;  // custom verb, e.g. "/sheets:list"
+  }
+  string body = 8;
+  repeated HttpRule additional_bindings = 11;
+}
+
+message Http {
+  repeated HttpRule rules = 1;
+}

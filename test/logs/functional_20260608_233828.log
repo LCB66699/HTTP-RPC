@@ -1,0 +1,13 @@
+Log: /home/ubuntu/HTTP-RPC/test/logs/functional_20260608_233828.log
+
+
+[1;36m=== 0. API 连通性 ===[0m
+[32m[PASS][0m API reachable
+
+[1;36m=== 1. 认证 (Auth) ===[0m
+
+[1;36m=== 1.1 注册新用户 ===[0m
+[31m[FAIL][0m Register failed: {"error":"Username already exists"}
+[31m[FAIL][0m Register: no rpc_at in Set-Cookie
+
+[1;36m=== 1.2 重复注册（应拒绝） ===[0m

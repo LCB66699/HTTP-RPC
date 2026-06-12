@@ -1,0 +1,7 @@
+syntax = "proto3";
+package test;
+option go_package = "test-proto/gen";
+import "google/api/annotations.proto";
+service Test { rpc Foo(FooReq) returns (FooRes) { option (google.api.http) = { get: "/api/foo" }; } }
+message FooReq { string m = 1; }
+message FooRes { string m = 1; }

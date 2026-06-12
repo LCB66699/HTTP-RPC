@@ -1,0 +1,7 @@
+syntax = "proto3";
+package rpc;
+option go_package = "gateway-grpc/gen/rpc";
+import "google/api/annotations.proto";
+message FooReq { string m = 1; }
+message FooRes { string m = 1; }
+service SpreadsheetService { rpc Foo(FooReq) returns (FooRes) { option (google.api.http) = { get: "/api/sheets" }; } }
