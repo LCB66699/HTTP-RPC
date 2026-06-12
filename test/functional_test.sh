@@ -40,14 +40,24 @@ fi
 # ---- 1. 认证 ----
 title "1. 认证 (Auth)"
 
-title "1.1 注册新用户"
+title "1.1 注册新用户（或登录已有）"
 REG=$($CURL -X POST "$API/api/register" \
     -H 'Content-Type: application/json' \
     -c "$JAR" -D "/tmp/rpc_hdr_$$" \
     -d '{"username":"tester_fn","password":"test1234"}')
-echo "$REG" | grep -q '"success":true' \
-    && green "Register OK" \
-    || red "Register failed: $REG"
+if echo "$REG" | grep -q '"success":true'; then
+    green "Register OK"
+else
+    # 用户可能已存在（CI 重跑），尝试登录
+    warn "Register failed (user may exist), trying login..."
+    REG=$($CURL -X POST "$API/api/login" \
+        -H 'Content-Type: application/json' \
+        -c "$JAR" -D "/tmp/rpc_hdr_$$" \
+        -d '{"username":"tester_fn","password":"test1234"}')
+    echo "$REG" | grep -q '"success":true' \
+        && green "Login OK (reused existing user)" \
+        || red "Login also failed: $REG"
+fi
 REG_TOKEN=$(extract_token "/tmp/rpc_hdr_$$")
 [ -n "$REG_TOKEN" ] \
     && green "Register: rpc_at cookie received" \
