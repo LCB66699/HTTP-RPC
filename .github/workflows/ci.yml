@@ -47,6 +47,8 @@ jobs:
 
       - name: Start services
         run: |
+          docker compose down -v --remove-orphans 2>/dev/null || true
+          rm -rf data/ 2>/dev/null || true
           docker compose up -d
           echo "Waiting for health..."
           for i in $(seq 1 90); do
