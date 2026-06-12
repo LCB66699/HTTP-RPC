@@ -19,6 +19,7 @@ import (
 	"github.com/sony/gobreaker/v2"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/connectivity"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/keepalive"
 	"google.golang.org/grpc/metadata"
@@ -28,6 +29,7 @@ import (
 )
 
 var jwtSecret []byte
+var authConn, sheetConn, fileConn *grpc.ClientConn
 
 // cbWithSlow wraps a circuit breaker with a slow-call counter
 type cbWithSlow struct {
@@ -52,13 +54,13 @@ func main() {
 	searchAddr := getenv("SEARCH_ADDR", "rpc-search:50051")
 	log.Printf("Auth=%s Sheet=%s File=%s Search=%s", authAddr, sheetAddr, fileAddr, searchAddr)
 
-	authConn, _ := grpc.NewClient("dns:///"+authAddr, creds, kp, lb)
+	authConn, _ = grpc.NewClient("dns:///"+authAddr, creds, kp, lb)
 	authClient := pb.NewAuthServiceClient(authConn)
 
-	sheetConn, _ := grpc.NewClient("dns:///"+sheetAddr, creds, kp, lb)
+	sheetConn, _ = grpc.NewClient("dns:///"+sheetAddr, creds, kp, lb)
 	sheetClient := pb.NewSpreadsheetServiceClient(sheetConn)
 
-	fileConn, _ := grpc.NewClient("dns:///"+fileAddr, creds, kp, lb)
+	fileConn, _ = grpc.NewClient("dns:///"+fileAddr, creds, kp, lb)
 	fileClient := pb.NewFileServiceClient(fileConn)
 
 	searchConn, _ := grpc.NewClient("dns:///"+searchAddr, creds, kp, lb)
@@ -131,6 +133,21 @@ func main() {
 	})
 	mux.HandleFunc("GET /api/health", func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, map[string]string{"gateway": "READY"})
+	})
+	mux.HandleFunc("GET /api/health/ready", func(w http.ResponseWriter, r *http.Request) {
+		checkConn := func(name string, conn *grpc.ClientConn) string {
+			s := conn.GetState()
+			if s == connectivity.Ready { return "OK" }
+			return s.String()
+		}
+		status := map[string]string{"gateway": "OK"}
+		status["auth"] = checkConn("auth", authConn)
+		status["sheet"] = checkConn("sheet", sheetConn)
+		status["file"] = checkConn("file", fileConn)
+		allOK := status["auth"] == "OK" && status["sheet"] == "OK" && status["file"] == "OK"
+		code := http.StatusOK
+		if !allOK { code = http.StatusServiceUnavailable }
+		writeJSONStatus(w, code, map[string]interface{}{"_all": allOK, "status": status})
 	})
 	mux.HandleFunc("GET /api/me", func(w http.ResponseWriter, r *http.Request) {
 		user := getUserFromCookie(r)
