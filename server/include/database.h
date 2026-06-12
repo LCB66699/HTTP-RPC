@@ -18,6 +18,7 @@ struct SpreadsheetRow {
     int row_count = 0, col_count = 0;
     std::string created_at, updated_at;
     int version = 1;
+    std::string storage_path;
 };
 
 struct SpreadsheetSummary {
@@ -97,6 +98,8 @@ public:
     bool DeleteFile(int64_t id, int64_t user_id = 0);
     bool GetFileOwner(int64_t id, int64_t& owner_user_id);
     bool GetFileStoragePath(int64_t id, std::string& storage_path);
+    bool GetSpreadsheetStoragePath(int64_t id, std::string& storage_path);
+    bool UpdateSpreadsheetStoragePath(int64_t id, const std::string& storage_path);
 
     // Undo log
     bool WriteUndoLog(const std::string& xid, const std::string& table_name,
@@ -204,6 +207,8 @@ public:
     bool DeleteFile(int64_t id, int64_t user_id = 0);
     bool GetFileOwner(int64_t id, int64_t& owner_user_id);
     bool GetFileStoragePath(int64_t id, std::string& storage_path);
+    bool GetSpreadsheetStoragePath(int64_t id, std::string& storage_path);
+    bool UpdateSpreadsheetStoragePath(int64_t id, const std::string& storage_path);
 
     // === Undo Log (by user_id or broadcast) ===
     bool WriteUndoLog(const std::string& xid, const std::string& table_name,

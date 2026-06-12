@@ -14,14 +14,18 @@ import (
 	"time"
 
 	amqp "github.com/rabbitmq/amqp091-go"
+	"github.com/minio/minio-go/v7"
+	"github.com/minio/minio-go/v7/pkg/credentials"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 	"github.com/elastic/go-elasticsearch/v8"
 )
 
 var (
-	mongoColl *mongo.Collection
-	esClient  *elasticsearch.Client
+	mongoColl  *mongo.Collection
+	esClient   *elasticsearch.Client
+	minioCli   *minio.Client
+	minioBucket string
 )
 
 func main() {
@@ -33,6 +37,17 @@ func main() {
 	mongoClient, _ := mongo.Connect(context.Background(),
 		options.Client().ApplyURI(getenv("MONGO_URI", "mongodb://mongodb:27017")))
 	mongoColl = mongoClient.Database("rpc_search").Collection("doc_contents")
+
+	// MinIO client
+	minioEndpoint := getenv("MINIO_ENDPOINT", "minio:9000")
+	minioBucket = getenv("MINIO_BUCKET", "rpc-files")
+	minioCli, _ = minio.New(minioEndpoint, &minio.Options{
+		Creds: credentials.NewStaticV4(
+			getenv("MINIO_ACCESS_KEY", "rpc-minio"),
+			getenv("MINIO_SECRET_KEY", "rpc-minio-123456"), ""),
+		Secure: false,
+	})
+	log.Printf("[Notify] MinIO: %s/%s", minioEndpoint, minioBucket)
 
 	rabbitHost := getenv("RABBITMQ_HOST", "rabbitmq")
 	conn, err := amqp.Dial(fmt.Sprintf("amqp://%s:%s@%s:5672/",
@@ -94,10 +109,29 @@ func handleFileUploaded(event map[string]interface{}) bool {
 	origName, _ := event["original_name"].(string)
 	mimeType, _ := event["mime_type"].(string)
 
+	// Fetch content from MinIO if object_key present
+	var contentText string
+	var rawSize int64
+	if objectKey, ok := event["object_key"].(string); ok && objectKey != "" && minioCli != nil {
+		obj, err := minioCli.GetObject(context.Background(), minioBucket, objectKey, minio.GetObjectOptions{})
+		if err == nil {
+			defer obj.Close()
+			buf := new(bytes.Buffer)
+			written, _ := buf.ReadFrom(obj)
+			rawSize = written
+			contentText = buf.String()
+			log.Printf("[Notify] MinIO content fetched: %s (%d bytes)", objectKey, rawSize)
+		}
+	}
+
 	doc := map[string]interface{}{
 		"file_id": fileID, "user_id": userID,
 		"original_name": origName, "mime_type": mimeType,
 		"parsed_at": time.Now().UTC(),
+	}
+	if contentText != "" {
+		doc["content_text"] = contentText
+		doc["raw_size"] = rawSize
 	}
 	if _, err := mongoColl.UpdateOne(context.Background(),
 		map[string]interface{}{"file_id": fileID},
@@ -139,10 +173,27 @@ func handleSheetUpsert(event map[string]interface{}) bool {
 	name, _ := event["name"].(string)
 	desc, _ := event["description"].(string)
 
+	// Fetch content from MinIO if object_key present
+	var cells, headers interface{}
+	if objectKey, ok := event["object_key"].(string); ok && objectKey != "" && minioCli != nil {
+		obj, err := minioCli.GetObject(context.Background(), minioBucket, objectKey, minio.GetObjectOptions{})
+		if err == nil {
+			defer obj.Close()
+			var sheetData map[string]interface{}
+			if json.NewDecoder(obj).Decode(&sheetData) == nil {
+				cells = sheetData["data"]
+				headers = sheetData["headers"]
+				log.Printf("[Notify] MinIO sheet content fetched: %s", objectKey)
+			}
+		}
+	}
+
 	doc := map[string]interface{}{
 		"sheet_id": sheetID, "user_id": userID,
 		"name": name, "description": desc, "updated_at": time.Now().UTC(),
 	}
+	if cells != nil { doc["cells"] = cells }
+	if headers != nil { doc["headers"] = headers }
 	if _, err := mongoColl.Database().Collection("sheet_contents").UpdateOne(context.Background(),
 		map[string]interface{}{"sheet_id": sheetID},
 		map[string]interface{}{"$set": doc}, options.Update().SetUpsert(true)); err != nil {

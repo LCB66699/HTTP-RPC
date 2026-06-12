@@ -1,0 +1,19 @@
+# 本地调试 — C++ 服务 GDB 权限 + 源码挂载
+# CI 环境没有此文件，不受影响
+
+services:
+  auth-1:
+    cap_add: [SYS_PTRACE]
+    security_opt: [seccomp:unconfined]
+    volumes:
+      - ./server:/src/server:ro
+  sheet-1:
+    cap_add: [SYS_PTRACE]
+    security_opt: [seccomp:unconfined]
+    volumes:
+      - ./server:/src/server:ro
+  file-1:
+    cap_add: [SYS_PTRACE]
+    security_opt: [seccomp:unconfined]
+    volumes:
+      - ./server:/src/server:ro

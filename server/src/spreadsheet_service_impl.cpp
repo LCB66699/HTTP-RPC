@@ -88,10 +88,30 @@ grpc::Status SpreadsheetServiceImpl::CreateSpreadsheet(
         return grpc::Status::OK;
     }
 
+    // MinIO: 上传表格 JSON → 元数据存 MySQL storage_path；回退 MySQL JSON 列
+    std::string storage_key;
+    if (minio_ && minio_->IsConfigured()) {
+        auto us = std::chrono::duration_cast<std::chrono::microseconds>(
+            std::chrono::high_resolution_clock::now().time_since_epoch()).count();
+        storage_key = std::to_string(req->user_id()) + "/" + std::to_string(us) + ".json";
+        nlohmann::json content;
+        content["headers"] = nlohmann::json::parse(req->headers_json().empty() ? "[]" : req->headers_json());
+        content["data"]   = nlohmann::json::parse(req->data_json().empty() ? "[]" : req->data_json());
+        std::string body = content.dump();
+        if (!minio_->PutObject(storage_key, body, "application/json")) {
+            resp->set_success(false);
+            resp->set_error("MinIO upload failed");
+            return grpc::Status::OK;
+        }
+    }
+
     int64_t id = 0;
     bool ok = db_->CreateSpreadsheet(req->user_id(), username, req->name(),
                                      req->description(), req->headers_json(),
                                      req->data_json(), id, req->idempotency_key());
+    if (!ok && !storage_key.empty()) {
+        minio_->DeleteObject(storage_key);  // rollback
+    }
 
     if (!ok) {
         resp->set_success(false);
@@ -107,6 +127,11 @@ grpc::Status SpreadsheetServiceImpl::CreateSpreadsheet(
         return grpc::Status::OK;
     }
 
+    // Write storage_path back to MySQL after MinIO upload
+    if (!storage_key.empty() && db_) {
+        db_->UpdateSpreadsheetStoragePath(id, storage_key);
+    }
+
     // Invalidate list cache
     if (redis_ && redis_->IsConnected()) {
         redis_->Increment(VersionKey(req->user_id()));
@@ -119,6 +144,7 @@ grpc::Status SpreadsheetServiceImpl::CreateSpreadsheet(
         ev["id"] = id;
         ev["user_id"] = req->user_id();
         ev["name"] = req->name();
+        if (!storage_key.empty()) ev["object_key"] = storage_key;
         rabbit_->Publish("rpc.events", "sheet.created", ev.dump());
     }
 
@@ -172,10 +198,25 @@ grpc::Status SpreadsheetServiceImpl::GetSpreadsheet(
     const int  NULL_TTL     = 60;    // 空值缓存 1min
     const int  LOCK_TTL     = 10;    // 刷新锁 10s，防死锁
 
+    // 辅助函数：从 MinIO 回填 headers/data
+    auto fillFromMinIO = [this](SpreadsheetRow& row) {
+        if (minio_ && minio_->IsConfigured() && !row.storage_path.empty()) {
+            std::string body;
+            if (minio_->GetObject(row.storage_path, body)) {
+                try {
+                    auto j = nlohmann::json::parse(body);
+                    row.headers_json = j.value("headers", nlohmann::json::array()).dump();
+                    row.data_json   = j.value("data",   nlohmann::json::array()).dump();
+                } catch (...) {}
+            }
+        }
+    };
+
     // 异步刷新函数：查 MySQL → 回写 Redis(data+ts) → 释放锁
-    auto async_refresh = [this, kNullMarker](int64_t id, int64_t uid, std::string ck, std::string tk, std::string lk) {
+    auto async_refresh = [this, kNullMarker, &fillFromMinIO](int64_t id, int64_t uid, std::string ck, std::string tk, std::string lk) {
         SpreadsheetRow row;
         if (db_ && db_->GetSpreadsheet(id, uid, row)) {
+            fillFromMinIO(row);
             rpc::GetSpreadsheetResponse fresh;
             auto* s = fresh.mutable_spreadsheet();
             s->set_id(row.id);
@@ -317,7 +358,8 @@ grpc::Status SpreadsheetServiceImpl::GetSpreadsheet(
         return grpc::Status::OK;
     }
 
-    // 3) Populate response from MySQL
+    // 3) Populate response (MinIO first, MySQL fallback)
+    fillFromMinIO(row);
     auto* sheet = resp->mutable_spreadsheet();
     sheet->set_id(row.id);
     sheet->set_username(row.username);

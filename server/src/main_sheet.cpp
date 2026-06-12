@@ -1,4 +1,4 @@
-// Sheet Service main — 独立编译
+﻿// Sheet Service main 鈥?鐙珛缂栬瘧
 #include "spreadsheet_service_impl.h"
 #include "auth_interceptor.h"
 #include "database.h"
@@ -10,7 +10,6 @@
 #include "call_logger.h"
 #include "system_logger.h"
 #include "health_service_impl.h"
-#include "tx_resource.h"
 #include <grpcpp/grpcpp.h>
 #include <cstdio>
 #include <cstdlib>
@@ -59,6 +58,21 @@ int main(int argc, char* argv[]) {
     const char* rb_host = std::getenv("RABBITMQ_HOST");
     if(rb_host) rabbit_pub = std::make_unique<RabbitPublisher>(rb_host,5672,"rpc","rpc-rabbit-123456");
 
+    minio::Client minio_client;
+    const char* minio_ep = std::getenv("MINIO_ENDPOINT");
+    const char* minio_ak = std::getenv("MINIO_ACCESS_KEY");
+    const char* minio_sk = std::getenv("MINIO_SECRET_KEY");
+    const char* minio_bk = std::getenv("MINIO_BUCKET");
+    if (minio_ep && minio_ak && minio_sk && minio_bk) {
+        minio_client.endpoint   = minio_ep;
+        minio_client.access_key = minio_ak;
+        minio_client.secret_key = minio_sk;
+        minio_client.bucket     = minio_bk;
+        const char* minio_pub = std::getenv("MINIO_PUBLIC_URL");
+        minio_client.public_url = minio_pub ? minio_pub : ("http://" + std::string(minio_ep));
+        printf("[Sheet] MinIO configured: %s/%s\n", minio_ep, minio_bk);
+    }
+
     signal(SIGINT,SignalHandler); signal(SIGTERM,SignalHandler);
 
     HealthMonitorImpl health_monitor;
@@ -66,7 +80,6 @@ int main(int argc, char* argv[]) {
     health_monitor.SetNodeInfo("sheet-"+std::to_string(port),"sheet",host,port);
     health_monitor.StartHeartbeat();
 
-    TxResource tx_resource; tx_resource.SetDatabase(db.get());
 
     std::string addr=host+":"+std::to_string(port);
     grpc::ServerBuilder builder;
@@ -87,8 +100,8 @@ int main(int argc, char* argv[]) {
     sheet_service.SetL1Cache(l1_cache.get()); sheet_service.SetLogger(logger.get());
     sheet_service.SetSysLog(slog.get());
     if(rabbit_pub) sheet_service.SetRabbitMQ(rabbit_pub.get());
+    if(minio_client.IsConfigured()) sheet_service.SetMinio(&minio_client);
     builder.RegisterService(&sheet_service);
-    builder.RegisterService(&tx_resource);
 
     g_server = builder.BuildAndStart();
     printf("[Sheet] Listening on %s\n",addr.c_str());

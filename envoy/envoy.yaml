@@ -51,10 +51,15 @@ static_resources:
     circuit_breakers:
       thresholds:
       - priority: DEFAULT
-        max_connections: 1024
-        max_pending_requests: 1024
-        max_requests: 1024
+        max_connections: 100
+        max_pending_requests: 50
+        max_requests: 200
         max_retries: 3
+    outlier_detection:
+      interval: 10s
+      base_ejection_time: 30s
+      max_ejection_percent: 50
+      consecutive_5xx: 5
     load_assignment:
       cluster_name: gateway
       endpoints:

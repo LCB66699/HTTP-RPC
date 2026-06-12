@@ -244,6 +244,7 @@ bool Database::Initialize() {
     // DEFAULT 0 allows idempotent migration on existing rows (populated below via JOIN).
     mysql_query(c, "ALTER TABLE spreadsheets ADD COLUMN user_id BIGINT NOT NULL DEFAULT 0");
     mysql_query(c, "ALTER TABLE files        ADD COLUMN user_id BIGINT NOT NULL DEFAULT 0");
+    mysql_query(c, "ALTER TABLE spreadsheets ADD COLUMN storage_path VARCHAR(512) DEFAULT NULL");
     // Backfill from users table (no-op if already populated).
     mysql_query(c, "UPDATE spreadsheets s JOIN users u ON s.username=u.username SET s.user_id=u.id WHERE s.user_id=0");
     mysql_query(c, "UPDATE files f        JOIN users u ON f.username=u.username SET f.user_id=u.id WHERE f.user_id=0");
@@ -439,7 +440,7 @@ bool Database::CreateSpreadsheet(int64_t user_id, const std::string& username,
 bool Database::GetSpreadsheet(int64_t id, int64_t user_id, SpreadsheetRow& out) {
     if (user_id <= 0) return false;
     std::string sql = "SELECT id,username,name,description,headers_json,data_json,"
-                      "row_count,col_count,created_at,updated_at,version FROM spreadsheets WHERE id="
+                      "row_count,col_count,created_at,updated_at,version,storage_path FROM spreadsheets WHERE id="
                       + std::to_string(id) + " AND user_id=" + std::to_string(user_id);
     return ExecRead(sql, [&](MYSQL_RES* res) {
         MYSQL_ROW row = mysql_fetch_row(res);
@@ -455,6 +456,7 @@ bool Database::GetSpreadsheet(int64_t id, int64_t user_id, SpreadsheetRow& out) 
         out.created_at = row[8] ? row[8] : "";
         out.updated_at = row[9] ? row[9] : "";
         out.version = row[10] ? std::stoi(row[10]) : 1;
+        out.storage_path = row[11] ? row[11] : "";
         return true;
     });
 }
@@ -709,6 +711,22 @@ bool Database::GetFileStoragePath(int64_t id, std::string& storage_path) {
     });
 }
 
+bool Database::GetSpreadsheetStoragePath(int64_t id, std::string& storage_path) {
+    storage_path.clear();
+    std::string sql = "SELECT storage_path FROM spreadsheets WHERE id=" + std::to_string(id);
+    return ExecRead(sql, [&](MYSQL_RES* res) {
+        MYSQL_ROW row = mysql_fetch_row(res);
+        if (row && row[0]) storage_path = row[0];
+        return row != nullptr;
+    });
+}
+bool Database::UpdateSpreadsheetStoragePath(int64_t id, const std::string& storage_path) {
+    auto* ec = EscConn();
+    if (!ec) return false;
+    std::string sql = "UPDATE spreadsheets SET storage_path=" + q(ec, storage_path) + " WHERE id=" + std::to_string(id);
+    return ExecWrite(sql);
+}
+
 // ---- Undo Log (always master — 2PC requires consistency) ----
 
 bool Database::WriteUndoLog(const std::string& xid, const std::string& table_name,
@@ -944,6 +962,16 @@ bool ShardedDatabase::GetFileOwner(int64_t id, int64_t& owner_user_id) {
 bool ShardedDatabase::GetFileStoragePath(int64_t id, std::string& storage_path) {
     for (auto& db : shards_)
         if (db->GetFileStoragePath(id, storage_path)) return true;
+    return false;
+}
+bool ShardedDatabase::GetSpreadsheetStoragePath(int64_t id, std::string& storage_path) {
+    for (auto& db : shards_)
+        if (db->GetSpreadsheetStoragePath(id, storage_path)) return true;
+    return false;
+}
+bool ShardedDatabase::UpdateSpreadsheetStoragePath(int64_t id, const std::string& storage_path) {
+    for (auto& db : shards_)
+        if (db->UpdateSpreadsheetStoragePath(id, storage_path)) return true;
     return false;
 }
 

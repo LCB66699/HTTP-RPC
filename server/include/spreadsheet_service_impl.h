@@ -6,6 +6,7 @@
 #include "generated/rpc_auth.grpc.pb.h"
 #include "generated/rpc_auth.pb.h"
 #include "rabbit_publisher.h"
+#include "minio_client.h"
 
 class ShardedDatabase;
 class RedisClient;
@@ -24,6 +25,7 @@ public:
     void SetSysLog(SystemLogger* slog) { slog_ = slog; }
     void SetAuthInterceptor(AuthInterceptor* interceptor) { auth_ = interceptor; }
     void SetRabbitMQ(RabbitPublisher* rb) { rabbit_ = rb; }
+    void SetMinio(minio::Client* mc) { minio_ = mc; }
     void SetAuthChannel(std::shared_ptr<grpc::Channel> ch) {
         auth_stub_ = rpc::AuthService::NewStub(ch);
     }
@@ -57,4 +59,5 @@ private:
     AuthInterceptor* auth_ = nullptr;
     std::unique_ptr<rpc::AuthService::Stub> auth_stub_;
     RabbitPublisher* rabbit_ = nullptr;
+    minio::Client* minio_ = nullptr;
 };

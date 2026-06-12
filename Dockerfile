@@ -21,15 +21,19 @@ RUN cd /tmp/redis-plus-plus \
     && rm -rf /tmp/redis-plus-plus
 
 ARG SERVICE=auth
+ARG DEBUG=false
 WORKDIR /src
 COPY . .
+RUN if [ "$DEBUG" = "true" ]; then sed -i 's/-O2/-g -O0/g' Makefile; fi
 RUN make clean && make ${SERVICE}
 
 FROM ubuntu:24.04
 
+ARG DEBUG=false
 RUN apt update && apt install -y \
     libgrpc++1.51t64 libmysqlclient21 libhiredis-dev libssl3t64 zlib1g \
     libnghttp2-14 librabbitmq4 apache2-utils curl \
+    $(if [ "$DEBUG" = "true" ]; then echo gdb; fi) \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=builder /usr/local/lib/libredis++.so* /usr/local/lib/

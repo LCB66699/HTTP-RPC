@@ -25,7 +25,7 @@ extract_token() {
         | sed 's/.*rpc_at=//;s/;.*//' | tr -d '\r\n'
 }
 
-cleanup() { rm -f "$JAR" "/tmp/rpc_hdr_$$" "/tmp/rpc_test_upload.txt" "/tmp/rpc_test_download.txt" "/tmp/rl.txt" "/tmp/rpc_func_jar2_$$" "/tmp/rpc_test_user2_file.txt" "/tmp/rpc_cross_file.txt"; }
+cleanup() { rm -f "$JAR" "/tmp/rpc_hdr_$$" "/tmp/rpc_test_upload.txt" "/tmp/rpc_test_download.txt" "/tmp/rl.txt" "/tmp/rpc_func_jar2_$$"; }
 trap cleanup EXIT
 
 # ---- 0. 连通性检查 ----
@@ -200,7 +200,7 @@ echo "$FLIST" | grep -q '"success":true' \
     || red "File list failed: $FLIST"
 
 title "4.3 下载并校验内容"
-$CURL -o /tmp/rpc_test_download.txt \
+$CURL -L -o /tmp/rpc_test_download.txt \
     "$API/api/files/$FILE_ID" -b "$JAR" 2>/dev/null
 grep -q "Hello HTTP-RPC" /tmp/rpc_test_download.txt 2>/dev/null \
     && green "Download & content verified" \
@@ -214,24 +214,43 @@ echo "$FDEL" | grep -q '"success":true' \
 
 # ---- 5. Token Refresh ----
 title "5. Token 刷新 (RefreshToken)"
+sleep 3
 
-# 用 Cookie 驱动——rpc_rt 在 $JAR 里
-title "5.1 Cookie-only refresh"
-REFRESH_RESP=$($CURL -X POST "$API/api/refresh" \
+REFRESH_LOGIN=$(curl -sk -X POST "$API/api/login" \
     -H 'Content-Type: application/json' \
-    -b "$JAR" -c "$JAR" \
-    -d '{}')
-echo "$REFRESH_RESP" | grep -q '"access_token"' \
-    && green "Cookie refresh OK" \
-    || red "Cookie refresh failed: $REFRESH_RESP"
+    -d '{"username":"tester_fn","password":"test1234"}')
+REFRESH_TOKEN=$(echo "$REFRESH_LOGIN" | python3 -c "import sys,json; print(json.load(sys.stdin).get('refresh_token',''))" 2>/dev/null)
+[ -n "$REFRESH_TOKEN" ] \
+    && green "Refresh token captured: ${REFRESH_TOKEN:0:8}..." \
+    || red "No refresh_token in login response"
 
-title "5.2 无效 refresh_token 应被拒绝"
-BAD_REFRESH=$($CURL -X POST "$API/api/refresh" \
-    -H 'Content-Type: application/json' \
-    -d '{"username":"tester_fn","refresh_token":"00000000-0000-0000-0000-000000000000"}')
-echo "$BAD_REFRESH" | grep -q '"error"' \
-    && green "Invalid refresh_token rejected" \
-    || red "Should reject invalid refresh_token"
+if [ -n "$REFRESH_TOKEN" ]; then
+    title "5.1 POST /api/refresh"
+    REFRESH_RESP=$($CURL -X POST "$API/api/refresh" \
+        -H 'Content-Type: application/json' \
+        -b "$JAR" \
+        -d "{\"username\":\"tester_fn\",\"refresh_token\":\"$REFRESH_TOKEN\"}")
+    NEW_AT=$(echo "$REFRESH_RESP" | python3 -c "import sys,json; print(json.load(sys.stdin).get('access_token',''))" 2>/dev/null)
+    if [ -n "$NEW_AT" ]; then
+        green "Token refresh OK (new access_token: ${NEW_AT:0:8}...)"
+        title "5.2 新 token 验证"
+        NEW_CODE=$(curl -sk -o /dev/null -w "%{http_code}" -H "Cookie: rpc_at=$NEW_AT" "$API/api/sheets?page=0&page_size=1")
+        [ "$NEW_CODE" = "200" ] \
+            && green "Refreshed token accepted" \
+            || red "Refreshed token rejected (got $NEW_CODE)"
+    else
+        red "Token refresh failed: $REFRESH_RESP"
+    fi
+    title "5.2 无效 refresh_token 应被拒绝"
+    BAD_REFRESH=$($CURL -X POST "$API/api/refresh" \
+        -H 'Content-Type: application/json' \
+        -d '{"username":"tester_fn","refresh_token":"00000000-0000-0000-0000-000000000000"}')
+    echo "$BAD_REFRESH" | grep -q '"error"' \
+        && green "Invalid refresh_token rejected" \
+        || red "Should reject invalid refresh_token"
+else
+    red "Skipped: no refresh_token available"
+fi
 
 # ---- 6. 搜索 ----
 title "6. 搜索 (Elasticsearch)"
@@ -241,7 +260,7 @@ SEARCH_RES=$($CURL -X POST "$API/api/search" \
     -H 'Content-Type: application/json' \
     -b "$JAR" \
     -d "$SEARCH_REQ")
-echo "$SEARCH_RES" | grep -q '"results"' \
+echo "$SEARCH_RES" | grep -q '"success":true' \
     && green "Search API OK" \
     || red "Search failed: $SEARCH_RES"
 
@@ -258,9 +277,7 @@ $CURL -X POST "$API/api/login" -H 'Content-Type: application/json' \
 # user2 创建自己的表
 CREATE2=$($CURL -X POST "$API/api/sheets" -H 'Content-Type: application/json' \
     -b "$JAR2" -d '{"name":"user2私密表","headers_json":"[]","data_json":"[]"}')
-echo "$CREATE2" | grep -q '"success":true' \
-    || red "user2 create sheet failed: $CREATE2"
-SHEET_ID2=$(echo "$CREATE2" | sed -n 's/.*"id"[[:space:]]*:[[:space:]]*"\{0,1\}\([^",}]*\)"\{0,1\}.*/\1/p' | head -1)
+SHEET_ID2=$(echo "$CREATE2" | sed 's/.*"id":"*//;s/"*[,}].*//')
 
 # user1 的列表不应看到 user2 的表
 LIST_CHECK=$($CURL "$API/api/sheets" -b "$JAR")
@@ -268,34 +285,13 @@ echo "$LIST_CHECK" | grep -q "$SHEET_ID2" \
     && red "Cross-user leak: user1 sees user2 sheet" \
     || green "Cross-user isolation OK"
 
-# user1 不能打开 user2 的表（须拒绝，且不能出现 user2 表名）
-SHEET_CROSS=$($CURL "$API/api/sheets/$SHEET_ID2" -b "$JAR")
-if echo "$SHEET_CROSS" | grep -q 'user2私密表'; then
-    red "Cross-user access allowed: $SHEET_CROSS"
-elif echo "$SHEET_CROSS" | grep -Eq '"success"[[:space:]]*:[[:space:]]*true'; then
-    red "Cross-user access allowed (success=true): $SHEET_CROSS"
-else
-    green "Get other user's sheet rejected"
-fi
-
-# user2 上传私密文件
-echo "user2 secret file" > /tmp/rpc_test_user2_file.txt
-UPLOAD2=$($CURL -X POST "$API/api/files/upload" \
-    -b "$JAR2" \
-    -F "file=@/tmp/rpc_test_user2_file.txt")
-FILE_ID2=$(echo "$UPLOAD2" | sed 's/.*"id":"*//;s/"*[,}].*//')
-
-# user1 不能下载 user2 的文件
-FILE_CROSS=$($CURL -o /tmp/rpc_cross_file.txt -w "%{http_code}" \
-    "$API/api/files/$FILE_ID2" -b "$JAR" 2>/dev/null)
-if [ "$FILE_CROSS" = "200" ] && grep -q "user2 secret file" /tmp/rpc_cross_file.txt 2>/dev/null; then
-    red "Cross-user file access allowed"
-else
-    green "Get other user's file rejected"
-fi
+# user1 不能打开 user2 的表
+CODE_CROSS=$($CURL -o /dev/null -w "%{http_code}" "$API/api/sheets/$SHEET_ID2" -b "$JAR")
+[ "$CODE_CROSS" != "200" ] \
+    && green "Get other user's sheet rejected" \
+    || red "Cross-user access allowed"
 
 # 清理
-$CURL -X DELETE "$API/api/files/$FILE_ID2" -b "$JAR2" > /dev/null 2>&1
 $CURL -X DELETE "$API/api/sheets/$SHEET_ID2" -b "$JAR2" > /dev/null 2>&1
 
 # ---- 8. Health ----

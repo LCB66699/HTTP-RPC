@@ -31,14 +31,13 @@ PROTO_SRCS    := $(wildcard $(PROTO_DIR)/*.proto)
 GEN_CC        := $(patsubst $(PROTO_DIR)/%.proto,$(GEN_CPP_DIR)/%.pb.cc,$(PROTO_SRCS))
 GEN_GRPC_CC   := $(patsubst $(PROTO_DIR)/%.proto,$(GEN_CPP_DIR)/%.grpc.pb.cc,$(PROTO_SRCS))
 
-# ---- gRPC Server (所有后端服务) ----
+# ---- gRPC Server (所有后端服�? ----
 SERVER_SRCS := $(SERVER_DIR)/src/main.cpp \
                $(SERVER_DIR)/src/auth_service_impl.cpp \
                $(SERVER_DIR)/src/auth_interceptor.cpp \
                $(SERVER_DIR)/src/spreadsheet_service_impl.cpp \
                $(SERVER_DIR)/src/file_service_impl.cpp \
                $(SERVER_DIR)/src/health_service_impl.cpp \
-               $(SERVER_DIR)/src/tx_resource.cpp \
                $(SERVER_DIR)/src/call_logger.cpp \
                $(SERVER_DIR)/src/database.cpp \
                $(SERVER_DIR)/src/redis_client.cpp \
@@ -51,7 +50,6 @@ SERVER_SRCS := $(SERVER_DIR)/src/main.cpp \
 GATEWAY_SRCS := $(GATEWAY_DIR)/src/main.cpp \
                 $(GATEWAY_DIR)/src/gateway.cpp \
                 $(GATEWAY_DIR)/src/http2_server.cpp \
-                $(SERVER_DIR)/src/tx_manager.cpp \
                 $(SERVER_DIR)/src/database.cpp \
                 $(SERVER_DIR)/src/redis_client.cpp
 
@@ -83,8 +81,8 @@ SHARED_SRCS := $(SERVER_DIR)/src/database.cpp \
 
 # Proto objects for each service
 AUTH_PB   := $(GEN_CPP_DIR)/rpc_auth.pb.o $(GEN_CPP_DIR)/rpc_auth.grpc.pb.o $(GEN_CPP_DIR)/rpc_health.pb.o $(GEN_CPP_DIR)/rpc_health.grpc.pb.o
-SHEET_PB  := $(GEN_CPP_DIR)/rpc_spreadsheet.pb.o $(GEN_CPP_DIR)/rpc_spreadsheet.grpc.pb.o $(GEN_CPP_DIR)/rpc_auth.pb.o $(GEN_CPP_DIR)/rpc_auth.grpc.pb.o $(GEN_CPP_DIR)/rpc_health.pb.o $(GEN_CPP_DIR)/rpc_health.grpc.pb.o $(GEN_CPP_DIR)/rpc_tx.pb.o $(GEN_CPP_DIR)/rpc_tx.grpc.pb.o
-FILE_PB   := $(GEN_CPP_DIR)/rpc_file.pb.o $(GEN_CPP_DIR)/rpc_file.grpc.pb.o $(GEN_CPP_DIR)/rpc_auth.pb.o $(GEN_CPP_DIR)/rpc_auth.grpc.pb.o $(GEN_CPP_DIR)/rpc_health.pb.o $(GEN_CPP_DIR)/rpc_health.grpc.pb.o $(GEN_CPP_DIR)/rpc_tx.pb.o $(GEN_CPP_DIR)/rpc_tx.grpc.pb.o
+SHEET_PB  := $(GEN_CPP_DIR)/rpc_spreadsheet.pb.o $(GEN_CPP_DIR)/rpc_spreadsheet.grpc.pb.o $(GEN_CPP_DIR)/rpc_auth.pb.o $(GEN_CPP_DIR)/rpc_auth.grpc.pb.o $(GEN_CPP_DIR)/rpc_health.pb.o $(GEN_CPP_DIR)/rpc_health.grpc.pb.o
+FILE_PB   := $(GEN_CPP_DIR)/rpc_file.pb.o $(GEN_CPP_DIR)/rpc_file.grpc.pb.o $(GEN_CPP_DIR)/rpc_auth.pb.o $(GEN_CPP_DIR)/rpc_auth.grpc.pb.o $(GEN_CPP_DIR)/rpc_health.pb.o $(GEN_CPP_DIR)/rpc_health.grpc.pb.o
 SEARCH_PB := $(GEN_CPP_DIR)/rpc_search.pb.o $(GEN_CPP_DIR)/rpc_search.grpc.pb.o $(GEN_CPP_DIR)/rpc_health.pb.o $(GEN_CPP_DIR)/rpc_health.grpc.pb.o
 
 auth: proto
@@ -105,12 +103,10 @@ sheet: proto
 	$(CXX) $(CXXFLAGS) -c -o $(GEN_CPP_DIR)/rpc_auth.grpc.pb.o $(GEN_CPP_DIR)/rpc_auth.grpc.pb.cc
 	$(CXX) $(CXXFLAGS) -c -o $(GEN_CPP_DIR)/rpc_health.pb.o $(GEN_CPP_DIR)/rpc_health.pb.cc
 	$(CXX) $(CXXFLAGS) -c -o $(GEN_CPP_DIR)/rpc_health.grpc.pb.o $(GEN_CPP_DIR)/rpc_health.grpc.pb.cc
-	$(CXX) $(CXXFLAGS) -c -o $(GEN_CPP_DIR)/rpc_tx.pb.o $(GEN_CPP_DIR)/rpc_tx.pb.cc
-	$(CXX) $(CXXFLAGS) -c -o $(GEN_CPP_DIR)/rpc_tx.grpc.pb.o $(GEN_CPP_DIR)/rpc_tx.grpc.pb.cc
 	$(CXX) $(CXXFLAGS) -o rpc_sheet \
 		$(SERVER_DIR)/src/main_sheet.cpp $(SERVER_DIR)/src/spreadsheet_service_impl.cpp $(SERVER_DIR)/src/health_service_impl.cpp $(SHARED_SRCS) \
 		$(SERVER_DIR)/src/l1_cache.cpp $(SERVER_DIR)/src/l1_invalidator.cpp \
-		$(SERVER_DIR)/src/rabbit_publisher.cpp $(SERVER_DIR)/src/tx_resource.cpp \
+		$(SERVER_DIR)/src/rabbit_publisher.cpp
 		$(SHEET_PB) $(LDFLAGS_RPC)
 	@echo "[OK] rpc_sheet"
 
@@ -122,11 +118,9 @@ file: proto
 	$(CXX) $(CXXFLAGS) -c -o $(GEN_CPP_DIR)/rpc_auth.grpc.pb.o $(GEN_CPP_DIR)/rpc_auth.grpc.pb.cc
 	$(CXX) $(CXXFLAGS) -c -o $(GEN_CPP_DIR)/rpc_health.pb.o $(GEN_CPP_DIR)/rpc_health.pb.cc
 	$(CXX) $(CXXFLAGS) -c -o $(GEN_CPP_DIR)/rpc_health.grpc.pb.o $(GEN_CPP_DIR)/rpc_health.grpc.pb.cc
-	$(CXX) $(CXXFLAGS) -c -o $(GEN_CPP_DIR)/rpc_tx.pb.o $(GEN_CPP_DIR)/rpc_tx.pb.cc
-	$(CXX) $(CXXFLAGS) -c -o $(GEN_CPP_DIR)/rpc_tx.grpc.pb.o $(GEN_CPP_DIR)/rpc_tx.grpc.pb.cc
 	$(CXX) $(CXXFLAGS) -o rpc_file \
 		$(SERVER_DIR)/src/main_file.cpp $(SERVER_DIR)/src/file_service_impl.cpp $(SERVER_DIR)/src/health_service_impl.cpp $(SHARED_SRCS) \
-		$(SERVER_DIR)/src/l1_cache.cpp $(SERVER_DIR)/src/rabbit_publisher.cpp $(SERVER_DIR)/src/tx_resource.cpp \
+		$(SERVER_DIR)/src/l1_cache.cpp $(SERVER_DIR)/src/rabbit_publisher.cpp
 		$(FILE_PB) $(LDFLAGS_RPC)
 	@echo "[OK] rpc_file"
 

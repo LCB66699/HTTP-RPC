@@ -11,10 +11,12 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/redis/go-redis/v9"
+	"github.com/sony/gobreaker/v2"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials/insecure"
@@ -26,6 +28,12 @@ import (
 )
 
 var jwtSecret []byte
+
+// cbWithSlow wraps a circuit breaker with a slow-call counter
+type cbWithSlow struct {
+	*gobreaker.CircuitBreaker[any]
+	slowCalls atomic.Int64
+}
 
 func main() {
 	jwtSecret = []byte(getenv("JWT_SECRET", "default-secret-32bytes-here!!!!!"))
@@ -41,7 +49,8 @@ func main() {
 	authAddr := getenv("AUTH_ADDR", "rpc-auth:50051")
 	sheetAddr := getenv("SHEET_ADDR", "rpc-sheet:50051")
 	fileAddr := getenv("FILE_ADDR", "rpc-file:50051")
-	log.Printf("Auth=%s Sheet=%s File=%s", authAddr, sheetAddr, fileAddr)
+	searchAddr := getenv("SEARCH_ADDR", "rpc-search:50051")
+	log.Printf("Auth=%s Sheet=%s File=%s Search=%s", authAddr, sheetAddr, fileAddr, searchAddr)
 
 	authConn, _ := grpc.NewClient("dns:///"+authAddr, creds, kp, lb)
 	authClient := pb.NewAuthServiceClient(authConn)
@@ -52,10 +61,42 @@ func main() {
 	fileConn, _ := grpc.NewClient("dns:///"+fileAddr, creds, kp, lb)
 	fileClient := pb.NewFileServiceClient(fileConn)
 
+	searchConn, _ := grpc.NewClient("dns:///"+searchAddr, creds, kp, lb)
+	searchClient := pb.NewSearchServiceClient(searchConn)
+
 	// Redis
 	redisAddr := getenv("REDIS_ADDR", "redis-cluster-7000:7000")
 	redisPass := getenv("REDIS_PASSWORD", "rpc-redis-123456")
 	rdb := redis.NewClient(&redis.Options{Addr: redisAddr, Password: redisPass})
+
+	// 熔断器 + 慢调用计数器（每个 C++ 服务一个）
+	newCB := func(name string) *cbWithSlow {
+		cbs := &cbWithSlow{}
+		cbs.CircuitBreaker = gobreaker.NewCircuitBreaker[any](gobreaker.Settings{
+			Name:        name,
+			MaxRequests: 3,
+			Interval:    30 * time.Second,
+			Timeout:     30 * time.Second,
+			ReadyToTrip: func(counts gobreaker.Counts) bool {
+				slow := float64(cbs.slowCalls.Load())
+				total := float64(counts.Requests)
+				return counts.ConsecutiveFailures >= 5 ||
+					(total >= 10 && float64(counts.TotalFailures)/total >= 0.5) ||
+					(total >= 10 && slow/total >= 0.8)
+			},
+			OnStateChange: func(name string, from, to gobreaker.State) {
+				log.Printf("[cb] %s: %s → %s", name, from, to)
+				if to == gobreaker.StateClosed {
+					cbs.slowCalls.Store(0)
+				}
+			},
+		})
+		return cbs
+	}
+	_ = newCB("auth")
+	cbSheet := newCB("sheet")
+	cbFile := newCB("file")
+	_ = newCB("search")  // 预留给 Search handler 重试
 
 	// === Auth ===
 	mux.HandleFunc("POST /api/register", func(w http.ResponseWriter, r *http.Request) {
@@ -116,65 +157,30 @@ func main() {
 
 	// === Search ===
 	mux.HandleFunc("POST /api/search", func(w http.ResponseWriter, r *http.Request) {
-		var req map[string]interface{}
-		json.NewDecoder(r.Body).Decode(&req)
-		q, _ := req["q"].(string)
+		var body struct {
+			Q    string `json:"q"`
+			Sort string `json:"sort"`
+		}
+		json.NewDecoder(r.Body).Decode(&body)
 		uid := extractUID(r)
-		log.Printf("[search] uid=%d q=%q", uid, q)
 		if uid == 0 {
 			http.Error(w, `{"error":"Jwt is missing"}`, http.StatusUnauthorized)
 			return
 		}
-		must := []interface{}{}
-		if q != "" {
-			must = append(must, map[string]interface{}{
-				"bool": map[string]interface{}{
-					"should": []interface{}{
-						map[string]interface{}{"match_phrase_prefix": map[string]interface{}{"name": q}},
-						map[string]interface{}{"match_phrase_prefix": map[string]interface{}{"description": q}},
-						map[string]interface{}{"match_phrase_prefix": map[string]interface{}{"original_name": q}},
-						map[string]interface{}{"wildcard": map[string]interface{}{"name": map[string]interface{}{"value": "*" + q + "*"}}},
-						map[string]interface{}{"wildcard": map[string]interface{}{"description": map[string]interface{}{"value": "*" + q + "*"}}},
-						map[string]interface{}{"wildcard": map[string]interface{}{"original_name": map[string]interface{}{"value": "*" + q + "*"}}},
-					},
-					"minimum_should_match": 1,
-				},
-			})
-		} else {
-			writeJSON(w, map[string]interface{}{"total": 0, "results": []interface{}{}})
+		resp, err := searchClient.Search(injectToken(r), &pb.SearchRequest{
+			Query: body.Q, UserId: uid, Sort: body.Sort,
+		})
+		if err != nil || resp == nil || !resp.Success {
+			msg := "search unavailable"
+			if err != nil {
+				msg = err.Error()
+			} else if resp != nil && resp.GetError() != "" {
+				msg = resp.GetError()
+			}
+			writeJSON(w, map[string]interface{}{"success": false, "error": msg})
 			return
 		}
-		body, _ := json.Marshal(map[string]interface{}{
-			"query": map[string]interface{}{
-				"bool": map[string]interface{}{
-					"must": must,
-					"filter": map[string]interface{}{"term": map[string]interface{}{"user_id": uid}},
-				},
-			},
-			"size": 20,
-		})
-		log.Printf("[search-es] %s", string(body)); resp, err := httpPost("http://elasticsearch:9200/sheets_search,files_search/_search", body)
-		if err != nil {
-			writeJSON(w, map[string]interface{}{"error": "search unavailable"})
-			return
-		}
-		var esResp struct {
-			Hits struct {
-				Total struct{ Value int } `json:"total"`
-				Hits  []struct {
-					Source map[string]interface{} `json:"_source"`
-				} `json:"hits"`
-			} `json:"hits"`
-		}
-		json.Unmarshal(resp, &esResp)
-		results := []map[string]interface{}{}
-		for _, h := range esResp.Hits.Hits {
-			results = append(results, h.Source)
-		}
-		writeJSON(w, map[string]interface{}{
-			"total":   esResp.Hits.Total.Value,
-			"results": results,
-		})
+		writeJSON(w, resp)
 	})
 
 	// === Sheet CRUD ===
@@ -197,7 +203,9 @@ func main() {
 		writeJSON(w, resp)
 	})
 	mux.HandleFunc("GET /api/sheets", func(w http.ResponseWriter, r *http.Request) {
-		resp, err := sheetClient.ListSpreadsheets(injectToken(r), &pb.ListSpreadsheetsRequest{UserId: extractUID(r)})
+		resp, err := callWithRetry(cbSheet, 3, "sheet.list", func(ctx context.Context) (*pb.ListSpreadsheetsResponse, error) {
+			return sheetClient.ListSpreadsheets(withAuth(ctx, r), &pb.ListSpreadsheetsRequest{UserId: extractUID(r)})
+		})
 		if err != nil || resp == nil || !resp.Success {
 			msg := "list failed"
 			if err != nil {
@@ -208,6 +216,7 @@ func main() {
 			writeJSON(w, map[string]interface{}{"success": false, "error": msg})
 			return
 		}
+		writeJSON(w, resp)
 	})
 	mux.HandleFunc("GET /api/sheets/{id}", func(w http.ResponseWriter, r *http.Request) {
 		id := parseInt64(r.PathValue("id"))
@@ -217,7 +226,9 @@ func main() {
 			writeJSONStatus(w, http.StatusUnauthorized, map[string]interface{}{"success": false, "error": "Unauthorized"})
 			return
 		}
-		resp, err := sheetClient.GetSpreadsheet(injectToken(r), &pb.GetSpreadsheetRequest{Id: id, UserId: uid})
+		resp, err := callWithRetry(cbSheet, 3, "sheet.get", func(ctx context.Context) (*pb.GetSpreadsheetResponse, error) {
+			return sheetClient.GetSpreadsheet(withAuth(ctx, r), &pb.GetSpreadsheetRequest{Id: id, UserId: uid})
+		})
 		if err != nil {
 			writeGRPCError(w, err, "Not found")
 			return
@@ -254,7 +265,9 @@ func main() {
 	})
 	mux.HandleFunc("DELETE /api/sheets/{id}", func(w http.ResponseWriter, r *http.Request) {
 		id := parseInt64(r.PathValue("id"))
-		resp, err := sheetClient.DeleteSpreadsheet(injectToken(r), &pb.DeleteSpreadsheetRequest{Id: id, UserId: extractUID(r)})
+		resp, err := callWithRetry(cbSheet, 2, "sheet.delete", func(ctx context.Context) (*pb.DeleteSpreadsheetResponse, error) {
+			return sheetClient.DeleteSpreadsheet(withAuth(ctx, r), &pb.DeleteSpreadsheetRequest{Id: id, UserId: extractUID(r)})
+		})
 		if err != nil || resp == nil || !resp.Success {
 			msg := "delete failed"
 			if err != nil {
@@ -270,7 +283,9 @@ func main() {
 
 	// === File CRUD ===
 	mux.HandleFunc("GET /api/files", func(w http.ResponseWriter, r *http.Request) {
-		resp, err := fileClient.ListFiles(injectToken(r), &pb.ListFilesRequest{UserId: extractUID(r)})
+		resp, err := callWithRetry(cbFile, 3, "file.list", func(ctx context.Context) (*pb.ListFilesResponse, error) {
+			return fileClient.ListFiles(withAuth(ctx, r), &pb.ListFilesRequest{UserId: extractUID(r)})
+		})
 		if err != nil || resp == nil || !resp.Success {
 			msg := "list failed"
 			if err != nil {
@@ -317,13 +332,19 @@ func main() {
 			writeJSONStatus(w, http.StatusUnauthorized, map[string]interface{}{"success": false, "error": "Unauthorized"})
 			return
 		}
-		resp, err := fileClient.GetFile(injectToken(r), &pb.GetFileRequest{Id: id, UserId: uid})
+		resp, err := callWithRetry(cbFile, 3, "file.get", func(ctx context.Context) (*pb.GetFileResponse, error) {
+			return fileClient.GetFile(withAuth(ctx, r), &pb.GetFileRequest{Id: id, UserId: uid})
+		})
 		if err != nil {
 			writeGRPCError(w, err, "Not found")
 			return
 		}
 		if resp == nil || !resp.Success {
 			writeJSONStatus(w, http.StatusNotFound, map[string]interface{}{"success": false, "error": "Not found"})
+			return
+		}
+		if resp.GetDownloadUrl() != "" {
+			http.Redirect(w, r, resp.GetDownloadUrl(), http.StatusFound)
 			return
 		}
 		if resp.File != nil {
@@ -335,7 +356,9 @@ func main() {
 	})
 	mux.HandleFunc("DELETE /api/files/{id}", func(w http.ResponseWriter, r *http.Request) {
 		id := parseInt64(r.PathValue("id"))
-		resp, err := fileClient.DeleteFile(injectToken(r), &pb.DeleteFileRequest{Id: id, UserId: extractUID(r)})
+		resp, err := callWithRetry(cbFile, 2, "file.delete", func(ctx context.Context) (*pb.DeleteFileResponse, error) {
+			return fileClient.DeleteFile(withAuth(ctx, r), &pb.DeleteFileRequest{Id: id, UserId: extractUID(r)})
+		})
 		if err != nil || resp == nil || !resp.Success {
 			msg := "delete failed"
 			if err != nil {
@@ -360,6 +383,20 @@ func setCookies(w http.ResponseWriter, at, rt string) {
 	if rt != "" {
 		http.SetCookie(w, &http.Cookie{Name: "rpc_rt", Value: rt, Path: "/api/refresh", HttpOnly: true, Secure: true, SameSite: http.SameSiteStrictMode})
 	}
+}
+
+func withAuth(ctx context.Context, r *http.Request) context.Context {
+	token := ""
+	for _, c := range r.Cookies() {
+		if c.Name == "rpc_at" {
+			token = c.Value
+			break
+		}
+	}
+	if token != "" {
+		return metadata.AppendToOutgoingContext(ctx, "authorization", "Bearer "+token)
+	}
+	return ctx
 }
 
 func injectToken(r *http.Request) context.Context {
@@ -393,7 +430,14 @@ func writeJSONStatus(w http.ResponseWriter, code int, v interface{}) {
 func writeGRPCError(w http.ResponseWriter, err error, fallback string) {
 	code := http.StatusNotFound
 	msg := fallback
-	if st, ok := status.FromError(err); ok {
+	if err == gobreaker.ErrOpenState {
+		code = http.StatusServiceUnavailable
+		writeJSONStatus(w, code, map[string]interface{}{
+			"success": false, "error": "Service temporarily unavailable (circuit open)",
+			"degraded": true,
+		})
+		return
+	} else if st, ok := status.FromError(err); ok {
 		switch st.Code() {
 		case codes.PermissionDenied, codes.Unauthenticated:
 			code = http.StatusForbidden
@@ -500,22 +544,46 @@ func corsMiddleware(next http.Handler) http.Handler {
 	})
 }
 
-func httpGet(url string) ([]byte, error) {
-	resp, err := http.Get(url)
+// callWithRetry 熔断器（外）+ gRPC 重试（内）
+// 每轮重试创建独立 3s deadline，避免慢实例阻塞全部重试
+// 只重试可恢复错误：Unavailable / DeadlineExceeded / ResourceExhausted / Aborted
+// 调用超过 2s 记入慢调用计数器，供熔断器 ReadyToTrip 使用
+func callWithRetry[T any](cb *cbWithSlow, maxAttempts int, label string, fn func(context.Context) (T, error)) (T, error) {
+	result, err := cb.Execute(func() (any, error) {
+		var lastErr error
+		for attempt := 0; attempt < maxAttempts; attempt++ {
+			if attempt > 0 {
+				d := time.Duration(50<<(attempt-1)) * time.Millisecond
+				time.Sleep(d)
+				log.Printf("[retry] %s attempt %d/%d after %v", label, attempt+1, maxAttempts, d)
+			}
+			attemptCtx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+			start := time.Now()
+			r, e := fn(attemptCtx)
+			cancel()
+			if time.Since(start) > 2*time.Second {
+				cb.slowCalls.Add(1)
+			}
+			if e == nil {
+				return r, nil
+			}
+			lastErr = e
+			if st, ok := status.FromError(e); ok {
+				switch st.Code() {
+				case codes.Unavailable, codes.DeadlineExceeded,
+					codes.ResourceExhausted, codes.Aborted:
+					continue
+				}
+			}
+			return nil, e
+		}
+		return nil, lastErr
+	})
 	if err != nil {
-		return nil, err
+		var zero T
+		return zero, err
 	}
-	defer resp.Body.Close()
-	return io.ReadAll(resp.Body)
-}
-
-func httpPost(url string, body []byte) ([]byte, error) {
-	resp, err := http.Post(url, "application/json", strings.NewReader(string(body)))
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-	return io.ReadAll(resp.Body)
+	return result.(T), nil
 }
 
 func getenv(key, fallback string) string {

@@ -33,6 +33,7 @@ int main(int argc, char* argv[]) {
         else if(arg=="--mysql-password"&&i+1<argc) mysql_password=argv[++i];
         else if(arg=="--mysql-db"&&i+1<argc) mysql_db=argv[++i];
         else if(arg=="--mysql-shards"&&i+1<argc) mysql_shards=std::atoi(argv[++i]);
+        else if(arg=="--mysql-port"&&i+1<argc) mysql_port=std::atoi(argv[++i]);
         else if(arg=="--redis-cluster"&&i+1<argc) redis_cluster_seeds.push_back(argv[++i]);
         else if(arg=="--redis-password"&&i+1<argc) redis_password=argv[++i];
     }

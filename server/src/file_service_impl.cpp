@@ -72,21 +72,33 @@ grpc::Status FileServiceImpl::CreateFile(grpc::ServerContext* context,
         return grpc::Status::OK;
     }
 
-    // 文件内容直接存 MySQL LONGBLOB（MinIO 已移除）
-
+    // MinIO 优先：上传内容 → 元数据写 MySQL（storage_path）；回退 LONGBLOB
     int64_t id = 0;
+    std::string storage_key;
+    if (minio_ && minio_->IsConfigured() && !req->file_content().empty()) {
+        auto us = std::chrono::duration_cast<std::chrono::microseconds>(
+            std::chrono::high_resolution_clock::now().time_since_epoch()).count();
+        storage_key = std::to_string(req->user_id()) + "/" + std::to_string(us);
+        if (!minio_->PutObject(storage_key, req->file_content(), req->mime_type())) {
+            resp->set_success(false);
+            resp->set_error("MinIO upload failed");
+            return grpc::Status::OK;
+        }
+    }
+
     bool ok = db_->CreateFile(req->user_id(), username, req->original_name(),
                               req->size(), req->mime_type(),
-                              "", id, req->idempotency_key());
+                              storage_key, id, req->idempotency_key());
 
     if (!ok) {
+        if (!storage_key.empty()) minio_->DeleteObject(storage_key);
         resp->set_success(false);
         resp->set_error("Failed to create file record");
         return grpc::Status::OK;
     }
 
-    // 文件内容写入 MySQL
-    if (!req->file_content().empty()) {
+    // 回退：MinIO 不可用时文件内容存 MySQL LONGBLOB
+    if (!req->file_content().empty() && storage_key.empty()) {
         db_->UpdateFileContent(id, req->file_content());
     }
 
@@ -106,6 +118,7 @@ grpc::Status FileServiceImpl::CreateFile(grpc::ServerContext* context,
         ev["original_name"] = req->original_name();
         ev["mime_type"] = req->mime_type();
         ev["size"] = req->size();
+        if (!storage_key.empty()) ev["object_key"] = storage_key;
         rabbit_->Publish("rpc.events", "file.uploaded", ev.dump());
     }
 
@@ -278,7 +291,17 @@ grpc::Status FileServiceImpl::GetFile(grpc::ServerContext* context,
     resp->set_success(true);
     resp->set_cache_source("mysql");
 
-    resp->set_file_content(row.file_content);
+    // MinIO 优先：生成预签名 URL 302 重定向；回退 LONGBLOB
+    if (minio_ && minio_->IsConfigured() && !row.storage_path.empty()) {
+        std::string url = minio_->PresignedGetUrl(row.storage_path, 3600);
+        if (!url.empty()) {
+            resp->set_download_url(url);
+        } else {
+            resp->set_file_content(row.file_content);
+        }
+    } else {
+        resp->set_file_content(row.file_content);
+    }
 
     // 3) Populate cache (skip if >1MB)
     if (redis_ && redis_->IsConnected()) {
