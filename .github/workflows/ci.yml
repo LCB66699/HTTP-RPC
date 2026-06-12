@@ -58,14 +58,10 @@ jobs:
             fi
             sleep 2
           done
-          # 等后端服务就绪（额外等待，比固定 sleep 更可靠）
+          # 等后端服务就绪
           sleep 20
-          docker compose ps
           echo "=== Services status ==="
           docker compose ps
-          echo "=== Recent logs ==="
-          docker compose logs --tail=80
-          exit 1
 
       - name: Functional tests
         run: bash test/functional_test.sh
