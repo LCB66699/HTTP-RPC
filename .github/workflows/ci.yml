@@ -53,11 +53,14 @@ jobs:
           echo "Waiting for health..."
           for i in $(seq 1 90); do
             if curl -sk https://localhost/api/health 2>/dev/null | grep -q gateway; then
-              echo "Ready after ${i}s"
-              exit 0
+              echo "Gateway ready after ${i}s"
+              break
             fi
             sleep 2
           done
+          # 等后端服务连好 MySQL（healthcheck 已覆盖）
+          sleep 15
+          docker compose ps
           echo "=== Services status ==="
           docker compose ps
           echo "=== Recent logs ==="
