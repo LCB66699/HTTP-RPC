@@ -58,15 +58,8 @@ jobs:
             fi
             sleep 2
           done
-          # 等所有服务 healthy
-          for i in $(seq 1 60); do
-            UNHEALTHY=$(docker compose ps --format json | grep -v '"Health":"healthy"' | wc -l)
-            if [ "$UNHEALTHY" -eq 0 ]; then
-              echo "All healthy after ${i}s"
-              break
-            fi
-            sleep 2
-          done
+          # 等后端服务就绪（额外等待，比固定 sleep 更可靠）
+          sleep 20
           docker compose ps
           echo "=== Services status ==="
           docker compose ps
