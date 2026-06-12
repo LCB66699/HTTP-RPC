@@ -43,15 +43,21 @@ fi
 title "1. 认证 (Auth)"
 
 title "1.1 注册新用户（或登录已有）"
+echo "DEBUG: TEST_USER=$TEST_USER"
 REG=$($CURL -X POST "$API/api/register" \
     -H 'Content-Type: application/json' \
     -c "$JAR" -D "/tmp/rpc_hdr_$$" \
     -d "{\"username\":\"$TEST_USER\",\"password\":\"test1234\"}")
+echo "DEBUG: REG=$REG"
 if echo "$REG" | grep -q '"success":true'; then
     green "Register OK"
 else
-    # 用户可能已存在（CI 重跑），尝试登录
-    warn "Register failed (user may exist), trying login..."
+    warn "Register failed, trying login..."
+    REG=$($CURL -X POST "$API/api/login" \
+        -H 'Content-Type: application/json' \
+        -c "$JAR" -D "/tmp/rpc_hdr_$$" \
+        -d "{\"username\":\"$TEST_USER\",\"password\":\"test1234\"}")
+    echo "DEBUG: LOGIN=$REG"
     REG=$($CURL -X POST "$API/api/login" \
         -H 'Content-Type: application/json' \
         -c "$JAR" -D "/tmp/rpc_hdr_$$" \
