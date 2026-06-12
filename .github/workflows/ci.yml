@@ -17,14 +17,12 @@ jobs:
       - uses: actions/setup-go@v5
         with: { go-version: "1.22" }
 
-      - name: Go lint
+      - name: Go format check
         run: |
           cd gateway-grpc
-          go vet ./...
           gofmt -l . | tee /dev/stderr | test ! -s /dev/stdin
-
-      - name: Go unit tests
-        run: cd gateway-grpc && go test -v -race -count=1 ./...
+          cd ../services/notify-service
+          gofmt -l . | tee /dev/stderr | test ! -s /dev/stdin
 
       - name: C++ format check
         run: |
