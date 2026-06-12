@@ -58,8 +58,8 @@ jobs:
             fi
             sleep 2
           done
-          # 等后端服务就绪
-          sleep 20
+          # 等后端服务和 MySQL 完全就绪
+          sleep 30
           echo "=== Services status ==="
           docker compose ps
 
