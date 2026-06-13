@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"io"
 	"log"
 	"net/http"
@@ -131,6 +132,60 @@ func main() {
 		setCookies(w, resp.AccessToken, "")
 		writeJSON(w, resp)
 	})
+	mux.HandleFunc("PUT /api/me/password", func(w http.ResponseWriter, r *http.Request) {
+		var body struct {
+			OldPassword string `json:"old_password"`
+			NewPassword string `json:"new_password"`
+		}
+		json.NewDecoder(r.Body).Decode(&body)
+		uid := extractUID(r)
+		if uid == 0 {
+			http.Error(w, `{"error":"unauthorized"}`, http.StatusUnauthorized)
+			return
+		}
+		req := &pb.ChangePasswordRequest{UserId: uid, OldPassword: body.OldPassword, NewPassword: body.NewPassword}
+		resp, err := authClient.ChangePassword(r.Context(), req)
+		if err != nil || resp == nil || !resp.Success {
+			msg := "change failed"
+			if err != nil {
+				msg = err.Error()
+			} else if resp != nil && resp.GetError() != "" {
+				msg = resp.GetError()
+			}
+			writeJSON(w, map[string]interface{}{"success": false, "error": msg})
+			return
+		}
+		writeJSON(w, resp)
+	})
+	mux.HandleFunc("POST /api/auth/otp/send", func(w http.ResponseWriter, r *http.Request) {
+		var body struct{ Phone string `json:"phone"` }
+		json.NewDecoder(r.Body).Decode(&body)
+		if body.Phone == "" {
+			writeJSON(w, map[string]interface{}{"success": false, "error": "phone required"})
+			return
+		}
+		code := fmt.Sprintf("%06d", time.Now().UnixNano()%1000000)
+		rdb.Set(r.Context(), "otp:"+body.Phone, code, 5*time.Minute)
+		log.Printf("[OTP] phone=%s code=%s", body.Phone, code)
+		writeJSON(w, map[string]interface{}{"success": true})
+	})
+	mux.HandleFunc("POST /api/auth/phone/login", func(w http.ResponseWriter, r *http.Request) {
+		var body struct {
+			Phone string `json:"phone"`
+			OTP   string `json:"otp"`
+		}
+		json.NewDecoder(r.Body).Decode(&body)
+		stored, _ := rdb.Get(r.Context(), "otp:"+body.Phone).Result()
+		if stored == "" || stored != body.OTP {
+			writeJSON(w, map[string]interface{}{"success": false, "error": "Invalid OTP"})
+			return
+		}
+		rdb.Del(r.Context(), "otp:"+body.Phone)
+		resp, _ := authClient.LoginByPhone(r.Context(), &pb.PhoneLoginRequest{Phone: body.Phone, Otp: body.OTP})
+		setCookies(w, resp.AccessToken, resp.RefreshToken)
+		writeJSON(w, resp)
+	})
+
 	mux.HandleFunc("GET /api/health", func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, map[string]string{"gateway": "READY"})
 	})

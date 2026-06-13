@@ -7,7 +7,7 @@ RUN go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.36.5
 RUN go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.5.1
 
 WORKDIR /build
-COPY envoy/protos/ ./protos/
+COPY proto/ ./protos/
 COPY gateway-grpc/ .
 
 RUN mkdir -p gen/rpc
