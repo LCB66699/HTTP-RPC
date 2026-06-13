@@ -56,9 +56,10 @@ message GetFileResponse {
 
 message ListFilesRequest {
   int64 user_id = 1;
-  // 0-based page index; page_size=0 means return all (backward compatible)
   int32 page = 2;
   int32 page_size = 3;
+  int64 after_id = 4;  // cursor: 0=首页
+  int32 limit = 5;     // 默认 20
 }
 
 message ListFilesResponse {
@@ -66,6 +67,8 @@ message ListFilesResponse {
   repeated FileInfo files = 2;
   int32 total = 3;
   string cache_source = 4;
+  string next_cursor = 6;
+  bool has_more = 7;
   string error = 5;
 }
 
