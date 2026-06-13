@@ -162,3 +162,93 @@ func TestChangePassword_GrpcError(t *testing.T) {
 		t.Errorf("expected 500 on gRPC error, got %d", w.Code)
 	}
 }
+
+// ---- Cursor pagination ----
+func TestListSheets_CursorFirstPage(t *testing.T) {
+	orig := sheetClient
+	sheetClient = &mockSheetClient{
+		listResp: &pb.ListSpreadsheetsResponse{Success: true, Total: 50, HasMore: true, NextCursor: "999"},
+	}
+	defer func() { sheetClient = orig }()
+	req := httptest.NewRequest("GET", "/api/sheets?limit=10", nil)
+	req.AddCookie(&http.Cookie{Name: "rpc_at", Value: validTestJWT()})
+	w := httptest.NewRecorder()
+	mux := http.NewServeMux()
+	mux.HandleFunc("GET /api/sheets", func(w http.ResponseWriter, r *http.Request) {
+		resp, _ := sheetClient.ListSpreadsheets(r.Context(), &pb.ListSpreadsheetsRequest{UserId: 12345, Limit: 10})
+		if resp.GetHasMore() && resp.GetNextCursor() == "" {
+			t.Error("has_more=true requires next_cursor")
+		}
+		writeJSON(w, resp)
+	})
+	mux.ServeHTTP(w, req)
+	if !strings.Contains(w.Body.String(), "\"has_more\":true") {
+		t.Errorf("expected has_more, got: %s", w.Body.String())
+	}
+}
+
+func TestListSheets_EmptyResult(t *testing.T) {
+	orig := sheetClient
+	sheetClient = &mockSheetClient{
+		listResp: &pb.ListSpreadsheetsResponse{Success: true, Total: 0, HasMore: false},
+	}
+	defer func() { sheetClient = orig }()
+	req := httptest.NewRequest("GET", "/api/sheets?limit=10", nil)
+	req.AddCookie(&http.Cookie{Name: "rpc_at", Value: validTestJWT()})
+	w := httptest.NewRecorder()
+	mux := http.NewServeMux()
+	mux.HandleFunc("GET /api/sheets", func(w http.ResponseWriter, r *http.Request) {
+		resp, _ := sheetClient.ListSpreadsheets(r.Context(), &pb.ListSpreadsheetsRequest{UserId: 12345, Limit: 10})
+		writeJSON(w, resp)
+	})
+	mux.ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Errorf("expected 200, got %d", w.Code)
+	}
+}
+
+// ---- Folder ----
+type mockFileClient struct {
+	createFolderResp *pb.CreateFolderResponse
+}
+
+func (m *mockFileClient) ListFiles(ctx context.Context, req *pb.ListFilesRequest, opts ...grpc.CallOption) (*pb.ListFilesResponse, error) {
+	return nil, nil
+}
+func (m *mockFileClient) GetFile(ctx context.Context, req *pb.GetFileRequest, opts ...grpc.CallOption) (*pb.GetFileResponse, error) {
+	return nil, nil
+}
+func (m *mockFileClient) CreateFile(ctx context.Context, req *pb.CreateFileRequest, opts ...grpc.CallOption) (*pb.CreateFileResponse, error) {
+	return nil, nil
+}
+func (m *mockFileClient) DeleteFile(ctx context.Context, req *pb.DeleteFileRequest, opts ...grpc.CallOption) (*pb.DeleteFileResponse, error) {
+	return nil, nil
+}
+func (m *mockFileClient) CreateFolder(ctx context.Context, req *pb.CreateFolderRequest, opts ...grpc.CallOption) (*pb.CreateFolderResponse, error) {
+	return m.createFolderResp, nil
+}
+func (m *mockFileClient) MoveFile(ctx context.Context, req *pb.MoveFileRequest, opts ...grpc.CallOption) (*pb.MoveFileResponse, error) { return nil, nil }
+func (m *mockFileClient) BatchDelete(ctx context.Context, req *pb.BatchDeleteRequest, opts ...grpc.CallOption) (*pb.BatchDeleteResponse, error) {
+	return nil, nil
+}
+
+func TestCreateFolder_Success(t *testing.T) {
+	orig := fileClient
+	fileClient = &mockFileClient{createFolderResp: &pb.CreateFolderResponse{Success: true, Id: 999}}
+	defer func() { fileClient = orig }()
+	req := httptest.NewRequest("POST", "/api/files/folder", strings.NewReader(`{"name":"test"}`))
+	req.AddCookie(&http.Cookie{Name: "rpc_at", Value: validTestJWT()})
+	w := httptest.NewRecorder()
+	mux := http.NewServeMux()
+	mux.HandleFunc("POST /api/files/folder", func(w http.ResponseWriter, r *http.Request) {
+		var body struct{ Name string }
+		json.NewDecoder(r.Body).Decode(&body)
+		uid := extractUID(r)
+		resp, _ := fileClient.CreateFolder(r.Context(), &pb.CreateFolderRequest{UserId: uid, Name: body.Name})
+		writeJSON(w, resp)
+	})
+	mux.ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Errorf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+}
