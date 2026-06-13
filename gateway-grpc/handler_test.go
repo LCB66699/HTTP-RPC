@@ -209,11 +209,12 @@ func TestListSheets_EmptyResult(t *testing.T) {
 
 // ---- Folder ----
 type mockFileClient struct {
+	listResp         *pb.ListFilesResponse
 	createFolderResp *pb.CreateFolderResponse
 }
 
 func (m *mockFileClient) ListFiles(ctx context.Context, req *pb.ListFilesRequest, opts ...grpc.CallOption) (*pb.ListFilesResponse, error) {
-	return nil, nil
+	return m.listResp, nil
 }
 func (m *mockFileClient) GetFile(ctx context.Context, req *pb.GetFileRequest, opts ...grpc.CallOption) (*pb.GetFileResponse, error) {
 	return nil, nil
@@ -252,3 +253,89 @@ func TestCreateFolder_Success(t *testing.T) {
 		t.Errorf("expected 200, got %d: %s", w.Code, w.Body.String())
 	}
 }
+
+// ---- OTP login ----
+type mockAuthFullClient struct {
+	loginResp        *pb.LoginResponse
+	changePwdResp    *pb.ChangePasswordResponse
+	loginByPhoneResp *pb.LoginResponse
+}
+
+func (m *mockAuthFullClient) Login(ctx context.Context, req *pb.LoginRequest, opts ...grpc.CallOption) (*pb.LoginResponse, error) {
+	return m.loginResp, nil
+}
+func (m *mockAuthFullClient) Register(ctx context.Context, req *pb.RegisterRequest, opts ...grpc.CallOption) (*pb.RegisterResponse, error) {
+	return nil, nil
+}
+func (m *mockAuthFullClient) RefreshToken(ctx context.Context, req *pb.RefreshTokenRequest, opts ...grpc.CallOption) (*pb.RefreshTokenResponse, error) {
+	return nil, nil
+}
+func (m *mockAuthFullClient) ChangePassword(ctx context.Context, req *pb.ChangePasswordRequest, opts ...grpc.CallOption) (*pb.ChangePasswordResponse, error) {
+	return m.changePwdResp, nil
+}
+func (m *mockAuthFullClient) LoginByPhone(ctx context.Context, req *pb.PhoneLoginRequest, opts ...grpc.CallOption) (*pb.LoginResponse, error) {
+	return m.loginByPhoneResp, nil
+}
+
+func TestPhoneLogin_Success(t *testing.T) {
+	orig := authClient
+	authClient = &mockAuthFullClient{
+		loginByPhoneResp: &pb.LoginResponse{Success: true, UserId: 1,
+			AccessToken: "at", RefreshToken: "rt", Role: "user"},
+	}
+	defer func() { authClient = orig }()
+	req := httptest.NewRequest("POST", "/api/auth/phone/login",
+		strings.NewReader(`{"phone":"13800138000","otp":"123456"}`))
+	w := httptest.NewRecorder()
+	mux := http.NewServeMux()
+	mux.HandleFunc("POST /api/auth/phone/login", func(w http.ResponseWriter, r *http.Request) {
+		var body struct{ Phone, OTP string }
+		json.NewDecoder(r.Body).Decode(&body)
+		resp, _ := authClient.LoginByPhone(r.Context(), &pb.PhoneLoginRequest{Phone: body.Phone, Otp: body.OTP})
+		writeJSON(w, resp)
+	})
+	mux.ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Errorf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+func TestPhotoList_Success(t *testing.T) {
+	orig := fileClient
+	fileClient = &mockFileClient{listResp: &pb.ListFilesResponse{Success: true, Total: 5}}
+	defer func() { fileClient = orig }()
+	req := httptest.NewRequest("GET", "/api/photos", nil)
+	req.AddCookie(&http.Cookie{Name: "rpc_at", Value: validTestJWT()})
+	w := httptest.NewRecorder()
+	mux := http.NewServeMux()
+	mux.HandleFunc("GET /api/photos", func(w http.ResponseWriter, r *http.Request) {
+		resp, _ := fileClient.ListFiles(r.Context(), &pb.ListFilesRequest{UserId: 12345, MimeFilter: "image/"})
+		writeJSON(w, resp)
+	})
+	mux.ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Errorf("expected 200, got %d", w.Code)
+	}
+}
+
+func TestShareLink_Create(t *testing.T) {
+	sharingClient = &mockSharingClient{
+		linkResp: &pb.ShareLinkResponse{Success: true, Token: "abc123"},
+	}
+	req := httptest.NewRequest("POST", "/api/sheets/123/share-link",
+		strings.NewReader(`{"permission":"view"}`))
+	req.AddCookie(&http.Cookie{Name: "rpc_at", Value: validTestJWT()})
+	w := httptest.NewRecorder()
+	mux := http.NewServeMux()
+	mux.HandleFunc("POST /api/sheets/{id}/share-link", func(w http.ResponseWriter, r *http.Request) {
+		resp, _ := sharingClient.CreateShareLink(r.Context(), &pb.ShareLinkRequest{
+			OwnerId: 12345, ResourceType: "sheet", ResourceId: 123, Permission: "view",
+		})
+		writeJSON(w, resp)
+	})
+	mux.ServeHTTP(w, req)
+	if !strings.Contains(w.Body.String(), `abc123`) {
+		t.Errorf("expected token abc123, got: %s", w.Body.String())
+	}
+}
+
