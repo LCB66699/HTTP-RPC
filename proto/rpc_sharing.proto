@@ -1,0 +1,71 @@
+syntax = "proto3";
+package rpc;
+
+option go_package = "rpc-server/proto/rpc";
+
+service SharingService {
+  rpc Share(ShareRequest) returns (ShareResponse);
+  rpc Revoke(RevokeRequest) returns (RevokeResponse);
+  rpc ListShares(ResourceRequest) returns (ShareListResponse);
+  rpc CreateShareLink(ShareLinkRequest) returns (ShareLinkResponse);
+  rpc GetByToken(ShareTokenRequest) returns (SharedResourceResponse);
+}
+
+message ShareRequest {
+  int64 owner_id = 1;
+  string resource_type = 2;  // "sheet" | "file"
+  int64 resource_id = 3;
+  string grantee_username = 4;
+  string permission = 5;  // "view" | "edit"
+}
+message ShareResponse { bool success = 1; string error = 2; }
+
+message RevokeRequest {
+  int64 owner_id = 1;
+  string resource_type = 2;
+  int64 resource_id = 3;
+  string grantee_username = 4;
+}
+message RevokeResponse { bool success = 1; string error = 2; }
+
+message ResourceRequest {
+  int64 owner_id = 1;
+  string resource_type = 2;
+  int64 resource_id = 3;
+}
+
+message AccessEntry {
+  string username = 1;
+  string permission = 2;
+  string granted_at = 3;
+}
+message ShareListResponse {
+  bool success = 1;
+  repeated AccessEntry entries = 2;
+  string error = 3;
+}
+
+message ShareLinkRequest {
+  int64 owner_id = 1;
+  string resource_type = 2;
+  int64 resource_id = 3;
+  string permission = 4;  // "view" | "edit"
+}
+message ShareLinkResponse {
+  bool success = 1;
+  string token = 2;
+  string error = 3;
+}
+
+message ShareTokenRequest { string token = 1; }
+
+message SharedResourceInfo {
+  string resource_type = 1;
+  int64 resource_id = 2;
+  string permission = 3;
+}
+message SharedResourceResponse {
+  bool success = 1;
+  SharedResourceInfo info = 2;
+  string error = 3;
+}

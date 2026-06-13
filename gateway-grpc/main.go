@@ -214,6 +214,64 @@ func main() {
 			"auth-service": {}, "sheet-service": {}, "file-service": {}, "search-service": {},
 		}})
 	})
+	// === Sharing ===
+	mux.HandleFunc("POST /api/sheets/{id}/share", func(w http.ResponseWriter, r *http.Request) {
+		uid := extractUID(r)
+		var body struct {
+			Username   string `json:"username"`
+			Permission string `json:"permission"`
+		}
+		json.NewDecoder(r.Body).Decode(&body)
+		id := parseInt64(r.PathValue("id"))
+		resp, _ := authClient.Share(injectToken(r), &pb.ShareRequest{
+			OwnerId: uid, ResourceType: "sheet", ResourceId: id,
+			GranteeUsername: body.Username, Permission: body.Permission,
+		})
+		writeJSON(w, resp)
+	})
+	mux.HandleFunc("DELETE /api/sheets/{id}/share", func(w http.ResponseWriter, r *http.Request) {
+		uid := extractUID(r)
+		username := r.URL.Query().Get("username")
+		id := parseInt64(r.PathValue("id"))
+		resp, _ := authClient.Revoke(injectToken(r), &pb.RevokeRequest{
+			OwnerId: uid, ResourceType: "sheet", ResourceId: id,
+			GranteeUsername: username,
+		})
+		writeJSON(w, resp)
+	})
+	mux.HandleFunc("GET /api/sheets/{id}/share", func(w http.ResponseWriter, r *http.Request) {
+		uid := extractUID(r)
+		id := parseInt64(r.PathValue("id"))
+		resp, _ := authClient.ListShares(injectToken(r), &pb.ResourceRequest{
+			OwnerId: uid, ResourceType: "sheet", ResourceId: id,
+		})
+		writeJSON(w, resp)
+	})
+	mux.HandleFunc("POST /api/sheets/{id}/share-link", func(w http.ResponseWriter, r *http.Request) {
+		uid := extractUID(r)
+		id := parseInt64(r.PathValue("id"))
+		resp, _ := authClient.CreateShareLink(injectToken(r), &pb.ShareLinkRequest{
+			OwnerId: uid, ResourceType: "sheet", ResourceId: id, Permission: "view",
+		})
+		writeJSON(w, resp)
+	})
+	mux.HandleFunc("GET /api/s/{token}", func(w http.ResponseWriter, r *http.Request) {
+		token := r.PathValue("token")
+		resp, _ := authClient.GetByToken(injectToken(r), &pb.ShareTokenRequest{Token: token})
+		if resp == nil || !resp.Success {
+			writeJSONStatus(w, http.StatusNotFound, map[string]interface{}{"success": false, "error": "Not found"})
+			return
+		}
+		info := resp.GetInfo()
+		// Redirect to actual resource based on type
+		switch info.GetResourceType() {
+		case "sheet":
+			http.Redirect(w, r, "/api/sheets/"+info.GetResourceId(), http.StatusFound)
+		case "file":
+			http.Redirect(w, r, "/api/files/"+info.GetResourceId(), http.StatusFound)
+		}
+	})
+
 	mux.HandleFunc("GET /api/history", func(w http.ResponseWriter, r *http.Request) {
 		user := getUserFromCookie(r)
 		if user == "" {
@@ -347,6 +405,20 @@ func main() {
 			} else if resp != nil && resp.GetError() != "" {
 				msg = resp.GetError()
 			}
+			writeJSON(w, map[string]interface{}{"success": false, "error": msg})
+			return
+		}
+		writeJSON(w, resp)
+	})
+
+	// === Photos (复用 File Service, 筛选 image/*) ===
+	mux.HandleFunc("GET /api/photos", func(w http.ResponseWriter, r *http.Request) {
+		resp, err := fileClient.ListFiles(injectToken(r), &pb.ListFilesRequest{
+			UserId: extractUID(r), MimeFilter: "image/",
+		})
+		if err != nil || resp == nil || !resp.Success {
+			msg := "list failed"
+			if err != nil { msg = err.Error() }
 			writeJSON(w, map[string]interface{}{"success": false, "error": msg})
 			return
 		}

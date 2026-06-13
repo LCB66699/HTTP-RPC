@@ -253,6 +253,22 @@ bool Database::Initialize() {
     mysql_query(c, "ALTER TABLE spreadsheets ADD COLUMN version INT NOT NULL DEFAULT 1");
     mysql_query(c, "ALTER TABLE users MODIFY COLUMN password_hash VARCHAR(256) NOT NULL");
     mysql_query(c, "ALTER TABLE users ADD COLUMN token_version INT NOT NULL DEFAULT 0");
+    exec("CREATE TABLE IF NOT EXISTS share_permissions ("
+         "id BIGINT AUTO_INCREMENT PRIMARY KEY, "
+         "resource_type VARCHAR(20) NOT NULL, "
+         "resource_id BIGINT NOT NULL, "
+         "owner_id BIGINT NOT NULL, "
+         "grantee_id BIGINT NOT NULL, "
+         "permission VARCHAR(20) NOT NULL DEFAULT 'view', "
+         "created_at DATETIME DEFAULT NOW())");
+    exec("CREATE TABLE IF NOT EXISTS share_links ("
+         "id BIGINT AUTO_INCREMENT PRIMARY KEY, "
+         "resource_type VARCHAR(20) NOT NULL, "
+         "resource_id BIGINT NOT NULL, "
+         "token VARCHAR(64) UNIQUE NOT NULL, "
+         "permission VARCHAR(20) NOT NULL DEFAULT 'view', "
+         "expires_at DATETIME NULL, "
+         "created_at DATETIME DEFAULT NOW())");
     mysql_query(c, "ALTER TABLE users ADD COLUMN phone VARCHAR(20) UNIQUE NULL");
     mysql_query(c, "ALTER TABLE users ADD COLUMN display_name VARCHAR(100) DEFAULT NULL");
     mysql_query(c, "ALTER TABLE users ADD COLUMN avatar_url TEXT DEFAULT NULL");
