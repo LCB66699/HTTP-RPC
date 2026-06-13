@@ -1,5 +1,4 @@
-# Envoy API Gateway — JWT 鉴权 (从 Cookie 提取验证) + 反向代理 + 熔断
-# gRPC-JSON 转码待办: proto descriptor 兼容性问题
+# Envoy — 纯反向代理 + 熔断（JWT 鉴权已移至 gRPC-Gateway）
 
 static_resources:
   listeners:
@@ -21,25 +20,6 @@ static_resources:
               - match: { prefix: "/" }
                 route: { cluster: gateway, timeout: 30s }
           http_filters:
-          # JWT 鉴权 — login/register/refresh 跳过
-          - name: envoy.filters.http.jwt_authn
-            typed_config:
-              "@type": type.googleapis.com/envoy.extensions.filters.http.jwt_authn.v3.JwtAuthentication
-              providers:
-                rpc_provider:
-                  from_cookies: [rpc_at]
-                  local_jwks:
-                    inline_string: |
-                      {"keys":[{"kty":"oct","k":"{{JWT_SECRET_B64}}","alg":"HS256"}]}
-                  forward: true
-                  forward_payload_header: x-jwt-username
-              rules:
-              - match: { prefix: "/api/health" }
-              - match: { prefix: "/api/login" }
-              - match: { prefix: "/api/register" }
-              - match: { prefix: "/api/refresh" }
-              - match: { prefix: "/" }
-                requires: { provider_name: rpc_provider }
           - name: envoy.filters.http.router
             typed_config:
               "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
@@ -66,7 +46,7 @@ static_resources:
       - lb_endpoints:
         - endpoint: { address: { socket_address: { address: "grpc-gateway", port_value: 8080 } } }
 
-  # Search gRPC 服务 (Gateway 替代: 搜索直连 ES)
+  # Search gRPC (预留)
   - name: search_grpc
     type: STRICT_DNS
     connect_timeout: 0.25s
