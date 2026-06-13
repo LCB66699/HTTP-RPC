@@ -153,7 +153,7 @@ title "1.5 用户名 <3 字符（应拒绝）"
 REG3=$($CURL -X POST "$API/api/register" \
     -H 'Content-Type: application/json' \
     -d '{"username":"ab","password":"test1234"}')
-echo "$REG3" | grep -q '"success":false' \
+echo "$REG3" | grep -q '"error"' \
     && green "Short username rejected" \
     || red "Should reject short username"
 
