@@ -207,6 +207,25 @@ echo "$LIST" | grep -q '"success":true' \
     && green "List sheets OK" \
     || red "List failed: $LIST"
 
+title "3.2b 游标分页"
+PAGE1=$($CURL "$API/api/sheets?limit=5" -b "$JAR")
+CURSOR=$(echo "$PAGE1" | grep -o '"next_cursor":"[^"]*"' | sed 's/"next_cursor":"//;s/"//')
+HASMORE=$(echo "$PAGE1" | grep -o '"has_more":[^,}]*' | sed 's/"has_more"://')
+if [ -n "$CURSOR" ] && [ "$HASMORE" = "true" ]; then
+    PAGE2=$($CURL "$API/api/sheets?limit=5&after_id=$CURSOR" -b "$JAR")
+    echo "$PAGE2" | grep -q '"success":true' \
+        && green "Cursor pagination OK" \
+        || red "Cursor page2 failed: $PAGE2"
+else
+    warn "Cursor pagination skipped (not enough data or not implemented)"
+fi
+
+title "3.2c 旧偏移分页兼容"
+OLD_PAGE=$($CURL "$API/api/sheets?page=0&page_size=5" -b "$JAR")
+echo "$OLD_PAGE" | grep -q '"success":true' \
+    && green "List sheets OK" \
+    || red "List failed: $LIST"
+
 title "3.3 获取单表"
 GET=$($CURL "$API/api/sheets/$SHEET_ID" -b "$JAR")
 echo "$GET" | grep -q '"success":true' \

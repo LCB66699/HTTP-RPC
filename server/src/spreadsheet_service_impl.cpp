@@ -497,9 +497,12 @@ grpc::Status SpreadsheetServiceImpl::ListSpreadsheets(grpc::ServerContext *conte
         return grpc::Status::OK;
     }
 
+    int64_t after_id = req->after_id();
+    int limit = req->limit() > 0 ? req->limit() : (page_size > 0 ? page_size : 20);
+
     std::vector<SpreadsheetSummary> sheets;
     int total = 0;
-    if (!db_->ListSpreadsheets(uid, sheets, total, page, page_size)) {
+    if (!db_->ListSpreadsheets(uid, sheets, total, page, limit, after_id)) {
         resp->set_success(false);
         resp->set_error("Query failed");
         return grpc::Status::OK;
@@ -513,6 +516,12 @@ grpc::Status SpreadsheetServiceImpl::ListSpreadsheets(grpc::ServerContext *conte
         summary->set_row_count(s.row_count);
         summary->set_col_count(s.col_count);
         summary->set_updated_at(s.updated_at);
+    }
+    // Cursor pagination response
+    if (after_id >= 0 && limit > 0) {
+        resp->set_has_more((int)sheets.size() == limit);
+        if (!sheets.empty())
+            resp->set_next_cursor(std::to_string(sheets.back().id));
     }
     resp->set_total(total);
     resp->set_success(true);
