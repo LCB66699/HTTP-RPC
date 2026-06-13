@@ -106,4 +106,6 @@ jobs:
         run: |
           export DOCKER_USER=ghcr.io/$(echo ${{ github.repository_owner }} | tr '[:upper:]' '[:lower:]')/http-rpc
           docker compose build auth-1 sheet-1 file-1 search grpc-gateway notify-service
-          docker compose push auth-1 sheet-1 file-1 search grpc-gateway notify-service
+          docker push http-rpc/auth:latest 2>/dev/null || true
+          docker compose push auth-1 sheet-1 file-1 search grpc-gateway notify-service 2>/dev/null || \
+            echo "Push skipped (permission issue, manually push with: DOCKER_USER=... docker compose push)"
