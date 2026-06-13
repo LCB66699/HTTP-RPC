@@ -270,7 +270,7 @@ services:
       - sheet-1
       - file-1
     healthcheck:
-      test: ["CMD-SHELL", "bash -c 'echo > /dev/tcp/localhost/9901' 2>/dev/null"]
+      test: ["CMD-SHELL", "bash -c 'echo > /dev/tcp/localhost/8080' 2>/dev/null"]
       interval: 5s
       timeout: 3s
       retries: 12
@@ -293,7 +293,7 @@ services:
       - sheet-1
       - file-1
     healthcheck:
-      test: ["CMD-SHELL", "bash -c 'echo > /dev/tcp/localhost/9901' 2>/dev/null"]
+      test: ["CMD-SHELL", "bash -c 'echo > /dev/tcp/localhost/8080' 2>/dev/null"]
       interval: 5s
       timeout: 3s
       retries: 12
