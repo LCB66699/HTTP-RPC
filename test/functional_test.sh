@@ -7,8 +7,16 @@ API="${1:-https://localhost}"
 CURL="curl -sk --connect-timeout 5 --max-time 15 --retry 2"
 JAR="/tmp/rpc_functional_cookies_$$"
 PASS=0; FAIL=0
-TEST_USER="tester_$(date +%s)"   # CI 重跑不走旧数据
+TEST_USER="tester_$(date +%s)"
 TEST_PASS="test1234"
+
+# CI runner 网络不稳定，轮询 Gateway 直到就绪
+for i in $(seq 1 60); do
+    if curl -sk -o /dev/null -w "%{http_code}" "$API/api/health" 2>/dev/null | grep -q "200"; then
+        break
+    fi
+    sleep 3
+done
 
 LOG_DIR="$(cd "$(dirname "$0")" && pwd)/logs"
 mkdir -p "$LOG_DIR"
