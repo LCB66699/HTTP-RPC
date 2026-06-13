@@ -431,6 +431,8 @@ services:
     depends_on:
       mysql-spreadsheet-0:
         condition: service_healthy
+      mysql-spreadsheet-1:
+        condition: service_healthy
       redis-cluster-init:
         condition: service_completed_successfully
     healthcheck:
@@ -460,6 +462,8 @@ services:
         aliases: [rpc-sheet]
     depends_on:
       mysql-spreadsheet-0:
+        condition: service_healthy
+      mysql-spreadsheet-1:
         condition: service_healthy
       redis-cluster-init:
         condition: service_completed_successfully
