@@ -77,6 +77,8 @@ func main() {
 	ch.QueueBind(q.Name, "sheet.deleted", "rpc.events", false, nil)
 	msgs, _ := ch.Consume(q.Name, "", false, false, false, false, nil)
 
+	startCanalFallback(ch)
+
 	log.Println("[Notify] Listening for events (DLQ: notify.dlq)...")
 	for msg := range msgs {
 		var event map[string]interface{}
