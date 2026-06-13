@@ -9,6 +9,9 @@ service FileService {
   rpc GetFile(GetFileRequest) returns (GetFileResponse);
   rpc ListFiles(ListFilesRequest) returns (ListFilesResponse);
   rpc DeleteFile(DeleteFileRequest) returns (DeleteFileResponse);
+  rpc CreateFolder(CreateFolderRequest) returns (CreateFolderResponse);
+  rpc MoveFile(MoveFileRequest) returns (MoveFileResponse);
+  rpc BatchDelete(BatchDeleteRequest) returns (BatchDeleteResponse);
 }
 
 message FileInfo {
@@ -18,6 +21,8 @@ message FileInfo {
   int64 size = 4;
   string mime_type = 5;
   string created_at = 6;
+  int64 folder_id = 7;  // 0 = root
+  bool is_folder = 8;
 }
 
 // Requests identify the caller by user_id (integer FK to users.id).
@@ -60,6 +65,8 @@ message ListFilesRequest {
   int32 page_size = 3;
   int64 after_id = 4;  // cursor: 0=首页
   int32 limit = 5;     // 默认 20
+  int64 folder_id = 6; // 0=root, -1=all
+  string mime_filter = 7; // e.g. "image/*" for photos
 }
 
 message ListFilesResponse {
@@ -76,6 +83,26 @@ message DeleteFileRequest {
   int64 id = 1;
   int64 user_id = 2;
 }
+
+message CreateFolderRequest {
+  int64 user_id = 1;
+  string name = 2;
+  int64 parent_folder_id = 3;  // 0 = root
+}
+message CreateFolderResponse { bool success = 1; int64 id = 2; string error = 3; }
+
+message MoveFileRequest {
+  int64 id = 1;
+  int64 user_id = 2;
+  int64 target_folder_id = 3;
+}
+message MoveFileResponse { bool success = 1; string error = 2; }
+
+message BatchDeleteRequest {
+  int64 user_id = 1;
+  repeated int64 ids = 2;
+}
+message BatchDeleteResponse { bool success = 1; int32 deleted_count = 2; string error = 3; }
 
 message DeleteFileResponse {
   bool success = 1;

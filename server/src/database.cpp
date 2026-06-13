@@ -253,6 +253,9 @@ bool Database::Initialize() {
     mysql_query(c, "ALTER TABLE spreadsheets ADD COLUMN version INT NOT NULL DEFAULT 1");
     mysql_query(c, "ALTER TABLE users MODIFY COLUMN password_hash VARCHAR(256) NOT NULL");
     mysql_query(c, "ALTER TABLE users ADD COLUMN token_version INT NOT NULL DEFAULT 0");
+    mysql_query(c, "ALTER TABLE users ADD COLUMN phone VARCHAR(20) UNIQUE NULL");
+    mysql_query(c, "ALTER TABLE users ADD COLUMN display_name VARCHAR(100) DEFAULT NULL");
+    mysql_query(c, "ALTER TABLE users ADD COLUMN avatar_url TEXT DEFAULT NULL");
     mysql_query(c, "ALTER TABLE files ADD COLUMN file_content LONGBLOB AFTER mime_type");
     mysql_query(c, "ALTER TABLE files DROP COLUMN stored_name");
 
@@ -547,8 +550,7 @@ bool Database::GetSpreadsheet(int64_t id, int64_t user_id, SpreadsheetRow &out) 
 bool Database::ListSpreadsheets(int64_t user_id, std::vector<SpreadsheetSummary> &out, int &total, int page,
                                 int page_size, int64_t after_id) {
     std::string where = "WHERE user_id=" + std::to_string(user_id);
-    if (after_id > 0)
-        where += " AND id<" + std::to_string(after_id);
+    if (after_id > 0) where += " AND id<" + std::to_string(after_id);
 
     // Always obtain exact total via COUNT(*) — avoids loading all rows just to
     // count them
@@ -739,8 +741,7 @@ bool Database::GetFile(int64_t id, int64_t user_id, FileRow &out) {
 bool Database::ListFiles(int64_t user_id, std::vector<FileRow> &out, int &total, int page, int page_size,
                          int64_t after_id) {
     std::string where = "WHERE user_id=" + std::to_string(user_id);
-    if (after_id > 0)
-        where += " AND id<" + std::to_string(after_id);
+    if (after_id > 0) where += " AND id<" + std::to_string(after_id);
 
     // Always obtain exact total via COUNT(*) to avoid loading all rows just to
     // count
@@ -1086,7 +1087,7 @@ bool ShardedDatabase::GetFile(int64_t id, int64_t user_id, FileRow &out) {
     return ShardFor(user_id)->GetFile(id, user_id, out);
 }
 bool ShardedDatabase::ListFiles(int64_t user_id, std::vector<FileRow> &out, int &total, int page, int page_size,
-                                int64_t after_id) {
+                               int64_t after_id) {
     return ShardFor(user_id)->ListFiles(user_id, out, total, page, page_size, after_id);
 }
 
@@ -1153,4 +1154,68 @@ int ShardedDatabase::PurgeOldUndoLogs(int days) {
     for (auto &db : shards_)
         total += db->PurgeOldUndoLogs(days);
     return total;
+}
+
+// ---- Account management helpers ----
+int64_t Database::GetUserIdByPhone(const std::string &phone) {
+    std::string sql = "SELECT id FROM users WHERE phone=" + q(EscConn(), phone);
+    int64_t uid = -1;
+    ExecRead(sql, [&](MYSQL_RES *res) {
+        MYSQL_ROW row = mysql_fetch_row(res);
+        if (row && row[0]) uid = std::stoll(row[0]);
+        return true;
+    });
+    return uid;
+}
+std::string Database::GetUsernameById(int64_t user_id) {
+    std::string sql =
+        "SELECT username FROM users WHERE id=" + std::to_string(user_id);
+    std::string name;
+    ExecRead(sql, [&](MYSQL_RES *res) {
+        MYSQL_ROW row = mysql_fetch_row(res);
+        if (row && row[0]) name = row[0];
+        return true;
+    });
+    return name;
+}
+bool Database::VerifyUserPassword(int64_t user_id, const std::string &password) {
+    std::string sql =
+        "SELECT password_hash FROM users WHERE id=" + std::to_string(user_id);
+    std::string stored;
+    ExecRead(sql, [&](MYSQL_RES *res) {
+        MYSQL_ROW row = mysql_fetch_row(res);
+        if (row && row[0]) stored = row[0];
+        return true;
+    });
+    return sha256::verify_password(password, stored);
+}
+bool Database::UpdateUserPassword(int64_t user_id, const std::string &new_hash) {
+    auto *ec = EscConn();
+    std::string sql = "UPDATE users SET password_hash=" + q(ec, new_hash) +
+                      " WHERE id=" + std::to_string(user_id);
+    return ExecWrite(sql);
+}
+int64_t ShardedDatabase::GetUserIdByPhone(const std::string &phone) {
+    for (auto &db : shards_) {
+        int64_t uid = db->GetUserIdByPhone(phone);
+        if (uid > 0) return uid;
+    }
+    return -1;
+}
+std::string ShardedDatabase::GetUsernameById(int64_t user_id) {
+    for (auto &db : shards_) {
+        auto name = db->GetUsernameById(user_id);
+        if (!name.empty()) return name;
+    }
+    return "";
+}
+bool ShardedDatabase::VerifyUserPassword(int64_t user_id, const std::string &pwd) {
+    for (auto &db : shards_)
+        if (db->VerifyUserPassword(user_id, pwd)) return true;
+    return false;
+}
+bool ShardedDatabase::UpdateUserPassword(int64_t user_id, const std::string &h) {
+    for (auto &db : shards_)
+        if (db->UpdateUserPassword(user_id, h)) return true;
+    return false;
 }

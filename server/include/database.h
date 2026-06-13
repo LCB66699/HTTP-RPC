@@ -60,6 +60,10 @@ class Database {
     bool IncrementTokenVersion(const std::string &username);
     // Returns users.id for embedding in JWT; -1 on failure.
     int64_t GetUserId(const std::string &username);
+    int64_t GetUserIdByPhone(const std::string &phone);
+    std::string GetUsernameById(int64_t user_id);
+    bool VerifyUserPassword(int64_t user_id, const std::string &password);
+    bool UpdateUserPassword(int64_t user_id, const std::string &new_hash);
 
     // Spreadsheets — caller passes user_id (users.id) as the owner key.
     // username is stored alongside for display; idempotency_key deduplicates
@@ -174,6 +178,10 @@ class ShardedDatabase {
     int GetTokenVersion(const std::string &username);
     bool IncrementTokenVersion(const std::string &username);
     int64_t GetUserId(const std::string &username);
+    int64_t GetUserIdByPhone(const std::string &phone);
+    std::string GetUsernameById(int64_t user_id);
+    bool VerifyUserPassword(int64_t user_id, const std::string &password);
+    bool UpdateUserPassword(int64_t user_id, const std::string &new_hash);
     bool ImportFromUsersJson(const std::string &json_path);
 
     // === Spreadsheets (hash by user_id) ===
