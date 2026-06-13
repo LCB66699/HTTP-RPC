@@ -50,19 +50,21 @@ jobs:
           docker compose down -v --remove-orphans 2>/dev/null || true
           rm -rf data/ 2>/dev/null || true
           docker compose up -d
-          echo "Waiting for Gateway..."
-          for i in $(seq 1 90); do
-            if curl -sk https://localhost/api/health 2>/dev/null | grep -q gateway; then
-              echo "Gateway ready after ${i}s"
+          echo "Waiting for all containers healthy..."
+          for i in $(seq 1 180); do
+            TOTAL=$(docker compose ps -a --format json 2>/dev/null | wc -l)
+            HEALTHY=$(docker compose ps -a --format json 2>/dev/null | grep -c '"Health":"healthy"' || true)
+            # 有些容器没有 healthcheck (如 es-init, minio-init)，算 they exited 0
+            EXITED_OK=$(docker compose ps -a --format json 2>/dev/null | grep -c '"ExitCode":0' || true)
+            OK=$((HEALTHY + EXITED_OK))
+            if [ "$OK" -ge "$TOTAL" ] && [ "$TOTAL" -gt 0 ]; then
+              echo "All containers healthy after ${i}s ($TOTAL total)"
               break
             fi
-            sleep 2
-          done
-          echo "Waiting for backend readiness..."
-          for i in $(seq 1 60); do
-            if curl -sk https://localhost/api/health/ready 2>/dev/null | grep -q '"_all":true'; then
-              echo "All services ready after ${i}s"
-              break
+            if [ "$i" -eq 180 ]; then
+              echo "Timeout! unhealthy containers:"
+              docker compose ps -a
+              exit 1
             fi
             sleep 2
           done
