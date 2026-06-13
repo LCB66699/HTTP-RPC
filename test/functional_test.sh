@@ -177,10 +177,17 @@ CODE=$($CURL -o /dev/null -w "%{http_code}" \
 title "3. 表格 (Spreadsheet)"
 
 title "3.1 创建表格"
-CREATE=$($CURL -X POST "$API/api/sheets" \
-    -H 'Content-Type: application/json' \
-    -b "$JAR" \
-    -d '{"name":"测试表格","description":"自动化测试","headers_json":"[\"A\",\"B\",\"C\"]","data_json":"[[\"a1\",\"b1\",\"c1\"],[\"a2\",\"b2\",\"c2\"]]"}')
+for retry in 1 2 3 4 5; do
+    CREATE=$($CURL -X POST "$API/api/sheets" \
+        -H 'Content-Type: application/json' \
+        -b "$JAR" \
+        -d '{"name":"测试表格","description":"自动化测试","headers_json":"[\"A\",\"B\",\"C\"]","data_json":"[[\"a1\",\"b1\",\"c1\"],[\"a2\",\"b2\",\"c2\"]]"}')
+    echo "$CREATE" | grep -q '"success":true' && break
+    if [ $retry -lt 5 ]; then
+        warn "Sheet create attempt $retry failed (MySQL may still be initializing), retrying in 5s..."
+        sleep 5
+    fi
+done
 SHEET_ID=$(echo "$CREATE" | sed 's/.*"id":"*//;s/"*[,}].*//')
 echo "$CREATE" | grep -q '"success":true' \
     && green "Create sheet OK, id=$SHEET_ID" \
