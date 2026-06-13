@@ -395,9 +395,12 @@ grpc::Status FileServiceImpl::ListFiles(grpc::ServerContext *context, const rpc:
         return grpc::Status::OK;
     }
 
+    int64_t after_id = req->after_id();
+    int limit = req->limit() > 0 ? req->limit() : (page_size > 0 ? page_size : 20);
+
     std::vector<FileRow> files;
     int total = 0;
-    if (!db_->ListFiles(uid, files, total, page, page_size)) {
+    if (!db_->ListFiles(uid, files, total, page, limit, after_id)) {
         resp->set_success(false);
         resp->set_error("Query failed");
         return grpc::Status::OK;
@@ -411,6 +414,11 @@ grpc::Status FileServiceImpl::ListFiles(grpc::ServerContext *context, const rpc:
         f->set_size(row.size);
         f->set_mime_type(row.mime_type);
         f->set_created_at(row.created_at);
+    }
+    if (after_id >= 0 && limit > 0) {
+        resp->set_has_more((int)files.size() == limit);
+        if (!files.empty())
+            resp->set_next_cursor(std::to_string(files.back().id));
     }
     resp->set_total(total);
     resp->set_success(true);
