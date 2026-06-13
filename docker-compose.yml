@@ -1,4 +1,4 @@
-services:
+﻿services:
   # ===== Nginx (TLS termination + rate limiting) =====
   nginx:
     build: { dockerfile: Dockerfile.nginx }
@@ -177,24 +177,6 @@ services:
       - REDIS_PASSWORD=${REDIS_PASSWORD:-rpc-redis-123456}
     entrypoint: ["/bin/sh", "/init.sh"]
     restart: "no"
-
-  # ===== Canal ? binlog subscription =====
-  canal-server:
-    image: canal/canal-server:v1.1.7
-    ports: ["11111:11111"]
-    environment:
-      - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD:-123456}
-    volumes:
-      - ./canal/server/canal.properties:/home/admin/canal-server/conf/canal.properties:ro
-      - ./canal/server/instance.properties:/home/admin/canal-server/conf/spreadsheet/instance.properties:ro
-      - ./data/canal-server/conf:/home/admin/canal-server/conf/spreadsheet
-    restart: always
-    depends_on:
-      mysql-spreadsheet-0:
-        condition: service_healthy
-      redis-cluster-1:
-        condition: service_healthy
-
 
   # ===== RabbitMQ ? ???? =====
   rabbitmq:

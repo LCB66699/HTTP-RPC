@@ -1,16 +1,16 @@
 #pragma once
+#include <string>
+#include <grpcpp/grpcpp.h>
 #include "generated/rpc_search.grpc.pb.h"
 #include "generated/rpc_search.pb.h"
-#include <grpcpp/grpcpp.h>
-#include <string>
 
 class SearchServiceImpl final : public rpc::SearchService::Service {
 public:
-  explicit SearchServiceImpl(const std::string &es_host) : es_host_(es_host) {}
+    explicit SearchServiceImpl(const std::string& es_host) : es_host_(es_host) {}
 
-  grpc::Status Search(grpc::ServerContext *ctx, const rpc::SearchRequest *req,
-                      rpc::SearchResponse *resp) override;
+    grpc::Status Search(grpc::ServerContext* ctx, const rpc::SearchRequest* req,
+                        rpc::SearchResponse* resp) override;
 
 private:
-  std::string es_host_;
+    std::string es_host_;
 };
