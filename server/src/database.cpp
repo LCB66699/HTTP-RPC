@@ -547,7 +547,8 @@ bool Database::GetSpreadsheet(int64_t id, int64_t user_id, SpreadsheetRow &out) 
 bool Database::ListSpreadsheets(int64_t user_id, std::vector<SpreadsheetSummary> &out, int &total, int page,
                                 int page_size, int64_t after_id) {
     std::string where = "WHERE user_id=" + std::to_string(user_id);
-    if (after_id > 0) where += " AND id<" + std::to_string(after_id);
+    if (after_id > 0)
+        where += " AND id<" + std::to_string(after_id);
 
     // Always obtain exact total via COUNT(*) — avoids loading all rows just to
     // count them
@@ -738,7 +739,8 @@ bool Database::GetFile(int64_t id, int64_t user_id, FileRow &out) {
 bool Database::ListFiles(int64_t user_id, std::vector<FileRow> &out, int &total, int page, int page_size,
                          int64_t after_id) {
     std::string where = "WHERE user_id=" + std::to_string(user_id);
-    if (after_id > 0) where += " AND id<" + std::to_string(after_id);
+    if (after_id > 0)
+        where += " AND id<" + std::to_string(after_id);
 
     // Always obtain exact total via COUNT(*) to avoid loading all rows just to
     // count
@@ -1084,7 +1086,7 @@ bool ShardedDatabase::GetFile(int64_t id, int64_t user_id, FileRow &out) {
     return ShardFor(user_id)->GetFile(id, user_id, out);
 }
 bool ShardedDatabase::ListFiles(int64_t user_id, std::vector<FileRow> &out, int &total, int page, int page_size,
-                               int64_t after_id) {
+                                int64_t after_id) {
     return ShardFor(user_id)->ListFiles(user_id, out, total, page, page_size, after_id);
 }
 
