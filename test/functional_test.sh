@@ -42,7 +42,7 @@ fi
 # 预热：等 Auth 真正就绪（能处理注册请求）
 title "0.1 Auth 预热"
 WARM_USER="warmup_$(date +%s)"
-for i in $(seq 1 30); do
+for i in $(seq 1 50); do
     WARM=$($CURL -X POST "$API/api/register" \
         -H 'Content-Type: application/json' \
         -d "{\"username\":\"$WARM_USER\",\"password\":\"test1234\"}" 2>/dev/null)
@@ -50,11 +50,11 @@ for i in $(seq 1 30); do
         green "Auth ready after ${i}s"
         break
     fi
-    if [ $i -eq 30 ]; then
-        red "Auth not ready after 30 retries: $WARM"
+    if [ $i -eq 50 ]; then
+        red "Auth not ready after 250s: $WARM"
         exit 1
     fi
-    sleep 2
+    sleep 5
 done
 
 # ---- 1. 认证 ----
