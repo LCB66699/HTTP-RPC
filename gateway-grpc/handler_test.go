@@ -15,14 +15,16 @@ import (
 	pb "gateway-grpc/gen/rpc"
 )
 
-// ---- Mock clients ----
-type mockSheetClient struct {
-	listResp *pb.ListSpreadsheetsResponse
-	listErr  error
+func validTestJWT() string {
+	return "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1aWQiOjEyMzQ1LCJleHAiOjk5OTk5OTk5OTl9.fake"
 }
 
+// ---- Mocks ----
+type mockSheetClient struct {
+	listResp *pb.ListSpreadsheetsResponse
+}
 func (m *mockSheetClient) ListSpreadsheets(ctx context.Context, req *pb.ListSpreadsheetsRequest, opts ...grpc.CallOption) (*pb.ListSpreadsheetsResponse, error) {
-	return m.listResp, m.listErr
+	return m.listResp, nil
 }
 func (m *mockSheetClient) GetSpreadsheet(ctx context.Context, req *pb.GetSpreadsheetRequest, opts ...grpc.CallOption) (*pb.GetSpreadsheetResponse, error) {
 	return nil, nil
@@ -38,13 +40,12 @@ func (m *mockSheetClient) DeleteSpreadsheet(ctx context.Context, req *pb.DeleteS
 }
 
 type mockAuthClient struct {
-	changePwdResp *pb.ChangePasswordResponse
 	changePwdErr  error
-	loginResp     *pb.LoginResponse
+	changePwdResp *pb.ChangePasswordResponse
+	loginByPhoneResp *pb.LoginResponse
 }
-
 func (m *mockAuthClient) Login(ctx context.Context, req *pb.LoginRequest, opts ...grpc.CallOption) (*pb.LoginResponse, error) {
-	return m.loginResp, nil
+	return nil, nil
 }
 func (m *mockAuthClient) Register(ctx context.Context, req *pb.RegisterRequest, opts ...grpc.CallOption) (*pb.RegisterResponse, error) {
 	return nil, nil
@@ -53,37 +54,81 @@ func (m *mockAuthClient) RefreshToken(ctx context.Context, req *pb.RefreshTokenR
 	return nil, nil
 }
 func (m *mockAuthClient) ChangePassword(ctx context.Context, req *pb.ChangePasswordRequest, opts ...grpc.CallOption) (*pb.ChangePasswordResponse, error) {
-	return m.changePwdResp, m.changePwdErr
+	if m.changePwdErr != nil {
+		return nil, m.changePwdErr
+	}
+	return m.changePwdResp, nil
 }
 func (m *mockAuthClient) LoginByPhone(ctx context.Context, req *pb.PhoneLoginRequest, opts ...grpc.CallOption) (*pb.LoginResponse, error) {
+	return m.loginByPhoneResp, nil
+}
+
+type mockFileClient struct {
+	listResp         *pb.ListFilesResponse
+	createFolderResp *pb.CreateFolderResponse
+}
+func (m *mockFileClient) ListFiles(ctx context.Context, req *pb.ListFilesRequest, opts ...grpc.CallOption) (*pb.ListFilesResponse, error) {
+	return m.listResp, nil
+}
+func (m *mockFileClient) GetFile(ctx context.Context, req *pb.GetFileRequest, opts ...grpc.CallOption) (*pb.GetFileResponse, error) {
+	return nil, nil
+}
+func (m *mockFileClient) CreateFile(ctx context.Context, req *pb.CreateFileRequest, opts ...grpc.CallOption) (*pb.CreateFileResponse, error) {
+	return nil, nil
+}
+func (m *mockFileClient) DeleteFile(ctx context.Context, req *pb.DeleteFileRequest, opts ...grpc.CallOption) (*pb.DeleteFileResponse, error) {
+	return nil, nil
+}
+func (m *mockFileClient) CreateFolder(ctx context.Context, req *pb.CreateFolderRequest, opts ...grpc.CallOption) (*pb.CreateFolderResponse, error) {
+	return m.createFolderResp, nil
+}
+func (m *mockFileClient) MoveFile(ctx context.Context, req *pb.MoveFileRequest, opts ...grpc.CallOption) (*pb.MoveFileResponse, error) {
+	return nil, nil
+}
+func (m *mockFileClient) BatchDelete(ctx context.Context, req *pb.BatchDeleteRequest, opts ...grpc.CallOption) (*pb.BatchDeleteResponse, error) {
 	return nil, nil
 }
 
-// ---- Helper ----
-func validTestJWT() string {
-	return "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1aWQiOjEyMzQ1LCJleHAiOjk5OTk5OTk5OTl9.fake"
+type SharingClient interface {
+	Share(ctx context.Context, req *pb.ShareRequest, opts ...grpc.CallOption) (*pb.ShareResponse, error)
+	Revoke(ctx context.Context, req *pb.RevokeRequest, opts ...grpc.CallOption) (*pb.RevokeResponse, error)
+	ListShares(ctx context.Context, req *pb.ResourceRequest, opts ...grpc.CallOption) (*pb.ShareListResponse, error)
+	CreateShareLink(ctx context.Context, req *pb.ShareLinkRequest, opts ...grpc.CallOption) (*pb.ShareLinkResponse, error)
+	GetByToken(ctx context.Context, req *pb.ShareTokenRequest, opts ...grpc.CallOption) (*pb.SharedResourceResponse, error)
 }
 
-// ---- Test: ChangePassword ----
+type mockSharingClient struct{ linkResp *pb.ShareLinkResponse }
+
+func (m *mockSharingClient) Share(ctx context.Context, req *pb.ShareRequest, opts ...grpc.CallOption) (*pb.ShareResponse, error) {
+	return nil, nil
+}
+func (m *mockSharingClient) Revoke(ctx context.Context, req *pb.RevokeRequest, opts ...grpc.CallOption) (*pb.RevokeResponse, error) {
+	return nil, nil
+}
+func (m *mockSharingClient) ListShares(ctx context.Context, req *pb.ResourceRequest, opts ...grpc.CallOption) (*pb.ShareListResponse, error) {
+	return nil, nil
+}
+func (m *mockSharingClient) CreateShareLink(ctx context.Context, req *pb.ShareLinkRequest, opts ...grpc.CallOption) (*pb.ShareLinkResponse, error) {
+	return m.linkResp, nil
+}
+func (m *mockSharingClient) GetByToken(ctx context.Context, req *pb.ShareTokenRequest, opts ...grpc.CallOption) (*pb.SharedResourceResponse, error) {
+	return nil, nil
+}
+
+var sharingClient SharingClient
+
+// ---- Change Password ----
 func TestChangePassword_Success(t *testing.T) {
 	orig := authClient
-	authClient = &mockAuthClient{
-		changePwdResp: &pb.ChangePasswordResponse{Success: true},
-	}
+	authClient = &mockAuthClient{changePwdResp: &pb.ChangePasswordResponse{Success: true}}
 	defer func() { authClient = orig }()
-
 	req := httptest.NewRequest("PUT", "/api/me/password",
 		strings.NewReader(`{"old_password":"old","new_password":"new1234"}`))
 	req.AddCookie(&http.Cookie{Name: "rpc_at", Value: validTestJWT()})
 	w := httptest.NewRecorder()
-
-	// Create a minimal mux with just the change password handler
 	mux := http.NewServeMux()
 	mux.HandleFunc("PUT /api/me/password", func(w http.ResponseWriter, r *http.Request) {
-		var body struct {
-			OldPassword string `json:"old_password"`
-			NewPassword string `json:"new_password"`
-		}
+		var body struct{ OldPassword, NewPassword string }
 		json.NewDecoder(r.Body).Decode(&body)
 		uid := extractUID(r)
 		if uid == 0 {
@@ -100,7 +145,6 @@ func TestChangePassword_Success(t *testing.T) {
 		writeJSON(w, resp)
 	})
 	mux.ServeHTTP(w, req)
-
 	if w.Code != http.StatusOK {
 		t.Errorf("expected 200, got %d: %s", w.Code, w.Body.String())
 	}
@@ -110,41 +154,30 @@ func TestChangePassword_Unauthorized(t *testing.T) {
 	req := httptest.NewRequest("PUT", "/api/me/password",
 		strings.NewReader(`{"old_password":"old","new_password":"new1234"}`))
 	w := httptest.NewRecorder()
-
 	mux := http.NewServeMux()
 	mux.HandleFunc("PUT /api/me/password", func(w http.ResponseWriter, r *http.Request) {
-		uid := extractUID(r)
-		if uid == 0 {
+		if extractUID(r) == 0 {
 			http.Error(w, `{"error":"unauthorized"}`, http.StatusUnauthorized)
 			return
 		}
-		writeJSON(w, map[string]string{"ok": "ok"})
 	})
 	mux.ServeHTTP(w, req)
-
 	if w.Code != http.StatusUnauthorized {
-		t.Errorf("expected 401 without cookie, got %d", w.Code)
+		t.Errorf("expected 401, got %d", w.Code)
 	}
 }
 
 func TestChangePassword_GrpcError(t *testing.T) {
 	orig := authClient
-	authClient = &mockAuthClient{
-		changePwdErr: status.Error(codes.Internal, "DB error"),
-	}
+	authClient = &mockAuthClient{changePwdErr: status.Error(codes.Internal, "DB error")}
 	defer func() { authClient = orig }()
-
 	req := httptest.NewRequest("PUT", "/api/me/password",
 		strings.NewReader(`{"old_password":"old","new_password":"new1234"}`))
 	req.AddCookie(&http.Cookie{Name: "rpc_at", Value: validTestJWT()})
 	w := httptest.NewRecorder()
-
 	mux := http.NewServeMux()
 	mux.HandleFunc("PUT /api/me/password", func(w http.ResponseWriter, r *http.Request) {
-		var body struct {
-			OldPassword string `json:"old_password"`
-			NewPassword string `json:"new_password"`
-		}
+		var body struct{ OldPassword, NewPassword string }
 		json.NewDecoder(r.Body).Decode(&body)
 		uid := extractUID(r)
 		resp, err := authClient.ChangePassword(r.Context(), &pb.ChangePasswordRequest{
@@ -157,13 +190,12 @@ func TestChangePassword_GrpcError(t *testing.T) {
 		writeJSON(w, resp)
 	})
 	mux.ServeHTTP(w, req)
-
 	if w.Code != http.StatusInternalServerError {
-		t.Errorf("expected 500 on gRPC error, got %d", w.Code)
+		t.Errorf("expected 500, got %d", w.Code)
 	}
 }
 
-// ---- Cursor pagination ----
+// ---- Cursor Pagination ----
 func TestListSheets_CursorFirstPage(t *testing.T) {
 	orig := sheetClient
 	sheetClient = &mockSheetClient{
@@ -182,7 +214,7 @@ func TestListSheets_CursorFirstPage(t *testing.T) {
 		writeJSON(w, resp)
 	})
 	mux.ServeHTTP(w, req)
-	if !strings.Contains(w.Body.String(), "\"has_more\":true") {
+	if !strings.Contains(w.Body.String(), `"has_more":true`) {
 		t.Errorf("expected has_more, got: %s", w.Body.String())
 	}
 }
@@ -208,31 +240,6 @@ func TestListSheets_EmptyResult(t *testing.T) {
 }
 
 // ---- Folder ----
-type mockFileClient struct {
-	listResp         *pb.ListFilesResponse
-	createFolderResp *pb.CreateFolderResponse
-}
-
-func (m *mockFileClient) ListFiles(ctx context.Context, req *pb.ListFilesRequest, opts ...grpc.CallOption) (*pb.ListFilesResponse, error) {
-	return m.listResp, nil
-}
-func (m *mockFileClient) GetFile(ctx context.Context, req *pb.GetFileRequest, opts ...grpc.CallOption) (*pb.GetFileResponse, error) {
-	return nil, nil
-}
-func (m *mockFileClient) CreateFile(ctx context.Context, req *pb.CreateFileRequest, opts ...grpc.CallOption) (*pb.CreateFileResponse, error) {
-	return nil, nil
-}
-func (m *mockFileClient) DeleteFile(ctx context.Context, req *pb.DeleteFileRequest, opts ...grpc.CallOption) (*pb.DeleteFileResponse, error) {
-	return nil, nil
-}
-func (m *mockFileClient) CreateFolder(ctx context.Context, req *pb.CreateFolderRequest, opts ...grpc.CallOption) (*pb.CreateFolderResponse, error) {
-	return m.createFolderResp, nil
-}
-func (m *mockFileClient) MoveFile(ctx context.Context, req *pb.MoveFileRequest, opts ...grpc.CallOption) (*pb.MoveFileResponse, error) { return nil, nil }
-func (m *mockFileClient) BatchDelete(ctx context.Context, req *pb.BatchDeleteRequest, opts ...grpc.CallOption) (*pb.BatchDeleteResponse, error) {
-	return nil, nil
-}
-
 func TestCreateFolder_Success(t *testing.T) {
 	orig := fileClient
 	fileClient = &mockFileClient{createFolderResp: &pb.CreateFolderResponse{Success: true, Id: 999}}
@@ -254,34 +261,11 @@ func TestCreateFolder_Success(t *testing.T) {
 	}
 }
 
-// ---- OTP login ----
-type mockAuthFullClient struct {
-	loginResp        *pb.LoginResponse
-	changePwdResp    *pb.ChangePasswordResponse
-	loginByPhoneResp *pb.LoginResponse
-}
-
-func (m *mockAuthFullClient) Login(ctx context.Context, req *pb.LoginRequest, opts ...grpc.CallOption) (*pb.LoginResponse, error) {
-	return m.loginResp, nil
-}
-func (m *mockAuthFullClient) Register(ctx context.Context, req *pb.RegisterRequest, opts ...grpc.CallOption) (*pb.RegisterResponse, error) {
-	return nil, nil
-}
-func (m *mockAuthFullClient) RefreshToken(ctx context.Context, req *pb.RefreshTokenRequest, opts ...grpc.CallOption) (*pb.RefreshTokenResponse, error) {
-	return nil, nil
-}
-func (m *mockAuthFullClient) ChangePassword(ctx context.Context, req *pb.ChangePasswordRequest, opts ...grpc.CallOption) (*pb.ChangePasswordResponse, error) {
-	return m.changePwdResp, nil
-}
-func (m *mockAuthFullClient) LoginByPhone(ctx context.Context, req *pb.PhoneLoginRequest, opts ...grpc.CallOption) (*pb.LoginResponse, error) {
-	return m.loginByPhoneResp, nil
-}
-
+// ---- Phone OTP ----
 func TestPhoneLogin_Success(t *testing.T) {
 	orig := authClient
-	authClient = &mockAuthFullClient{
-		loginByPhoneResp: &pb.LoginResponse{Success: true, UserId: 1,
-			AccessToken: "at", RefreshToken: "rt", Role: "user"},
+	authClient = &mockAuthClient{
+		loginByPhoneResp: &pb.LoginResponse{Success: true, UserId: 1, AccessToken: "at", RefreshToken: "rt", Role: "user"},
 	}
 	defer func() { authClient = orig }()
 	req := httptest.NewRequest("POST", "/api/auth/phone/login",
@@ -300,6 +284,46 @@ func TestPhoneLogin_Success(t *testing.T) {
 	}
 }
 
+func TestOTPSend_ValidPhone(t *testing.T) {
+	req := httptest.NewRequest("POST", "/api/auth/otp/send",
+		strings.NewReader(`{"phone":"13800138000"}`))
+	w := httptest.NewRecorder()
+	mux := http.NewServeMux()
+	mux.HandleFunc("POST /api/auth/otp/send", func(w http.ResponseWriter, r *http.Request) {
+		var body struct{ Phone string }
+		json.NewDecoder(r.Body).Decode(&body)
+		if body.Phone == "" {
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		writeJSON(w, map[string]interface{}{"success": true})
+	})
+	mux.ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Errorf("expected 200, got %d", w.Code)
+	}
+}
+
+func TestOTPSend_EmptyPhone_Rejected(t *testing.T) {
+	req := httptest.NewRequest("POST", "/api/auth/otp/send", strings.NewReader(`{"phone":""}`))
+	w := httptest.NewRecorder()
+	mux := http.NewServeMux()
+	mux.HandleFunc("POST /api/auth/otp/send", func(w http.ResponseWriter, r *http.Request) {
+		var body struct{ Phone string }
+		json.NewDecoder(r.Body).Decode(&body)
+		if body.Phone == "" {
+			http.Error(w, `{"error":"phone required"}`, http.StatusBadRequest)
+			return
+		}
+		writeJSON(w, map[string]interface{}{"success": true})
+	})
+	mux.ServeHTTP(w, req)
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("expected 400, got %d", w.Code)
+	}
+}
+
+// ---- Photo ----
 func TestPhotoList_Success(t *testing.T) {
 	orig := fileClient
 	fileClient = &mockFileClient{listResp: &pb.ListFilesResponse{Success: true, Total: 5}}
@@ -318,6 +342,7 @@ func TestPhotoList_Success(t *testing.T) {
 	}
 }
 
+// ---- Sharing ----
 func TestShareLink_Create(t *testing.T) {
 	sharingClient = &mockSharingClient{
 		linkResp: &pb.ShareLinkResponse{Success: true, Token: "abc123"},
@@ -339,3 +364,22 @@ func TestShareLink_Create(t *testing.T) {
 	}
 }
 
+func TestShareToken_Access(t *testing.T) {
+	sharingClient = &mockSharingClient{}
+	req := httptest.NewRequest("GET", "/api/s/abc123", nil)
+	w := httptest.NewRecorder()
+	mux := http.NewServeMux()
+	mux.HandleFunc("GET /api/s/{token}", func(w http.ResponseWriter, r *http.Request) {
+		token := r.PathValue("token")
+		resp, _ := sharingClient.GetByToken(r.Context(), &pb.ShareTokenRequest{Token: token})
+		if resp == nil || !resp.Success {
+			writeJSONStatus(w, http.StatusNotFound, map[string]interface{}{"success": false})
+			return
+		}
+		writeJSON(w, resp)
+	})
+	mux.ServeHTTP(w, req)
+	if w.Code != http.StatusNotFound {
+		t.Errorf("expected 404 for invalid token, got %d", w.Code)
+	}
+}
