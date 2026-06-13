@@ -144,8 +144,8 @@ grep -i 'set-cookie' "/tmp/rpc_hdr_$$" | grep -qi 'samesite=strict' \
 title "1.4 错误密码（应拒绝）"
 LOGIN2=$($CURL -X POST "$API/api/login" \
     -H 'Content-Type: application/json' \
-    -d '{"username":"$TEST_USER","password":"wrongpass"}')
-echo "$LOGIN2" | grep -q '"success":false' \
+    -d "{\"username\":\"$TEST_USER\",\"password\":\"wrongpass\"}")
+echo "$LOGIN2" | grep -q '"error"' \
     && green "Bad password rejected" \
     || red "Bad password should fail"
 
@@ -161,7 +161,7 @@ title "1.6 密码 <6 字符（应拒绝）"
 REG4=$($CURL -X POST "$API/api/register" \
     -H 'Content-Type: application/json' \
     -d '{"username":"shortpw_fn","password":"12345"}')
-echo "$REG4" | grep -q '"success":false' \
+echo "$REG4" | grep -q '"error"' \
     && green "Short password rejected" \
     || red "Should reject short password"
 
