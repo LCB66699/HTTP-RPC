@@ -71,7 +71,7 @@ class Database {
     // page is 0-based; page_size=0 disables pagination and returns all rows
     // (backward compat)
     bool ListSpreadsheets(int64_t user_id, std::vector<SpreadsheetSummary> &out, int &total, int page = 0,
-                          int page_size = 0);
+                          int page_size = 0, int64_t after_id = 0);
     bool UpdateSpreadsheet(int64_t id, int64_t user_id, const std::string &name, const std::string &desc,
                            const std::string &headers_json, const std::string &data_json, int version = 0);
     bool UpdateSpreadsheet(int64_t id, const std::string &name, const std::string &desc,
@@ -182,7 +182,7 @@ class ShardedDatabase {
                            int64_t &out_id, const std::string &idempotency_key = "");
     bool GetSpreadsheet(int64_t id, int64_t user_id, SpreadsheetRow &out);
     bool ListSpreadsheets(int64_t user_id, std::vector<SpreadsheetSummary> &out, int &total, int page = 0,
-                          int page_size = 0);
+                          int page_size = 0, int64_t after_id = 0);
     bool UpdateSpreadsheet(int64_t id, int64_t user_id, const std::string &name, const std::string &desc,
                            const std::string &headers_json, const std::string &data_json, int version = 0);
     bool UpdateSpreadsheet(int64_t id, const std::string &name, const std::string &desc,
