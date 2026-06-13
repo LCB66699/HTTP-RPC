@@ -50,15 +50,22 @@ jobs:
           docker compose down -v --remove-orphans 2>/dev/null || true
           rm -rf data/ 2>/dev/null || true
           docker compose up -d
-          echo "Waiting for readiness..."
-          for i in $(seq 1 120); do
+          echo "Waiting for Gateway..."
+          for i in $(seq 1 90); do
+            if curl -sk https://localhost/api/health 2>/dev/null | grep -q gateway; then
+              echo "Gateway ready after ${i}s"
+              break
+            fi
+            sleep 2
+          done
+          echo "Waiting for backend readiness..."
+          for i in $(seq 1 60); do
             if curl -sk https://localhost/api/health/ready 2>/dev/null | grep -q '"_all":true'; then
               echo "All services ready after ${i}s"
               break
             fi
             sleep 2
           done
-          curl -sk https://localhost/api/health/ready || true
           echo "=== Services status ==="
           docker compose ps
 
