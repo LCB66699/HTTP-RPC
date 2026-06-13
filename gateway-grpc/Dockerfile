@@ -15,7 +15,7 @@ RUN PATH=$PATH:$GOPATH/bin protoc \
     -I protos \
     --go_out=paths=source_relative:gen/rpc \
     --go-grpc_out=paths=source_relative:gen/rpc \
-    protos/rpc_auth.proto protos/rpc_spreadsheet.proto protos/rpc_file.proto protos/rpc_search.proto
+    protos/rpc_auth.proto protos/rpc_spreadsheet.proto protos/rpc_file.proto protos/rpc_search.proto protos/rpc_sharing.proto
 
 RUN printf 'module gateway-grpc/gen/rpc\n\ngo 1.24\n' > gen/rpc/go.mod
 RUN go mod edit -replace gateway-grpc/gen/rpc=./gen/rpc

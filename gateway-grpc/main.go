@@ -30,7 +30,34 @@ import (
 )
 
 var jwtSecret []byte
+
+// ---- DI: 可注入的 gRPC client 接口 ----
+type SheetClient interface {
+	ListSpreadsheets(ctx context.Context, req *pb.ListSpreadsheetsRequest, opts ...grpc.CallOption) (*pb.ListSpreadsheetsResponse, error)
+	GetSpreadsheet(ctx context.Context, req *pb.GetSpreadsheetRequest, opts ...grpc.CallOption) (*pb.GetSpreadsheetResponse, error)
+	CreateSpreadsheet(ctx context.Context, req *pb.CreateSpreadsheetRequest, opts ...grpc.CallOption) (*pb.CreateSpreadsheetResponse, error)
+	UpdateSpreadsheet(ctx context.Context, req *pb.UpdateSpreadsheetRequest, opts ...grpc.CallOption) (*pb.UpdateSpreadsheetResponse, error)
+	DeleteSpreadsheet(ctx context.Context, req *pb.DeleteSpreadsheetRequest, opts ...grpc.CallOption) (*pb.DeleteSpreadsheetResponse, error)
+}
+type FileClient interface {
+	ListFiles(ctx context.Context, req *pb.ListFilesRequest, opts ...grpc.CallOption) (*pb.ListFilesResponse, error)
+	GetFile(ctx context.Context, req *pb.GetFileRequest, opts ...grpc.CallOption) (*pb.GetFileResponse, error)
+	CreateFile(ctx context.Context, req *pb.CreateFileRequest, opts ...grpc.CallOption) (*pb.CreateFileResponse, error)
+	DeleteFile(ctx context.Context, req *pb.DeleteFileRequest, opts ...grpc.CallOption) (*pb.DeleteFileResponse, error)
+}
+type AuthClientI interface {
+	Login(ctx context.Context, req *pb.LoginRequest, opts ...grpc.CallOption) (*pb.LoginResponse, error)
+	Register(ctx context.Context, req *pb.RegisterRequest, opts ...grpc.CallOption) (*pb.RegisterResponse, error)
+	RefreshToken(ctx context.Context, req *pb.RefreshTokenRequest, opts ...grpc.CallOption) (*pb.RefreshTokenResponse, error)
+	ChangePassword(ctx context.Context, req *pb.ChangePasswordRequest, opts ...grpc.CallOption) (*pb.ChangePasswordResponse, error)
+	LoginByPhone(ctx context.Context, req *pb.PhoneLoginRequest, opts ...grpc.CallOption) (*pb.LoginResponse, error)
+}
+
+// 真实连接（包级变量，main() 里初始化）
 var authConn, sheetConn, fileConn *grpc.ClientConn
+var sheetClient SheetClient
+var fileClient FileClient
+var authClient AuthClientI
 
 // cbWithSlow wraps a circuit breaker with a slow-call counter
 type cbWithSlow struct {
@@ -56,16 +83,18 @@ func main() {
 	log.Printf("Auth=%s Sheet=%s File=%s Search=%s", authAddr, sheetAddr, fileAddr, searchAddr)
 
 	authConn, _ = grpc.NewClient("dns:///"+authAddr, creds, kp, lb)
-	authClient := pb.NewAuthServiceClient(authConn)
+	authClient = pb.NewAuthServiceClient(authConn)
 
 	sheetConn, _ = grpc.NewClient("dns:///"+sheetAddr, creds, kp, lb)
-	sheetClient := pb.NewSpreadsheetServiceClient(sheetConn)
+	sheetClient = pb.NewSpreadsheetServiceClient(sheetConn)
 
 	fileConn, _ = grpc.NewClient("dns:///"+fileAddr, creds, kp, lb)
-	fileClient := pb.NewFileServiceClient(fileConn)
+	fileClient = pb.NewFileServiceClient(fileConn)
 
 	searchConn, _ := grpc.NewClient("dns:///"+searchAddr, creds, kp, lb)
 	searchClient := pb.NewSearchServiceClient(searchConn)
+
+	sharingClient := pb.NewSharingServiceClient(authConn)
 
 	// Redis
 	redisAddr := getenv("REDIS_ADDR", "redis-cluster-7000:7000")
@@ -223,7 +252,7 @@ func main() {
 		}
 		json.NewDecoder(r.Body).Decode(&body)
 		id := parseInt64(r.PathValue("id"))
-		resp, _ := authClient.Share(injectToken(r), &pb.ShareRequest{
+		resp, _ := sharingClient.Share(injectToken(r), &pb.ShareRequest{
 			OwnerId: uid, ResourceType: "sheet", ResourceId: id,
 			GranteeUsername: body.Username, Permission: body.Permission,
 		})
@@ -233,7 +262,7 @@ func main() {
 		uid := extractUID(r)
 		username := r.URL.Query().Get("username")
 		id := parseInt64(r.PathValue("id"))
-		resp, _ := authClient.Revoke(injectToken(r), &pb.RevokeRequest{
+		resp, _ := sharingClient.Revoke(injectToken(r), &pb.RevokeRequest{
 			OwnerId: uid, ResourceType: "sheet", ResourceId: id,
 			GranteeUsername: username,
 		})
@@ -242,7 +271,7 @@ func main() {
 	mux.HandleFunc("GET /api/sheets/{id}/share", func(w http.ResponseWriter, r *http.Request) {
 		uid := extractUID(r)
 		id := parseInt64(r.PathValue("id"))
-		resp, _ := authClient.ListShares(injectToken(r), &pb.ResourceRequest{
+		resp, _ := sharingClient.ListShares(injectToken(r), &pb.ResourceRequest{
 			OwnerId: uid, ResourceType: "sheet", ResourceId: id,
 		})
 		writeJSON(w, resp)
@@ -250,14 +279,14 @@ func main() {
 	mux.HandleFunc("POST /api/sheets/{id}/share-link", func(w http.ResponseWriter, r *http.Request) {
 		uid := extractUID(r)
 		id := parseInt64(r.PathValue("id"))
-		resp, _ := authClient.CreateShareLink(injectToken(r), &pb.ShareLinkRequest{
+		resp, _ := sharingClient.CreateShareLink(injectToken(r), &pb.ShareLinkRequest{
 			OwnerId: uid, ResourceType: "sheet", ResourceId: id, Permission: "view",
 		})
 		writeJSON(w, resp)
 	})
 	mux.HandleFunc("GET /api/s/{token}", func(w http.ResponseWriter, r *http.Request) {
 		token := r.PathValue("token")
-		resp, _ := authClient.GetByToken(injectToken(r), &pb.ShareTokenRequest{Token: token})
+		resp, _ := sharingClient.GetByToken(injectToken(r), &pb.ShareTokenRequest{Token: token})
 		if resp == nil || !resp.Success {
 			writeJSONStatus(w, http.StatusNotFound, map[string]interface{}{"success": false, "error": "Not found"})
 			return
@@ -266,9 +295,9 @@ func main() {
 		// Redirect to actual resource based on type
 		switch info.GetResourceType() {
 		case "sheet":
-			http.Redirect(w, r, "/api/sheets/"+info.GetResourceId(), http.StatusFound)
+			http.Redirect(w, r, fmt.Sprintf("/api/sheets/%d", info.GetResourceId()), http.StatusFound)
 		case "file":
-			http.Redirect(w, r, "/api/files/"+info.GetResourceId(), http.StatusFound)
+			http.Redirect(w, r, fmt.Sprintf("/api/files/%d", info.GetResourceId()), http.StatusFound)
 		}
 	})
 
