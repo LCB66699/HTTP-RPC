@@ -375,6 +375,43 @@ CODE_CROSS=$($CURL -o /dev/null -w "%{http_code}" "$API/api/sheets/$SHEET_ID2" -
 $CURL -X DELETE "$API/api/sheets/$SHEET_ID2" -b "$JAR2" > /dev/null 2>&1
 
 # ---- 8. Health ----
+# ---- 6b. 账户管理 ----
+title "6b. 改密码"
+CHPWD=$($CURL -X PUT "$API/api/me/password" \
+    -H 'Content-Type: application/json' \
+    -b "$JAR" \
+    -d "{\"old_password\":\"test1234\",\"new_password\":\"newpass456\"}")
+echo "$CHPWD" | grep -q '"success":true' \
+    && green "Change password OK" \
+    || warn "Change password not implemented: $CHPWD"
+
+# ---- 6c. 文件夹 ----
+title "6c. 创建文件夹"
+FOLDER=$($CURL -X POST "$API/api/files/folder" \
+    -H 'Content-Type: application/json' \
+    -b "$JAR" \
+    -d '{"name":"test_folder"}')
+echo "$FOLDER" | grep -q '"success":true' \
+    && green "Create folder OK" \
+    || warn "Folder feature not implemented: $FOLDER"
+
+# ---- 6d. 相册 ----
+title "6d. 照片列表"
+PHOTOS=$($CURL "$API/api/photos" -b "$JAR")
+echo "$PHOTOS" | grep -q '"success":true' \
+    && green "Photo list OK" \
+    || warn "Photo feature not implemented: $PHOTOS"
+
+# ---- 6e. 分享链接 ----
+title "6e. 创建分享链接"
+SHARE=$($CURL -X POST "$API/api/sheets/$SHEET_ID/share-link" \
+    -H 'Content-Type: application/json' \
+    -b "$JAR" \
+    -d '{"permission":"view"}')
+echo "$SHARE" | grep -q '"token"' \
+    && green "Share link created" \
+    || warn "Share feature not implemented: $SHARE"
+
 title "8. 健康检查"
 
 HEALTH=$($CURL "$API/api/health")
