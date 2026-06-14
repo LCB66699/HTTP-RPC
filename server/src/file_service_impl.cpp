@@ -511,24 +511,42 @@ grpc::Status FileServiceImpl::DeleteFile(grpc::ServerContext *context, const rpc
     return grpc::Status::OK;
 }
 
-
-grpc::Status FileServiceImpl::CreateFolder(grpc::ServerContext* ctx, const rpc::CreateFolderRequest* req, rpc::CreateFolderResponse* resp) {
-    if (auth_) { AuthContext ac = auth_->Authenticate(ctx); if (!ac.authenticated) return grpc::Status(grpc::StatusCode::UNAUTHENTICATED, ""); }
+grpc::Status FileServiceImpl::CreateFolder(grpc::ServerContext *ctx, const rpc::CreateFolderRequest *req,
+                                           rpc::CreateFolderResponse *resp) {
+    if (auth_) {
+        AuthContext ac = auth_->Authenticate(ctx);
+        if (!ac.authenticated)
+            return grpc::Status(grpc::StatusCode::UNAUTHENTICATED, "");
+    }
     int64_t id = 0;
     bool ok = db_->CreateFolder(req->user_id(), req->name(), req->parent_folder_id(), id);
     resp->set_success(ok);
-    if (ok) resp->set_id(id); else resp->set_error("Failed to create folder");
+    if (ok)
+        resp->set_id(id);
+    else
+        resp->set_error("Failed to create folder");
     return grpc::Status::OK;
 }
-grpc::Status FileServiceImpl::MoveFile(grpc::ServerContext* ctx, const rpc::MoveFileRequest* req, rpc::MoveFileResponse* resp) {
-    if (auth_) { AuthContext ac = auth_->Authenticate(ctx); if (!ac.authenticated) return grpc::Status(grpc::StatusCode::UNAUTHENTICATED, ""); }
+grpc::Status FileServiceImpl::MoveFile(grpc::ServerContext *ctx, const rpc::MoveFileRequest *req,
+                                       rpc::MoveFileResponse *resp) {
+    if (auth_) {
+        AuthContext ac = auth_->Authenticate(ctx);
+        if (!ac.authenticated)
+            return grpc::Status(grpc::StatusCode::UNAUTHENTICATED, "");
+    }
     bool ok = db_->MoveFile(req->id(), req->target_folder_id());
     resp->set_success(ok);
-    if (!ok) resp->set_error("Failed to move file");
+    if (!ok)
+        resp->set_error("Failed to move file");
     return grpc::Status::OK;
 }
-grpc::Status FileServiceImpl::BatchDelete(grpc::ServerContext* ctx, const rpc::BatchDeleteRequest* req, rpc::BatchDeleteResponse* resp) {
-    if (auth_) { AuthContext ac = auth_->Authenticate(ctx); if (!ac.authenticated) return grpc::Status(grpc::StatusCode::UNAUTHENTICATED, ""); }
+grpc::Status FileServiceImpl::BatchDelete(grpc::ServerContext *ctx, const rpc::BatchDeleteRequest *req,
+                                          rpc::BatchDeleteResponse *resp) {
+    if (auth_) {
+        AuthContext ac = auth_->Authenticate(ctx);
+        if (!ac.authenticated)
+            return grpc::Status(grpc::StatusCode::UNAUTHENTICATED, "");
+    }
     std::vector<int64_t> ids(req->ids().begin(), req->ids().end());
     int count = db_->BatchDeleteFiles(req->user_id(), ids);
     resp->set_success(count > 0);

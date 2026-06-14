@@ -95,7 +95,8 @@ class Database {
     bool GetFile(int64_t id, int64_t user_id, FileRow &out);
     // page is 0-based; page_size=0 disables pagination and returns all rows
     // (backward compat)
-    bool ListFiles(int64_t user_id, std::vector<FileRow> &out, int &total, int page = 0, int page_size = 0, int64_t after_id = 0);
+    bool ListFiles(int64_t user_id, std::vector<FileRow> &out, int &total, int page = 0, int page_size = 0,
+                   int64_t after_id = 0);
     bool DeleteFile(int64_t id, int64_t user_id = 0);
     bool GetFileOwner(int64_t id, int64_t &owner_user_id);
     bool GetFileStoragePath(int64_t id, std::string &storage_path);
@@ -207,7 +208,8 @@ class ShardedDatabase {
                     const std::string &idempotency_key = "");
     bool UpdateFileContent(int64_t id, const std::string &content);
     bool GetFile(int64_t id, int64_t user_id, FileRow &out);
-    bool ListFiles(int64_t user_id, std::vector<FileRow> &out, int &total, int page = 0, int page_size = 0, int64_t after_id = 0);
+    bool ListFiles(int64_t user_id, std::vector<FileRow> &out, int &total, int page = 0, int page_size = 0,
+                   int64_t after_id = 0);
     bool DeleteFile(int64_t id, int64_t user_id = 0);
     bool GetFileOwner(int64_t id, int64_t &owner_user_id);
     bool GetFileStoragePath(int64_t id, std::string &storage_path);
