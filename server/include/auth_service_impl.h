@@ -36,12 +36,9 @@ class AuthServiceImpl final : public rpc::AuthService::Service {
                               rpc::RefreshTokenResponse *resp) override;
     grpc::Status ChangePassword(grpc::ServerContext *, const rpc::ChangePasswordRequest *,
                                 rpc::ChangePasswordResponse *) override;
-    grpc::Status SendOTP(grpc::ServerContext *, const rpc::SendOTPRequest *,
-                         rpc::SendOTPResponse *) override;
-    grpc::Status LoginByPhone(grpc::ServerContext *, const rpc::PhoneLoginRequest *,
-                              rpc::LoginResponse *) override;
-    grpc::Status BindPhone(grpc::ServerContext *, const rpc::BindPhoneRequest *,
-                           rpc::BindPhoneResponse *) override;
+    grpc::Status SendOTP(grpc::ServerContext *, const rpc::SendOTPRequest *, rpc::SendOTPResponse *) override;
+    grpc::Status LoginByPhone(grpc::ServerContext *, const rpc::PhoneLoginRequest *, rpc::LoginResponse *) override;
+    grpc::Status BindPhone(grpc::ServerContext *, const rpc::BindPhoneRequest *, rpc::BindPhoneResponse *) override;
     grpc::Status UpdateProfile(grpc::ServerContext *, const rpc::UpdateProfileRequest *,
                                rpc::UpdateProfileResponse *) override;
 

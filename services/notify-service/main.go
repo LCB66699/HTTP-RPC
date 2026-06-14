@@ -13,18 +13,18 @@ import (
 	"os"
 	"time"
 
-	amqp "github.com/rabbitmq/amqp091-go"
+	"github.com/elastic/go-elasticsearch/v8"
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
+	amqp "github.com/rabbitmq/amqp091-go"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
-	"github.com/elastic/go-elasticsearch/v8"
 )
 
 var (
-	mongoColl  *mongo.Collection
-	esClient   *elasticsearch.Client
-	minioCli   *minio.Client
+	mongoColl   *mongo.Collection
+	esClient    *elasticsearch.Client
+	minioCli    *minio.Client
 	minioBucket string
 )
 
@@ -52,7 +52,9 @@ func main() {
 	rabbitHost := getenv("RABBITMQ_HOST", "rabbitmq")
 	conn, err := amqp.Dial(fmt.Sprintf("amqp://%s:%s@%s:5672/",
 		getenv("RABBITMQ_USER", "rpc"), getenv("RABBITMQ_PASS", "rpc-rabbit-123456"), rabbitHost))
-	if err != nil { log.Fatalf("RabbitMQ: %v", err) }
+	if err != nil {
+		log.Fatalf("RabbitMQ: %v", err)
+	}
 	defer conn.Close()
 
 	ch, _ := conn.Channel()
@@ -194,8 +196,12 @@ func handleSheetUpsert(event map[string]interface{}) bool {
 		"sheet_id": sheetID, "user_id": userID,
 		"name": name, "description": desc, "updated_at": time.Now().UTC(),
 	}
-	if cells != nil { doc["cells"] = cells }
-	if headers != nil { doc["headers"] = headers }
+	if cells != nil {
+		doc["cells"] = cells
+	}
+	if headers != nil {
+		doc["headers"] = headers
+	}
 	if _, err := mongoColl.Database().Collection("sheet_contents").UpdateOne(context.Background(),
 		map[string]interface{}{"sheet_id": sheetID},
 		map[string]interface{}{"$set": doc}, options.Update().SetUpsert(true)); err != nil {
@@ -230,6 +236,8 @@ func handleSheetDelete(event map[string]interface{}) bool {
 }
 
 func getenv(key, fallback string) string {
-	if v := os.Getenv(key); v != "" { return v }
+	if v := os.Getenv(key); v != "" {
+		return v
+	}
 	return fallback
 }
