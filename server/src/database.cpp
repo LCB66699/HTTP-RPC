@@ -253,25 +253,25 @@ bool Database::Initialize() {
     mysql_query(c, "ALTER TABLE spreadsheets ADD COLUMN version INT NOT NULL DEFAULT 1");
     mysql_query(c, "ALTER TABLE users MODIFY COLUMN password_hash VARCHAR(256) NOT NULL");
     mysql_query(c, "ALTER TABLE users ADD COLUMN token_version INT NOT NULL DEFAULT 0");
-    exec(
-        "CREATE TABLE IF NOT EXISTS share_permissions ("
-        "id BIGINT AUTO_INCREMENT PRIMARY KEY, "
-        "resource_type VARCHAR(20) NOT NULL, "
-        "resource_id BIGINT NOT NULL, "
-        "owner_id BIGINT NOT NULL, "
-        "grantee_id BIGINT NOT NULL, "
-        "permission VARCHAR(20) NOT NULL DEFAULT 'view', "
-        "created_at DATETIME DEFAULT NOW())");
-    exec(
-        "CREATE TABLE IF NOT EXISTS share_links ("
-        "id BIGINT AUTO_INCREMENT PRIMARY KEY, "
-        "resource_type VARCHAR(20) NOT NULL, "
-        "resource_id BIGINT NOT NULL, "
-        "token VARCHAR(64) UNIQUE NOT NULL, "
-        "permission VARCHAR(20) NOT NULL DEFAULT 'view', "
-        "expires_at DATETIME NULL, "
-        "created_at DATETIME DEFAULT NOW())");
+    exec("CREATE TABLE IF NOT EXISTS share_permissions ("
+         "id BIGINT AUTO_INCREMENT PRIMARY KEY, "
+         "resource_type VARCHAR(20) NOT NULL, "
+         "resource_id BIGINT NOT NULL, "
+         "owner_id BIGINT NOT NULL, "
+         "grantee_id BIGINT NOT NULL, "
+         "permission VARCHAR(20) NOT NULL DEFAULT 'view', "
+         "created_at DATETIME DEFAULT NOW())");
+    exec("CREATE TABLE IF NOT EXISTS share_links ("
+         "id BIGINT AUTO_INCREMENT PRIMARY KEY, "
+         "resource_type VARCHAR(20) NOT NULL, "
+         "resource_id BIGINT NOT NULL, "
+         "token VARCHAR(64) UNIQUE NOT NULL, "
+         "permission VARCHAR(20) NOT NULL DEFAULT 'view', "
+         "expires_at DATETIME NULL, "
+         "created_at DATETIME DEFAULT NOW())");
     mysql_query(c, "ALTER TABLE users ADD COLUMN phone VARCHAR(20) UNIQUE NULL");
+    mysql_query(c, "ALTER TABLE files ADD COLUMN folder_id BIGINT DEFAULT 0");
+    mysql_query(c, "ALTER TABLE files ADD COLUMN is_folder BOOLEAN DEFAULT FALSE");
     mysql_query(c, "ALTER TABLE users ADD COLUMN display_name VARCHAR(100) DEFAULT NULL");
     mysql_query(c, "ALTER TABLE users ADD COLUMN avatar_url TEXT DEFAULT NULL");
     mysql_query(c, "ALTER TABLE files ADD COLUMN file_content LONGBLOB AFTER mime_type");
@@ -568,8 +568,7 @@ bool Database::GetSpreadsheet(int64_t id, int64_t user_id, SpreadsheetRow &out) 
 bool Database::ListSpreadsheets(int64_t user_id, std::vector<SpreadsheetSummary> &out, int &total, int page,
                                 int page_size, int64_t after_id) {
     std::string where = "WHERE user_id=" + std::to_string(user_id);
-    if (after_id > 0)
-        where += " AND id<" + std::to_string(after_id);
+    if (after_id > 0) where += " AND id<" + std::to_string(after_id);
 
     // Always obtain exact total via COUNT(*) — avoids loading all rows just to
     // count them
@@ -760,8 +759,7 @@ bool Database::GetFile(int64_t id, int64_t user_id, FileRow &out) {
 bool Database::ListFiles(int64_t user_id, std::vector<FileRow> &out, int &total, int page, int page_size,
                          int64_t after_id) {
     std::string where = "WHERE user_id=" + std::to_string(user_id);
-    if (after_id > 0)
-        where += " AND id<" + std::to_string(after_id);
+    if (after_id > 0) where += " AND id<" + std::to_string(after_id);
 
     // Always obtain exact total via COUNT(*) to avoid loading all rows just to
     // count
@@ -1107,7 +1105,7 @@ bool ShardedDatabase::GetFile(int64_t id, int64_t user_id, FileRow &out) {
     return ShardFor(user_id)->GetFile(id, user_id, out);
 }
 bool ShardedDatabase::ListFiles(int64_t user_id, std::vector<FileRow> &out, int &total, int page, int page_size,
-                                int64_t after_id) {
+                               int64_t after_id) {
     return ShardFor(user_id)->ListFiles(user_id, out, total, page, page_size, after_id);
 }
 
@@ -1182,102 +1180,91 @@ int64_t Database::GetUserIdByPhone(const std::string &phone) {
     int64_t uid = -1;
     ExecRead(sql, [&](MYSQL_RES *res) {
         MYSQL_ROW row = mysql_fetch_row(res);
-        if (row && row[0])
-            uid = std::stoll(row[0]);
+        if (row && row[0]) uid = std::stoll(row[0]);
         return true;
     });
     return uid;
 }
 std::string Database::GetUsernameById(int64_t user_id) {
-    std::string sql = "SELECT username FROM users WHERE id=" + std::to_string(user_id);
+    std::string sql =
+        "SELECT username FROM users WHERE id=" + std::to_string(user_id);
     std::string name;
     ExecRead(sql, [&](MYSQL_RES *res) {
         MYSQL_ROW row = mysql_fetch_row(res);
-        if (row && row[0])
-            name = row[0];
+        if (row && row[0]) name = row[0];
         return true;
     });
     return name;
 }
 bool Database::VerifyUserPassword(int64_t user_id, const std::string &password) {
-    std::string sql = "SELECT password_hash FROM users WHERE id=" + std::to_string(user_id);
+    std::string sql =
+        "SELECT password_hash FROM users WHERE id=" + std::to_string(user_id);
     std::string stored;
     ExecRead(sql, [&](MYSQL_RES *res) {
         MYSQL_ROW row = mysql_fetch_row(res);
-        if (row && row[0])
-            stored = row[0];
+        if (row && row[0]) stored = row[0];
         return true;
     });
     return sha256::verify_password(password, stored);
 }
 bool Database::UpdateUserPassword(int64_t user_id, const std::string &new_hash) {
     auto *ec = EscConn();
-    std::string sql = "UPDATE users SET password_hash=" + q(ec, new_hash) + " WHERE id=" + std::to_string(user_id);
+    std::string sql = "UPDATE users SET password_hash=" + q(ec, new_hash) +
+                      " WHERE id=" + std::to_string(user_id);
     return ExecWrite(sql);
 }
 int64_t ShardedDatabase::GetUserIdByPhone(const std::string &phone) {
     for (auto &db : shards_) {
         int64_t uid = db->GetUserIdByPhone(phone);
-        if (uid > 0)
-            return uid;
+        if (uid > 0) return uid;
     }
     return -1;
 }
 std::string ShardedDatabase::GetUsernameById(int64_t user_id) {
     for (auto &db : shards_) {
         auto name = db->GetUsernameById(user_id);
-        if (!name.empty())
-            return name;
+        if (!name.empty()) return name;
     }
     return "";
 }
 bool ShardedDatabase::VerifyUserPassword(int64_t user_id, const std::string &pwd) {
     for (auto &db : shards_)
-        if (db->VerifyUserPassword(user_id, pwd))
-            return true;
+        if (db->VerifyUserPassword(user_id, pwd)) return true;
     return false;
 }
 bool ShardedDatabase::UpdateUserPassword(int64_t user_id, const std::string &h) {
     for (auto &db : shards_)
-        if (db->UpdateUserPassword(user_id, h))
-            return true;
+        if (db->UpdateUserPassword(user_id, h)) return true;
     return false;
 }
 
+
 // ---- Folder operations ----
-bool Database::CreateFolder(int64_t user_id, const std::string &name, int64_t parent_id, int64_t &out_id) {
-    auto *ec = EscConn();
-    if (!ec)
-        return false;
-    std::string sql =
-        "INSERT INTO files (user_id,username,original_name,size,mime_type,folder_id,is_folder,file_content) VALUES (" +
-        std::to_string(user_id) + ",'folder','" + name + "',0,''," + std::to_string(parent_id) + ",1,'')";
+bool Database::CreateFolder(int64_t user_id, const std::string& name, int64_t parent_id, int64_t& out_id) {
+    auto* ec = EscConn(); if (!ec) return false;
+    std::string sql = "INSERT INTO files (user_id,username,original_name,size,mime_type,folder_id,is_folder,file_content) VALUES ("
+        + std::to_string(user_id) + ",'folder'," + q(ec, name) + ",0,''," + std::to_string(parent_id) + ",1,'')";
     return ExecWriteInsert(sql, out_id);
 }
 bool Database::MoveFile(int64_t id, int64_t target_folder_id) {
-    std::string sql =
-        "UPDATE files SET folder_id=" + std::to_string(target_folder_id) + " WHERE id=" + std::to_string(id);
+    std::string sql = "UPDATE files SET folder_id=" + std::to_string(target_folder_id) + " WHERE id=" + std::to_string(id);
     return ExecWrite(sql);
 }
-int Database::BatchDeleteFiles(int64_t user_id, const std::vector<int64_t> &ids) {
+int Database::BatchDeleteFiles(int64_t user_id, const std::vector<int64_t>& ids) {
     int count = 0;
     for (auto id : ids) {
-        std::string sql =
-            "DELETE FROM files WHERE id=" + std::to_string(id) + " AND user_id=" + std::to_string(user_id);
-        if (ExecWrite(sql))
-            count++;
+        std::string sql = "DELETE FROM files WHERE id=" + std::to_string(id) + " AND user_id=" + std::to_string(user_id);
+        if (ExecWrite(sql)) count++;
     }
     return count;
 }
-bool ShardedDatabase::CreateFolder(int64_t user_id, const std::string &name, int64_t parent_id, int64_t &out_id) {
+bool ShardedDatabase::CreateFolder(int64_t user_id, const std::string& name, int64_t parent_id, int64_t& out_id) {
     return ShardFor(user_id)->CreateFolder(user_id, name, parent_id, out_id);
 }
 bool ShardedDatabase::MoveFile(int64_t id, int64_t target_folder_id) {
-    for (auto &db : shards_)
-        if (db->MoveFile(id, target_folder_id))
-            return true;
+    for (auto& db : shards_) if (db->MoveFile(id, target_folder_id)) return true;
     return false;
 }
-int ShardedDatabase::BatchDeleteFiles(int64_t user_id, const std::vector<int64_t> &ids) {
+int ShardedDatabase::BatchDeleteFiles(int64_t user_id, const std::vector<int64_t>& ids) {
     return ShardFor(user_id)->BatchDeleteFiles(user_id, ids);
 }

@@ -1812,12 +1812,7 @@ function renderFileList(data) {
     const sizeStr = isFolder ? '-' : (f.size < 1024 ? f.size + ' B'
       : f.size < 1048576 ? (f.size / 1024).toFixed(1) + ' KB'
       : (f.size / 1048576).toFixed(1) + ' MB');
-    const dragAttrs = isFolder
-      ? ` ondragover="event.preventDefault();this.style.boxShadow='0 0 0 2px var(--accent)'"
-          ondragleave="this.style.boxShadow=''"
-          ondrop="moveToFolder(event, '${f.id}')"`
-      : ` draggable="true" ondragstart="event.dataTransfer.setData('fileId','${f.id}')"`;
-    return `<div class="sheet-card"${dragAttrs}>
+    return `<div class="sheet-card">
       <div class="sheet-card-info">
         <h3>${icon} ${esc(f.original_name)}</h3>
         <div class="sheet-card-meta">
@@ -1904,7 +1899,9 @@ async function previewFile(id, name, mime) {
 
     let html = `<div style="padding:24px;max-width:900px;margin:0 auto"><h2>${esc(name)}</h2><p style="color:#94a3b8">${mime}</p><hr style="border-color:#334155;margin:16px 0">`;
     if (isImage) {
-      html += `<img src="${API}/files/${id}" style="max-width:100%;border-radius:8px">`;
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      html += `<img src="${url}" style="max-width:100%;border-radius:8px" onload="URL.revokeObjectURL('${url}')">`;
     } else if (isText) {
       const text = await res.text();
       html += `<pre style="background:#0f172a;color:#e2e8f0;padding:16px;border-radius:8px;overflow:auto;max-height:70vh;white-space:pre-wrap;font-size:0.85rem">${esc(text)}</pre>`;
@@ -1959,18 +1956,6 @@ document.getElementById('change-pwd-form').addEventListener('submit', async (e) 
   msg.textContent = data.success ? '密码修改成功' : (data.error || '修改失败');
   msg.style.color = data.success ? 'green' : 'red';
 });
-
-async function moveToFolder(event, folderId) {
-  event.preventDefault();
-  event.currentTarget.style.boxShadow = '';
-  const fileId = event.dataTransfer.getData('fileId');
-  if (!fileId || fileId === folderId) return;
-  const res = await fetch(API + '/files/' + fileId + '/move', {
-    method: 'PUT', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ target_folder_id: parseInt(folderId) }), credentials: 'same-origin'
-  });
-  if (res.ok) { loadFiles(); }
-}
 
 async function createFolder() {
   const name = prompt('输入文件夹名称:');

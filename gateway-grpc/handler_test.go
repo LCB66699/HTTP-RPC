@@ -23,7 +23,6 @@ func validTestJWT() string {
 type mockSheetClient struct {
 	listResp *pb.ListSpreadsheetsResponse
 }
-
 func (m *mockSheetClient) ListSpreadsheets(ctx context.Context, req *pb.ListSpreadsheetsRequest, opts ...grpc.CallOption) (*pb.ListSpreadsheetsResponse, error) {
 	return m.listResp, nil
 }
@@ -41,11 +40,10 @@ func (m *mockSheetClient) DeleteSpreadsheet(ctx context.Context, req *pb.DeleteS
 }
 
 type mockAuthClient struct {
-	changePwdErr     error
-	changePwdResp    *pb.ChangePasswordResponse
+	changePwdErr  error
+	changePwdResp *pb.ChangePasswordResponse
 	loginByPhoneResp *pb.LoginResponse
 }
-
 func (m *mockAuthClient) Login(ctx context.Context, req *pb.LoginRequest, opts ...grpc.CallOption) (*pb.LoginResponse, error) {
 	return nil, nil
 }
@@ -69,7 +67,6 @@ type mockFileClient struct {
 	listResp         *pb.ListFilesResponse
 	createFolderResp *pb.CreateFolderResponse
 }
-
 func (m *mockFileClient) ListFiles(ctx context.Context, req *pb.ListFilesRequest, opts ...grpc.CallOption) (*pb.ListFilesResponse, error) {
 	return m.listResp, nil
 }
