@@ -20,6 +20,7 @@ set(REDIS_PLUS_PLUS_BUILD_TEST OFF CACHE BOOL "" FORCE)
 set(REDIS_PLUS_PLUS_BUILD_STATIC OFF CACHE BOOL "" FORCE)
 set(REDIS_PLUS_PLUS_CXX_STANDARD 20 CACHE STRING "" FORCE)
 add_subdirectory(${CMAKE_SOURCE_DIR}/third_party/redis-plus-plus ${CMAKE_BINARY_DIR}/redis++)
+include_directories(${CMAKE_SOURCE_DIR}/third_party/redis-plus-plus/src)
 target_link_libraries(redis++ PUBLIC ${HIREDIS_LIBRARIES})
 
 # Proto generation
@@ -62,7 +63,7 @@ function(add_rpc_service NAME MAIN_SRC EXTRA_SRCS)
     target_link_libraries(rpc_${NAME}
         gRPC::grpc++ gRPC::grpc++_reflection ${Protobuf_LIBRARIES}
         OpenSSL::SSL OpenSSL::Crypto
-        ${MYSQL_LIBRARIES} redis++_static pthread nghttp2
+        ${MYSQL_LIBRARIES} redis++ pthread nghttp2
         ${RABBITMQ_LIBRARIES})
 endfunction()
 
