@@ -135,6 +135,7 @@
         <div style="display:flex;gap:8px;">
           <button id="btn-sheet-create-blank" class="btn btn-primary" onclick="createBlankSheet()">+ 新建空白表格</button>
           <button id="btn-sheet-upload" class="btn" onclick="triggerXlsxUpload()">上传 xlsx</button>
+        <button class="btn" onclick="shareResource('sheet')">分享</button>
           <input type="file" id="xlsx-file-input" accept=".xlsx,.xls" style="display:none;" onchange="if(this.files[0]){handleXlsxFile(this.files[0]);this.value='';}">
         </div>
       </div>
@@ -184,6 +185,8 @@
       <h2>我的文件</h2>
       <div style="display:flex;gap:8px;">
         <button id="btn-file-upload-trigger" class="btn btn-primary" onclick="document.getElementById('file-upload-input').click()">上传文件</button>
+	      <button class="btn" onclick="createFolder()">新建文件夹</button>
+        <button class="btn" onclick="shareResource('file')">分享</button>
         <input type="file" id="file-upload-input" style="display:none;" onchange="uploadFile(this.files[0])">
       </div>
     </div>
@@ -358,6 +361,17 @@
         <div class="profile-stat-value" id="pstat-top-service">--</div>
         <div class="profile-stat-label">最常用服务</div>
       </div>
+    </div>
+
+    <!-- Change Password -->
+    <div class="toolbar" style="margin-top:24px;">
+      <h2>修改密码</h2>
+      <form id="change-pwd-form" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+        <input type="password" id="pwd-old" placeholder="旧密码" style="width:160px;" required>
+        <input type="password" id="pwd-new" placeholder="新密码(≥6位)" style="width:160px;" required>
+        <button type="submit" class="btn btn-primary">确认修改</button>
+        <span id="pwd-msg" style="font-size:0.85rem;"></span>
+      </form>
     </div>
 
     <!-- Service Usage History -->

@@ -1934,6 +1934,64 @@ async function deleteFile(id, name) {
 }
 
 // ============================================================
+//  NEW FEATURES — change password, folder, share, photos
+// ============================================================
+
+document.getElementById('change-pwd-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const oldPwd = document.getElementById('pwd-old').value;
+  const newPwd = document.getElementById('pwd-new').value;
+  const msg = document.getElementById('pwd-msg');
+  if (!oldPwd || !newPwd || newPwd.length < 6) { msg.textContent = '新密码至少6位'; msg.style.color = 'red'; return; }
+  const res = await fetch(API + '/me/password', {
+    method: 'PUT', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ old_password: oldPwd, new_password: newPwd }),
+    credentials: 'same-origin'
+  });
+  const data = await res.json();
+  msg.textContent = data.success ? '密码修改成功' : (data.error || '修改失败');
+  msg.style.color = data.success ? 'green' : 'red';
+});
+
+async function createFolder() {
+  const name = prompt('输入文件夹名称:');
+  if (!name) return;
+  const res = await fetch(API + '/files/folder', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name, parent_folder_id: 0 }), credentials: 'same-origin'
+  });
+  const data = await res.json();
+  if (data.success) { loadFiles(); alert('文件夹创建成功'); }
+  else alert('创建失败: ' + (data.error || ''));
+}
+
+async function batchDelete() {
+  const checked = document.querySelectorAll('#files-list input[type=checkbox]:checked');
+  if (!checked.length) { alert('请勾选要删除的文件'); return; }
+  if (!confirm('确定删除 ' + checked.length + ' 个文件?')) return;
+  const ids = [...checked].map(cb => cb.dataset.id);
+  const res = await fetch(API + '/files/batch/delete', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ ids }), credentials: 'same-origin'
+  });
+  if (res.ok) loadFiles();
+}
+
+async function shareResource(type) {
+  const id = type === 'sheet' ? window.currentSheetId : prompt('输入 ' + type + ' ID:');
+  if (!id) return;
+  const username = prompt('分享给哪个用户?');
+  if (!username) return;
+  const perm = confirm('编辑权限? (取消=只读)') ? 'edit' : 'view';
+  const res = await fetch(API + '/' + type + 's/' + id + '/share', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ username, permission: perm }), credentials: 'same-origin'
+  });
+  const data = await res.json();
+  alert(data.success ? '分享成功' : ('分享失败: ' + (data.error || '')));
+}
+
+// ============================================================
 //  INIT
 // ============================================================
 

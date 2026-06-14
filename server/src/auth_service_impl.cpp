@@ -431,16 +431,15 @@ grpc::Status AuthServiceImpl::ValidateUser(grpc::ServerContext *, const rpc::Val
     return grpc::Status::OK;
 }
 
-grpc::Status AuthServiceImpl::ChangePassword(grpc::ServerContext *, const rpc::ChangePasswordRequest *req,
-                                             rpc::ChangePasswordResponse *resp) {
+grpc::Status AuthServiceImpl::ChangePassword(grpc::ServerContext *,
+                                              const rpc::ChangePasswordRequest *req,
+                                              rpc::ChangePasswordResponse *resp) {
     std::lock_guard<std::mutex> lock(mtx_);
-    std::string stored_hash;
-    if (!db_ || !db_->GetUser("", stored_hash)) {
+    if (!db_) {
         resp->set_success(false);
         resp->set_error("Database error");
         return grpc::Status::OK;
     }
-    // Verify old password
     if (!db_->VerifyUserPassword(req->user_id(), req->old_password())) {
         resp->set_success(false);
         resp->set_error("Old password is incorrect");
@@ -457,13 +456,13 @@ grpc::Status AuthServiceImpl::ChangePassword(grpc::ServerContext *, const rpc::C
         return grpc::Status::OK;
     }
     resp->set_success(true);
-    if (slog_)
-        LOG_INFO(*slog_, "User " + std::to_string(req->user_id()) + " changed password");
+    if (slog_) LOG_INFO(*slog_, "User " + std::to_string(req->user_id()) + " changed password");
     return grpc::Status::OK;
 }
 
-grpc::Status AuthServiceImpl::LoginByPhone(grpc::ServerContext *, const rpc::PhoneLoginRequest *req,
-                                           rpc::LoginResponse *resp) {
+grpc::Status AuthServiceImpl::LoginByPhone(grpc::ServerContext *,
+                                            const rpc::PhoneLoginRequest *req,
+                                            rpc::LoginResponse *resp) {
     if (!db_) {
         resp->set_success(false);
         resp->set_error("Database error");
@@ -483,22 +482,22 @@ grpc::Status AuthServiceImpl::LoginByPhone(grpc::ServerContext *, const rpc::Pho
     resp->set_access_token(CreateAccessToken(username, uid, role));
     resp->set_refresh_token(CreateRefreshToken(username, uid));
     resp->set_role(role);
-    if (slog_)
-        LOG_INFO(*slog_, "User '" + username + "' logged in via phone");
+    if (slog_) LOG_INFO(*slog_, "User '" + username + "' logged in via phone");
     return grpc::Status::OK;
 }
 
-grpc::Status AuthServiceImpl::SendOTP(grpc::ServerContext *, const rpc::SendOTPRequest *, rpc::SendOTPResponse *resp) {
+grpc::Status AuthServiceImpl::SendOTP(grpc::ServerContext *, const rpc::SendOTPRequest *,
+                                       rpc::SendOTPResponse *resp) {
     resp->set_success(true);
     return grpc::Status::OK;
 }
 grpc::Status AuthServiceImpl::BindPhone(grpc::ServerContext *, const rpc::BindPhoneRequest *,
-                                        rpc::BindPhoneResponse *resp) {
+                                         rpc::BindPhoneResponse *resp) {
     resp->set_success(true);
     return grpc::Status::OK;
 }
 grpc::Status AuthServiceImpl::UpdateProfile(grpc::ServerContext *, const rpc::UpdateProfileRequest *,
-                                            rpc::UpdateProfileResponse *resp) {
+                                             rpc::UpdateProfileResponse *resp) {
     resp->set_success(true);
     return grpc::Status::OK;
 }

@@ -1,1 +1,7 @@
 data/
+build/
+.claude/
+.git/
+*.exe
+.env
+test/logs/

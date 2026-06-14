@@ -131,7 +131,7 @@ func main() {
 	_ = newCB("auth")
 	cbSheet := newCB("sheet")
 	cbFile := newCB("file")
-	_ = newCB("search") // 预留给 Search handler 重试
+	_ = newCB("search")  // 预留给 Search handler 重试
 
 	// === Auth ===
 	mux.HandleFunc("POST /api/register", func(w http.ResponseWriter, r *http.Request) {
@@ -190,9 +190,7 @@ func main() {
 		writeJSON(w, resp)
 	})
 	mux.HandleFunc("POST /api/auth/otp/send", func(w http.ResponseWriter, r *http.Request) {
-		var body struct {
-			Phone string `json:"phone"`
-		}
+		var body struct{ Phone string `json:"phone"` }
 		json.NewDecoder(r.Body).Decode(&body)
 		if body.Phone == "" {
 			writeJSON(w, map[string]interface{}{"success": false, "error": "phone required"})
@@ -226,9 +224,7 @@ func main() {
 	mux.HandleFunc("GET /api/health/ready", func(w http.ResponseWriter, r *http.Request) {
 		checkConn := func(name string, conn *grpc.ClientConn) string {
 			s := conn.GetState()
-			if s == connectivity.Ready {
-				return "OK"
-			}
+			if s == connectivity.Ready { return "OK" }
 			return s.String()
 		}
 		status := map[string]string{"gateway": "OK"}
@@ -237,9 +233,7 @@ func main() {
 		status["file"] = checkConn("file", fileConn)
 		allOK := status["auth"] == "OK" && status["sheet"] == "OK" && status["file"] == "OK"
 		code := http.StatusOK
-		if !allOK {
-			code = http.StatusServiceUnavailable
-		}
+		if !allOK { code = http.StatusServiceUnavailable }
 		writeJSONStatus(w, code, map[string]interface{}{"_all": allOK, "status": status})
 	})
 	mux.HandleFunc("GET /api/me", func(w http.ResponseWriter, r *http.Request) {
@@ -456,9 +450,7 @@ func main() {
 		})
 		if err != nil || resp == nil || !resp.Success {
 			msg := "list failed"
-			if err != nil {
-				msg = err.Error()
-			}
+			if err != nil { msg = err.Error() }
 			writeJSON(w, map[string]interface{}{"success": false, "error": msg})
 			return
 		}
@@ -466,6 +458,24 @@ func main() {
 	})
 
 	// === File CRUD ===
+	mux.HandleFunc("POST /api/files/folder", func(w http.ResponseWriter, r *http.Request) {
+		var body struct {
+			Name           string `json:"name"`
+			ParentFolderId int64  `json:"parent_folder_id"`
+		}
+		json.NewDecoder(r.Body).Decode(&body)
+		uid := extractUID(r)
+		resp, err := fileClient.CreateFolder(injectToken(r), &pb.CreateFolderRequest{
+			UserId: uid, Name: body.Name, ParentFolderId: body.ParentFolderId,
+		})
+		if err != nil || resp == nil || !resp.Success {
+			msg := "create folder failed"
+			if err != nil { msg = err.Error() }
+			writeJSON(w, map[string]interface{}{"success": false, "error": msg})
+			return
+		}
+		writeJSON(w, resp)
+	})
 	mux.HandleFunc("GET /api/files", func(w http.ResponseWriter, r *http.Request) {
 		resp, err := callWithRetry(cbFile, 3, "file.list", func(ctx context.Context) (*pb.ListFilesResponse, error) {
 			return fileClient.ListFiles(withAuth(ctx, r), &pb.ListFilesRequest{UserId: extractUID(r)})
@@ -771,9 +781,7 @@ func callWithRetry[T any](cb *cbWithSlow, maxAttempts int, label string, fn func
 }
 
 func getenv(key, fallback string) string {
-	if v := os.Getenv(key); v != "" {
-		return v
-	}
+	if v := os.Getenv(key); v != "" { return v }
 	return fallback
 }
 
