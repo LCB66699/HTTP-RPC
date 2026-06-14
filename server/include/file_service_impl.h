@@ -40,6 +40,12 @@ class FileServiceImpl final : public rpc::FileService::Service {
                            rpc::ListFilesResponse *resp) override;
     grpc::Status DeleteFile(grpc::ServerContext *ctx, const rpc::DeleteFileRequest *req,
                             rpc::DeleteFileResponse *resp) override;
+    grpc::Status CreateFolder(grpc::ServerContext *, const rpc::CreateFolderRequest *,
+                              rpc::CreateFolderResponse *) override;
+    grpc::Status MoveFile(grpc::ServerContext *, const rpc::MoveFileRequest *,
+                          rpc::MoveFileResponse *) override;
+    grpc::Status BatchDelete(grpc::ServerContext *, const rpc::BatchDeleteRequest *,
+                             rpc::BatchDeleteResponse *) override;
 
    private:
     ShardedDatabase *db_ = nullptr;
