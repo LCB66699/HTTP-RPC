@@ -31,7 +31,7 @@ RUN ldconfig
 
 ARG SERVICE=auth
 WORKDIR /app
-COPY --from=builder /src/rpc_${SERVICE} /app/rpc_server
+COPY --from=builder /src/build/rpc_${SERVICE} /app/rpc_server
 COPY --from=builder /src/web-ui /app/web-ui
 
 EXPOSE 50051
