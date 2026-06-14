@@ -42,8 +42,7 @@ class FileServiceImpl final : public rpc::FileService::Service {
                             rpc::DeleteFileResponse *resp) override;
     grpc::Status CreateFolder(grpc::ServerContext *, const rpc::CreateFolderRequest *,
                               rpc::CreateFolderResponse *) override;
-    grpc::Status MoveFile(grpc::ServerContext *, const rpc::MoveFileRequest *,
-                          rpc::MoveFileResponse *) override;
+    grpc::Status MoveFile(grpc::ServerContext *, const rpc::MoveFileRequest *, rpc::MoveFileResponse *) override;
     grpc::Status BatchDelete(grpc::ServerContext *, const rpc::BatchDeleteRequest *,
                              rpc::BatchDeleteResponse *) override;
 
