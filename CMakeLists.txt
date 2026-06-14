@@ -61,8 +61,7 @@ set(SHARED_SRCS
     server/src/auth_interceptor.cpp
     server/src/call_logger.cpp
     server/src/database.cpp
-    server/src/redis_client.cpp
-    server/src/system_logger.cpp)
+    server/src/redis_client.cpp)
 
 # ---- Services ----
 function(add_rpc_service NAME MAIN_SRC EXTRA_SRCS)

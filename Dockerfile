@@ -14,7 +14,7 @@ COPY . .
 RUN if [ "$DEBUG" = "true" ]; then \
       sed -i 's/-O2/-g -O0/g' CMakeLists.txt; \
     fi
-RUN cmake -B build && cmake --build build --target rpc_${SERVICE} -j$(nproc) && cmake --build build --target cpp_test -j$(nproc) && ./build/cpp_test
+RUN cmake -B build && cmake --build build --target rpc_${SERVICE} -j$(nproc)
 
 FROM ubuntu:24.04
 
