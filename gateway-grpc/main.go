@@ -551,6 +551,18 @@ func main() {
 			return
 		}
 		if resp.GetDownloadUrl() != "" {
+			mime := resp.File.GetMimeType()
+			if strings.HasPrefix(mime, "image/") || strings.HasPrefix(mime, "video/") || strings.HasPrefix(mime, "audio/") {
+				http.Redirect(w, r, resp.GetDownloadUrl(), http.StatusFound)
+				return
+			}
+			dlResp, err := http.Get(resp.GetDownloadUrl())
+			if err == nil {
+				defer dlResp.Body.Close()
+				w.Header().Set("Content-Type", mime)
+				io.Copy(w, dlResp.Body)
+				return
+			}
 			http.Redirect(w, r, resp.GetDownloadUrl(), http.StatusFound)
 			return
 		}
