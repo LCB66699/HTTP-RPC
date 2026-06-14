@@ -49,7 +49,12 @@ jobs:
         run: |
           docker compose down -v --remove-orphans 2>/dev/null || true
           rm -rf data/ 2>/dev/null || true
-          docker compose up -d
+          docker compose up -d \
+            nginx grpc-gateway auth-1 sheet-1 file-1 search \
+            mysql-auth mysql-spreadsheet-0 mysql-spreadsheet-1 mysql-file-0 mysql-file-1 \
+            minio minio-init redis-cluster-1 redis-cluster-2 redis-cluster-3 \
+            redis-cluster-4 redis-cluster-5 redis-cluster-6 redis-cluster-init \
+            elasticsearch es-init
           echo "Waiting for all containers healthy..."
           for i in $(seq 1 180); do
             TOTAL=$(docker compose ps -a --format json 2>/dev/null | wc -l)
