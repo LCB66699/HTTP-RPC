@@ -1904,7 +1904,9 @@ async function previewFile(id, name, mime) {
 
     let html = `<div style="padding:24px;max-width:900px;margin:0 auto"><h2>${esc(name)}</h2><p style="color:#94a3b8">${mime}</p><hr style="border-color:#334155;margin:16px 0">`;
     if (isImage) {
-      html += `<img src="${API}/files/${id}" style="max-width:100%;border-radius:8px">`;
+      const blob = await fetch(API + '/files/' + id, { credentials: 'same-origin' }).then(r => r.blob());
+      const url = URL.createObjectURL(blob);
+      html += `<img src="${url}" style="max-width:100%;border-radius:8px" onload="setTimeout(()=>URL.revokeObjectURL('${url}'),5000)">`;
     } else if (isText) {
       const text = await res.text();
       html += `<pre style="background:#0f172a;color:#e2e8f0;padding:16px;border-radius:8px;overflow:auto;max-height:70vh;white-space:pre-wrap;font-size:0.85rem">${esc(text)}</pre>`;
