@@ -11,6 +11,7 @@ ARG SERVICE=auth
 ARG DEBUG=false
 WORKDIR /src
 COPY . .
+RUN rm -rf server/generated/*
 RUN if [ "$DEBUG" = "true" ]; then \
       sed -i 's/-O2/-g -O0/g' CMakeLists.txt; \
     fi

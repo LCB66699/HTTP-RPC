@@ -15,17 +15,11 @@ pkg_check_modules(HIREDIS REQUIRED hiredis)
 pkg_check_modules(RABBITMQ REQUIRED librabbitmq)
 find_package(GTest REQUIRED)
 
-# Redis++
-set(REDIS_SRC ${CMAKE_SOURCE_DIR}/third_party/redis-plus-plus)
-add_library(redis++ STATIC
-    ${REDIS_SRC}/src/sw/redis++/connection.cpp
-    ${REDIS_SRC}/src/sw/redis++/redis.cpp
-    ${REDIS_SRC}/src/sw/redis++/redis_cluster.cpp
-    ${REDIS_SRC}/src/sw/redis++/pipeline.cpp
-    ${REDIS_SRC}/src/sw/redis++/transaction.cpp
-    ${REDIS_SRC}/src/sw/redis++/subscriber.cpp
-)
-target_include_directories(redis++ PUBLIC ${REDIS_SRC}/src)
+# Redis++ — build as subproject
+set(REDIS_PLUS_PLUS_BUILD_TEST OFF CACHE BOOL "" FORCE)
+set(REDIS_PLUS_PLUS_BUILD_STATIC OFF CACHE BOOL "" FORCE)
+set(REDIS_PLUS_PLUS_CXX_STANDARD 20 CACHE STRING "" FORCE)
+add_subdirectory(${CMAKE_SOURCE_DIR}/third_party/redis-plus-plus ${CMAKE_BINARY_DIR}/redis++)
 target_link_libraries(redis++ PUBLIC ${HIREDIS_LIBRARIES})
 
 # Proto generation
@@ -37,7 +31,6 @@ set(PROTO_FILES
     ${PROTO_DIR}/rpc_auth.proto
     ${PROTO_DIR}/rpc_file.proto
     ${PROTO_DIR}/rpc_spreadsheet.proto
-    ${PROTO_DIR}/rpc_tx.proto
     ${PROTO_DIR}/rpc_health.proto
     ${PROTO_DIR}/rpc_search.proto
     ${PROTO_DIR}/rpc_sharing.proto)
@@ -69,7 +62,7 @@ function(add_rpc_service NAME MAIN_SRC EXTRA_SRCS)
     target_link_libraries(rpc_${NAME}
         gRPC::grpc++ gRPC::grpc++_reflection ${Protobuf_LIBRARIES}
         OpenSSL::SSL OpenSSL::Crypto
-        ${MYSQL_LIBRARIES} redis++ pthread nghttp2
+        ${MYSQL_LIBRARIES} redis++_static pthread nghttp2
         ${RABBITMQ_LIBRARIES})
 endfunction()
 
