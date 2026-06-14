@@ -63,7 +63,7 @@ function(add_rpc_service NAME MAIN_SRC EXTRA_SRCS)
     target_link_libraries(rpc_${NAME}
         gRPC::grpc++ gRPC::grpc++_reflection ${Protobuf_LIBRARIES}
         OpenSSL::SSL OpenSSL::Crypto
-        ${MYSQL_LIBRARIES} redis++_static pthread nghttp2
+        ${MYSQL_LIBRARIES} ${HIREDIS_LIBRARIES} redis++_static pthread nghttp2
         ${RABBITMQ_LIBRARIES})
 endfunction()
 
