@@ -26,9 +26,6 @@ RUN apt update && apt install -y \
     $(if [ "$DEBUG" = "true" ]; then echo gdb; fi) \
     && rm -rf /var/lib/apt/lists/*
 
-COPY --from=builder /usr/local/lib/libredis++.so* /usr/local/lib/
-RUN ldconfig
-
 ARG SERVICE=auth
 WORKDIR /app
 COPY --from=builder /src/build/rpc_${SERVICE} /app/rpc_server
