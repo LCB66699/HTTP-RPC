@@ -2,30 +2,19 @@ FROM ubuntu:24.04 AS builder
 
 RUN apt update && apt install -y \
     g++ make cmake git \
-    protobuf-compiler-grpc libgrpc++-dev \
+    protobuf-compiler-grpc libgrpc++-dev libprotobuf-dev \
     libmysqlclient-dev libhiredis-dev libssl-dev zlib1g-dev \
-    libnghttp2-dev librabbitmq-dev
-
-# Build and install redis-plus-plus from local source
-COPY third_party/redis-plus-plus/ /tmp/redis-plus-plus/
-RUN cd /tmp/redis-plus-plus \
-    && mkdir build && cd build \
-    && cmake -DCMAKE_BUILD_TYPE=Release \
-             -DREDIS_PLUS_PLUS_CXX_STANDARD=20 \
-             -DREDIS_PLUS_PLUS_BUILD_TEST=OFF \
-             -DREDIS_PLUS_PLUS_BUILD_STATIC=OFF \
-             .. \
-    && make -j$(nproc) \
-    && make install \
-    && ldconfig \
-    && rm -rf /tmp/redis-plus-plus
+    libnghttp2-dev librabbitmq-dev libgtest-dev
+RUN cd /usr/src/googletest && cmake . && make -j$(nproc) && cp lib/*.a /usr/lib
 
 ARG SERVICE=auth
 ARG DEBUG=false
 WORKDIR /src
 COPY . .
-RUN if [ "$DEBUG" = "true" ]; then sed -i 's/-O2/-g -O0/g' Makefile; fi
-RUN make clean && make ${SERVICE}
+RUN if [ "$DEBUG" = "true" ]; then \
+      sed -i 's/-O2/-g -O0/g' CMakeLists.txt; \
+    fi
+RUN cmake -B build && cmake --build build --target rpc_${SERVICE} -j$(nproc) && cmake --build build --target cpp_test -j$(nproc) && ./build/cpp_test
 
 FROM ubuntu:24.04
 
