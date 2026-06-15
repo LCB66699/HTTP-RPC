@@ -19,8 +19,8 @@ find_package(GTest REQUIRED)
 set(REDIS_PLUS_PLUS_BUILD_TEST OFF CACHE BOOL "" FORCE)
 set(REDIS_PLUS_PLUS_BUILD_STATIC ON CACHE BOOL "" FORCE)
 set(REDIS_PLUS_PLUS_CXX_STANDARD 20 CACHE STRING "" FORCE)
-add_subdirectory(${CMAKE_SOURCE_DIR}/third_party/redis-plus-plus ${CMAKE_BINARY_DIR}/redis++)
-include_directories(${CMAKE_SOURCE_DIR}/third_party/redis-plus-plus/src)
+add_subdirectory(${CMAKE_SOURCE_DIR}/vendor/redis-plus-plus ${CMAKE_BINARY_DIR}/redis++)
+include_directories(${CMAKE_SOURCE_DIR}/vendor/redis-plus-plus/src)
 target_link_libraries(redis++ PUBLIC ${HIREDIS_LIBRARIES})
 
 # Proto generation

@@ -6,7 +6,7 @@
       - "80:80"
       - "443:443"
     volumes:
-      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./deploy/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
       - ./web-ui:/app/web-ui:ro
       - ./certs:/certs
     entrypoint: >
@@ -20,8 +20,8 @@
     environment:
       MYSQL_ROOT_PASSWORD: "${MYSQL_ROOT_PASSWORD:-123456}"
     volumes:
-      - ./mysql/master/conf.d:/etc/mysql/conf.d
-      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+      - ./deploy/mysql/master/conf.d:/etc/mysql/conf.d
+      - ./deploy/mysql/init.sql:/docker-entrypoint-initdb.d/init.sql
       - ./data/mysql-auth:/var/lib/mysql
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
@@ -34,7 +34,7 @@
     image: mysql:8.0
     command: --innodb-buffer-pool-size=32M --innodb-log-buffer-size=4M --innodb-log-file-size=16M --performance-schema=OFF --skip-innodb-doublewrite
     environment: { MYSQL_ROOT_PASSWORD: "${MYSQL_ROOT_PASSWORD:-123456}" }
-    volumes: ["./init.sql:/docker-entrypoint-initdb.d/init.sql", "./data/mysql-sp-0:/var/lib/mysql"]
+    volumes: ["./deploy/mysql/init.sql:/docker-entrypoint-initdb.d/init.sql", "./data/mysql-sp-0:/var/lib/mysql"]
     networks:
       default:
         aliases: [mysql-spreadsheet]
@@ -48,14 +48,14 @@
     image: mysql:8.0
     command: --innodb-buffer-pool-size=32M --innodb-log-buffer-size=4M --innodb-log-file-size=16M --performance-schema=OFF --skip-innodb-doublewrite
     environment: { MYSQL_ROOT_PASSWORD: "${MYSQL_ROOT_PASSWORD:-123456}" }
-    volumes: ["./mysql/slave/conf.d:/etc/mysql/conf.d", "./data/mysql-sp-0s:/var/lib/mysql"]
+    volumes: ["./deploy/mysql/slave/conf.d:/etc/mysql/conf.d", "./data/mysql-sp-0s:/var/lib/mysql"]
     depends_on: [mysql-spreadsheet-0]
 
   mysql-spreadsheet-1:
     image: mysql:8.0
     command: --innodb-buffer-pool-size=32M --innodb-log-buffer-size=4M --innodb-log-file-size=16M --performance-schema=OFF --skip-innodb-doublewrite
     environment: { MYSQL_ROOT_PASSWORD: "${MYSQL_ROOT_PASSWORD:-123456}" }
-    volumes: ["./init.sql:/docker-entrypoint-initdb.d/init.sql", "./data/mysql-sp-1:/var/lib/mysql"]
+    volumes: ["./deploy/mysql/init.sql:/docker-entrypoint-initdb.d/init.sql", "./data/mysql-sp-1:/var/lib/mysql"]
     networks:
       default:
         aliases: [mysql-spreadsheet]
@@ -69,7 +69,7 @@
     image: mysql:8.0
     command: --innodb-buffer-pool-size=32M --innodb-log-buffer-size=4M --innodb-log-file-size=16M --performance-schema=OFF --skip-innodb-doublewrite
     environment: { MYSQL_ROOT_PASSWORD: "${MYSQL_ROOT_PASSWORD:-123456}" }
-    volumes: ["./mysql/slave/conf.d:/etc/mysql/conf.d", "./data/mysql-sp-1s:/var/lib/mysql"]
+    volumes: ["./deploy/mysql/slave/conf.d:/etc/mysql/conf.d", "./data/mysql-sp-1s:/var/lib/mysql"]
     depends_on: [mysql-spreadsheet-1]
 
   # ===== MySQL File (???) =====
@@ -77,7 +77,7 @@
     image: mysql:8.0
     command: --innodb-buffer-pool-size=32M --innodb-log-buffer-size=4M --innodb-log-file-size=16M --performance-schema=OFF --skip-innodb-doublewrite
     environment: { MYSQL_ROOT_PASSWORD: "${MYSQL_ROOT_PASSWORD:-123456}" }
-    volumes: ["./init.sql:/docker-entrypoint-initdb.d/init.sql", "./data/mysql-f-0:/var/lib/mysql"]
+    volumes: ["./deploy/mysql/init.sql:/docker-entrypoint-initdb.d/init.sql", "./data/mysql-f-0:/var/lib/mysql"]
     networks:
       default:
         aliases: [mysql-file]
@@ -91,14 +91,14 @@
     image: mysql:8.0
     command: --innodb-buffer-pool-size=32M --innodb-log-buffer-size=4M --innodb-log-file-size=16M --performance-schema=OFF --skip-innodb-doublewrite
     environment: { MYSQL_ROOT_PASSWORD: "${MYSQL_ROOT_PASSWORD:-123456}" }
-    volumes: ["./mysql/slave/conf.d:/etc/mysql/conf.d", "./data/mysql-f-0s:/var/lib/mysql"]
+    volumes: ["./deploy/mysql/slave/conf.d:/etc/mysql/conf.d", "./data/mysql-f-0s:/var/lib/mysql"]
     depends_on: [mysql-file-0]
 
   mysql-file-1:
     image: mysql:8.0
     command: --innodb-buffer-pool-size=32M --innodb-log-buffer-size=4M --innodb-log-file-size=16M --performance-schema=OFF --skip-innodb-doublewrite
     environment: { MYSQL_ROOT_PASSWORD: "${MYSQL_ROOT_PASSWORD:-123456}" }
-    volumes: ["./init.sql:/docker-entrypoint-initdb.d/init.sql", "./data/mysql-f-1:/var/lib/mysql"]
+    volumes: ["./deploy/mysql/init.sql:/docker-entrypoint-initdb.d/init.sql", "./data/mysql-f-1:/var/lib/mysql"]
     networks:
       default:
         aliases: [mysql-file]
@@ -112,14 +112,14 @@
     image: mysql:8.0
     command: --innodb-buffer-pool-size=32M --innodb-log-buffer-size=4M --innodb-log-file-size=16M --performance-schema=OFF --skip-innodb-doublewrite
     environment: { MYSQL_ROOT_PASSWORD: "${MYSQL_ROOT_PASSWORD:-123456}" }
-    volumes: ["./mysql/slave/conf.d:/etc/mysql/conf.d", "./data/mysql-f-1s:/var/lib/mysql"]
+    volumes: ["./deploy/mysql/slave/conf.d:/etc/mysql/conf.d", "./data/mysql-f-1s:/var/lib/mysql"]
     depends_on: [mysql-file-1]
 
   # ===== Redis Cluster (6 nodes, 3 masters + 3 replicas) =====
   redis-cluster-1:
     image: redis:7-alpine
     volumes:
-      - ./redis/cluster/redis.conf:/usr/local/etc/redis/redis.conf
+      - ./deploy/redis/cluster/redis.conf:/usr/local/etc/redis/redis.conf
       - ./data/redis-cluster-1:/data
     command: redis-server /usr/local/etc/redis/redis.conf --port 7000 --requirepass ${REDIS_PASSWORD:-rpc-redis-123456} --masterauth ${REDIS_PASSWORD:-rpc-redis-123456} --maxmemory 32mb --maxmemory-policy allkeys-lru
     networks:
@@ -134,32 +134,32 @@
   redis-cluster-2:
     image: redis:7-alpine
     volumes:
-      - ./redis/cluster/redis.conf:/usr/local/etc/redis/redis.conf
+      - ./deploy/redis/cluster/redis.conf:/usr/local/etc/redis/redis.conf
       - ./data/redis-cluster-2:/data
     command: redis-server /usr/local/etc/redis/redis.conf --port 7001 --requirepass ${REDIS_PASSWORD:-rpc-redis-123456} --masterauth ${REDIS_PASSWORD:-rpc-redis-123456} --maxmemory 32mb --maxmemory-policy allkeys-lru
     networks: { default: { aliases: [redis-cluster, redis-cluster-7001] } }
 
   redis-cluster-3:
     image: redis:7-alpine
-    volumes: [./redis/cluster/redis.conf:/usr/local/etc/redis/redis.conf, ./data/redis-cluster-3:/data]
+    volumes: [./deploy/redis/cluster/redis.conf:/usr/local/etc/redis/redis.conf, ./data/redis-cluster-3:/data]
     command: redis-server /usr/local/etc/redis/redis.conf --port 7002 --requirepass ${REDIS_PASSWORD:-rpc-redis-123456} --masterauth ${REDIS_PASSWORD:-rpc-redis-123456} --maxmemory 32mb --maxmemory-policy allkeys-lru
     networks: { default: { aliases: [redis-cluster, redis-cluster-7002] } }
 
   redis-cluster-4:
     image: redis:7-alpine
-    volumes: [./redis/cluster/redis.conf:/usr/local/etc/redis/redis.conf, ./data/redis-cluster-4:/data]
+    volumes: [./deploy/redis/cluster/redis.conf:/usr/local/etc/redis/redis.conf, ./data/redis-cluster-4:/data]
     command: redis-server /usr/local/etc/redis/redis.conf --port 7003 --requirepass ${REDIS_PASSWORD:-rpc-redis-123456} --masterauth ${REDIS_PASSWORD:-rpc-redis-123456} --maxmemory 32mb --maxmemory-policy allkeys-lru
     networks: { default: { aliases: [redis-cluster, redis-cluster-7003] } }
 
   redis-cluster-5:
     image: redis:7-alpine
-    volumes: [./redis/cluster/redis.conf:/usr/local/etc/redis/redis.conf, ./data/redis-cluster-5:/data]
+    volumes: [./deploy/redis/cluster/redis.conf:/usr/local/etc/redis/redis.conf, ./data/redis-cluster-5:/data]
     command: redis-server /usr/local/etc/redis/redis.conf --port 7004 --requirepass ${REDIS_PASSWORD:-rpc-redis-123456} --masterauth ${REDIS_PASSWORD:-rpc-redis-123456} --maxmemory 32mb --maxmemory-policy allkeys-lru
     networks: { default: { aliases: [redis-cluster, redis-cluster-7004] } }
 
   redis-cluster-6:
     image: redis:7-alpine
-    volumes: [./redis/cluster/redis.conf:/usr/local/etc/redis/redis.conf, ./data/redis-cluster-6:/data]
+    volumes: [./deploy/redis/cluster/redis.conf:/usr/local/etc/redis/redis.conf, ./data/redis-cluster-6:/data]
     command: redis-server /usr/local/etc/redis/redis.conf --port 7005 --requirepass ${REDIS_PASSWORD:-rpc-redis-123456} --masterauth ${REDIS_PASSWORD:-rpc-redis-123456} --maxmemory 32mb --maxmemory-policy allkeys-lru
     networks: { default: { aliases: [redis-cluster, redis-cluster-7005] } }
 
@@ -173,7 +173,7 @@
       - redis-cluster-5
       - redis-cluster-6
     volumes:
-      - ./redis/cluster/init.sh:/init.sh:ro
+      - ./deploy/redis/cluster/init.sh:/init.sh:ro
     environment:
       - REDIS_PASSWORD=${REDIS_PASSWORD:-rpc-redis-123456}
     entrypoint: ["/bin/sh", "/init.sh"]
@@ -238,7 +238,7 @@
   # ===== Elasticsearch =====
   elasticsearch:
     build:
-      context: ./es
+      context: ./deploy/es
       dockerfile: Dockerfile
     environment:
       - discovery.type=single-node
@@ -269,7 +269,7 @@
       MONGO_INITDB_DATABASE: rpc_search
     volumes:
       - ./data/mongodb:/data/db
-      - ./mongo/init.js:/docker-entrypoint-initdb.d/init.js:ro
+      - ./deploy/mongo/init.js:/docker-entrypoint-initdb.d/init.js:ro
     ports:
       - "27017:27017"
     healthcheck:
@@ -287,7 +287,7 @@
       elasticsearch:
         condition: service_healthy
     volumes:
-      - ./es/init.sh:/init.sh:ro
+      - ./deploy/es/init.sh:/init.sh:ro
     entrypoint: ["/bin/sh", "/init.sh"]
     restart: "no"
 
@@ -504,7 +504,7 @@
   grpc-gateway:
     build:
       context: .
-      dockerfile: gateway-grpc/Dockerfile
+      dockerfile: cmd/gateway-grpc/Dockerfile
     image: ${DOCKER_USER:-http-rpc}/gateway:latest
     environment:
       JWT_SECRET: "${JWT_SECRET:-default-secret-32bytes-here!!!!!}"
@@ -535,7 +535,7 @@
   grpc-gateway-2:
     build:
       context: .
-      dockerfile: gateway-grpc/Dockerfile
+      dockerfile: cmd/gateway-grpc/Dockerfile
     image: ${DOCKER_USER:-http-rpc}/gateway:latest
     environment:
       JWT_SECRET: "${JWT_SECRET:-default-secret-32bytes-here!!!!!}"

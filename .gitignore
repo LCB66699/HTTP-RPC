@@ -4,3 +4,4 @@ build/
 *.exe
 .env
 .mcp.json
+test/logs/
