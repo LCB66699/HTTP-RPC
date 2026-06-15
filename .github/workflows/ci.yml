@@ -21,7 +21,7 @@ jobs:
         run: |
           cd cmd/gateway-grpc
           gofmt -l . | tee /dev/stderr | test ! -s /dev/stdin
-          cd ../services/notify-service
+          cd ../../services/notify-service
           gofmt -l . | tee /dev/stderr | test ! -s /dev/stdin
 
       - name: C++ format check
