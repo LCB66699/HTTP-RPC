@@ -205,8 +205,15 @@ bool Database::ExecRead(const std::string &sql, std::function<bool(MYSQL_RES *)>
 // ---- schema init（首连接执行, DDL 全局生效无需在所有连接上重复） ----
 
 bool Database::Initialize() {
-    if (write_conns_.empty() || !write_conns_[0]->conn)
+    if (write_conns_.empty())
         return false;
+
+    // 首连接可能因启动时序问题为 null，尝试重连
+    if (!write_conns_[0]->conn) {
+        write_conns_[0]->conn = ConnectMYSQL(write_host_, write_port_);
+        if (!write_conns_[0]->conn)
+            return false;
+    }
 
     // 锁首连接执行全部 DDL, 避免与 ExecWrite 的 round-robin 分配交叉
     auto &wc = write_conns_[0];
