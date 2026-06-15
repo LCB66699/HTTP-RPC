@@ -19,8 +19,8 @@ docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
 
 ```bash
 # 查看 gateway 日志（双实例）
-docker compose logs gateway-1 --tail=30
-docker compose logs gateway-2 --tail=30
+docker compose logs grpc-gateway --tail=30
+docker compose logs grpc-gateway-2 --tail=30
 
 # 查看某个服务日志
 docker compose logs sheet-1 --tail=20
@@ -29,7 +29,7 @@ docker compose logs sheet-1 --tail=20
 docker compose logs nginx --tail=20
 
 # 持续跟踪日志
-docker compose logs -f gateway-1 gateway-2
+docker compose logs -f grpc-gateway grpc-gateway-2
 ```
 
 ### 重启/停止
@@ -44,9 +44,9 @@ docker compose down
 docker compose restart nginx
 
 # 单实例灰度更新（另一个实例继续服务，零停机）
-docker compose up -d --build --no-deps gateway-1
+docker compose up -d --build --no-deps grpc-gateway
 sleep 5
-docker compose up -d --build --no-deps gateway-2
+docker compose up -d --build --no-deps grpc-gateway-2
 ```
 
 ### 零停机滚动更新
@@ -126,10 +126,10 @@ docker network prune -f
 ### 进入容器排查
 
 ```bash
-docker compose exec gateway-1 sh
-docker compose exec gateway-1 ps aux
-docker compose exec gateway-1 getent hosts sheet-1
-docker compose exec gateway-1 bash -c 'echo > /dev/tcp/localhost/8081 && echo OK || echo FAIL'
+docker compose exec grpc-gateway sh
+docker compose exec grpc-gateway ps aux
+docker compose exec grpc-gateway getent hosts sheet-1
+docker compose exec grpc-gateway bash -c 'echo > /dev/tcp/localhost/8081 && echo OK || echo FAIL'
 ```
 
 ### 模拟故障
@@ -139,8 +139,8 @@ docker compose stop sheet-2          # 验证 gRPC round_robin 切换
 docker compose start sheet-2
 docker compose stop file-1 file-2    # 验证 2PC 回滚 + 熔断触发
 docker compose start file-1 file-2
-docker compose stop gateway-1        # 验证 nginx least_conn 自动切 gateway-2
-docker compose start gateway-1
+docker compose stop grpc-gateway        # 验证 nginx least_conn 自动切 grpc-gateway-2
+docker compose start grpc-gateway
 ```
 
 ---
@@ -182,10 +182,10 @@ docker start nginx-2
 ## 三、DNS 别名
 
 ```bash
-docker compose exec gateway-1 getent hosts rpc-sheet   # → 3 行 IP (sheet-1/2/3)
-docker compose exec gateway-1 getent hosts rpc-auth    # → 2 行 IP (auth-1/2)
-docker compose exec gateway-1 getent hosts rpc-file    # → 2 行 IP (file-1/2)
-docker compose ps gateway-1 gateway-2                  # 验证双实例
+docker compose exec grpc-gateway getent hosts rpc-sheet   # → 3 行 IP (sheet-1/2/3)
+docker compose exec grpc-gateway getent hosts rpc-auth    # → 2 行 IP (auth-1/2)
+docker compose exec grpc-gateway getent hosts rpc-file    # → 2 行 IP (file-1/2)
+docker compose ps grpc-gateway grpc-gateway-2                  # 验证双实例
 ```
 
 ---
@@ -331,7 +331,7 @@ grpcurl -plaintext -d '{"user_id":7,"page":0,"page_size":10}' \
 grpcurl -plaintext localhost:50051 grpc.health.v1.Health/Check
 
 # 端口连通性
-docker exec http-rpc-gateway-1-1 bash -c "echo > /dev/tcp/sheet-1/50051 && echo OK"
+docker exec http-rpc-grpc-gateway-1 bash -c "echo > /dev/tcp/sheet-1/50051 && echo OK"
 ```
 
 ---
@@ -569,7 +569,7 @@ nohup docker build -t img -f Dockerfile . > /tmp/build.log 2>&1 &
 # 检查进度: tail -f /tmp/build.log
 
 # 利用缓存加速（只重建变更的服务）
-docker compose build gateway-1    # 只编 Gateway
+docker compose build grpc-gateway    # 只编 Gateway
 docker compose build auth-1       # 只编 Auth
 # 而不是 docker compose build     # 全编
 ```
@@ -578,7 +578,7 @@ docker compose build auth-1       # 只编 Auth
 
 ```bash
 # 一键部署（需要 K8s 集群 + kubectl + kustomize）
-kubectl apply -k k8s/
+kubectl apply -k deploy/k8s/
 
 # 查看状态
 kubectl get pods -n http-rpc

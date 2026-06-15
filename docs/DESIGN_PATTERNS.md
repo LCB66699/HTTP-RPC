@@ -31,7 +31,7 @@
 
 **LVS 层 — wlc（加权最小连接）**
 
-`lvs/keepalived.conf`:
+`deploy/lvs/keepalived.conf`:
 ```
 virtual_server 192.168.1.100 443 {
     lb_algo wlc          ← 策略：选活跃连接最少的真实服务器
@@ -41,7 +41,7 @@ virtual_server 192.168.1.100 443 {
 
 **nginx 层 — least_conn + failover**
 
-`nginx.conf:26-33`:
+`deploy/nginx/nginx.conf:26-33`:
 ```nginx
 upstream gateway_pool {
     least_conn;          ← 策略：七层可感知，选连接最少的 upstream
@@ -53,7 +53,7 @@ upstream gateway_pool {
 
 **gRPC 层 — round_robin**
 
-`gateway-cpp/src/gateway.cpp:61`:
+`server/src/gateway.cpp:61`:
 ```cpp
 args.SetLoadBalancingPolicyName("round_robin");
 // 策略字符串可替换为 "pick_first" / "grpclb"
@@ -61,7 +61,7 @@ args.SetLoadBalancingPolicyName("round_robin");
 
 **DNS 辅助 — 多 IP 解析 + 定时刷新**
 
-`gateway-cpp/src/gateway.cpp:69`:
+`server/src/gateway.cpp:69`:
 ```cpp
 args.SetInt(GRPC_ARG_DNS_MIN_TIME_BETWEEN_RESOLUTIONS_MS, 5000);
 // Docker DNS aliases 返回多个 IP → gRPC 感知 subchannel 变化
@@ -70,7 +70,7 @@ args.SetInt(GRPC_ARG_DNS_MIN_TIME_BETWEEN_RESOLUTIONS_MS, 5000);
 ### 关键：统一接口
 
 ```cpp
-// gateway-cpp/src/gateway.cpp:92-111 — 三个后端共用工厂
+// server/src/gateway.cpp:92-111 — 三个后端共用工厂
 auto auth_ch_  = MakeChannel("rpc-auth:50051");   // 2 副本
 auto sheet_ch_ = MakeChannel("rpc-sheet:50051");   // 3 副本
 auto file_ch_  = MakeChannel("rpc-file:50051");    // 2 副本
@@ -229,7 +229,7 @@ auto sh_list = [this](auto& req, std::string& r) {
 `with_cb` 包一层，不改 `sh_list` 一行代码：
 
 ```cpp
-// gateway-cpp/src/gateway.cpp:1215-1221
+// server/src/gateway.cpp:1215-1221
 svr.Get("/api/sheets",       with_cb(cb_sheet_, sh_list));
 svr.Post("/api/sheets",      with_cb(cb_sheet_, sh_create));
 svr.Put("/api/sheets",       with_cb(cb_sheet_, sh_update));
@@ -276,7 +276,7 @@ nginx 令牌桶(429) → Gateway JWT 验签(401) → with_cb 熔断+排队(503) 
                                     熔断/重试/负载均衡
 ```
 
-`gateway-cpp/src/gateway.cpp` 中的每个 handler：
+`server/src/gateway.cpp` 中的每个 handler：
 
 ```cpp
 auto sh_list = [this](auto& req, std::string& r) {
@@ -385,7 +385,7 @@ std::shared_ptr<grpc::Channel> file_ch_;
 
 ### 应用：MakeChannel — 唯一真正的工厂方法
 
-`gateway-cpp/src/gateway.cpp:36-73`:
+`server/src/gateway.cpp:36-73`:
 ```cpp
 static std::shared_ptr<grpc::Channel> MakeChannel(const std::string& addr) {
     grpc::ChannelArguments args;
@@ -417,7 +417,7 @@ health_ch_= MakeChannel("rpc-sheet:50051");   // gateway.cpp:128
 
 ### 状态机
 
-`gateway-cpp/include/circuit_breaker.h`:
+`server/include/circuit_breaker.h`:
 ```
 CLOSED ──(条件触发)──→ OPEN ──(超时)──→ HALF_OPEN ──(探测)──→ CLOSED/OPEN
 ```
@@ -574,7 +574,7 @@ gRPC 重试不产生重复数据。
 
 ### 实现
 
-`gateway-cpp/src/gateway.cpp`:
+`server/src/gateway.cpp`:
 ```cpp
 // 客户端传 X-Idempotency-Key 头 → gRPC metadata
 freq.set_idempotency_key(req.get_header_value("X-Idempotency-Key"));

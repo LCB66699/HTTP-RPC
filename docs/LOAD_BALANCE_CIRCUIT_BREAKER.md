@@ -7,8 +7,8 @@
 | Envoy ROUND_ROBIN | `envoy/envoy.yaml` | 活跃 | 单端点，ROUND_ROBIN 无意义 |
 | Envoy circuit_breaker | `envoy/envoy.yaml` | 活跃 | 阈值 1024，从未触发 |
 | C++ CircuitBreaker | `server/include/circuit_breaker.h` | **死代码**（687 行） | 从未 include/实例化 |
-| Nginx upstream | `nginx.conf` | 活跃 | least_conn，但后端只有 1 个 envoy |
-| Gateway gRPC | `gateway-grpc/main.go` | 活跃 | passthrough，单 IP 固定连接 |
+| Nginx upstream | `deploy/nginx/nginx.conf` | 活跃 | least_conn，但后端只有 1 个 envoy |
+| Gateway gRPC | `cmd/gateway-grpc/main.go` | 活跃 | passthrough，单 IP 固定连接 |
 | C++ gRPC 调用 | `main_sheet.cpp` | 活跃 | 单 channel，2s deadline |
 
 **核心问题：auth×2、sheet×2、file×2 各两个实例，但第二个实例从未收到流量。**
@@ -21,7 +21,7 @@
 
 ### Tier 1 — gRPC 客户端负载均衡（改动最小，收益最大）
 
-**改什么：** `gateway-grpc/main.go` 加 `dns:///` 前缀 + `round_robin` 配置
+**改什么：** `cmd/gateway-grpc/main.go` 加 `dns:///` 前缀 + `round_robin` 配置
 
 ```
 改前：
@@ -43,7 +43,7 @@ authConn, _ := grpc.NewClient("dns:///rpc-auth:50051", creds, kp,
 
 ### Tier 2 — gRPC 重试（可用性提升）
 
-**改什么：** `gateway-grpc/main.go` 加 `callWithRetry` 泛型重试函数
+**改什么：** `cmd/gateway-grpc/main.go` 加 `callWithRetry` 泛型重试函数
 
 ```
 func callWithRetry[T any](ctx context.Context, maxAttempts int, label string, 
@@ -71,7 +71,7 @@ func callWithRetry[T any](ctx context.Context, maxAttempts int, label string,
 
 ### Tier 3 — 熔断器（防雪崩）
 
-**改什么：** `gateway-grpc/main.go` 引入 `sony/gobreaker`，每个 C++ 服务一个熔断器
+**改什么：** `cmd/gateway-grpc/main.go` 引入 `sony/gobreaker`，每个 C++ 服务一个熔断器
 
 **状态机：**
 ```
@@ -145,8 +145,8 @@ Tier 6 独立
 
 | 文件 | Tier | 改动 |
 |------|------|------|
-| `gateway-grpc/main.go` | 1, 2, 3 | DNS resolver + round_robin + retry + gobreaker |
-| `gateway-grpc/go.mod` | 3 | 加 `sony/gobreaker` |
+| `cmd/gateway-grpc/main.go` | 1, 2, 3 | DNS resolver + round_robin + retry + gobreaker |
+| `cmd/gateway-grpc/go.mod` | 3 | 加 `sony/gobreaker` |
 | `docker-compose.yml` | 4 | dns: consul + Consul DNS 地址 |
 | `envoy/envoy.yaml` | 5 | 阈值降低 + outlier_detection |
 | `server/include/circuit_breaker.h` | 6 | 删除 |

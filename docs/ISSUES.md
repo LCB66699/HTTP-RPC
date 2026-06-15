@@ -395,7 +395,7 @@ bool ShouldTripService() const {
 
 **根因**：容器重启后 IP 变化，nginx upstream 缓存了解析结果，返回 502。
 
-**修复**：`nginx.conf` 加 `resolver 127.0.0.11 valid=10s ipv6=off` + upstream `resolve` 关键字。
+**修复**：`deploy/nginx/nginx.conf` 加 `resolver 127.0.0.11 valid=10s ipv6=off` + upstream `resolve` 关键字。
 
 ### 13.14 前端残留旧 RPC 风格 API 路径
 

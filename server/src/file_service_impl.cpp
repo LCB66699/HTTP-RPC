@@ -553,3 +553,8 @@ grpc::Status FileServiceImpl::BatchDelete(grpc::ServerContext *ctx, const rpc::B
     resp->set_deleted_count(count);
     return grpc::Status::OK;
 }
+
+
+
+
+
