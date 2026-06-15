@@ -358,7 +358,7 @@
       MINIO_PUBLIC_URL: "http://minio:9000"
     command: >
       /app/rpc_server --service spreadsheet --port 50051
-      --mysql-write-host mysql-spreadsheet --mysql-read-hosts mysql-spreadsheet --mysql-password ${MYSQL_ROOT_PASSWORD:-123456} --mysql-db rpc_spreadsheet --mysql-shards 2
+      --mysql-write-host mysql-spreadsheet --mysql-read-hosts mysql-spreadsheet --mysql-password ${MYSQL_ROOT_PASSWORD:-123456} --mysql-db rpc_spreadsheet --mysql-shards 1
       --redis-cluster redis-cluster-7000:7000 --redis-cluster redis-cluster-7001:7001 --redis-cluster redis-cluster-7002:7002 --redis-password ${REDIS_PASSWORD:-rpc-redis-123456}
     networks:
       default:
@@ -390,7 +390,7 @@
       MINIO_PUBLIC_URL: "http://minio:9000"
     command: >
       /app/rpc_server --service spreadsheet --port 50051
-      --mysql-write-host mysql-spreadsheet --mysql-read-hosts mysql-spreadsheet --mysql-password ${MYSQL_ROOT_PASSWORD:-123456} --mysql-db rpc_spreadsheet --mysql-shards 2
+      --mysql-write-host mysql-spreadsheet --mysql-read-hosts mysql-spreadsheet --mysql-password ${MYSQL_ROOT_PASSWORD:-123456} --mysql-db rpc_spreadsheet --mysql-shards 1
       --redis-cluster redis-cluster-7000:7000 --redis-cluster redis-cluster-7001:7001 --redis-cluster redis-cluster-7002:7002 --redis-password ${REDIS_PASSWORD:-rpc-redis-123456}
     networks:
       default:
@@ -428,7 +428,7 @@
       MINIO_PUBLIC_URL: "http://minio:9000"
     command: >
       /app/rpc_server --service file --port 50051
-      --mysql-write-host mysql-file --mysql-read-hosts mysql-file --mysql-password ${MYSQL_ROOT_PASSWORD:-123456} --mysql-db rpc_file --mysql-shards 2
+      --mysql-write-host mysql-file --mysql-read-hosts mysql-file --mysql-password ${MYSQL_ROOT_PASSWORD:-123456} --mysql-db rpc_file --mysql-shards 1
       --redis-cluster redis-cluster-7000:7000 --redis-cluster redis-cluster-7001:7001 --redis-cluster redis-cluster-7002:7002 --redis-password ${REDIS_PASSWORD:-rpc-redis-123456}
     networks:
       default:
@@ -458,7 +458,7 @@
       MINIO_PUBLIC_URL: "http://minio:9000"
     command: >
       /app/rpc_server --service file --port 50051
-      --mysql-write-host mysql-file --mysql-read-hosts mysql-file --mysql-password ${MYSQL_ROOT_PASSWORD:-123456} --mysql-db rpc_file --mysql-shards 2
+      --mysql-write-host mysql-file --mysql-read-hosts mysql-file --mysql-password ${MYSQL_ROOT_PASSWORD:-123456} --mysql-db rpc_file --mysql-shards 1
       --redis-cluster redis-cluster-7000:7000 --redis-cluster redis-cluster-7001:7001 --redis-cluster redis-cluster-7002:7002 --redis-password ${REDIS_PASSWORD:-rpc-redis-123456}
     networks:
       default:
