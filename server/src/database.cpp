@@ -1001,8 +1001,13 @@ ShardedDatabase::ShardedDatabase(int shard_count, const std::string &write_host_
 }
 
 void ShardedDatabase::InitializeAll() {
-    for (auto &db : shards_)
-        db->Initialize();
+    for (auto &db : shards_) {
+        for (int retry = 0; retry < 30; ++retry) {
+            if (db->Initialize()) break;
+            if (retry == 0) fprintf(stderr, "[DB] Waiting for MySQL to be ready...\n");
+            std::this_thread::sleep_for(std::chrono::seconds(2));
+        }
+    }
 }
 
 Database *ShardedDatabase::ShardFor(int64_t user_id) {
