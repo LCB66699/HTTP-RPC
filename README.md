@@ -1,6 +1,6 @@
 # HTTP-RPC 微服务分布式系统
 
-基于 gRPC + Envoy + gRPC-Gateway 的微服务数据表格系统，支持文件存储、全文搜索、多层缓存和弹性容错。
+基于 gRPC + gRPC-Gateway 的微服务数据表格系统，支持文件存储、全文搜索、多层缓存和弹性容错。
 
 ## 架构
 
@@ -9,10 +9,7 @@
    │  HTTPS
    ▼
 nginx :443                           ← TLS 终结 + 令牌桶限流 (3层)
-   │  least_conn → envoy_pool
-   ▼
-Envoy ×2 :8080                       ← JWT Cookie 鉴权 + ROUND_ROBIN + outlier_detection
-   │
+   │  least_conn → gateway_pool
    ▼
 gRPC-Gateway (Go) ×2 :8080          ← HTTP/JSON ↔ gRPC + 熔断器 + 重试 + readiness
    │  dns:/// + round_robin
@@ -32,12 +29,12 @@ C++ 服务 ──RabbitMQ──→ Notify Service (Go) ──→ MongoDB + ES �
   MinIO ×1 (文件/表格内容对象存储)
 ```
 
-## 容器清单 (~33个)
+## 容器清单 (~31个)
 
 | 层 | 容器 | 数量 |
 |----|------|------|
 | 入口 | nginx | 1 |
-| 网关 | envoy, grpc-gateway | 4 (各×2) |
+| 网关 | grpc-gateway | 2 |
 | C++ 服务 | auth, sheet, file, search | 7 |
 | Go 服务 | notify-service | 1 |
 | 存储 | MySQL, Redis, ES, MongoDB, MinIO | 18 |
@@ -47,50 +44,51 @@ C++ 服务 ──RabbitMQ──→ Notify Service (Go) ──→ MongoDB + ES �
 ## 项目结构
 
 ```
-├── gateway-grpc/              Go gRPC-Gateway (HTTP→gRPC 转译)
-│   ├── main.go                   路由 + JWT + 熔断器(gobreaker) + 重试 + readiness
-│   ├── main_test.go              JWT 单元测试
-│   └── Dockerfile
-├── envoy/                     Envoy API 网关
-│   ├── envoy.yaml                JWT 鉴权 + circuit_breaker + outlier_detection
-│   ├── entrypoint.sh
-│   ├── Dockerfile
-│   └── protos/                   Go proto 副本
-├── server/                    C++ gRPC 后端服务
+├── cmd/
+│   └── gateway-grpc/           Go gRPC-Gateway (HTTP→gRPC 转译)
+│       ├── main.go                 路由 + JWT + 熔断器(gobreaker) + 重试 + readiness
+│       ├── handler_test.go         集成测试
+│       ├── main_test.go            JWT 单元测试
+│       └── Dockerfile
+├── server/                     C++ gRPC 后端服务
 │   ├── include/
-│   │   ├── database.h            MySQL 读写分离 + ShardedDatabase 分片
-│   │   ├── redis_client.h        Redis Cluster (redis-plus-plus)
-│   │   ├── jwt.h                 JWT HS256 签名/验签
-│   │   ├── auth_interceptor.h    gRPC JWT 拦截器
-│   │   ├── l1_cache.h            L1 LRU 本地缓存 (10K/30min)
-│   │   ├── l1_invalidator.h      Redis Pub/Sub → L1 缓存失效
-│   │   ├── rabbit_publisher.h    RabbitMQ 事件发布
-│   │   ├── minio_client.h        MinIO 客户端 (AWS SigV4)
-│   │   ├── snowflake.h           Snowflake 分布式 ID
-│   │   ├── call_logger.h         调用日志 + Redis 异步 flush
-│   │   └── *_service_impl.h     各服务实现
+│   │   ├── database.h             MySQL 读写分离 + ShardedDatabase 分片
+│   │   ├── redis_client.h         Redis Cluster (redis-plus-plus)
+│   │   ├── jwt.h                  JWT HS256 签名/验签
+│   │   ├── auth_interceptor.h     gRPC JWT 拦截器
+│   │   ├── l1_cache.h             L1 LRU 本地缓存 (10K/30min)
+│   │   ├── l1_invalidator.h       Redis Pub/Sub → L1 缓存失效
+│   │   ├── rabbit_publisher.h     RabbitMQ 事件发布
+│   │   ├── minio_client.h         MinIO 客户端 (AWS SigV4)
+│   │   ├── snowflake.h            Snowflake 分布式 ID
+│   │   ├── call_logger.h          调用日志 + Redis 异步 flush
+│   │   └── *_service_impl.h      各服务实现
 │   └── src/
-│       ├── main_auth.cpp         Auth 独立入口
-│       ├── main_sheet.cpp        Sheet 独立入口 (含 MinIO)
-│       ├── main_file.cpp         File 独立入口 (含 MinIO)
-│       ├── main_search.cpp       Search 独立入口
+│       ├── main_auth.cpp          Auth 独立入口
+│       ├── main_sheet.cpp         Sheet 独立入口 (含 MinIO)
+│       ├── main_file.cpp          File 独立入口 (含 MinIO)
+│       ├── main_search.cpp        Search 独立入口
 │       └── ...
 ├── services/
-│   └── notify-service/           Go RabbitMQ 消费者 → MongoDB + ES + MinIO
-├── proto/                     Protobuf 定义
-├── es/                        Elasticsearch Dockerfile
-├── mongo/                     MongoDB 初始化
-├── redis/cluster/             Redis Cluster 配置 + 智能 init
-├── mysql/                     MySQL 主从配置
-├── canal/                     Canal binlog 订阅 (预留)
-├── docs/                      设计文档 + 调试指南
-├── test/                      功能/性能/压力测试
-├── Dockerfile                 多阶段构建 (ubuntu，支持 DEBUG)
-├── docker-compose.yml         全栈部署
+│   └── notify-service/            Go RabbitMQ 消费者 → MongoDB + ES + MinIO
+├── proto/                      Protobuf 定义
+├── deploy/                     部署 & 基础设施配置
+│   ├── es/                      Elasticsearch Dockerfile
+│   ├── mongo/                   MongoDB 初始化
+│   ├── redis/cluster/           Redis Cluster 配置 + 智能 init
+│   ├── mysql/                   MySQL 主从配置 + init.sql
+│   ├── nginx/                   nginx.conf (TLS + 三层令牌桶限流)
+│   ├── envoy/                   Envoy Dockerfile (历史遗留)
+│   ├── kanal/                   Canal binlog 订阅 (预留)
+│   ├── k8s/                     Kubernetes 部署文件
+│   └── lvs/                     LVS + Keepalived 4层负载均衡
+├── vendor/                     第三方依赖 (redis-plus-plus)
+├── docs/                       设计文档 + 调试指南
+├── test/                       功能/性能/压力测试
+├── Dockerfile                  多阶段构建 (ubuntu，一次编译产出全部 C++ 服务)
+├── docker-compose.yml          全栈部署
 ├── docker-compose.override.yml 本地调试 (GDB 权限 + 源码挂载)
-├── dev.sh                     本地开发快捷命令
-├── Makefile                   独立编译目标 (auth/sheet/file/search)
-└── nginx.conf                 TLS + 三层令牌桶限流
+└── dev.sh                      本地开发快捷命令
 ```
 
 ## 本地开发
@@ -148,12 +146,11 @@ bash dev.sh debug sheet # GDB 断点调试 (详见 docs/DEBUG_GUIDE.md)
 
 | 机制 | 实现 |
 |------|------|
-| 负载均衡 | Nginx least_conn → Envoy ROUND_ROBIN → Gateway dns:/// + round_robin → C++ dns:/// + round_robin (4层) |
+| 负载均衡 | Nginx least_conn → Gateway dns:/// + round_robin → C++ dns:/// + round_robin (3层) |
 | 熔断器 | Gateway gobreaker (Closed→Open→Half-Open), 慢调用检测 + 失败率阈值, 每服务独立 |
 | gRPC 重试 | 幂等读最多3次, 指数退避 50/100/200ms, 只重试 Unavailable/DeadlineExceeded/ResourceExhausted/Aborted |
 | 就绪探针 | `/api/health/ready` 检查 auth/sheet/file gRPC 连接状态, CI 轮询替代固定 sleep |
-| Envoy 容错 | outlier_detection: 连续5次5xx→踢出30s |
-| JWT 鉴权 | Envoy Cookie→Gateway HS256 验签→C++ AuthInterceptor→Auth.ValidateUser 四层 |
+| JWT 鉴权 | Cookie→Gateway HS256 验签→C++ AuthInterceptor→Auth.ValidateUser 三层 |
 | L1 缓存 | 进程内 LRU (10K/30min), Redis Pub/Sub 失效 |
 | L2 缓存 | Redis Cluster Cache-Aside, JitteredTTL 防雪崩, 逻辑过期 + 异步刷新, null marker 防穿透 |
 | 对象存储 | MinIO: 文件内容 + 表格数据, 预签名URL 302下载 |
