@@ -24,10 +24,15 @@ jobs:
           cd ../../services/notify-service
           gofmt -l . | tee /dev/stderr | test ! -s /dev/stdin
 
-      - name: C++ format check
+      - name: C++ auto-format
         run: |
           sudo apt-get update -qq && sudo apt-get install -y -qq clang-format
-          find server/src -name '*.cpp' -o -name '*.h' | xargs clang-format --dry-run --Werror
+          find server/src server/include -name '*.cpp' -o -name '*.h' | xargs clang-format -i
+          echo "C++ files formatted"
+
+      - name: C++ format check
+        run: |
+          find server/src server/include -name '*.cpp' -o -name '*.h' | xargs clang-format --dry-run --Werror
 
   # ===== Stage 2: 构建 + 集成测试 =====
   integration:
