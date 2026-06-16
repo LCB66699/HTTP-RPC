@@ -78,7 +78,6 @@ func main() {
 		}()
 	}
 	tracer = otel.Tracer("notify-service")
-	var err error
 	esClient, _ = elasticsearch.NewClient(elasticsearch.Config{
 		Addresses: []string{getenv("ES_HOST", "http://elasticsearch:9200")},
 	})
@@ -134,7 +133,7 @@ func main() {
 	propagator := otel.GetTextMapPropagator()
 	for msg := range msgs {
 		// Extract W3C traceparent from AMQP headers
-		ctx := propagator.Extract(context.Background(), propagation.MapCarrier(msg.Headers))
+		ctx := propagator.Extract(context.Background(), amqpHeadersToCarrier(msg.Headers))
 		ctx, span := tracer.Start(ctx, "process."+msg.RoutingKey,
 			trace.WithAttributes(
 				attribute.String("messaging.system", "rabbitmq"),
@@ -297,6 +296,17 @@ func handleSheetDelete(event map[string]interface{}) bool {
 	}
 	log.Printf("[Notify] Deleted sheet %d", sheetID)
 	return true
+}
+
+// amqpHeadersToCarrier converts AMQP Table to OTel TextMapCarrier.
+func amqpHeadersToCarrier(h amqp.Table) propagation.MapCarrier {
+	c := make(propagation.MapCarrier, len(h))
+	for k, v := range h {
+		if s, ok := v.(string); ok {
+			c[k] = s
+		}
+	}
+	return c
 }
 
 func getenv(key, fallback string) string {
