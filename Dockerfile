@@ -13,11 +13,12 @@ RUN git clone --depth 1 --branch v1.16.1 https://github.com/open-telemetry/opent
         -DCMAKE_BUILD_TYPE=Release \
         -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
         -DBUILD_SHARED_LIBS=OFF \
-        -DWITH_OTLP_GRPC=ON \
+        -DWITH_OTLP_HTTP=ON \
         -DWITH_STL=ON \
         -DBUILD_TESTING=OFF \
     && cmake --build build -j$(nproc) \
     && cmake --install build \
+    && echo "=== OTel installed libs ===" && ls /usr/local/lib/libopentelemetry* 2>/dev/null || true \
     && rm -rf /tmp/otel-cpp
 
 ARG SERVICE=auth

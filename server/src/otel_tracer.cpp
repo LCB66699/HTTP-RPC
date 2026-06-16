@@ -1,7 +1,8 @@
 #include "otel_tracer.h"
 
 #include <grpcpp/server_context.h>
-#include <opentelemetry/exporters/otlp/otlp_grpc_exporter_factory.h>
+#include <opentelemetry/exporters/otlp/otlp_http_exporter_factory.h>
+#include <opentelemetry/exporters/otlp/otlp_http_exporter_options.h>
 #include <opentelemetry/sdk/resource/resource.h>
 #include <opentelemetry/sdk/trace/simple_processor_factory.h>
 #include <opentelemetry/sdk/trace/tracer_provider_factory.h>
@@ -23,9 +24,11 @@ namespace trace = opentelemetry::trace;
 static nostd::shared_ptr<trace::Tracer> g_tracer;
 
 void InitTracer(const std::string &service_name) {
-    auto exporter = opentelemetry::exporter::otlp::OtlpGrpcExporterFactory::Create();
+    opentelemetry::exporter::otlp::OtlpHttpExporterOptions opts;
+    opts.url = "http://jaeger:4318/v1/traces";
+    auto exporter = opentelemetry::exporter::otlp::OtlpHttpExporterFactory::Create(opts);
     if (!exporter) {
-        fprintf(stderr, "[OTel] Failed to create OTLP exporter\n");
+        fprintf(stderr, "[OTel] Failed to create OTLP HTTP exporter\n");
         return;
     }
     auto processor = sdktrace::SimpleSpanProcessorFactory::Create(std::move(exporter));
