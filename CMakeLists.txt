@@ -23,10 +23,30 @@ add_subdirectory(${CMAKE_SOURCE_DIR}/vendor/redis-plus-plus ${CMAKE_BINARY_DIR}/
 include_directories(${CMAKE_SOURCE_DIR}/vendor/redis-plus-plus/src)
 target_link_libraries(redis++ PUBLIC ${HIREDIS_LIBRARIES})
 
-# OpenTelemetry C++ (installed to /usr/local from source)
-set(OTEL_LIBS
-    opentelemetry_exporter_otlp_http opentelemetry_otlp_recordable
-    opentelemetry_trace opentelemetry_resources opentelemetry_common)
+# OpenTelemetry C++ — auto-detect, skip if headers not installed
+set(OTEL_LIBS "")
+set(HAS_OTEL OFF)
+if(EXISTS "/usr/local/include/opentelemetry/exporters/otlp/otlp_http_exporter.h")
+    message(STATUS "OTel HTTP exporter found")
+    set(HAS_OTEL ON)
+    set(OTEL_LIBS
+        opentelemetry_exporter_otlp_http opentelemetry_otlp_recordable
+        opentelemetry_trace opentelemetry_resources opentelemetry_common)
+elseif(EXISTS "/usr/local/include/opentelemetry/exporters/otlp/otlp_grpc_exporter_factory.h")
+    message(STATUS "OTel gRPC exporter found")
+    set(HAS_OTEL ON)
+    set(OTEL_LIBS
+        -Wl,--start-group
+        opentelemetry_exporter_otlp_grpc opentelemetry_exporter_otlp_grpc_client
+        opentelemetry_otlp_recordable opentelemetry_logs
+        opentelemetry_trace opentelemetry_resources opentelemetry_version
+        opentelemetry_proto opentelemetry_proto_grpc
+        opentelemetry_common
+        -Wl,--end-group)
+else()
+    message(STATUS "OTel NOT found — tracing disabled")
+endif()
+add_compile_definitions(HAS_OTEL=$<BOOL:${HAS_OTEL}>)
 
 # Proto generation
 set(PROTO_DIR ${CMAKE_SOURCE_DIR}/proto)
@@ -60,8 +80,10 @@ set(SHARED_SRCS
     server/src/auth_interceptor.cpp
     server/src/call_logger.cpp
     server/src/database.cpp
-    server/src/redis_client.cpp
-    server/src/otel_tracer.cpp)
+    server/src/redis_client.cpp)
+if(HAS_OTEL)
+    list(APPEND SHARED_SRCS server/src/otel_tracer.cpp)
+endif()
 
 # ---- Services ----
 function(add_rpc_service NAME MAIN_SRC EXTRA_SRCS)
@@ -72,6 +94,9 @@ function(add_rpc_service NAME MAIN_SRC EXTRA_SRCS)
         ${MYSQL_LIBRARIES} ${HIREDIS_LIBRARIES} redis++_static pthread nghttp2
         ${RABBITMQ_LIBRARIES}
         ${OTEL_LIBS})
+    if(HAS_OTEL)
+        target_compile_definitions(rpc_${NAME} PRIVATE HAS_OTEL=1)
+    endif()
 endfunction()
 
 add_rpc_service(auth   server/src/main_auth.cpp     "server/src/auth_service_impl.cpp;server/src/health_service_impl.cpp")

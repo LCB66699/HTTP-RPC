@@ -34,7 +34,9 @@ int main(int argc, char *argv[]) {
     const char *env_secret = std::getenv("JWT_SECRET");
     std::string jwt_secret = env_secret ? env_secret : "default-secret-32bytes-here!!!!!";
 
+    #if HAS_OTEL
     InitTracer("auth-service");
+#endif
 
     for (int i = 1; i < argc; ++i) {
         std::string arg = argv[i];

@@ -20,7 +20,9 @@ int main(int argc, char *argv[]) {
     int port = 50051;
     const char *es_host = std::getenv("ES_HOST");
 
+    #if HAS_OTEL
     InitTracer("search-service");
+#endif
 
     for (int i = 1; i < argc; ++i) {
         std::string arg = argv[i];
