@@ -4,7 +4,7 @@ RUN apt update && apt install -y \
     g++ make cmake git \
     protobuf-compiler-grpc libgrpc++-dev libprotobuf-dev \
     libmysqlclient-dev libhiredis-dev libssl-dev zlib1g-dev \
-    libnghttp2-dev librabbitmq-dev libgtest-dev
+    libnghttp2-dev librabbitmq-dev libgtest-dev libcurl4-openssl-dev
 RUN cd /usr/src/googletest && cmake . && make -j$(nproc) && cp lib/*.a /usr/lib
 
 # OpenTelemetry C++ (OTLP HTTP exporter, static libs)
@@ -36,7 +36,7 @@ FROM ubuntu:24.04
 ARG DEBUG=false
 RUN apt update && apt install -y \
     libgrpc++1.51t64 libmysqlclient21 libhiredis-dev libssl3t64 zlib1g \
-    libnghttp2-14 librabbitmq4 apache2-utils curl \
+    libnghttp2-14 librabbitmq4 apache2-utils curl libcurl4 \
     $(if [ "$DEBUG" = "true" ]; then echo gdb; fi) \
     && rm -rf /var/lib/apt/lists/*
 
