@@ -30,8 +30,12 @@ if(EXISTS "/usr/local/include/opentelemetry/exporters/otlp/otlp_http_exporter.h"
     message(STATUS "OTel HTTP exporter found")
     set(HAS_OTEL ON)
     set(OTEL_LIBS
+        -Wl,--start-group
         opentelemetry_exporter_otlp_http opentelemetry_otlp_recordable
-        opentelemetry_trace opentelemetry_resources opentelemetry_common)
+        opentelemetry_logs opentelemetry_proto
+        opentelemetry_trace opentelemetry_resources opentelemetry_common
+        -Wl,--end-group
+        curl)
 elseif(EXISTS "/usr/local/include/opentelemetry/exporters/otlp/otlp_grpc_exporter_factory.h")
     message(STATUS "OTel gRPC exporter found")
     set(HAS_OTEL ON)

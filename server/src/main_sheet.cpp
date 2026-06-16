@@ -1,4 +1,4 @@
-﻿// Sheet Service main 鈥?鐙珛缂栬瘧
+﻿// Sheet Service main 
 #include <grpcpp/grpcpp.h>
 
 #include <csignal>
