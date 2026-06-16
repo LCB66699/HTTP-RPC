@@ -10,6 +10,7 @@
 #include <opentelemetry/trace/trace_id.h>
 #include <opentelemetry/trace/trace_flags.h>
 #include <opentelemetry/trace/provider.h>
+#include <opentelemetry/nostd/span.h>
 #include <cstdio>
 #include <cstring>
 
@@ -27,7 +28,7 @@ void InitTracer(const std::string &service_name) {
         fprintf(stderr, "[OTel] Failed to create OTLP exporter\n");
         return;
     }
-    auto processor = sdktrace::SimpleProcessorFactory::Create(std::move(exporter));
+    auto processor = sdktrace::SimpleSpanProcessorFactory::Create(std::move(exporter));
     auto res = resource::Resource::Create({{"service.name", service_name}});
     auto provider = sdktrace::TracerProviderFactory::Create(std::move(processor), res);
     trace::Provider::SetTracerProvider(std::move(provider));
@@ -59,13 +60,13 @@ class OTelSpanImpl : public OTelSpan {
 
     static std::string HexTraceId(const trace::TraceId &id) {
         char buf[33];
-        id.ToLowerBase16(buf);
+        id.ToLowerBase16(nostd::span<char, 32>(buf));
         buf[32] = 0;
         return buf;
     }
     static std::string HexSpanId(const trace::SpanId &id) {
         char buf[17];
-        id.ToLowerBase16(buf);
+        id.ToLowerBase16(nostd::span<char, 16>(buf));
         buf[16] = 0;
         return buf;
     }
@@ -128,8 +129,8 @@ std::string GetCurrentTraceParent() {
     if (!span->IsRecording()) return "";
     auto ctx = span->GetContext();
     char tid_hex[33], sid_hex[17];
-    ctx.trace_id().ToLowerBase16(tid_hex); tid_hex[32] = 0;
-    ctx.span_id().ToLowerBase16(sid_hex); sid_hex[16] = 0;
+    ctx.trace_id().ToLowerBase16(nostd::span<char, 32>(tid_hex)); tid_hex[32] = 0;
+    ctx.span_id().ToLowerBase16(nostd::span<char, 16>(sid_hex)); sid_hex[16] = 0;
     char buf[128];
     snprintf(buf, sizeof(buf), "00-%s-%s-%s",
              tid_hex, sid_hex, ctx.trace_flags().IsSampled() ? "01" : "00");
