@@ -25,10 +25,10 @@ target_link_libraries(redis++ PUBLIC ${HIREDIS_LIBRARIES})
 
 # OpenTelemetry C++ (installed to /usr/local from source)
 set(OTEL_LIBS
-    opentelemetry_trace opentelemetry_resources
-    opentelemetry_exporter_otlp_grpc_client opentelemetry_exporter_otlp_grpc
-    opentelemetry_otlp_recordable opentelemetry_proto
-    opentelemetry_common)
+    opentelemetry_exporter_otlp_grpc opentelemetry_exporter_otlp_grpc_client
+    opentelemetry_otlp_recordable opentelemetry_logs
+    opentelemetry_trace opentelemetry_resources opentelemetry_common
+    opentelemetry_version opentelemetry_proto)
 
 # Proto generation
 set(PROTO_DIR ${CMAKE_SOURCE_DIR}/proto)
