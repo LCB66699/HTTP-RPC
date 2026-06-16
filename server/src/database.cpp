@@ -208,19 +208,16 @@ bool Database::Initialize() {
     if (write_conns_.empty())
         return false;
 
-    // 启动时序可能导致连接为 null，尝试重连所有写连接
+    // 启动时序问题：不管连接是否 null，全部重建确保连到同一个就绪的 MySQL
     for (size_t i = 0; i < write_conns_.size(); ++i) {
-        if (!write_conns_[i]->conn) {
-            write_conns_[i]->conn = ConnectMYSQL(write_host_, write_port_);
-            if (i == 0 && !write_conns_[0]->conn)
-                return false;
-        }
+        if (write_conns_[i]->conn) mysql_close(write_conns_[i]->conn);
+        write_conns_[i]->conn = ConnectMYSQL(write_host_, write_port_);
+        if (i == 0 && !write_conns_[0]->conn)
+            return false;
     }
-
-    // 确保 MySQL 完全就绪（健康检查 ping 通过不代表能接受 DDL）
-    if (mysql_ping(write_conns_[0]->conn) != 0) {
-        fprintf(stderr, "[DB] mysql_ping failed after connect\n");
-        return false;
+    for (size_t i = 0; i < read_conns_.size(); ++i) {
+        if (read_conns_[i]->conn) mysql_close(read_conns_[i]->conn);
+        read_conns_[i]->conn = ConnectMYSQL(read_hosts_[i % read_hosts_.size()], read_port_);
     }
 
     // 锁首连接执行全部 DDL, 避免与 ExecWrite 的 round-robin 分配交叉
