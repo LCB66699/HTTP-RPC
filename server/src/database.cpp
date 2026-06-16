@@ -208,11 +208,13 @@ bool Database::Initialize() {
     if (write_conns_.empty())
         return false;
 
-    // 首连接可能因启动时序问题为 null，尝试重连
-    if (!write_conns_[0]->conn) {
-        write_conns_[0]->conn = ConnectMYSQL(write_host_, write_port_);
-        if (!write_conns_[0]->conn)
-            return false;
+    // 启动时序可能导致连接为 null，尝试重连所有写连接
+    for (size_t i = 0; i < write_conns_.size(); ++i) {
+        if (!write_conns_[i]->conn) {
+            write_conns_[i]->conn = ConnectMYSQL(write_host_, write_port_);
+            if (i == 0 && !write_conns_[0]->conn)
+                return false;
+        }
     }
 
     // 锁首连接执行全部 DDL, 避免与 ExecWrite 的 round-robin 分配交叉
