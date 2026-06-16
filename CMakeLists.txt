@@ -31,8 +31,8 @@ if(EXISTS "/usr/local/include/opentelemetry/exporters/otlp/otlp_http_exporter.h"
     set(HAS_OTEL ON)
     set(OTEL_LIBS
         -Wl,--start-group
-        opentelemetry_exporter_otlp_http opentelemetry_otlp_recordable
-        opentelemetry_logs opentelemetry_proto
+        opentelemetry_exporter_otlp_http opentelemetry_exporter_otlp_http_client
+        opentelemetry_otlp_recordable opentelemetry_logs opentelemetry_proto
         opentelemetry_trace opentelemetry_resources opentelemetry_common
         -Wl,--end-group
         curl)
