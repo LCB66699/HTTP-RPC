@@ -16,3 +16,5 @@ require (
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc v1.28.0
 	go.opentelemetry.io/otel/sdk v1.28.0
 )
+
+replace gateway-grpc/gen/rpc => ./gen/rpc
