@@ -30,8 +30,9 @@ void InitTracer(const std::string &service_name) {
     }
     auto processor = sdktrace::SimpleSpanProcessorFactory::Create(std::move(exporter));
     auto res = resource::Resource::Create({{"service.name", service_name}});
-    auto provider = sdktrace::TracerProviderFactory::Create(std::move(processor), res);
-    trace::Provider::SetTracerProvider(std::move(provider));
+    auto provider_raw = sdktrace::TracerProviderFactory::Create(std::move(processor), res);
+    auto provider = nostd::shared_ptr<trace::TracerProvider>(provider_raw.release());
+    trace::Provider::SetTracerProvider(provider);
     auto provider2 = trace::Provider::GetTracerProvider();
     g_tracer = provider2->GetTracer("http-rpc-cpp", "1.0.0");
     fprintf(stderr, "[OTel] Tracer initialized: service=%s\n", service_name.c_str());
@@ -60,13 +61,13 @@ class OTelSpanImpl : public OTelSpan {
 
     static std::string HexTraceId(const trace::TraceId &id) {
         char buf[33];
-        id.ToLowerBase16(nostd::span<char, 32>(buf));
+        id.ToLowerBase16(nostd::span<char, 32>(buf, 32));
         buf[32] = 0;
         return buf;
     }
     static std::string HexSpanId(const trace::SpanId &id) {
         char buf[17];
-        id.ToLowerBase16(nostd::span<char, 16>(buf));
+        id.ToLowerBase16(nostd::span<char, 16>(buf, 16));
         buf[16] = 0;
         return buf;
     }
@@ -129,8 +130,8 @@ std::string GetCurrentTraceParent() {
     if (!span->IsRecording()) return "";
     auto ctx = span->GetContext();
     char tid_hex[33], sid_hex[17];
-    ctx.trace_id().ToLowerBase16(nostd::span<char, 32>(tid_hex)); tid_hex[32] = 0;
-    ctx.span_id().ToLowerBase16(nostd::span<char, 16>(sid_hex)); sid_hex[16] = 0;
+    ctx.trace_id().ToLowerBase16(nostd::span<char, 32>(tid_hex, 32)); tid_hex[32] = 0;
+    ctx.span_id().ToLowerBase16(nostd::span<char, 16>(sid_hex, 16)); sid_hex[16] = 0;
     char buf[128];
     snprintf(buf, sizeof(buf), "00-%s-%s-%s",
              tid_hex, sid_hex, ctx.trace_flags().IsSampled() ? "01" : "00");
