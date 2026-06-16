@@ -217,12 +217,21 @@ bool Database::Initialize() {
         }
     }
 
+    // 确保 MySQL 完全就绪（健康检查 ping 通过不代表能接受 DDL）
+    if (mysql_ping(write_conns_[0]->conn) != 0) {
+        fprintf(stderr, "[DB] mysql_ping failed after connect\n");
+        return false;
+    }
+
     // 锁首连接执行全部 DDL, 避免与 ExecWrite 的 round-robin 分配交叉
     auto &wc = write_conns_[0];
     std::lock_guard<std::mutex> lock(wc->mtx);
     MYSQL *c = wc->conn;
 
-    auto exec = [&](const char *sql) { mysql_query(c, sql); };
+    auto exec = [&](const char *sql) {
+        if (mysql_query(c, sql) != 0)
+            fprintf(stderr, "[DB] DDL error: %s\n", mysql_error(c));
+    };
 
     exec(
         "CREATE TABLE IF NOT EXISTS users ("
