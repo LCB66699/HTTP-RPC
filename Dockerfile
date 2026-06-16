@@ -7,20 +7,8 @@ RUN apt update && apt install -y \
     libnghttp2-dev librabbitmq-dev libgtest-dev
 RUN cd /usr/src/googletest && cmake . && make -j$(nproc) && cp lib/*.a /usr/lib
 
-# OpenTelemetry C++ (OTLP gRPC exporter, static libs)
-RUN git clone --depth 1 --branch v1.18.0 https://github.com/open-telemetry/opentelemetry-cpp.git /tmp/otel-cpp \
-    && cd /tmp/otel-cpp && cmake -B build \
-        -DCMAKE_BUILD_TYPE=Release \
-        -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
-        -DBUILD_SHARED_LIBS=OFF \
-        -DWITH_OTLP_HTTP=ON \
-        -DWITH_STL=ON \
-        -DBUILD_TESTING=OFF \
-    && cmake --build build -j$(nproc) \
-    && cmake --install build \
-    && echo "=== OTel installed libs ===" && ls /usr/local/lib/libopentelemetry* 2>/dev/null || true \
-    && echo "=== OTel HTTP headers ===" && find /usr/local/include -path "*otlp*http*" -type f 2>/dev/null || true \
-    && rm -rf /tmp/otel-cpp
+# OpenTelemetry C++ — TODO: re-enable once Docker cache issue is resolved
+# RUN git clone --depth 1 --branch v1.18.0 ...
 
 ARG SERVICE=auth
 ARG DEBUG=false

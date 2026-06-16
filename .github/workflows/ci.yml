@@ -46,9 +46,7 @@ jobs:
         run: sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc
 
       - name: Build images
-        env:
-          DOCKER_BUILDKIT: 0
-        run: docker compose build --no-cache
+        run: docker compose build
 
       - name: Start services
         run: |
@@ -114,8 +112,7 @@ jobs:
 
       - name: Build & push
         env:
-          DOCKER_BUILDKIT: 0
           DOCKER_USER: ghcr.io/lcb66699/http-rpc
         run: |
-          docker compose build --no-cache auth-1 sheet-1 file-1 search grpc-gateway notify-service
+          docker compose build auth-1 sheet-1 file-1 search grpc-gateway notify-service
           docker compose push auth-1 sheet-1 file-1 search grpc-gateway notify-service
