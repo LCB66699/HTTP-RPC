@@ -77,7 +77,11 @@ docker compose up -d --build --no-deps file-2
 
 **日常清理（推荐）：**
 
+# 格式化所有 C++ 源码
+  clang-format -i server/src/*.cpp server/include/*.h
 ```bash
+
+
 # 查看占用
 docker system df                          # 总览
 docker images --format '{{.Size}}\t{{.Repository}}' | sort -rh | head -10

@@ -49,7 +49,7 @@ func pollSingleMySQL(dsn string, ch *amqp.Channel) {
 }
 
 func pollOutbox(db *sql.DB, ch *amqp.Channel) {
-	rows, err := db.Query("SELECT id, event_type, payload FROM outbox ORDER BY id LIMIT 100")
+	rows, err := db.Query("SELECT id, event_type, payload, trace_context FROM outbox ORDER BY id LIMIT 100")
 	if err != nil {
 		if err != sql.ErrNoRows {
 			log.Printf("[Outbox] query error: %v", err)
@@ -62,11 +62,20 @@ func pollOutbox(db *sql.DB, ch *amqp.Channel) {
 	for rows.Next() {
 		var id int64
 		var eventType, payload string
-		if err := rows.Scan(&id, &eventType, &payload); err != nil {
+		var traceContext sql.NullString
+		if err := rows.Scan(&id, &eventType, &payload, &traceContext); err != nil {
 			continue
 		}
+		headers := amqp.Table{}
+		if traceContext.Valid && traceContext.String != "" {
+			headers["traceparent"] = traceContext.String
+		}
 		if err := ch.Publish("rpc.events", eventType, false, false,
-			amqp.Publishing{ContentType: "application/json", Body: []byte(payload)}); err != nil {
+			amqp.Publishing{
+				ContentType: "application/json",
+				Body:        []byte(payload),
+				Headers:     headers,
+			}); err != nil {
 			log.Printf("[Outbox] publish error: %v", err)
 			return
 		}

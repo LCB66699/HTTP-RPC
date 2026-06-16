@@ -19,6 +19,14 @@ import (
 	amqp "github.com/rabbitmq/amqp091-go"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
+	"go.opentelemetry.io/otel/propagation"
+	"go.opentelemetry.io/otel/sdk/resource"
+	sdktrace "go.opentelemetry.io/otel/sdk/trace"
+	semconv "go.opentelemetry.io/otel/semconv/v1.24.0"
+	"go.opentelemetry.io/otel/trace"
 )
 
 var (
@@ -26,9 +34,50 @@ var (
 	esClient    *elasticsearch.Client
 	minioCli    *minio.Client
 	minioBucket string
+	tracer      trace.Tracer
 )
 
+func initTracer() (*sdktrace.TracerProvider, error) {
+	ctx := context.Background()
+	endpoint := getenv("OTEL_EXPORTER_OTLP_ENDPOINT", "jaeger:4317")
+	exporter, err := otlptracegrpc.New(ctx,
+		otlptracegrpc.WithEndpoint(endpoint),
+		otlptracegrpc.WithInsecure(),
+	)
+	if err != nil {
+		log.Printf("[tracing] OTLP exporter error: %v", err)
+		return nil, err
+	}
+	tp := sdktrace.NewTracerProvider(
+		sdktrace.WithBatcher(exporter),
+		sdktrace.WithSampler(sdktrace.AlwaysSample()),
+		sdktrace.WithResource(resource.NewWithAttributes(
+			semconv.SchemaURL,
+			semconv.ServiceName("notify-service"),
+		)),
+	)
+	otel.SetTracerProvider(tp)
+	otel.SetTextMapPropagator(propagation.NewCompositeTextMapPropagator(
+		propagation.TraceContext{},
+		propagation.Baggage{},
+	))
+	log.Printf("[tracing] initialized, endpoint=%s", endpoint)
+	return tp, nil
+}
+
 func main() {
+	tp, err := initTracer()
+	if err != nil {
+		log.Printf("[tracing] WARNING: tracer not available: %v", err)
+	}
+	if tp != nil {
+		defer func() {
+			if err := tp.Shutdown(context.Background()); err != nil {
+				log.Printf("[tracing] shutdown error: %v", err)
+			}
+		}()
+	}
+	tracer = otel.Tracer("notify-service")
 	var err error
 	esClient, _ = elasticsearch.NewClient(elasticsearch.Config{
 		Addresses: []string{getenv("ES_HOST", "http://elasticsearch:9200")},
@@ -82,9 +131,22 @@ func main() {
 	startOutboxPoller(ch)
 
 	log.Println("[Notify] Listening for events (DLQ: notify.dlq)...")
+	propagator := otel.GetTextMapPropagator()
 	for msg := range msgs {
+		// Extract W3C traceparent from AMQP headers
+		ctx := propagator.Extract(context.Background(), propagation.MapCarrier(msg.Headers))
+		ctx, span := tracer.Start(ctx, "process."+msg.RoutingKey,
+			trace.WithAttributes(
+				attribute.String("messaging.system", "rabbitmq"),
+				attribute.String("messaging.destination", msg.RoutingKey),
+				attribute.String("messaging.operation", "process"),
+			),
+		)
+
 		var event map[string]interface{}
 		if err := json.Unmarshal(msg.Body, &event); err != nil {
+			span.RecordError(err)
+			span.End()
 			msg.Nack(false, false)
 			continue
 		}
@@ -102,8 +164,10 @@ func main() {
 		if ok {
 			msg.Ack(false)
 		} else {
+			span.RecordError(fmt.Errorf("processing failed"))
 			msg.Nack(false, true)
 		}
+		span.End()
 	}
 }
 

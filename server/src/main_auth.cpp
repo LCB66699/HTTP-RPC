@@ -10,6 +10,7 @@
 #include "call_logger.h"
 #include "database.h"
 #include "health_service_impl.h"
+#include "otel_tracer.h"
 #include "redis_client.h"
 #include "snowflake.h"
 #include "system_logger.h"
@@ -32,6 +33,8 @@ int main(int argc, char *argv[]) {
     int redis_pool_size = 4;
     const char *env_secret = std::getenv("JWT_SECRET");
     std::string jwt_secret = env_secret ? env_secret : "default-secret-32bytes-here!!!!!";
+
+    InitTracer("auth-service");
 
     for (int i = 1; i < argc; ++i) {
         std::string arg = argv[i];

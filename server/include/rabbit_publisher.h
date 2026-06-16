@@ -13,6 +13,10 @@ class RabbitPublisher {
 
     bool Publish(const std::string &exchange, const std::string &routing_key, const std::string &body);
 
+    // 带 W3C traceparent 的事件发布
+    bool PublishWithTrace(const std::string &exchange, const std::string &routing_key, const std::string &body,
+                          const std::string &traceparent, const std::string &tracestate = "");
+
    private:
     bool Connect();
     std::string host_;

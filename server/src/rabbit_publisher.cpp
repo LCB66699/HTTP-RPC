@@ -54,3 +54,42 @@ bool RabbitPublisher::Publish(const std::string &exchange, const std::string &ro
     }
     return true;
 }
+
+bool RabbitPublisher::PublishWithTrace(const std::string &exchange, const std::string &routing_key,
+                                       const std::string &body, const std::string &traceparent,
+                                       const std::string &tracestate) {
+    if (!Connect())
+        return false;
+
+    amqp_basic_properties_t props;
+    memset(&props, 0, sizeof(props));
+    props._flags = AMQP_BASIC_CONTENT_TYPE_FLAG | AMQP_BASIC_HEADERS_FLAG;
+    props.content_type = amqp_cstring_bytes("application/json");
+
+    int n = 1 + (tracestate.empty() ? 0 : 1);
+    amqp_table_entry_t *entries = new amqp_table_entry_t[n];
+
+    entries[0].key = amqp_cstring_bytes("traceparent");
+    entries[0].value.kind = AMQP_FIELD_KIND_UTF8;
+    entries[0].value.value.bytes = amqp_cstring_bytes(traceparent.c_str());
+
+    if (!tracestate.empty()) {
+        entries[1].key = amqp_cstring_bytes("tracestate");
+        entries[1].value.kind = AMQP_FIELD_KIND_UTF8;
+        entries[1].value.value.bytes = amqp_cstring_bytes(tracestate.c_str());
+    }
+
+    props.headers.num_entries = n;
+    props.headers.entries = entries;
+
+    amqp_bytes_t msg = amqp_cstring_bytes(body.c_str());
+    int st = amqp_basic_publish(conn_, 1, amqp_cstring_bytes(exchange.c_str()),
+                                amqp_cstring_bytes(routing_key.c_str()), 0, 0, &props, msg);
+    delete[] entries;
+
+    if (st < 0) {
+        fprintf(stderr, "[RabbitMQ] publish failed: %d\n", st);
+        return false;
+    }
+    return true;
+}

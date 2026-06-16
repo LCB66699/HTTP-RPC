@@ -18,6 +18,14 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/redis/go-redis/v9"
 	"github.com/sony/gobreaker/v2"
+	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
+	"go.opentelemetry.io/otel/propagation"
+	"go.opentelemetry.io/otel/sdk/resource"
+	sdktrace "go.opentelemetry.io/otel/sdk/trace"
+	semconv "go.opentelemetry.io/otel/semconv/v1.24.0"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/connectivity"
@@ -68,8 +76,48 @@ type cbWithSlow struct {
 	slowCalls atomic.Int64
 }
 
+func initTracer() (*sdktrace.TracerProvider, error) {
+	ctx := context.Background()
+	endpoint := getenv("OTEL_EXPORTER_OTLP_ENDPOINT", "jaeger:4317")
+	exporter, err := otlptracegrpc.New(ctx,
+		otlptracegrpc.WithEndpoint(endpoint),
+		otlptracegrpc.WithInsecure(),
+	)
+	if err != nil {
+		log.Printf("[tracing] OTLP exporter error: %v", err)
+		return nil, err
+	}
+	tp := sdktrace.NewTracerProvider(
+		sdktrace.WithBatcher(exporter),
+		sdktrace.WithSampler(sdktrace.AlwaysSample()),
+		sdktrace.WithResource(resource.NewWithAttributes(
+			semconv.SchemaURL,
+			semconv.ServiceName("gateway-grpc"),
+		)),
+	)
+	otel.SetTracerProvider(tp)
+	otel.SetTextMapPropagator(propagation.NewCompositeTextMapPropagator(
+		propagation.TraceContext{},
+		propagation.Baggage{},
+	))
+	log.Printf("[tracing] initialized, endpoint=%s", endpoint)
+	return tp, nil
+}
+
 func main() {
 	jwtSecret = []byte(getenv("JWT_SECRET", "default-secret-32bytes-here!!!!!"))
+
+	tp, err := initTracer()
+	if err != nil {
+		log.Printf("[tracing] WARNING: tracer not available: %v", err)
+	}
+	if tp != nil {
+		defer func() {
+			if err := tp.Shutdown(context.Background()); err != nil {
+				log.Printf("[tracing] shutdown error: %v", err)
+			}
+		}()
+	}
 
 	mux := http.NewServeMux()
 
@@ -78,6 +126,7 @@ func main() {
 	})
 	creds := grpc.WithTransportCredentials(insecure.NewCredentials())
 	lb := grpc.WithDefaultServiceConfig(`{"loadBalancingConfig":[{"round_robin":{}}]}`)
+	otelStats := grpc.WithStatsHandler(otelgrpc.NewClientHandler())
 
 	authAddr := getenv("AUTH_ADDR", "rpc-auth:50051")
 	sheetAddr := getenv("SHEET_ADDR", "rpc-sheet:50051")
@@ -85,16 +134,16 @@ func main() {
 	searchAddr := getenv("SEARCH_ADDR", "rpc-search:50051")
 	log.Printf("Auth=%s Sheet=%s File=%s Search=%s", authAddr, sheetAddr, fileAddr, searchAddr)
 
-	authConn, _ = grpc.NewClient("dns:///"+authAddr, creds, kp, lb)
+	authConn, _ = grpc.NewClient("dns:///"+authAddr, creds, kp, lb, otelStats)
 	authClient = pb.NewAuthServiceClient(authConn)
 
-	sheetConn, _ = grpc.NewClient("dns:///"+sheetAddr, creds, kp, lb)
+	sheetConn, _ = grpc.NewClient("dns:///"+sheetAddr, creds, kp, lb, otelStats)
 	sheetClient = pb.NewSpreadsheetServiceClient(sheetConn)
 
-	fileConn, _ = grpc.NewClient("dns:///"+fileAddr, creds, kp, lb)
+	fileConn, _ = grpc.NewClient("dns:///"+fileAddr, creds, kp, lb, otelStats)
 	fileClient = pb.NewFileServiceClient(fileConn)
 
-	searchConn, _ := grpc.NewClient("dns:///"+searchAddr, creds, kp, lb)
+	searchConn, _ := grpc.NewClient("dns:///"+searchAddr, creds, kp, lb, otelStats)
 	searchClient := pb.NewSearchServiceClient(searchConn)
 
 	sharingClient := pb.NewSharingServiceClient(authConn)
@@ -365,7 +414,7 @@ func main() {
 		writeJSON(w, resp)
 	})
 	mux.HandleFunc("GET /api/sheets", func(w http.ResponseWriter, r *http.Request) {
-		resp, err := callWithRetry(cbSheet, 3, "sheet.list", func(ctx context.Context) (*pb.ListSpreadsheetsResponse, error) {
+		resp, err := callWithRetry(r.Context(), cbSheet, 3, "sheet.list", func(ctx context.Context) (*pb.ListSpreadsheetsResponse, error) {
 			return sheetClient.ListSpreadsheets(withAuth(ctx, r), &pb.ListSpreadsheetsRequest{UserId: extractUID(r)})
 		})
 		if err != nil || resp == nil || !resp.Success {
@@ -388,7 +437,7 @@ func main() {
 			writeJSONStatus(w, http.StatusUnauthorized, map[string]interface{}{"success": false, "error": "Unauthorized"})
 			return
 		}
-		resp, err := callWithRetry(cbSheet, 3, "sheet.get", func(ctx context.Context) (*pb.GetSpreadsheetResponse, error) {
+		resp, err := callWithRetry(r.Context(), cbSheet, 3, "sheet.get", func(ctx context.Context) (*pb.GetSpreadsheetResponse, error) {
 			return sheetClient.GetSpreadsheet(withAuth(ctx, r), &pb.GetSpreadsheetRequest{Id: id, UserId: uid})
 		})
 		if err != nil {
@@ -427,7 +476,7 @@ func main() {
 	})
 	mux.HandleFunc("DELETE /api/sheets/{id}", func(w http.ResponseWriter, r *http.Request) {
 		id := parseInt64(r.PathValue("id"))
-		resp, err := callWithRetry(cbSheet, 2, "sheet.delete", func(ctx context.Context) (*pb.DeleteSpreadsheetResponse, error) {
+		resp, err := callWithRetry(r.Context(), cbSheet, 2, "sheet.delete", func(ctx context.Context) (*pb.DeleteSpreadsheetResponse, error) {
 			return sheetClient.DeleteSpreadsheet(withAuth(ctx, r), &pb.DeleteSpreadsheetRequest{Id: id, UserId: extractUID(r)})
 		})
 		if err != nil || resp == nil || !resp.Success {
@@ -490,7 +539,7 @@ func main() {
 		writeJSON(w, resp)
 	})
 	mux.HandleFunc("GET /api/files", func(w http.ResponseWriter, r *http.Request) {
-		resp, err := callWithRetry(cbFile, 3, "file.list", func(ctx context.Context) (*pb.ListFilesResponse, error) {
+		resp, err := callWithRetry(r.Context(), cbFile, 3, "file.list", func(ctx context.Context) (*pb.ListFilesResponse, error) {
 			return fileClient.ListFiles(withAuth(ctx, r), &pb.ListFilesRequest{UserId: extractUID(r)})
 		})
 		if err != nil || resp == nil || !resp.Success {
@@ -539,7 +588,7 @@ func main() {
 			writeJSONStatus(w, http.StatusUnauthorized, map[string]interface{}{"success": false, "error": "Unauthorized"})
 			return
 		}
-		resp, err := callWithRetry(cbFile, 3, "file.get", func(ctx context.Context) (*pb.GetFileResponse, error) {
+		resp, err := callWithRetry(r.Context(), cbFile, 3, "file.get", func(ctx context.Context) (*pb.GetFileResponse, error) {
 			return fileClient.GetFile(withAuth(ctx, r), &pb.GetFileRequest{Id: id, UserId: uid})
 		})
 		if err != nil {
@@ -568,7 +617,7 @@ func main() {
 	})
 	mux.HandleFunc("DELETE /api/files/{id}", func(w http.ResponseWriter, r *http.Request) {
 		id := parseInt64(r.PathValue("id"))
-		resp, err := callWithRetry(cbFile, 2, "file.delete", func(ctx context.Context) (*pb.DeleteFileResponse, error) {
+		resp, err := callWithRetry(r.Context(), cbFile, 2, "file.delete", func(ctx context.Context) (*pb.DeleteFileResponse, error) {
 			return fileClient.DeleteFile(withAuth(ctx, r), &pb.DeleteFileRequest{Id: id, UserId: extractUID(r)})
 		})
 		if err != nil || resp == nil || !resp.Success {
@@ -584,8 +633,13 @@ func main() {
 		writeJSON(w, resp)
 	})
 
+	handler := otelhttp.NewHandler(jwtMiddleware(corsMiddleware(mux)), "gateway-grpc",
+		otelhttp.WithTracerProvider(otel.GetTracerProvider()),
+		otelhttp.WithPropagators(otel.GetTextMapPropagator()),
+	)
+
 	log.Printf("[Gateway-gRPC] Listening on :%s", getenv("PORT", "8080"))
-	log.Fatal(http.ListenAndServe(":"+getenv("PORT", "8080"), jwtMiddleware(corsMiddleware(mux))))
+	log.Fatal(http.ListenAndServe(":"+getenv("PORT", "8080"), handler))
 }
 
 func setCookies(w http.ResponseWriter, at, rt string) {
@@ -757,10 +811,8 @@ func corsMiddleware(next http.Handler) http.Handler {
 }
 
 // callWithRetry 熔断器（外）+ gRPC 重试（内）
-// 每轮重试创建独立 3s deadline，避免慢实例阻塞全部重试
-// 只重试可恢复错误：Unavailable / DeadlineExceeded / ResourceExhausted / Aborted
-// 调用超过 2s 记入慢调用计数器，供熔断器 ReadyToTrip 使用
-func callWithRetry[T any](cb *cbWithSlow, maxAttempts int, label string, fn func(context.Context) (T, error)) (T, error) {
+// ctx 保留原始请求的 trace context，避免每次重试丢失链路。
+func callWithRetry[T any](ctx context.Context, cb *cbWithSlow, maxAttempts int, label string, fn func(context.Context) (T, error)) (T, error) {
 	result, err := cb.Execute(func() (any, error) {
 		var lastErr error
 		for attempt := 0; attempt < maxAttempts; attempt++ {
@@ -769,7 +821,7 @@ func callWithRetry[T any](cb *cbWithSlow, maxAttempts int, label string, fn func
 				time.Sleep(d)
 				log.Printf("[retry] %s attempt %d/%d after %v", label, attempt+1, maxAttempts, d)
 			}
-			attemptCtx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+			attemptCtx, cancel := context.WithTimeout(ctx, 3*time.Second)
 			start := time.Now()
 			r, e := fn(attemptCtx)
 			cancel()

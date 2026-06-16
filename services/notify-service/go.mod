@@ -8,6 +8,10 @@ require (
 	github.com/minio/minio-go/v7 v7.0.74
 	github.com/rabbitmq/amqp091-go v1.10.0
 	go.mongodb.org/mongo-driver v1.16.0
+	go.opentelemetry.io/otel v1.28.0
+	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc v1.28.0
+	go.opentelemetry.io/otel/sdk v1.28.0
+	go.opentelemetry.io/otel/trace v1.28.0
 )
 
 require (

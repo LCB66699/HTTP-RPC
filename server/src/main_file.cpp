@@ -11,6 +11,7 @@
 #include "file_service_impl.h"
 #include "health_service_impl.h"
 #include "l1_cache.h"
+#include "otel_tracer.h"
 #include "rabbit_publisher.h"
 #include "redis_client.h"
 #include "snowflake.h"
@@ -34,6 +35,8 @@ int main(int argc, char *argv[]) {
     int redis_pool_size = 4;
     const char *env_secret = std::getenv("JWT_SECRET");
     std::string jwt_secret = env_secret ? env_secret : "default-secret";
+
+    InitTracer("file-service");
 
     for (int i = 1; i < argc; ++i) {
         std::string arg = argv[i];

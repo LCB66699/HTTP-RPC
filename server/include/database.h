@@ -102,7 +102,8 @@ class Database {
     bool GetFileStoragePath(int64_t id, std::string &storage_path);
     bool GetSpreadsheetStoragePath(int64_t id, std::string &storage_path);
     bool UpdateSpreadsheetStoragePath(int64_t id, const std::string &storage_path);
-    bool InsertOutbox(const std::string &event_type, const std::string &payload);
+    bool InsertOutbox(const std::string &event_type, const std::string &payload,
+                      const std::string &trace_context = "");
     bool CreateFolder(int64_t user_id, const std::string &name, int64_t parent_id, int64_t &out_id);
     bool MoveFile(int64_t id, int64_t target_folder_id);
     int BatchDeleteFiles(int64_t user_id, const std::vector<int64_t> &ids);
@@ -215,7 +216,8 @@ class ShardedDatabase {
     bool GetFileStoragePath(int64_t id, std::string &storage_path);
     bool GetSpreadsheetStoragePath(int64_t id, std::string &storage_path);
     bool UpdateSpreadsheetStoragePath(int64_t id, const std::string &storage_path);
-    bool InsertOutbox(int64_t user_id, const std::string &event_type, const std::string &payload);
+    bool InsertOutbox(int64_t user_id, const std::string &event_type, const std::string &payload,
+                      const std::string &trace_context = "");
     bool CreateFolder(int64_t user_id, const std::string &name, int64_t parent_id, int64_t &out_id);
     bool MoveFile(int64_t id, int64_t target_folder_id);
     int BatchDeleteFiles(int64_t user_id, const std::vector<int64_t> &ids);

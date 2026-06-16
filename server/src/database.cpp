@@ -290,6 +290,9 @@ bool Database::Initialize() {
     // store
     mysql_query(c, "ALTER TABLE files ADD COLUMN storage_path VARCHAR(512) DEFAULT NULL");
 
+    // Trace context for distributed tracing through the outbox
+    mysql_query(c, "ALTER TABLE outbox ADD COLUMN trace_context VARCHAR(512) DEFAULT NULL AFTER payload");
+
     // Idempotency key columns — NULL means "no deduplication" (multiple NULLs
     // allowed by UNIQUE). ON DUPLICATE KEY UPDATE id=LAST_INSERT_ID(id) returns
     // the existing id on replay.
@@ -1139,16 +1142,22 @@ bool ShardedDatabase::GetFileStoragePath(int64_t id, std::string &storage_path) 
     return false;
 }
 // ---- Outbox ----
-bool Database::InsertOutbox(const std::string &event_type, const std::string &payload) {
+bool Database::InsertOutbox(const std::string &event_type, const std::string &payload,
+                             const std::string &trace_context) {
     auto *ec = EscConn();
     if (!ec)
         return false;
-    std::string sql =
-        "INSERT INTO outbox (event_type, payload) VALUES (" + q(ec, event_type) + "," + q(ec, payload) + ")";
-    return ExecWrite(sql);
+    std::string cols = "event_type, payload";
+    std::string vals = q(ec, event_type) + "," + q(ec, payload);
+    if (!trace_context.empty()) {
+        cols += ", trace_context";
+        vals += "," + q(ec, trace_context);
+    }
+    return ExecWrite("INSERT INTO outbox (" + cols + ") VALUES (" + vals + ")");
 }
-bool ShardedDatabase::InsertOutbox(int64_t user_id, const std::string &event_type, const std::string &payload) {
-    return ShardFor(user_id)->InsertOutbox(event_type, payload);
+bool ShardedDatabase::InsertOutbox(int64_t user_id, const std::string &event_type, const std::string &payload,
+                                   const std::string &trace_context) {
+    return ShardFor(user_id)->InsertOutbox(event_type, payload, trace_context);
 }
 bool ShardedDatabase::GetSpreadsheetStoragePath(int64_t id, std::string &storage_path) {
     for (auto &db : shards_)

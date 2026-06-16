@@ -6,6 +6,7 @@
 #include <cstdlib>
 
 #include "health_service_impl.h"
+#include "otel_tracer.h"
 #include "search_service_impl.h"
 
 static std::unique_ptr<grpc::Server> g_server;
@@ -18,6 +19,8 @@ int main(int argc, char *argv[]) {
     std::string host = "0.0.0.0";
     int port = 50051;
     const char *es_host = std::getenv("ES_HOST");
+
+    InitTracer("search-service");
 
     for (int i = 1; i < argc; ++i) {
         std::string arg = argv[i];

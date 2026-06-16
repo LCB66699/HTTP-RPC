@@ -7,6 +7,19 @@ RUN apt update && apt install -y \
     libnghttp2-dev librabbitmq-dev libgtest-dev
 RUN cd /usr/src/googletest && cmake . && make -j$(nproc) && cp lib/*.a /usr/lib
 
+# OpenTelemetry C++ (OTLP gRPC exporter, static libs)
+RUN git clone --depth 1 --branch v1.16.1 https://github.com/open-telemetry/opentelemetry-cpp.git /tmp/otel-cpp \
+    && cd /tmp/otel-cpp && cmake -B build \
+        -DCMAKE_BUILD_TYPE=Release \
+        -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
+        -DBUILD_SHARED_LIBS=OFF \
+        -DWITH_OTLP_GRPC=ON \
+        -DWITH_STL=ON \
+        -DBUILD_TESTING=OFF \
+    && cmake --build build -j$(nproc) \
+    && cmake --install build \
+    && rm -rf /tmp/otel-cpp
+
 ARG SERVICE=auth
 ARG DEBUG=false
 WORKDIR /src
