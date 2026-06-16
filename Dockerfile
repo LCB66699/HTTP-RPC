@@ -22,6 +22,7 @@ RUN git clone --depth 1 --branch v1.16.1 https://github.com/open-telemetry/opent
 
 ARG SERVICE=auth
 ARG DEBUG=false
+ARG CACHEBUST=1
 WORKDIR /src
 COPY . .
 RUN rm -rf server/generated/*

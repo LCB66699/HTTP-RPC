@@ -45,10 +45,8 @@ jobs:
       - name: Free disk
         run: sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc
 
-      - uses: docker/setup-buildx-action@v3
-
-      - name: Build images (cached)
-        run: docker compose build
+      - name: Build images
+        run: COMPOSE_BAKE=false docker compose build
 
       - name: Start services
         run: |
