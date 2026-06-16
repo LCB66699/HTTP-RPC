@@ -220,15 +220,16 @@ bool Database::Initialize() {
         read_conns_[i]->conn = ConnectMYSQL(read_hosts_[i % read_hosts_.size()], read_port_);
     }
 
-    // 锁首连接执行全部 DDL, 避免与 ExecWrite 的 round-robin 分配交叉
-    auto &wc = write_conns_[0];
-    std::lock_guard<std::mutex> lock(wc->mtx);
-    MYSQL *c = wc->conn;
+    // 每条写连接都执行 DDL，杜绝因连接状态差异导致的 Table not found
+    for (auto &wcp : write_conns_) {
+        if (!wcp->conn) continue;
+        std::lock_guard<std::mutex> lock(wcp->mtx);
+        MYSQL *c = wcp->conn;
 
-    auto exec = [&](const char *sql) {
-        if (mysql_query(c, sql) != 0)
-            fprintf(stderr, "[DB] DDL error: %s\n", mysql_error(c));
-    };
+        auto exec = [&](const char *sql) {
+            if (mysql_query(c, sql) != 0)
+                fprintf(stderr, "[DB] DDL error: %s\n", mysql_error(c));
+        };
 
     exec(
         "CREATE TABLE IF NOT EXISTS users ("
@@ -367,6 +368,8 @@ bool Database::Initialize() {
     mysql_query(c,
                 "ALTER TABLE files MODIFY COLUMN idempotency_key CHAR(36) "
                 "NULL DEFAULT NULL");
+
+    }  // end DDL loop over write_conns_
 
     printf("[DB] schema initialized on master: %s\n", db_name_.c_str());
     return true;
