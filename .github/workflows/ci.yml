@@ -114,5 +114,5 @@ jobs:
         env:
           DOCKER_USER: ghcr.io/lcb66699/http-rpc
         run: |
-          docker compose build auth-1 sheet-1 file-1 search grpc-gateway notify-service
+          docker compose build --no-cache auth-1 sheet-1 file-1 search grpc-gateway notify-service
           docker compose push auth-1 sheet-1 file-1 search grpc-gateway notify-service
