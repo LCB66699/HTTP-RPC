@@ -187,6 +187,10 @@ func main() {
 		var req pb.RegisterRequest
 		json.NewDecoder(r.Body).Decode(&req)
 		resp, _ := authClient.Register(r.Context(), &req)
+		if resp != nil && !resp.Success {
+			writeError(w, nil, resp.GetError())
+			return
+		}
 		setCookies(w, resp.AccessToken, resp.RefreshToken)
 		writeJSON(w, resp)
 	})
@@ -194,6 +198,10 @@ func main() {
 		var req pb.LoginRequest
 		json.NewDecoder(r.Body).Decode(&req)
 		resp, _ := authClient.Login(r.Context(), &req)
+		if resp != nil && !resp.Success {
+			writeError(w, nil, resp.GetError())
+			return
+		}
 		setCookies(w, resp.AccessToken, resp.RefreshToken)
 		writeJSON(w, resp)
 	})
@@ -227,13 +235,7 @@ func main() {
 		req := &pb.ChangePasswordRequest{UserId: uid, OldPassword: body.OldPassword, NewPassword: body.NewPassword}
 		resp, err := authClient.ChangePassword(r.Context(), req)
 		if err != nil || resp == nil || !resp.Success {
-			msg := "change failed"
-			if err != nil {
-				msg = err.Error()
-			} else if resp != nil && resp.GetError() != "" {
-				msg = resp.GetError()
-			}
-			writeJSON(w, map[string]interface{}{"success": false, "error": msg})
+			writeError(w, err, resp.GetError())
 			return
 		}
 		writeJSON(w, resp)
@@ -242,7 +244,7 @@ func main() {
 		var body struct{ Phone string `json:"phone"` }
 		json.NewDecoder(r.Body).Decode(&body)
 		if body.Phone == "" {
-			writeJSON(w, map[string]interface{}{"success": false, "error": "phone required"})
+			writeJSONStatus(w, http.StatusBadRequest, map[string]interface{}{"success": false, "error": "phone required"})
 			return
 		}
 		code := fmt.Sprintf("%06d", time.Now().UnixNano()%1000000)
@@ -258,7 +260,7 @@ func main() {
 		json.NewDecoder(r.Body).Decode(&body)
 		stored, _ := rdb.Get(r.Context(), "otp:"+body.Phone).Result()
 		if stored == "" || stored != body.OTP {
-			writeJSON(w, map[string]interface{}{"success": false, "error": "Invalid OTP"})
+			writeJSONStatus(w, http.StatusUnauthorized, map[string]interface{}{"success": false, "error": "Invalid OTP"})
 			return
 		}
 		rdb.Del(r.Context(), "otp:"+body.Phone)
@@ -356,7 +358,7 @@ func main() {
 	mux.HandleFunc("GET /api/history", func(w http.ResponseWriter, r *http.Request) {
 		user := getUserFromCookie(r)
 		if user == "" {
-			writeJSON(w, map[string]string{"error": "login required"})
+			writeJSONStatus(w, http.StatusUnauthorized, map[string]string{"error": "login required"})
 			return
 		}
 		entries, _ := rdb.LRange(r.Context(), "call_logs:"+user, -20, -1).Result()
@@ -382,13 +384,7 @@ func main() {
 			Query: body.Q, UserId: uid, Sort: body.Sort,
 		})
 		if err != nil || resp == nil || !resp.Success {
-			msg := "search unavailable"
-			if err != nil {
-				msg = err.Error()
-			} else if resp != nil && resp.GetError() != "" {
-				msg = resp.GetError()
-			}
-			writeJSON(w, map[string]interface{}{"success": false, "error": msg})
+			writeError(w, err, resp.GetError())
 			return
 		}
 		writeJSON(w, resp)
@@ -402,13 +398,7 @@ func main() {
 		req.UserId = uid
 		resp, err := sheetClient.CreateSpreadsheet(injectToken(r), &req)
 		if err != nil || resp == nil || !resp.Success {
-			msg := "create failed"
-			if err != nil {
-				msg = err.Error()
-			} else if resp != nil && resp.GetError() != "" {
-				msg = resp.GetError()
-			}
-			writeJSON(w, map[string]interface{}{"success": false, "error": msg})
+			writeError(w, err, resp.GetError())
 			return
 		}
 		writeJSON(w, resp)
@@ -418,13 +408,7 @@ func main() {
 			return sheetClient.ListSpreadsheets(withAuth(ctx, r), &pb.ListSpreadsheetsRequest{UserId: extractUID(r)})
 		})
 		if err != nil || resp == nil || !resp.Success {
-			msg := "list failed"
-			if err != nil {
-				msg = err.Error()
-			} else if resp != nil && resp.GetError() != "" {
-				msg = resp.GetError()
-			}
-			writeJSON(w, map[string]interface{}{"success": false, "error": msg})
+			writeError(w, err, resp.GetError())
 			return
 		}
 		writeJSON(w, resp)
@@ -463,13 +447,7 @@ func main() {
 		req.UserId = extractUID(r)
 		resp, err := sheetClient.UpdateSpreadsheet(injectToken(r), &req)
 		if err != nil || resp == nil || !resp.Success {
-			msg := "update failed"
-			if err != nil {
-				msg = err.Error()
-			} else if resp != nil && resp.GetError() != "" {
-				msg = resp.GetError()
-			}
-			writeJSON(w, map[string]interface{}{"success": false, "error": msg})
+			writeError(w, err, resp.GetError())
 			return
 		}
 		writeJSON(w, resp)
@@ -480,13 +458,7 @@ func main() {
 			return sheetClient.DeleteSpreadsheet(withAuth(ctx, r), &pb.DeleteSpreadsheetRequest{Id: id, UserId: extractUID(r)})
 		})
 		if err != nil || resp == nil || !resp.Success {
-			msg := "delete failed"
-			if err != nil {
-				msg = err.Error()
-			} else if resp != nil && resp.GetError() != "" {
-				msg = resp.GetError()
-			}
-			writeJSON(w, map[string]interface{}{"success": false, "error": msg})
+			writeError(w, err, resp.GetError())
 			return
 		}
 		writeJSON(w, resp)
@@ -498,9 +470,7 @@ func main() {
 			UserId: extractUID(r), MimeFilter: "image/",
 		})
 		if err != nil || resp == nil || !resp.Success {
-			msg := "list failed"
-			if err != nil { msg = err.Error() }
-			writeJSON(w, map[string]interface{}{"success": false, "error": msg})
+			writeError(w, err, resp.GetError())
 			return
 		}
 		writeJSON(w, resp)
@@ -513,9 +483,7 @@ func main() {
 		json.NewDecoder(r.Body).Decode(&body)
 		resp, err := fileClient.MoveFile(injectToken(r), &pb.MoveFileRequest{Id: id, TargetFolderId: body.TargetFolderId})
 		if err != nil || resp == nil || !resp.Success {
-			msg := "move failed"
-			if err != nil { msg = err.Error() }
-			writeJSON(w, map[string]interface{}{"success": false, "error": msg})
+			writeError(w, err, resp.GetError())
 			return
 		}
 		writeJSON(w, resp)
@@ -531,9 +499,7 @@ func main() {
 			UserId: uid, Name: body.Name, ParentFolderId: body.ParentFolderId,
 		})
 		if err != nil || resp == nil || !resp.Success {
-			msg := "create folder failed"
-			if err != nil { msg = err.Error() }
-			writeJSON(w, map[string]interface{}{"success": false, "error": msg})
+			writeError(w, err, resp.GetError())
 			return
 		}
 		writeJSON(w, resp)
@@ -543,13 +509,7 @@ func main() {
 			return fileClient.ListFiles(withAuth(ctx, r), &pb.ListFilesRequest{UserId: extractUID(r)})
 		})
 		if err != nil || resp == nil || !resp.Success {
-			msg := "list failed"
-			if err != nil {
-				msg = err.Error()
-			} else if resp != nil && resp.GetError() != "" {
-				msg = resp.GetError()
-			}
-			writeJSON(w, map[string]interface{}{"success": false, "error": msg})
+			writeError(w, err, resp.GetError())
 			return
 		}
 		writeJSON(w, resp)
@@ -570,13 +530,7 @@ func main() {
 			MimeType: h.Header.Get("Content-Type"), FileContent: data,
 		})
 		if err != nil || resp == nil || !resp.Success {
-			msg := "upload failed"
-			if err != nil {
-				msg = err.Error()
-			} else if resp != nil && resp.GetError() != "" {
-				msg = resp.GetError()
-			}
-			writeJSON(w, map[string]interface{}{"success": false, "error": msg})
+			writeError(w, err, resp.GetError())
 			return
 		}
 		writeJSON(w, resp)
@@ -621,13 +575,7 @@ func main() {
 			return fileClient.DeleteFile(withAuth(ctx, r), &pb.DeleteFileRequest{Id: id, UserId: extractUID(r)})
 		})
 		if err != nil || resp == nil || !resp.Success {
-			msg := "delete failed"
-			if err != nil {
-				msg = err.Error()
-			} else if resp != nil && resp.GetError() != "" {
-				msg = resp.GetError()
-			}
-			writeJSON(w, map[string]interface{}{"success": false, "error": msg})
+			writeError(w, err, resp.GetError())
 			return
 		}
 		writeJSON(w, resp)
@@ -710,6 +658,56 @@ func writeGRPCError(w http.ResponseWriter, err error, fallback string) {
 			msg = st.Message()
 		}
 	}
+	writeJSONStatus(w, code, map[string]interface{}{"success": false, "error": msg})
+}
+
+// errorStatusCode 将 C++ 服务返回的 error 消息映射为 HTTP 状态码
+func errorStatusCode(errMsg string) int {
+	switch {
+	case strings.Contains(errMsg, "Jwt is missing"),
+		strings.Contains(errMsg, "Invalid token"),
+		strings.Contains(errMsg, "Unauthorized"),
+		strings.Contains(errMsg, "login required"),
+		strings.Contains(errMsg, "Invalid OTP"),
+		strings.Contains(errMsg, "Invalid refresh token"):
+		return http.StatusUnauthorized
+	case strings.Contains(errMsg, "Forbidden"),
+		strings.Contains(errMsg, "permission denied"):
+		return http.StatusForbidden
+	case strings.Contains(errMsg, "Not found"):
+		return http.StatusNotFound
+	case strings.Contains(errMsg, "required"),
+		strings.Contains(errMsg, "no file"),
+		strings.Contains(errMsg, "short"),
+		strings.Contains(errMsg, "Username"),
+		strings.Contains(errMsg, "Password"):
+		return http.StatusBadRequest
+	case strings.Contains(errMsg, "Duplicate"),
+		strings.Contains(errMsg, "conflict"),
+		strings.Contains(errMsg, "already exists"):
+		return http.StatusConflict
+	case strings.Contains(errMsg, "Database not available"),
+		strings.Contains(errMsg, "Service temporarily unavailable"):
+		return http.StatusServiceUnavailable
+	case strings.Contains(errMsg, "Query failed"),
+		strings.Contains(errMsg, "Failed to create"),
+		strings.Contains(errMsg, "update failed"),
+		strings.Contains(errMsg, "delete failed"),
+		strings.Contains(errMsg, "upload failed"),
+		strings.Contains(errMsg, "MinIO"):
+		return http.StatusInternalServerError
+	default:
+		return http.StatusOK
+	}
+}
+
+// writeError 统一错误响应：根据 error 消息返回合适的 HTTP 状态码
+func writeError(w http.ResponseWriter, err error, respErr string) {
+	msg := respErr
+	if err != nil {
+		msg = err.Error()
+	}
+	code := errorStatusCode(msg)
 	writeJSONStatus(w, code, map[string]interface{}{"success": false, "error": msg})
 }
 
