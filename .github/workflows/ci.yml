@@ -57,7 +57,7 @@ jobs:
             mysql-auth mysql-spreadsheet-0 mysql-spreadsheet-1 mysql-file-0 mysql-file-1 \
             minio minio-init redis-cluster-1 redis-cluster-2 redis-cluster-3 \
             redis-cluster-4 redis-cluster-5 redis-cluster-6 redis-cluster-init \
-            elasticsearch es-init
+            elasticsearch es-init jaeger
           echo "Waiting for all containers healthy..."
           for i in $(seq 1 180); do
             TOTAL=$(docker compose ps -a --format json 2>/dev/null | wc -l)

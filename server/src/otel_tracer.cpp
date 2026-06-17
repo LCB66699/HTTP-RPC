@@ -24,8 +24,27 @@ namespace trace = opentelemetry::trace;
 static nostd::shared_ptr<trace::Tracer> g_tracer;
 
 void InitTracer(const std::string &service_name) {
-    fprintf(stderr, "[OTel] %s: tracer init deferred (Jaeger may not be ready yet)\n",
-            service_name.c_str());
+    try {
+        opentelemetry::exporter::otlp::OtlpHttpExporterOptions opts;
+        opts.url = "http://jaeger:4318/v1/traces";
+        auto exporter = std::unique_ptr<opentelemetry::sdk::trace::SpanExporter>(
+            new opentelemetry::exporter::otlp::OtlpHttpExporter(opts));
+        auto processor = sdktrace::SimpleSpanProcessorFactory::Create(std::move(exporter));
+        auto res = resource::Resource::Create({{"service.name", service_name}});
+        auto provider_raw = sdktrace::TracerProviderFactory::Create(std::move(processor), res);
+        if (!provider_raw) {
+            fprintf(stderr, "[OTel] Failed to create TracerProvider for %s\n", service_name.c_str());
+            return;
+        }
+        auto provider = nostd::shared_ptr<trace::TracerProvider>(provider_raw.release());
+        trace::Provider::SetTracerProvider(provider);
+        g_tracer = trace::Provider::GetTracerProvider()->GetTracer("http-rpc-cpp", "1.0.0");
+        fprintf(stderr, "[OTel] Tracer initialized: service=%s\n", service_name.c_str());
+    } catch (const std::exception &e) {
+        fprintf(stderr, "[OTel] Init failed for %s: %s\n", service_name.c_str(), e.what());
+    } catch (...) {
+        fprintf(stderr, "[OTel] Init failed for %s (unknown)\n", service_name.c_str());
+    }
 }
 
 // === Implementation of OTelSpan wrapper ===
