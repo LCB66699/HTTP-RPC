@@ -195,7 +195,7 @@ grpc::Status SpreadsheetServiceImpl::GetSpreadsheet(grpc::ServerContext *context
     if (slog_) LOG_DEBUG(*slog_, "GetOwner id=" + std::to_string(req->id()) +
                                      " owner=" + std::to_string(owner_uid) + " req_uid=" + std::to_string(req->user_id()));
     if (found && owner_uid != req->user_id()) {
-        if (slog_) LOG_WARN(*slog_, "Owner mismatch! sheet_id=" + std::to_string(req->id()) +
+        if (slog_) LOG_DEBUG(*slog_, "Owner mismatch! sheet_id=" + std::to_string(req->id()) +
                                       " owner=" + std::to_string(owner_uid) + " caller=" + std::to_string(req->user_id()));
     }
     if (!found || owner_uid != req->user_id()) {

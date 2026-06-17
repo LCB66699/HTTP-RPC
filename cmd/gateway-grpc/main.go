@@ -396,7 +396,7 @@ func main() {
 		json.NewDecoder(r.Body).Decode(&req)
 		uid := extractUID(r)
 		req.UserId = uid
-		log.Printf("[debug] CreateSheet uid=%d", uid)
+		// log.Printf("[debug] CreateSheet uid=%d", uid)  // uncomment for debugging
 		resp, err := sheetClient.CreateSpreadsheet(injectToken(r), &req)
 		if err != nil || resp == nil || !resp.Success {
 			writeError(w, err, resp.GetError(), resp.GetErrorCode())
@@ -422,7 +422,7 @@ func main() {
 			writeJSONStatus(w, http.StatusUnauthorized, map[string]interface{}{"success": false, "error": "Unauthorized"})
 			return
 		}
-		log.Printf("[debug] GetSheet id=%d uid=%d", id, uid)
+		// log.Printf("[debug] GetSheet id=%d uid=%d", id, uid)  // uncomment for debugging
 		resp, err := callWithRetry(r.Context(), cbSheet, 3, "sheet.get", func(ctx context.Context) (*pb.GetSpreadsheetResponse, error) {
 			return sheetClient.GetSpreadsheet(withAuth(ctx, r), &pb.GetSpreadsheetRequest{Id: id, UserId: uid})
 		})
