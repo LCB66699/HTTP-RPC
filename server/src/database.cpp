@@ -214,7 +214,7 @@ bool Database::Initialize() {
     for (size_t i = 0; i < write_conns_.size(); ++i) {
         if (write_conns_[i]->conn) mysql_close(write_conns_[i]->conn);
         write_conns_[i]->conn = ConnectMYSQL(write_host_, write_port_);
-        if (i == 0 && !write_conns_[0]->conn)
+        if (!write_conns_[i]->conn)
             return false;
     }
     for (size_t i = 0; i < read_conns_.size(); ++i) {
