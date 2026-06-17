@@ -22,6 +22,7 @@ MYSQL *Database::ConnectMYSQL(const std::string &host, int port) {
         mysql_close(c);
         return nullptr;
     }
+    mysql_autocommit(c, 1);  // 显式开启 autocommit，确保 INSERT 后其他连接立即可见
     return c;
 }
 
