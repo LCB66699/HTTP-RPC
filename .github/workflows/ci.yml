@@ -89,7 +89,7 @@ jobs:
         if: failure()
         run: |
           echo "=== sheet-1 ==="
-          docker compose logs sheet-1 --tail=40
+          docker compose logs sheet-1 --tail=60
           echo "=== file-1 ==="
           docker compose logs file-1 --tail=40
           echo "=== grpc-gateway ==="
