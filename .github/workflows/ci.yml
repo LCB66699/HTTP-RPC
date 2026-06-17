@@ -46,7 +46,7 @@ jobs:
         run: sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc
 
       - name: Build images
-        run: docker compose build
+        run: docker compose build --no-cache
 
       - name: Start services
         run: |
