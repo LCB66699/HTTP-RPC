@@ -7,6 +7,7 @@
 #include "auth_interceptor.h"
 #include "call_logger.h"
 #include "database.h"
+#include "error_codes.h"
 #include "file_helpers.h"
 #include "l1_cache.h"
 #include "redis_client.h"
