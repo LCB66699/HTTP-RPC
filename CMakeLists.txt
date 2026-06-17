@@ -45,8 +45,7 @@ elseif(EXISTS "/usr/local/include/opentelemetry/exporters/otlp/otlp_grpc_exporte
         opentelemetry_exporter_otlp_grpc opentelemetry_exporter_otlp_grpc_client
         opentelemetry_otlp_recordable opentelemetry_logs
         opentelemetry_trace opentelemetry_resources opentelemetry_version
-        opentelemetry_proto opentelemetry_proto_grpc
-        opentelemetry_common
+        opentelemetry_proto opentelemetry_common
         -Wl,--end-group)
 else()
     message(STATUS "OTel NOT found — tracing disabled")
