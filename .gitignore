@@ -5,3 +5,6 @@ build/
 .env
 .mcp.json
 test/logs/
+mongo/
+mysql/
+redis/
