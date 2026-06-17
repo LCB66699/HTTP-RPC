@@ -188,7 +188,7 @@ func main() {
 		json.NewDecoder(r.Body).Decode(&req)
 		resp, _ := authClient.Register(r.Context(), &req)
 		if resp != nil && !resp.Success {
-			writeError(w, nil, resp.GetError())
+			writeError(w, nil, resp.GetError(), resp.GetErrorCode())
 			return
 		}
 		setCookies(w, resp.AccessToken, resp.RefreshToken)
@@ -199,7 +199,7 @@ func main() {
 		json.NewDecoder(r.Body).Decode(&req)
 		resp, _ := authClient.Login(r.Context(), &req)
 		if resp != nil && !resp.Success {
-			writeError(w, nil, resp.GetError())
+			writeError(w, nil, resp.GetError(), resp.GetErrorCode())
 			return
 		}
 		setCookies(w, resp.AccessToken, resp.RefreshToken)

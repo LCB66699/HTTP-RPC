@@ -18,7 +18,7 @@ message ShareRequest {
   string grantee_username = 4;
   string permission = 5;  // "view" | "edit"
 }
-message ShareResponse { bool success = 1; string error = 2; }
+message ShareResponse { bool success = 1; string error = 2; int32 error_code = 99; }
 
 message RevokeRequest {
   int64 owner_id = 1;
@@ -26,7 +26,7 @@ message RevokeRequest {
   int64 resource_id = 3;
   string grantee_username = 4;
 }
-message RevokeResponse { bool success = 1; string error = 2; }
+message RevokeResponse { bool success = 1; string error = 2; int32 error_code = 99; }
 
 message ResourceRequest {
   int64 owner_id = 1;
