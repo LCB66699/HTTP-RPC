@@ -158,7 +158,12 @@ grpc::Status FileServiceImpl::GetFile(grpc::ServerContext *context, const rpc::G
         return grpc::Status::OK;
     }
     int64_t owner_uid = 0;
-    bool found = db_ && db_->GetFileOwner(req->id(), owner_uid);
+    bool found = false;
+    for (int retry = 0; retry < 3 && db_; ++retry) {
+        found = db_->GetFileOwner(req->id(), owner_uid);
+        if (found && owner_uid != 0) break;
+        if (retry < 2) std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    }
     if (slog_) LOG_DEBUG(*slog_, "GetFileOwner id=" + std::to_string(req->id()) +
                                      " found=" + std::to_string(found) + " owner=" + std::to_string(owner_uid) +
                                      " req_uid=" + std::to_string(req->user_id()));
