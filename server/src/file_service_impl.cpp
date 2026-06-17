@@ -158,7 +158,11 @@ grpc::Status FileServiceImpl::GetFile(grpc::ServerContext *context, const rpc::G
         return grpc::Status::OK;
     }
     int64_t owner_uid = 0;
-    if (!db_ || !db_->GetFileOwner(req->id(), owner_uid) || owner_uid != req->user_id()) {
+    bool found = db_ && db_->GetFileOwner(req->id(), owner_uid);
+    if (slog_) LOG_DEBUG(*slog_, "GetFileOwner id=" + std::to_string(req->id()) +
+                                     " found=" + std::to_string(found) + " owner=" + std::to_string(owner_uid) +
+                                     " req_uid=" + std::to_string(req->user_id()));
+    if (!found || owner_uid != req->user_id()) {
         resp->set_success(false);
         SET_ERROR(resp, "Not found", rpc_error::NOT_FOUND);
         return grpc::Status::OK;

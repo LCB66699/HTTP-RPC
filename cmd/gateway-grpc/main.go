@@ -540,6 +540,7 @@ func main() {
 	mux.HandleFunc("GET /api/files/{id}", func(w http.ResponseWriter, r *http.Request) {
 		id := parseInt64(r.PathValue("id"))
 		uid := extractUID(r)
+		log.Printf("[debug] GetFile id=%d uid=%d", id, uid)
 		if uid == 0 {
 			writeJSONStatus(w, http.StatusUnauthorized, map[string]interface{}{"success": false, "error": "Unauthorized"})
 			return
