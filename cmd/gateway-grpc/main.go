@@ -718,20 +718,14 @@ func extractUID(r *http.Request) int64 {
 		if err != nil {
 			break
 		}
-		var claims map[string]interface{}
-		dec := json.NewDecoder(strings.NewReader(string(raw)))
-		dec.UseNumber()
-		if dec.Decode(&claims) != nil {
-			break
-		}
-		switch v := claims["uid"].(type) {
-		case json.Number:
-			n, _ := v.Int64()
-			return n
-		case float64:
-			return int64(v)
-		case string:
-			n, _ := strconv.ParseInt(v, 10, 64)
+		// JWT payload 里 uid 可能是裸数字也可能是字符串。
+		// 裸数字在 Go JSON 解码时会被解析为 float64，
+		// 对于 17 位 Snowflake ID 会精度丢失甚至溢出。
+		// 用正则直接从 raw JSON 提取，避免 float64 截断。
+		re := regexp.MustCompile(`"uid":("?)(\d+)("?)`)
+		m := re.FindStringSubmatch(string(raw))
+		if m != nil {
+			n, _ := strconv.ParseInt(m[2], 10, 64)
 			return n
 		}
 	}
