@@ -26,7 +26,7 @@ target_link_libraries(redis++ PUBLIC ${HIREDIS_LIBRARIES})
 # OpenTelemetry C++ — auto-detect, skip if headers not installed
 set(OTEL_LIBS "")
 set(HAS_OTEL OFF)
-if(EXISTS "/usr/local/include/opentelemetry/exporters/otlp/otlp_http_exporter.h")
+if(FALSE)  # OTel HTTP — removed, gRPC only
     message(STATUS "OTel HTTP exporter found")
     set(HAS_OTEL ON)
     set(OTEL_LIBS
