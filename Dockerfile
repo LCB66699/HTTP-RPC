@@ -8,19 +8,9 @@ RUN apt update && apt install -y \
 RUN cd /usr/src/googletest && cmake . && make -j$(nproc) && cp lib/*.a /usr/lib
 
 # OpenTelemetry C++ (OTLP HTTP exporter, static libs)
-# v4 — OTel gRPC build
-RUN git clone --depth 1 --branch v1.18.0 https://github.com/open-telemetry/opentelemetry-cpp.git /tmp/otel-cpp \
-    && cd /tmp/otel-cpp && cmake -B build \
-        -DCMAKE_BUILD_TYPE=Release \
-        -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
-        -DBUILD_SHARED_LIBS=OFF \
-        -DWITH_OTLP_GRPC=ON \
-        -DWITH_STL=ON \
-        -DBUILD_TESTING=OFF \
-    && cmake --build build -j$(nproc) \
-    && cmake --install build \
-    && echo cache-bust-v4 \
-    && rm -rf /tmp/otel-cpp
+# OpenTelemetry C++ — not built (OTel-CPP v1.18 proto/grpc linker issues)
+# C++ tracing handled by Go Gateway's otelgrpc interceptor (traceparent injection)
+# If OTel-CPP headers are installed externally, CMake will auto-detect and link
 
 ARG SERVICE=auth
 ARG DEBUG=false
