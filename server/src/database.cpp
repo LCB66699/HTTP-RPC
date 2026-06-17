@@ -373,7 +373,8 @@ bool Database::Initialize() {
 
     }  // end DDL loop over write_conns_
 
-    printf("[DB] schema initialized on master: %s\n", db_name_.c_str());
+    fprintf(stderr, "[DB] schema initialized on %s (conns: write=%zu read=%zu)\n",
+            db_name_.c_str(), write_conns_.size(), read_conns_.size());
     return true;
 }
 
