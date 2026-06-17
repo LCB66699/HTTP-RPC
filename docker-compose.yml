@@ -301,6 +301,7 @@
     image: ${DOCKER_USER:-http-rpc}/auth:latest
     environment:
       JWT_SECRET: "${JWT_SECRET:-default-secret-32bytes-here!!!!!}"
+      LOG_LEVEL: "${LOG_LEVEL:-INFO}"
     command: >
       /app/rpc_server --service auth --port 50051
       --mysql-write-host mysql-auth --mysql-read-hosts mysql-auth --mysql-password ${MYSQL_ROOT_PASSWORD:-123456} --mysql-db rpc_auth --mysql-shards 1
@@ -322,6 +323,7 @@
     image: ${DOCKER_USER:-http-rpc}/auth:latest
     environment:
       JWT_SECRET: "${JWT_SECRET:-default-secret-32bytes-here!!!!!}"
+      LOG_LEVEL: "${LOG_LEVEL:-INFO}"
     command: >
       /app/rpc_server --service auth --port 50051
       --mysql-write-host mysql-auth --mysql-read-hosts mysql-auth --mysql-password ${MYSQL_ROOT_PASSWORD:-123456} --mysql-db rpc_auth --mysql-shards 1
@@ -350,6 +352,7 @@
     environment:
       AUTH_SVC_ADDR: "rpc-auth:50051"
       JWT_SECRET: "${JWT_SECRET:-default-secret-32bytes-here!!!!!}"
+      LOG_LEVEL: "${LOG_LEVEL:-INFO}"
       RABBITMQ_HOST: "rabbitmq"
       MINIO_ENDPOINT: "minio:9000"
       MINIO_ACCESS_KEY: "rpc-minio"
@@ -382,6 +385,7 @@
     environment:
       AUTH_SVC_ADDR: "rpc-auth:50051"
       JWT_SECRET: "${JWT_SECRET:-default-secret-32bytes-here!!!!!}"
+      LOG_LEVEL: "${LOG_LEVEL:-INFO}"
       RABBITMQ_HOST: "rabbitmq"
       MINIO_ENDPOINT: "minio:9000"
       MINIO_ACCESS_KEY: "rpc-minio"
@@ -420,6 +424,7 @@
     environment:
       AUTH_SVC_ADDR: "rpc-auth:50051"
       JWT_SECRET: "${JWT_SECRET:-default-secret-32bytes-here!!!!!}"
+      LOG_LEVEL: "${LOG_LEVEL:-INFO}"
       RABBITMQ_HOST: "rabbitmq"
       MINIO_ENDPOINT: "minio:9000"
       MINIO_ACCESS_KEY: "rpc-minio"
@@ -450,6 +455,7 @@
     environment:
       AUTH_SVC_ADDR: "rpc-auth:50051"
       JWT_SECRET: "${JWT_SECRET:-default-secret-32bytes-here!!!!!}"
+      LOG_LEVEL: "${LOG_LEVEL:-INFO}"
       RABBITMQ_HOST: "rabbitmq"
       MINIO_ENDPOINT: "minio:9000"
       MINIO_ACCESS_KEY: "rpc-minio"
@@ -508,6 +514,7 @@
     image: ${DOCKER_USER:-http-rpc}/gateway:latest
     environment:
       JWT_SECRET: "${JWT_SECRET:-default-secret-32bytes-here!!!!!}"
+      LOG_LEVEL: "${LOG_LEVEL:-INFO}"
       AUTH_ADDR: "rpc-auth:50051"
       SHEET_ADDR: "rpc-sheet:50051"
       REDIS_ADDR: "redis-cluster-7000:7000"
@@ -539,6 +546,7 @@
     image: ${DOCKER_USER:-http-rpc}/gateway:latest
     environment:
       JWT_SECRET: "${JWT_SECRET:-default-secret-32bytes-here!!!!!}"
+      LOG_LEVEL: "${LOG_LEVEL:-INFO}"
       AUTH_ADDR: "rpc-auth:50051"
       SHEET_ADDR: "rpc-sheet:50051"
       REDIS_ADDR: "redis-cluster-7000:7000"

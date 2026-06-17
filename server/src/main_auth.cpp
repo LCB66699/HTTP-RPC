@@ -75,7 +75,9 @@ int main(int argc, char *argv[]) {
     printf("[main] Snowflake worker_id=%d\n", wid);
 
     auto logger = std::make_unique<CallLogger>(1000, redis.get());
-    auto slog = std::make_unique<SystemLogger>("auth", LogLevel::INFO);
+    const char *env_log = std::getenv("LOG_LEVEL");
+    auto slog = std::make_unique<SystemLogger>("auth",
+        env_log ? ParseLogLevel(env_log) : LogLevel::INFO);
 
     signal(SIGINT, SignalHandler);
     signal(SIGTERM, SignalHandler);

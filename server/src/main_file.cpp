@@ -74,7 +74,9 @@ int main(int argc, char *argv[]) {
     db->SetSnowflake(&snowflake);
 
     auto logger = std::make_unique<CallLogger>(1000, redis.get());
-    auto slog = std::make_unique<SystemLogger>("file", LogLevel::INFO);
+    const char *env_log = std::getenv("LOG_LEVEL");
+    auto slog = std::make_unique<SystemLogger>("file",
+        env_log ? ParseLogLevel(env_log) : LogLevel::INFO);
 
     auto l1_cache = std::make_unique<L1Cache>(10000, 30);
 
