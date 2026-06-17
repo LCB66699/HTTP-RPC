@@ -92,6 +92,10 @@ jobs:
           docker compose logs sheet-1 --tail=40
           echo "=== file-1 ==="
           docker compose logs file-1 --tail=20
+          echo "=== grpc-gateway ==="
+          docker compose logs grpc-gateway --tail=20
+          echo "=== auth-1 ==="
+          docker compose logs auth-1 --tail=10
           echo "=== mysql-spreadsheet-0 ==="
           docker compose logs mysql-spreadsheet-0 --tail=10
           echo "=== mysql-spreadsheet-1 ==="
