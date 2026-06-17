@@ -8,6 +8,7 @@ RUN apt update && apt install -y \
 RUN cd /usr/src/googletest && cmake . && make -j$(nproc) && cp lib/*.a /usr/lib
 
 # OpenTelemetry C++ (OTLP HTTP exporter, static libs)
+# v3 — increment to bust Docker cache for OTel rebuild
 RUN git clone --depth 1 --branch v1.18.0 https://github.com/open-telemetry/opentelemetry-cpp.git /tmp/otel-cpp \
     && cd /tmp/otel-cpp && cmake -B build \
         -DCMAKE_BUILD_TYPE=Release \
@@ -18,6 +19,7 @@ RUN git clone --depth 1 --branch v1.18.0 https://github.com/open-telemetry/opent
         -DBUILD_TESTING=OFF \
     && cmake --build build -j$(nproc) \
     && cmake --install build \
+    && echo cache-bust-v3 \
     && rm -rf /tmp/otel-cpp
 
 ARG SERVICE=auth
