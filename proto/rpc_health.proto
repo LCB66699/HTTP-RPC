@@ -19,6 +19,7 @@ message ReportRequest {
 
 message ReportResponse {
   bool success = 1;
+  int32 error_code = 99;
 }
 
 message NodeInfo {
@@ -38,4 +39,5 @@ message QueryResponse {
   repeated NodeInfo nodes = 1;
   int32 total_online = 2;
   int32 total_offline = 3;
+  int32 error_code = 99;
 }

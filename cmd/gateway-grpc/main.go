@@ -235,7 +235,7 @@ func main() {
 		req := &pb.ChangePasswordRequest{UserId: uid, OldPassword: body.OldPassword, NewPassword: body.NewPassword}
 		resp, err := authClient.ChangePassword(r.Context(), req)
 		if err != nil || resp == nil || !resp.Success {
-			writeError(w, err, resp.GetError())
+			writeError(w, err, resp.GetError(), resp.GetErrorCode())
 			return
 		}
 		writeJSON(w, resp)
@@ -384,7 +384,7 @@ func main() {
 			Query: body.Q, UserId: uid, Sort: body.Sort,
 		})
 		if err != nil || resp == nil || !resp.Success {
-			writeError(w, err, resp.GetError())
+			writeError(w, err, resp.GetError(), resp.GetErrorCode())
 			return
 		}
 		writeJSON(w, resp)
@@ -398,7 +398,7 @@ func main() {
 		req.UserId = uid
 		resp, err := sheetClient.CreateSpreadsheet(injectToken(r), &req)
 		if err != nil || resp == nil || !resp.Success {
-			writeError(w, err, resp.GetError())
+			writeError(w, err, resp.GetError(), resp.GetErrorCode())
 			return
 		}
 		writeJSON(w, resp)
@@ -408,7 +408,7 @@ func main() {
 			return sheetClient.ListSpreadsheets(withAuth(ctx, r), &pb.ListSpreadsheetsRequest{UserId: extractUID(r)})
 		})
 		if err != nil || resp == nil || !resp.Success {
-			writeError(w, err, resp.GetError())
+			writeError(w, err, resp.GetError(), resp.GetErrorCode())
 			return
 		}
 		writeJSON(w, resp)
@@ -447,7 +447,7 @@ func main() {
 		req.UserId = extractUID(r)
 		resp, err := sheetClient.UpdateSpreadsheet(injectToken(r), &req)
 		if err != nil || resp == nil || !resp.Success {
-			writeError(w, err, resp.GetError())
+			writeError(w, err, resp.GetError(), resp.GetErrorCode())
 			return
 		}
 		writeJSON(w, resp)
@@ -458,7 +458,7 @@ func main() {
 			return sheetClient.DeleteSpreadsheet(withAuth(ctx, r), &pb.DeleteSpreadsheetRequest{Id: id, UserId: extractUID(r)})
 		})
 		if err != nil || resp == nil || !resp.Success {
-			writeError(w, err, resp.GetError())
+			writeError(w, err, resp.GetError(), resp.GetErrorCode())
 			return
 		}
 		writeJSON(w, resp)
@@ -470,7 +470,7 @@ func main() {
 			UserId: extractUID(r), MimeFilter: "image/",
 		})
 		if err != nil || resp == nil || !resp.Success {
-			writeError(w, err, resp.GetError())
+			writeError(w, err, resp.GetError(), resp.GetErrorCode())
 			return
 		}
 		writeJSON(w, resp)
@@ -483,7 +483,7 @@ func main() {
 		json.NewDecoder(r.Body).Decode(&body)
 		resp, err := fileClient.MoveFile(injectToken(r), &pb.MoveFileRequest{Id: id, TargetFolderId: body.TargetFolderId})
 		if err != nil || resp == nil || !resp.Success {
-			writeError(w, err, resp.GetError())
+			writeError(w, err, resp.GetError(), resp.GetErrorCode())
 			return
 		}
 		writeJSON(w, resp)
@@ -499,7 +499,7 @@ func main() {
 			UserId: uid, Name: body.Name, ParentFolderId: body.ParentFolderId,
 		})
 		if err != nil || resp == nil || !resp.Success {
-			writeError(w, err, resp.GetError())
+			writeError(w, err, resp.GetError(), resp.GetErrorCode())
 			return
 		}
 		writeJSON(w, resp)
@@ -509,7 +509,7 @@ func main() {
 			return fileClient.ListFiles(withAuth(ctx, r), &pb.ListFilesRequest{UserId: extractUID(r)})
 		})
 		if err != nil || resp == nil || !resp.Success {
-			writeError(w, err, resp.GetError())
+			writeError(w, err, resp.GetError(), resp.GetErrorCode())
 			return
 		}
 		writeJSON(w, resp)
@@ -530,7 +530,7 @@ func main() {
 			MimeType: h.Header.Get("Content-Type"), FileContent: data,
 		})
 		if err != nil || resp == nil || !resp.Success {
-			writeError(w, err, resp.GetError())
+			writeError(w, err, resp.GetError(), resp.GetErrorCode())
 			return
 		}
 		writeJSON(w, resp)
@@ -575,7 +575,7 @@ func main() {
 			return fileClient.DeleteFile(withAuth(ctx, r), &pb.DeleteFileRequest{Id: id, UserId: extractUID(r)})
 		})
 		if err != nil || resp == nil || !resp.Success {
-			writeError(w, err, resp.GetError())
+			writeError(w, err, resp.GetError(), resp.GetErrorCode())
 			return
 		}
 		writeJSON(w, resp)
@@ -661,53 +661,42 @@ func writeGRPCError(w http.ResponseWriter, err error, fallback string) {
 	writeJSONStatus(w, code, map[string]interface{}{"success": false, "error": msg})
 }
 
-// errorStatusCode 将 C++ 服务返回的 error 消息映射为 HTTP 状态码
-func errorStatusCode(errMsg string) int {
-	switch {
-	case strings.Contains(errMsg, "Jwt is missing"),
-		strings.Contains(errMsg, "Invalid token"),
-		strings.Contains(errMsg, "Unauthorized"),
-		strings.Contains(errMsg, "login required"),
-		strings.Contains(errMsg, "Invalid OTP"),
-		strings.Contains(errMsg, "Invalid refresh token"):
-		return http.StatusUnauthorized
-	case strings.Contains(errMsg, "Forbidden"),
-		strings.Contains(errMsg, "permission denied"):
-		return http.StatusForbidden
-	case strings.Contains(errMsg, "Not found"):
-		return http.StatusNotFound
-	case strings.Contains(errMsg, "required"),
-		strings.Contains(errMsg, "no file"),
-		strings.Contains(errMsg, "short"),
-		strings.Contains(errMsg, "Username"),
-		strings.Contains(errMsg, "Password"):
+// errorCodeToHTTP 将 C++ 服务返回的 error_code 枚举映射为 HTTP 状态码
+// 0=OK, 1=BAD_REQUEST(400), 2=UNAUTH(401), 3=FORBIDDEN(403),
+// 4=NOT_FOUND(404), 5=CONFLICT(409), 6=INTERNAL(500), 7=UNAVAILABLE(503)
+func errorCodeToHTTP(code int32) int {
+	switch code {
+	case 1:
 		return http.StatusBadRequest
-	case strings.Contains(errMsg, "Duplicate"),
-		strings.Contains(errMsg, "conflict"),
-		strings.Contains(errMsg, "already exists"):
+	case 2:
+		return http.StatusUnauthorized
+	case 3:
+		return http.StatusForbidden
+	case 4:
+		return http.StatusNotFound
+	case 5:
 		return http.StatusConflict
-	case strings.Contains(errMsg, "Database not available"),
-		strings.Contains(errMsg, "Service temporarily unavailable"):
-		return http.StatusServiceUnavailable
-	case strings.Contains(errMsg, "Query failed"),
-		strings.Contains(errMsg, "Failed to create"),
-		strings.Contains(errMsg, "update failed"),
-		strings.Contains(errMsg, "delete failed"),
-		strings.Contains(errMsg, "upload failed"),
-		strings.Contains(errMsg, "MinIO"):
+	case 6:
 		return http.StatusInternalServerError
+	case 7:
+		return http.StatusServiceUnavailable
 	default:
 		return http.StatusOK
 	}
 }
 
-// writeError 统一错误响应：根据 error 消息返回合适的 HTTP 状态码
-func writeError(w http.ResponseWriter, err error, respErr string) {
+// writeError 统一错误响应：优先用 error_code，fallback 到消息文本
+func writeError(w http.ResponseWriter, err error, respErr string, errorCode int32) {
 	msg := respErr
 	if err != nil {
 		msg = err.Error()
 	}
-	code := errorStatusCode(msg)
+	code := errorCodeToHTTP(errorCode)
+	if code == http.StatusOK {
+		// fallback: 如果 error_code 为 0 或未设置，用熔断/gRPC 错误判断
+		writeGRPCError(w, err, msg)
+		return
+	}
 	writeJSONStatus(w, code, map[string]interface{}{"success": false, "error": msg})
 }
 

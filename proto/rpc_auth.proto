@@ -24,6 +24,7 @@ message LoginRequest {
 message LoginResponse {
   bool success = 1;
   string error = 3;
+  int32 error_code = 99;  // 0=OK, 1=BAD_REQUEST, 2=UNAUTH, 3=FORBIDDEN, 4=NOT_FOUND, 5=CONFLICT, 6=INTERNAL, 7=UNAVAILABLE
   int64 user_id = 4;
   string access_token = 5;      // JWT, 15min
   string refresh_token = 6;     // UUID, 7d
@@ -38,6 +39,7 @@ message RegisterRequest {
 message RegisterResponse {
   bool success = 1;
   string error = 3;
+  int32 error_code = 99;
   int64 user_id = 4;
   string access_token = 5;
   string refresh_token = 6;
@@ -52,6 +54,7 @@ message RefreshTokenRequest {
 message RefreshTokenResponse {
   bool success = 1;
   string error = 2;
+  int32 error_code = 99;
   string access_token = 3;
 }
 
@@ -67,6 +70,7 @@ message ValidateUserResponse {
   int64 user_id = 3;
   string role = 4;
   string error = 5;
+  int32 error_code = 99;
 }
 
 message ChangePasswordRequest {
@@ -74,10 +78,10 @@ message ChangePasswordRequest {
   string old_password = 2;
   string new_password = 3;
 }
-message ChangePasswordResponse { bool success = 1; string error = 2; }
+message ChangePasswordResponse { bool success = 1; string error = 2; int32 error_code = 99; }
 
 message SendOTPRequest { string phone = 1; }
-message SendOTPResponse { bool success = 1; string error = 2; }
+message SendOTPResponse { bool success = 1; string error = 2; int32 error_code = 99; }
 
 message PhoneLoginRequest { string phone = 1; string otp = 2; }
 
@@ -86,11 +90,11 @@ message BindPhoneRequest {
   string phone = 2;
   string otp = 3;
 }
-message BindPhoneResponse { bool success = 1; string error = 2; }
+message BindPhoneResponse { bool success = 1; string error = 2; int32 error_code = 99; }
 
 message UpdateProfileRequest {
   int64 user_id = 1;
   string display_name = 2;
   string avatar_url = 3;
 }
-message UpdateProfileResponse { bool success = 1; string error = 2; }
+message UpdateProfileResponse { bool success = 1; string error = 2; int32 error_code = 99; }

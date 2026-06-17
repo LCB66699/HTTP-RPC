@@ -41,6 +41,7 @@ message CreateFileResponse {
   bool success = 1;
   int64 id = 2;
   string error = 3;
+  int32 error_code = 99;
 }
 
 message GetFileRequest {
@@ -57,6 +58,7 @@ message GetFileResponse {
   // Non-empty when file body lives in object storage (MinIO/S3).
   // Gateway should issue a 302 redirect to this URL instead of streaming file_content.
   string download_url = 6;
+  int32 error_code = 99;
 }
 
 message ListFilesRequest {
@@ -77,6 +79,7 @@ message ListFilesResponse {
   string next_cursor = 6;
   bool has_more = 7;
   string error = 5;
+  int32 error_code = 99;
 }
 
 message DeleteFileRequest {
@@ -107,4 +110,5 @@ message BatchDeleteResponse { bool success = 1; int32 deleted_count = 2; string 
 message DeleteFileResponse {
   bool success = 1;
   string error = 2;
+  int32 error_code = 99;
 }

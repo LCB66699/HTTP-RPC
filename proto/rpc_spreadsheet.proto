@@ -50,6 +50,7 @@ message CreateSpreadsheetResponse {
   bool success = 1;
   int64 id = 2;
   string error = 3;
+  int32 error_code = 99;
 }
 
 message GetSpreadsheetRequest {
@@ -62,6 +63,7 @@ message GetSpreadsheetResponse {
   Spreadsheet spreadsheet = 2;
   string cache_source = 3;
   string error = 4;
+  int32 error_code = 99;
 }
 
 message ListSpreadsheetsRequest {
@@ -81,6 +83,7 @@ message ListSpreadsheetsResponse {
   string error = 5;
   string next_cursor = 6;  // 下一页 after_id
   bool has_more = 7;
+  int32 error_code = 99;
 }
 
 message UpdateSpreadsheetRequest {
@@ -95,6 +98,7 @@ message UpdateSpreadsheetRequest {
 message UpdateSpreadsheetResponse {
   bool success = 1;
   string error = 2;
+  int32 error_code = 99;
 }
 
 message DeleteSpreadsheetRequest {
@@ -105,4 +109,5 @@ message DeleteSpreadsheetRequest {
 message DeleteSpreadsheetResponse {
   bool success = 1;
   string error = 2;
+  int32 error_code = 99;
 }

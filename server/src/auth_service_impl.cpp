@@ -11,6 +11,7 @@
 
 #include "call_logger.h"
 #include "database.h"
+#include "error_codes.h"
 #include "jwt.h"
 #include "redis_client.h"
 #include "sha256.h"
@@ -88,7 +89,7 @@ grpc::Status AuthServiceImpl::Login(grpc::ServerContext *, const rpc::LoginReque
         std::string stored_hash;
         if (!db_->GetUser(req->username(), stored_hash) || !sha256::verify_password(req->password(), stored_hash)) {
             resp->set_success(false);
-            resp->set_error("Invalid username or password");
+            SET_ERROR(resp, "Invalid username or password", rpc_error::UNAUTHENTICATED);
             if (logger_) {
                 auto dur = std::chrono::duration_cast<std::chrono::microseconds>(
                                std::chrono::high_resolution_clock::now() - start)
@@ -104,7 +105,7 @@ grpc::Status AuthServiceImpl::Login(grpc::ServerContext *, const rpc::LoginReque
         auto it = users_.find(req->username());
         if (it == users_.end() || it->second != b64enc(req->password())) {
             resp->set_success(false);
-            resp->set_error("Invalid username or password");
+            SET_ERROR(resp, "Invalid username or password", rpc_error::UNAUTHENTICATED);
             if (logger_) {
                 auto dur = std::chrono::duration_cast<std::chrono::microseconds>(
                                std::chrono::high_resolution_clock::now() - start)
@@ -173,7 +174,7 @@ grpc::Status AuthServiceImpl::Register(grpc::ServerContext *, const rpc::Registe
     // 先做输入校验（不查重——交给 INSERT 的 UNIQUE 约束，消除 TOCTOU 竞态窗口）
     if (req->username().size() < 3 || req->username().size() > 20) {
         resp->set_success(false);
-        resp->set_error("Username must be 3-20 characters");
+        SET_ERROR(resp, "Username must be 3-20 characters", rpc_error::BAD_REQUEST);
         if (logger_) {
             auto dur =
                 std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now() - start)
@@ -187,7 +188,7 @@ grpc::Status AuthServiceImpl::Register(grpc::ServerContext *, const rpc::Registe
     }
     if (req->password().size() < 6) {
         resp->set_success(false);
-        resp->set_error("Password must be at least 6 characters");
+        SET_ERROR(resp, "Password too short", rpc_error::BAD_REQUEST);
         if (logger_) {
             auto dur =
                 std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now() - start)
@@ -205,7 +206,7 @@ grpc::Status AuthServiceImpl::Register(grpc::ServerContext *, const rpc::Registe
         if (!db_->AddUser(req->username(), sha256::hash_password(req->password()))) {
             bool is_dup = db_->UserExists(req->username());
             resp->set_success(false);
-            resp->set_error(is_dup ? "Username already exists" : "Registration failed — username may already exist");
+            SET_ERROR(resp, is_dup ? "Username already exists" : "Registration failed", is_dup ? rpc_error::CONFLICT : rpc_error::INTERNAL);
             if (logger_) {
                 auto dur = std::chrono::duration_cast<std::chrono::microseconds>(
                                std::chrono::high_resolution_clock::now() - start)
@@ -220,7 +221,7 @@ grpc::Status AuthServiceImpl::Register(grpc::ServerContext *, const rpc::Registe
     } else {
         if (users_.count(req->username())) {
             resp->set_success(false);
-            resp->set_error("Username already exists");
+            SET_ERROR(resp, "Username already exists", rpc_error::CONFLICT);
             return grpc::Status::OK;
         }
         users_[req->username()] = b64enc(req->password());
@@ -311,7 +312,7 @@ grpc::Status AuthServiceImpl::RefreshToken(grpc::ServerContext *, const rpc::Ref
     std::string stored;
     if (!redis_ || !redis_->GetJSON("rt:" + req->username(), stored)) {
         resp->set_success(false);
-        resp->set_error("Invalid refresh token");
+        SET_ERROR(resp, "Invalid refresh token", rpc_error::UNAUTHENTICATED);
         return grpc::Status::OK;
     }
     std::string stored_rt;
@@ -330,7 +331,7 @@ grpc::Status AuthServiceImpl::RefreshToken(grpc::ServerContext *, const rpc::Ref
             redis_->DeleteKey("rate:login:" + req->username() + ":total");
         }
         resp->set_success(false);
-        resp->set_error("Invalid refresh token");
+        SET_ERROR(resp, "Invalid refresh token", rpc_error::UNAUTHENTICATED);
         return grpc::Status::OK;
     }
     std::string role = IsAdminUser(req->username()) ? "admin" : "user";
@@ -387,7 +388,7 @@ grpc::Status AuthServiceImpl::ValidateUser(grpc::ServerContext *, const rpc::Val
     // 身份比对：请求的 user_id 必须与 JWT 中的 uid 一致（0 表示不限定）
     if (uid != 0 && token_uid != 0 && uid != token_uid) {
         resp->set_valid(false);
-        resp->set_error("user_id mismatch token uid");
+        SET_ERROR(resp, "user_id mismatch", rpc_error::UNAUTHENTICATED);
         return grpc::Status::OK;
     }
     if (uid == 0)
@@ -400,7 +401,7 @@ grpc::Status AuthServiceImpl::ValidateUser(grpc::ServerContext *, const rpc::Val
 
     if (username.empty()) {
         resp->set_valid(false);
-        resp->set_error("invalid identity");
+        SET_ERROR(resp, "Invalid identity", rpc_error::UNAUTHENTICATED);
         return grpc::Status::OK;
     }
 
@@ -410,7 +411,7 @@ grpc::Status AuthServiceImpl::ValidateUser(grpc::ServerContext *, const rpc::Val
         std::string stored_hash;
         if (!db_->GetUser(username, stored_hash)) {
             resp->set_valid(false);
-            resp->set_error("user not found");
+            SET_ERROR(resp, "User not found", rpc_error::NOT_FOUND);
             return grpc::Status::OK;
         }
         if (uid == 0)
@@ -419,7 +420,7 @@ grpc::Status AuthServiceImpl::ValidateUser(grpc::ServerContext *, const rpc::Val
         auto it = users_.find(username);
         if (it == users_.end()) {
             resp->set_valid(false);
-            resp->set_error("user not found");
+            SET_ERROR(resp, "User not found", rpc_error::NOT_FOUND);
             return grpc::Status::OK;
         }
     }
@@ -436,22 +437,22 @@ grpc::Status AuthServiceImpl::ChangePassword(grpc::ServerContext *, const rpc::C
     std::lock_guard<std::mutex> lock(mtx_);
     if (!db_) {
         resp->set_success(false);
-        resp->set_error("Database error");
+        SET_ERROR(resp, "Database error", rpc_error::UNAVAILABLE);
         return grpc::Status::OK;
     }
     if (!db_->VerifyUserPassword(req->user_id(), req->old_password())) {
         resp->set_success(false);
-        resp->set_error("Old password is incorrect");
+        SET_ERROR(resp, "Old password incorrect", rpc_error::UNAUTHENTICATED);
         return grpc::Status::OK;
     }
     if (req->new_password().size() < 6) {
         resp->set_success(false);
-        resp->set_error("New password must be at least 6 characters");
+        SET_ERROR(resp, "New password too short", rpc_error::BAD_REQUEST);
         return grpc::Status::OK;
     }
     if (!db_->UpdateUserPassword(req->user_id(), sha256::hash_password(req->new_password()))) {
         resp->set_success(false);
-        resp->set_error("Failed to update password");
+        SET_ERROR(resp, "Failed to update password", rpc_error::INTERNAL);
         return grpc::Status::OK;
     }
     resp->set_success(true);
@@ -464,14 +465,14 @@ grpc::Status AuthServiceImpl::LoginByPhone(grpc::ServerContext *, const rpc::Pho
                                            rpc::LoginResponse *resp) {
     if (!db_) {
         resp->set_success(false);
-        resp->set_error("Database error");
+        SET_ERROR(resp, "Database error", rpc_error::UNAVAILABLE);
         return grpc::Status::OK;
     }
     std::string username;
     int64_t uid = db_->GetUserIdByPhone(req->phone());
     if (uid <= 0) {
         resp->set_success(false);
-        resp->set_error("Phone not registered");
+        SET_ERROR(resp, "Phone not registered", rpc_error::NOT_FOUND);
         return grpc::Status::OK;
     }
     username = db_->GetUsernameById(uid);
