@@ -186,7 +186,7 @@
       RABBITMQ_DEFAULT_USER: rpc
       RABBITMQ_DEFAULT_PASS: rpc-rabbit-123456
     ports:
-      - "5672:5672"
+      - "5673:5672"
       - "15672:15672"
     volumes:
       - ./data/rabbitmq:/var/lib/rabbitmq

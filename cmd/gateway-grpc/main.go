@@ -574,8 +574,10 @@ func main() {
 	})
 	mux.HandleFunc("DELETE /api/files/{id}", func(w http.ResponseWriter, r *http.Request) {
 		id := parseInt64(r.PathValue("id"))
+		uid := extractUID(r)
+		log.Printf("[debug] DeleteFile id=%d uid=%d", id, uid)
 		resp, err := callWithRetry(r.Context(), cbFile, 2, "file.delete", func(ctx context.Context) (*pb.DeleteFileResponse, error) {
-			return fileClient.DeleteFile(withAuth(ctx, r), &pb.DeleteFileRequest{Id: id, UserId: extractUID(r)})
+			return fileClient.DeleteFile(withAuth(ctx, r), &pb.DeleteFileRequest{Id: id, UserId: uid})
 		})
 		if err != nil || resp == nil || !resp.Success {
 			writeError(w, err, resp.GetError(), resp.GetErrorCode())
