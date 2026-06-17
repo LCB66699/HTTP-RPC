@@ -9,8 +9,8 @@
 #include "generated/rpc_spreadsheet.pb.h"
 #include "minio_client.h"
 #include "rabbit_publisher.h"
+#include "service_interfaces.h"
 
-class ShardedDatabase;
 class RedisClient;
 class CallLogger;
 class SystemLogger;
@@ -20,7 +20,7 @@ class AuthInterceptor;
 
 class SpreadsheetServiceImpl final : public rpc::SpreadsheetService::Service {
    public:
-    void SetDatabase(ShardedDatabase *db) { db_ = db; }
+    void SetDatabase(IDatabase *db) { db_ = db; }
     void SetRedis(RedisClient *redis) { redis_ = redis; }
     void SetL1Cache(L1Cache *cache) { l1_ = cache; }
     void SetLogger(CallLogger *logger) { logger_ = logger; }
@@ -46,7 +46,7 @@ class SpreadsheetServiceImpl final : public rpc::SpreadsheetService::Service {
                                    rpc::DeleteSpreadsheetResponse *resp) override;
 
    private:
-    ShardedDatabase *db_ = nullptr;
+    IDatabase *db_ = nullptr;
     RedisClient *redis_ = nullptr;
     L1Cache *l1_ = nullptr;
     CallLogger *logger_ = nullptr;

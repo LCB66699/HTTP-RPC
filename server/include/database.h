@@ -160,8 +160,10 @@ class Database {
     void HealthLoop();
 };
 
+#include "service_interfaces.h"
+
 // ---- ShardedDatabase: hash-routes by user_id across N Database shards ----
-class ShardedDatabase {
+class ShardedDatabase : public IDatabase {
    public:
     // shard_count: 分片数; host_prefix: "mysql-spreadsheet" →
     // "mysql-spreadsheet-0","mysql-spreadsheet-1"... db_name_prefix:
