@@ -13,7 +13,7 @@
 #include "system_logger.h"
 // Extract the username carried in gRPC metadata (set by the gateway for
 // logging).
-static std::string UsernameFromMeta(grpc::ServerContext *ctx) {
+std::string UsernameFromMeta(grpc::ServerContext *ctx) {
     auto it = ctx->client_metadata().find("username");
     if (it != ctx->client_metadata().end())
         return std::string(it->second.data(), it->second.length());
