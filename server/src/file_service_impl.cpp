@@ -8,6 +8,7 @@
 #include "auth_interceptor.h"
 #include "call_logger.h"
 #include "database.h"
+#include "file_helpers.h"
 #include "l1_cache.h"
 #include "redis_client.h"
 #include "system_logger.h"
@@ -49,15 +50,6 @@ bool FileServiceImpl::ValidateCaller(grpc::ServerContext *ctx, int64_t user_id, 
     return true;
 }
 
-static std::string FileVersionKey(int64_t user_id) {
-    return "u:" + std::to_string(user_id) + ":files:version";
-}
-static std::string FileListCacheKey(int64_t user_id, int64_t version, int page, int page_size) {
-    std::string key = "u:" + std::to_string(user_id) + ":files:v" + std::to_string(version);
-    if (page_size > 0)
-        key += ":p" + std::to_string(page) + ":ps" + std::to_string(page_size);
-    return key;
-}
 
 grpc::Status FileServiceImpl::CreateFile(grpc::ServerContext *context, const rpc::CreateFileRequest *req,
                                          rpc::CreateFileResponse *resp) {

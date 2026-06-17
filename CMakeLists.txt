@@ -112,7 +112,8 @@ add_rpc_service(search server/src/main_search.cpp   "server/src/search_service_i
 # ---- Tests ----
 add_executable(cpp_test
     test/test_sha256.cpp test/test_jwt.cpp test/test_snowflake.cpp
-    test/test_otel_helpers.cpp)
+    test/test_otel_helpers.cpp
+    test/test_sheet_helpers.cpp test/test_file_helpers.cpp)
 target_link_libraries(cpp_test GTest::gtest GTest::gtest_main OpenSSL::SSL OpenSSL::Crypto pthread)
 
 include(GoogleTest)

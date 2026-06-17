@@ -10,6 +10,7 @@
 #include "database.h"
 #include "l1_cache.h"
 #include "redis_client.h"
+#include "sheet_helpers.h"
 #include "system_logger.h"
 
 // Extract the username carried in gRPC metadata (set by the gateway for
@@ -56,16 +57,6 @@ bool SpreadsheetServiceImpl::ValidateCaller(grpc::ServerContext *ctx, int64_t us
     return true;
 }
 
-// Redis key helpers — keyed by user_id so username changes never corrupt cache.
-static std::string VersionKey(int64_t user_id) {
-    return "u:" + std::to_string(user_id) + ":sheets:version";
-}
-static std::string ListCacheKey(int64_t user_id, int64_t version, int page, int page_size) {
-    std::string key = "u:" + std::to_string(user_id) + ":sheets:v" + std::to_string(version);
-    if (page_size > 0)
-        key += ":p" + std::to_string(page) + ":ps" + std::to_string(page_size);
-    return key;
-}
 
 grpc::Status SpreadsheetServiceImpl::CreateSpreadsheet(grpc::ServerContext *context,
                                                        const rpc::CreateSpreadsheetRequest *req,
@@ -143,7 +134,7 @@ grpc::Status SpreadsheetServiceImpl::CreateSpreadsheet(grpc::ServerContext *cont
 
     // Invalidate list cache
     if (redis_ && redis_->IsConnected()) {
-        redis_->Increment(VersionKey(req->user_id()));
+        redis_->Increment(SheetVersionKey(req->user_id()));
         if (slog_)
             LOG_DEBUG(*slog_,
                       "Create id=" + std::to_string(id) + " INCR version for uid=" + std::to_string(req->user_id()));
@@ -458,12 +449,12 @@ grpc::Status SpreadsheetServiceImpl::ListSpreadsheets(grpc::ServerContext *conte
     int page = req->page();
     int page_size = req->page_size();
 
-    std::string version_key = VersionKey(uid);
+    std::string version_key = SheetVersionKey(uid);
 
     // 1) Try Redis cache
     if (redis_ && redis_->IsConnected()) {
         int64_t version = redis_->GetInt(version_key);
-        std::string cache_key = ListCacheKey(uid, version, page, page_size);
+        std::string cache_key = SheetListCacheKey(uid, version, page, page_size);
         std::string cached;
         if (redis_->GetJSON(cache_key, cached)) {
             if (resp->ParseFromString(cached)) {
@@ -530,7 +521,7 @@ grpc::Status SpreadsheetServiceImpl::ListSpreadsheets(grpc::ServerContext *conte
     // 3) Populate Redis cache
     if (redis_ && redis_->IsConnected()) {
         int64_t version = redis_->GetInt(version_key);
-        std::string cache_key = ListCacheKey(uid, version, page, page_size);
+        std::string cache_key = SheetListCacheKey(uid, version, page, page_size);
         std::string serialized;
         if (resp->SerializeToString(&serialized)) {
             if (redis_->SetJSON(cache_key, serialized, 120)) {
@@ -592,7 +583,7 @@ grpc::Status SpreadsheetServiceImpl::UpdateSpreadsheet(grpc::ServerContext *cont
                 redis_->DeleteKey("u:" + std::to_string(req->user_id()) + ":sheet:" + std::to_string(req->id()));
                 redis_->DeleteKey("u:" + std::to_string(req->user_id()) + ":sheet:" + std::to_string(req->id()) +
                                   ":ts");
-                redis_->Increment(VersionKey(req->user_id()));
+                redis_->Increment(SheetVersionKey(req->user_id()));
                 if (slog_)
                     LOG_DEBUG(*slog_, "Update id=" + std::to_string(req->id()) +
                                           " INVALIDATED + INCR version uid=" + std::to_string(req->user_id()));
@@ -692,7 +683,7 @@ grpc::Status SpreadsheetServiceImpl::DeleteSpreadsheet(grpc::ServerContext *cont
     if (redis_ && redis_->IsConnected()) {
         redis_->DeleteKey("sheet:" + std::to_string(req->id()));
         redis_->DeleteKey("sheet:" + std::to_string(req->id()) + ":ts");
-        redis_->Increment(VersionKey(req->user_id()));
+        redis_->Increment(SheetVersionKey(req->user_id()));
         if (slog_)
             LOG_DEBUG(*slog_, "Delete id=" + std::to_string(req->id()) +
                                   " INVALIDATED + INCR version uid=" + std::to_string(req->user_id()));
