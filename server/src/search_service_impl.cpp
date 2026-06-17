@@ -1,4 +1,5 @@
 #include "search_service_impl.h"
+#include "error_codes.h"
 
 #include <cstdio>
 #include <nlohmann/json.hpp>
@@ -8,12 +9,12 @@
 grpc::Status SearchServiceImpl::Search(grpc::ServerContext *, const rpc::SearchRequest *req,
                                        rpc::SearchResponse *resp) {
     if (es_host_.empty()) {
-        resp->set_error("Search service not configured");
+        SET_ERROR(resp, "Search service not configured", rpc_error::UNAVAILABLE);
         return grpc::Status::OK;
     }
     std::string q = req->query();
     if (q.empty()) {
-        resp->set_error("query required");
+        SET_ERROR(resp, "query required", rpc_error::BAD_REQUEST);
         return grpc::Status::OK;
     }
 
@@ -82,7 +83,7 @@ grpc::Status SearchServiceImpl::Search(grpc::ServerContext *, const rpc::SearchR
     es.set_read_timeout(5, 0);
     auto es_res = es.Post("/" + indices + "/_search", esq.dump(), "application/json");
     if (!es_res || es_res->status != 200) {
-        resp->set_error("Search temporarily unavailable");
+        SET_ERROR(resp, "Search temporarily unavailable", rpc_error::UNAVAILABLE);
         return grpc::Status::OK;
     }
 
@@ -125,7 +126,7 @@ grpc::Status SearchServiceImpl::Search(grpc::ServerContext *, const rpc::SearchR
             }
         }
     } catch (const std::exception &e) {
-        resp->set_error("parse error");
+        SET_ERROR(resp, "parse error", rpc_error::INTERNAL);
     }
     return grpc::Status::OK;
 }
