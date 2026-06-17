@@ -107,6 +107,7 @@ grpc::Status SpreadsheetServiceImpl::CreateSpreadsheet(grpc::ServerContext *cont
     }
 
     int64_t id = 0;
+    fprintf(stderr, "[debug] CreateSpreadsheet req->user_id=%lld\n", (long long)req->user_id());
     bool ok = db_->CreateSpreadsheet(req->user_id(), username, req->name(), req->description(), req->headers_json(),
                                      req->data_json(), id, req->idempotency_key());
     if (!ok && !storage_key.empty()) {
@@ -190,7 +191,10 @@ grpc::Status SpreadsheetServiceImpl::GetSpreadsheet(grpc::ServerContext *context
         return grpc::Status::OK;
     }
     int64_t owner_uid = 0;
-    if (!db_ || !db_->GetSpreadsheetOwner(req->id(), owner_uid) || owner_uid != req->user_id()) {
+    bool found = db_ && db_->GetSpreadsheetOwner(req->id(), owner_uid);
+    fprintf(stderr, "[debug] GetSpreadsheetOwner id=%lld found=%d owner=%lld req_uid=%lld\n",
+            (long long)req->id(), (int)found, (long long)owner_uid, (long long)req->user_id());
+    if (!found || owner_uid != req->user_id()) {
         resp->set_success(false);
         SET_ERROR(resp, "Not found", rpc_error::NOT_FOUND);
         return grpc::Status::OK;
