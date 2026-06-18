@@ -51,7 +51,7 @@ public:
 class MockRedis : public IRedisClient {
 public:
     MOCK_METHOD(bool, IsConnected, (), (override));
-    MOCK_METHOD(bool, Increment, (const std::string &key), (override));
+    MOCK_METHOD(int64_t, Increment, (const std::string &key), (override));
     MOCK_METHOD(bool, GetJSON, (const std::string &key, std::string &value), (override));
     MOCK_METHOD(bool, SetJSON, (const std::string &key, const std::string &value, int ttl), (override));
     MOCK_METHOD(bool, SetNX, (const std::string &key, const std::string &value, int ttl), (override));
