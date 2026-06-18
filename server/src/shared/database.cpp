@@ -48,14 +48,6 @@ sql_param::sql_param(MYSQL *conn, const std::string &s) : quote_(true) {
     val_.resize(len);
 }
 
-// 旧 q() / escape() 保留作为过渡兼容层，内部委托给 sql_param
-static std::string escape(MYSQL *conn, const std::string &s) {
-    return sql_param(conn, s).str();
-}
-static std::string q(MYSQL *conn, const std::string &s) {
-    return sql_param(conn, s).sql();
-}
-
 // 取任意可用连接供转义用（遍历写池→读池, 返回首个存活连接）
 MYSQL *Database::EscConn() {
     for (auto &wc : write_conns_)
