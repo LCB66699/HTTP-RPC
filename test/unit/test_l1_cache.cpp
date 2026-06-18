@@ -60,25 +60,27 @@ TEST(L1Cache, TtlExpiryReturnsNullopt) {
     L1Cache cache(10, 1);  // 1 second TTL
     cache.Set("k1", "v1");
     EXPECT_TRUE(cache.Get("k1").has_value());
+    EXPECT_EQ(cache.HitCount(), 1);
 
     // Wait for TTL to expire
     std::this_thread::sleep_for(std::chrono::milliseconds(1100));
 
     auto v = cache.Get("k1");
     EXPECT_EQ(v, std::nullopt);
-    EXPECT_EQ(cache.MissCount(), 2);  // initial miss is 0, this one + the expired one = 2
-    EXPECT_EQ(cache.Size(), 0);  // expired entry removed
+    EXPECT_EQ(cache.MissCount(), 1);  // only the expired Get counts as miss
+    EXPECT_EQ(cache.Size(), 0);
 }
 
 TEST(L1Cache, TtlExpiryCausesEvictionNotLru) {
-    L1Cache cache(3, 1);
+    // capacity=2, so Set("k3") triggers eviction (size hits max)
+    L1Cache cache(2, 1);
     cache.Set("k1", "v1");
     cache.Set("k2", "v2");
     std::this_thread::sleep_for(std::chrono::milliseconds(1100));
     // k1, k2 now expired
 
     cache.Set("k3", "v3");
-    // Before inserting k3, eviction should remove expired k1, k2 first
+    // EvictExpired fires first (lru_.size() >= max_entries_), removes both expired
     EXPECT_EQ(cache.Size(), 1);
     EXPECT_FALSE(cache.Get("k1").has_value());
     EXPECT_FALSE(cache.Get("k2").has_value());
