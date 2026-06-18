@@ -45,7 +45,7 @@ class IDatabase {
 class IRedisClient {
    public:
     virtual ~IRedisClient() = default;
-    virtual bool IsConnected() = 0;
+    virtual bool IsConnected() const = 0;
     virtual int64_t Increment(const std::string &key) = 0;
     virtual bool GetJSON(const std::string &key, std::string &value) = 0;
     virtual bool SetJSON(const std::string &key, const std::string &value, int ttl) = 0;
