@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.16)
+cmake_minimum_required(VERSION 3.18)
 project(http-rpc VERSION 1.0 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 20)
@@ -119,4 +119,4 @@ target_link_libraries(cpp_test
 target_link_options(cpp_test PRIVATE -no-pie)
 
 include(GoogleTest)
-gtest_discover_tests(cpp_test)
+gtest_discover_tests(cpp_test DISCOVERY_MODE PRE_TEST)
