@@ -32,9 +32,14 @@ TEST(SheetMock, GetSpreadsheetRedisCacheHit) {
     std::string ser;
     ASSERT_TRUE(cached_resp.SerializeToString(&ser));
 
-    // First GetJSON call (data key) returns the cached proto
+    // GetJSON returns the cached proto (ts key and data key both hit)
     EXPECT_CALL(redis, GetJSON(_, _))
-        .WillOnce(DoAll(SetArgReferee<1>(ser), Return(true)));
+        .WillRepeatedly(DoAll(SetArgReferee<1>(ser), Return(true)));
+
+    // Allow other redis calls (lock, etc.)
+    EXPECT_CALL(redis, SetNX(_, _, _)).WillRepeatedly(Return(true));
+    EXPECT_CALL(redis, SetJSON(_, _, _)).WillRepeatedly(Return(true));
+    EXPECT_CALL(redis, DeleteKey(_)).WillRepeatedly(Return(true));
 
     // DB must NOT be touched on cache hit
     EXPECT_CALL(db, GetSpreadsheet(_, _, _)).Times(0);
