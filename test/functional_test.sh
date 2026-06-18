@@ -200,6 +200,7 @@ SHEET_ID=$(echo "$CREATE" | sed 's/.*"id":"*//;s/"*[,}].*//')
 echo "$CREATE" | grep -q '"success":true' \
     && green "Create sheet OK, id=$SHEET_ID" \
     || red "Create sheet failed: $CREATE"
+sleep 2
 
 title "3.2 列表查询"
 LIST=$($CURL "$API/api/sheets" -b "$JAR")
@@ -271,6 +272,7 @@ FILE_ID=$(echo "$UPLOAD" | sed 's/.*"id":"*//;s/"*[,}].*//')
 echo "$UPLOAD" | grep -q '"success":true' \
     && green "Upload OK, id=$FILE_ID" \
     || red "Upload failed: $UPLOAD"
+sleep 2
 
 title "4.2 文件列表"
 FLIST=$($CURL "$API/api/files" -b "$JAR")
