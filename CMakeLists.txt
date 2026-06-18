@@ -70,12 +70,12 @@ set(PROTO_LIB_SRCS ${PROTO_SRCS} ${GRPC_SRCS})
 
 # Shared sources between services
 set(SHARED_SRCS
-    server/src/auth_interceptor.cpp
-    server/src/call_logger.cpp
-    server/src/database.cpp
-    server/src/redis_client.cpp)
+    server/src/shared/auth_interceptor.cpp
+    server/src/shared/call_logger.cpp
+    server/src/shared/database.cpp
+    server/src/shared/redis_client.cpp)
 if(HAS_OTEL)
-    list(APPEND SHARED_SRCS server/src/otel_tracer.cpp)
+    list(APPEND SHARED_SRCS server/src/shared/otel_tracer.cpp)
 endif()
 
 # ---- Services ----
@@ -92,18 +92,28 @@ function(add_rpc_service NAME MAIN_SRC EXTRA_SRCS)
     endif()
 endfunction()
 
-add_rpc_service(auth   server/src/main_auth.cpp     "server/src/auth_service_impl.cpp;server/src/health_service_impl.cpp")
-add_rpc_service(sheet  server/src/main_sheet.cpp    "server/src/spreadsheet_service_impl.cpp;server/src/health_service_impl.cpp;server/src/l1_cache.cpp;server/src/l1_invalidator.cpp;server/src/rabbit_publisher.cpp")
-add_rpc_service(file   server/src/main_file.cpp     "server/src/file_service_impl.cpp;server/src/health_service_impl.cpp;server/src/l1_cache.cpp;server/src/rabbit_publisher.cpp")
-add_rpc_service(search server/src/main_search.cpp   "server/src/search_service_impl.cpp;server/src/health_service_impl.cpp")
+add_rpc_service(auth   server/src/auth/main.cpp     "server/src/auth/auth_service_impl.cpp;server/src/shared/health_service_impl.cpp")
+add_rpc_service(sheet  server/src/sheet/main.cpp    "server/src/sheet/spreadsheet_service_impl.cpp;server/src/shared/health_service_impl.cpp;server/src/shared/l1_cache.cpp;server/src/shared/l1_invalidator.cpp;server/src/shared/rabbit_publisher.cpp")
+add_rpc_service(file   server/src/file/main.cpp     "server/src/file/file_service_impl.cpp;server/src/shared/health_service_impl.cpp;server/src/shared/l1_cache.cpp;server/src/shared/rabbit_publisher.cpp")
+add_rpc_service(search server/src/search/main.cpp   "server/src/search/search_service_impl.cpp;server/src/shared/health_service_impl.cpp")
 
 # ---- Tests ----
 add_executable(cpp_test
-    test/test_sha256.cpp test/test_jwt.cpp test/test_snowflake.cpp
-    test/test_otel_helpers.cpp
-    test/test_sheet_helpers.cpp test/test_file_helpers.cpp
-    test/test_data_helpers.cpp)
-target_link_libraries(cpp_test GTest::gtest GTest::gtest_main OpenSSL::SSL OpenSSL::Crypto pthread)
+    test/unit/test_sha256.cpp test/unit/test_jwt.cpp test/unit/test_snowflake.cpp
+    test/unit/test_otel_helpers.cpp
+    test/unit/test_sheet_helpers.cpp test/unit/test_file_helpers.cpp
+    test/unit/test_data_helpers.cpp
+    test/unit/test_l1_cache.cpp test/unit/test_call_logger.cpp
+    test/unit/test_auth_service.cpp
+    server/src/shared/l1_cache.cpp
+    server/src/auth/auth_service_impl.cpp
+    ${SHARED_SRCS}
+    ${PROTO_LIB_SRCS})
+target_link_libraries(cpp_test
+    GTest::gtest GTest::gtest_main
+    gRPC::grpc++ gRPC::grpc++_reflection ${Protobuf_LIBRARIES}
+    OpenSSL::SSL OpenSSL::Crypto
+    ${MYSQL_LIBRARIES} ${HIREDIS_LIBRARIES} redis++_static pthread)
 
 include(GoogleTest)
 gtest_discover_tests(cpp_test)

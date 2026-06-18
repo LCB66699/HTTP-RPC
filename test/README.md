@@ -6,12 +6,12 @@
 
 | 维度 | 目标 | 对应测试 |
 |------|------|---------|
-| **功能正确性** | 每个 API 的行为符合预期，边界条件有防御 | functional_test, search_test, grpc_test |
-| **系统完整性** | 所有服务能正常启动、互连、协同完成一个完整业务流程 | docker_health, integration_test |
+| **功能正确性** | 每个 API 的行为符合预期，边界条件有防御 | functional_test |
+| **系统完整性** | 所有服务能正常启动、互连、协同完成一个完整业务流程 | docker_health |
 | **性能基线** | 在已知硬件条件下建立性能参考值，后续变更可对比 | performance_test |
 | **稳定性边界** | 找到系统的吞吐上限和故障恢复能力，知道什么时候该扩容 | stress_test |
 
-测试执行顺序：**先确认活着（docker_health）→ 再确认能跑通（integration）→ 然后逐个功能验证（functional/search/grpc）→ 最后压测**。任何一步失败，后续测试结果都不可信。
+测试执行顺序：**先确认活着（docker_health）→ 再逐个功能验证（functional）→ 然后性能基准 → 最后压测**。
 
 ## 系统架构（当前版本 v2）
 
@@ -50,15 +50,12 @@
 
 | 文件 | 用途 | 耗时 |
 |------|------|------|
-| `docker_health.sh` | 全容器健康检查，逐个验证 healthy 状态 | ~2min |
-| `functional_test.sh` | 功能正确性：认证、鉴权、CRUD、缓存、Token 刷新、文件完整性 | ~45s |
-| `search_test.sh` | 搜索服务：创建→索引→搜索、scope 过滤、分页、高亮、模糊匹配 | ~40s |
-| `grpc_test.sh` | gRPC 直调：TxManager 2PC、HealthMonitor、Auth.ValidateUser、Search | ~30s |
-| `integration_test.sh` | E2E 集成：Docker 健康 + 注册→登录→创建→上传→索引→搜索→刷新→清理 | ~2min |
-| `performance_test.sh` | 性能基准：预热 → 单请求延迟 → 并发(P50/P95/P99) → 缓存命中率 → ab/wrk2 QPS | ~90s |
-| `stress_test.sh` | 逐层压测：L0 阶梯加压 → L1 内网 → L2 TLS → L3 公网 → L4 故障转移 → L5 稳定性 | ~2-37min |
-| `wrk_scripts/health.lua` | wrk2 GET 基准：纯网关吞吐，含自定义延迟分布报告 | — |
-| `wrk_scripts/mixed.lua` | wrk2 读写混合：70%列表/20%获取/10%创建，模拟真实流量 | — |
+| `e2e/docker_health.sh` | 全容器健康检查，逐个验证 healthy 状态 | ~2min |
+| `e2e/functional_test.sh` | 功能正确性：认证、鉴权、CRUD、缓存、Token 刷新、文件完整性 | ~45s |
+| `e2e/performance_test.sh` | 性能基准：预热 → 单请求延迟 → 并发(P50/P95/P99) → 缓存命中率 → ab/wrk2 QPS | ~90s |
+| `e2e/stress_test.sh` | 逐层压测：L0 阶梯加压 → L1 内网 → L2 TLS → L3 公网 → L4 故障转移 → L5 稳定性 | ~2-37min |
+| `wrk/health.lua` | wrk2 GET 基准：纯网关吞吐，含自定义延迟分布报告 | — |
+| `wrk/mixed.lua` | wrk2 读写混合：70%列表/20%获取/10%创建，模拟真实流量 | — |
 
 ## API 端点
 
@@ -109,11 +106,9 @@ make test-all
 make test-smoke
 
 # 单独测试
-make test-search          # 搜索功能
-make test-grpc            # gRPC 直调
-make test-integration     # E2E 集成
 make test-functional      # 功能正确性
 make test-performance     # 性能基准
+make test-stress          # 压力测试
 make test-docker-health   # 容器健康检查
 
 # 清理测试日志
@@ -123,8 +118,8 @@ make test-clean
 ## 功能测试
 
 ```bash
-bash test/functional_test.sh
-bash test/functional_test.sh https://192.168.1.100
+bash test/e2e/functional_test.sh
+bash test/e2e/functional_test.sh https://192.168.1.100
 ```
 
 ### 测试覆盖（24 项）
@@ -149,8 +144,8 @@ bash test/functional_test.sh https://192.168.1.100
 ## 性能测试
 
 ```bash
-bash test/performance_test.sh
-bash test/performance_test.sh https://192.168.1.100 20   # 自定义地址 + 并发数
+bash test/e2e/performance_test.sh
+bash test/e2e/performance_test.sh https://192.168.1.100 20   # 自定义地址 + 并发数
 ```
 
 ### 测试指标
@@ -182,20 +177,20 @@ bash test/performance_test.sh https://192.168.1.100 20   # 自定义地址 + 并
 ## 压力测试（逐层定位）
 
 ```bash
-bash test/stress_test.sh
-bash test/stress_test.sh https://localhost 5000 20
+bash test/e2e/stress_test.sh
+bash test/e2e/stress_test.sh https://localhost 5000 20
 #                               API         请求数  并发数
 
 # 全时长稳定性测试 (30min)
-bash test/stress_test.sh --long
+bash test/e2e/stress_test.sh --long
 
 # 自定义参数 + 全时长
-bash test/stress_test.sh --long https://localhost 5000 20
+bash test/e2e/stress_test.sh --long https://localhost 5000 20
 STRESS_LONG_DURATION=3600 STRESS_LONG_READERS=20 STRESS_LONG_WRITERS=5 \
-    bash test/stress_test.sh --long
+    bash test/e2e/stress_test.sh --long
 
 # 跳过 L5
-STRESS_LONG=0 bash test/stress_test.sh
+STRESS_LONG=0 bash test/e2e/stress_test.sh
 ```
 
 ### 七层递进
@@ -240,19 +235,19 @@ wrk2 -t4 -c10 -d30s -R200 --latency https://localhost/api/health
 
 # 使用 Lua 脚本获得详细延迟分布
 wrk2 -t4 -c10 -d30s -R200 --latency \
-    -s test/wrk_scripts/health.lua \
+    -s test/wrk/health.lua \
     https://localhost/api/health
 
 # 混合读写负载 (需要 token)
 export RPC_TOKEN="eyJ..."  # 从 cookie jar 或 functional_test 输出获取
 wrk2 -t4 -c20 -d60s -R200 --latency \
-    -s test/wrk_scripts/mixed.lua \
+    -s test/wrk/mixed.lua \
     https://localhost/api/sheets
 
 # 自定义混合比例
 MIXED_LIST_PCT=50 MIXED_GET_PCT=30 RPC_TOKEN="$TOK" \
     wrk2 -t4 -c20 -d60s -R200 --latency \
-    -s test/wrk_scripts/mixed.lua \
+    -s test/wrk/mixed.lua \
     https://localhost/api/sheets
 ```
 
@@ -261,19 +256,19 @@ MIXED_LIST_PCT=50 MIXED_GET_PCT=30 RPC_TOKEN="$TOK" \
 ```bash
 # 1. gRPC 副本容错
 docker stop http-rpc-sheet-2-1
-bash test/functional_test.sh
+bash test/e2e/functional_test.sh
 docker start http-rpc-sheet-2-1
 
 # 2. Redis Cluster 故障转移（gossip 自动选举，5s 内恢复）
 docker stop http-rpc-redis-cluster-1
 sleep 8
 docker logs http-rpc-redis-cluster-4 --tail 5
-bash test/functional_test.sh
+bash test/e2e/functional_test.sh
 docker start http-rpc-redis-cluster-1
 
 # 3. MySQL 分片 Slave 容错
 docker stop http-rpc-mysql-spreadsheet-0-slave-1
-bash test/functional_test.sh
+bash test/e2e/functional_test.sh
 docker start http-rpc-mysql-spreadsheet-0-slave-1
 
 # 4. 熔断器验证：停全部 sheet 副本，触发 OPEN
