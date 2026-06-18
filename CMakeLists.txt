@@ -105,12 +105,14 @@ add_executable(cpp_test
     test/unit/test_data_helpers.cpp
     test/unit/test_l1_cache.cpp test/unit/test_call_logger.cpp
     test/unit/test_auth_service.cpp
+    test/unit/test_sheet_mock.cpp
     server/src/shared/l1_cache.cpp
     server/src/auth/auth_service_impl.cpp
+    server/src/sheet/spreadsheet_service_impl.cpp
     ${SHARED_SRCS}
     ${PROTO_LIB_SRCS})
 target_link_libraries(cpp_test
-    GTest::gtest GTest::gtest_main
+    GTest::gtest GTest::gtest_main GTest::gmock
     gRPC::grpc++ gRPC::grpc++_reflection ${Protobuf_LIBRARIES}
     OpenSSL::SSL OpenSSL::Crypto
     ${MYSQL_LIBRARIES} ${HIREDIS_LIBRARIES} redis++_static pthread)

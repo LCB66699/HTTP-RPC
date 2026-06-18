@@ -8,10 +8,8 @@
 #include "generated/rpc_spreadsheet.grpc.pb.h"
 #include "generated/rpc_spreadsheet.pb.h"
 #include "minio_client.h"
-#include "rabbit_publisher.h"
 #include "service_interfaces.h"
 
-class RedisClient;
 class CallLogger;
 class SystemLogger;
 class L1Cache;
@@ -21,12 +19,12 @@ class AuthInterceptor;
 class SpreadsheetServiceImpl final : public rpc::SpreadsheetService::Service {
    public:
     void SetDatabase(IDatabase *db) { db_ = db; }
-    void SetRedis(RedisClient *redis) { redis_ = redis; }
+    void SetRedis(IRedisClient *redis) { redis_ = redis; }
     void SetL1Cache(L1Cache *cache) { l1_ = cache; }
     void SetLogger(CallLogger *logger) { logger_ = logger; }
     void SetSysLog(SystemLogger *slog) { slog_ = slog; }
     void SetAuthInterceptor(AuthInterceptor *interceptor) { auth_ = interceptor; }
-    void SetRabbitMQ(RabbitPublisher *rb) { rabbit_ = rb; }
+    void SetRabbitMQ(IRabbitPublisher *rb) { rabbit_ = rb; }
     void SetMinio(minio::Client *mc) { minio_ = mc; }
     void SetAuthChannel(std::shared_ptr<grpc::Channel> ch) { auth_stub_ = rpc::AuthService::NewStub(ch); }
 
@@ -47,12 +45,12 @@ class SpreadsheetServiceImpl final : public rpc::SpreadsheetService::Service {
 
    private:
     IDatabase *db_ = nullptr;
-    RedisClient *redis_ = nullptr;
+    IRedisClient *redis_ = nullptr;
     L1Cache *l1_ = nullptr;
     CallLogger *logger_ = nullptr;
     SystemLogger *slog_ = nullptr;
     AuthInterceptor *auth_ = nullptr;
     std::unique_ptr<rpc::AuthService::Stub> auth_stub_;
-    RabbitPublisher *rabbit_ = nullptr;
+    IRabbitPublisher *rabbit_ = nullptr;
     minio::Client *minio_ = nullptr;
 };

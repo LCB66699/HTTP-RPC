@@ -5,8 +5,9 @@
 #include <memory>
 #include <string>
 
-// 轻量 RabbitMQ 发布器 — 连接池复用, 线程安全
-class RabbitPublisher {
+#include "service_interfaces.h"
+
+class RabbitPublisher : public IRabbitPublisher {
    public:
     RabbitPublisher(const std::string &host, int port, const std::string &user, const std::string &pass);
     ~RabbitPublisher();

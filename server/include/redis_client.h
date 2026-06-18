@@ -8,13 +8,15 @@
 #include <unordered_map>
 #include <vector>
 
+#include "service_interfaces.h"
+
 namespace sw {
 namespace redis {
 class RedisCluster;
 }
 }  // namespace sw
 
-class RedisClient {
+class RedisClient : public IRedisClient {
    public:
     // cluster_seeds: "host:port" strings (at least one, preferably 3+)
     RedisClient(const std::vector<std::string> &cluster_seeds, const std::string &password = "", int pool_size = 4);
