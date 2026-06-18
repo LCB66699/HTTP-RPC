@@ -118,5 +118,8 @@ target_link_libraries(cpp_test
     ${MYSQL_LIBRARIES} ${HIREDIS_LIBRARIES} redis++_static pthread gmock)
 target_link_options(cpp_test PRIVATE -no-pie)
 
-include(GoogleTest)
-gtest_discover_tests(cpp_test DISCOVERY_MODE PRE_TEST)
+enable_testing()
+add_test(NAME cpp_test COMMAND cpp_test)
+# gtest_discover_tests 在 CMake 3.28 上 CTestTestfile.cmake 生成不稳定，
+# 改用 add_test 直接注册。ctest 运行时 ./cpp_test 一次性跑完 76 个 gtest，
+# 任一失败则 ctest 返回非零。
