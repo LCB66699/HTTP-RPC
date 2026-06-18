@@ -1,6 +1,6 @@
 # 单元测试
 
-70 个测试用例，覆盖项目核心工具函数和基础组件。
+76 个测试用例，覆盖核心工具函数、基础组件和 gRPC 服务缓存逻辑。
 
 ## 运行
 
@@ -16,10 +16,59 @@ ctest --test-dir build --output-on-failure
 ./build/cpp_test --gtest_filter='L1Cache.*'
 ./build/cpp_test --gtest_filter='CallLoggerTest.*'
 ./build/cpp_test --gtest_filter='AuthService.*'
+./build/cpp_test --gtest_filter='SheetMock.*'
 ./build/cpp_test --gtest_filter='SHA256.*'
 ./build/cpp_test --gtest_filter='JWT.*'
 ./build/cpp_test --gtest_filter='Snowflake.*'
 ```
+
+## Mock 测试
+
+Mock 类定义在 `test/unit/mocks.h`，基于 `service_interfaces.h` 的抽象接口：
+
+| Mock | 基于接口 | 方法数 |
+|---|---|---|
+| `MockDB` | `IDatabase` | 18 |
+| `MockRedis` | `IRedisClient` | 8 |
+| `MockRabbit` | `IRabbitPublisher` | 1 |
+
+### 用法示例
+
+```cpp
+#include "mocks.h"
+#include "spreadsheet_service_impl.h"
+
+TEST(SheetMock, Example) {
+    MockDB db;
+    MockRedis redis;
+    SpreadsheetServiceImpl svc;
+
+    // 注入 mock
+    svc.SetDatabase(&db);    // IDatabase*
+    svc.SetRedis(&redis);    // IRedisClient*
+
+    // 设定期望
+    EXPECT_CALL(redis, IsConnected()).WillRepeatedly(Return(true));
+    EXPECT_CALL(db, GetSpreadsheetOwner(1, _, _))
+        .WillOnce(DoAll(SetArgReferee<1>(42), Return(true)));
+
+    // 调用真实 gRPC 方法
+    grpc::ServerContext ctx;
+    rpc::GetSpreadsheetRequest req;
+    rpc::GetSpreadsheetResponse resp;
+    req.set_id(1);
+    req.set_user_id(42);
+    svc.GetSpreadsheet(&ctx, &req, &resp);
+}
+```
+
+### 已覆盖场景
+
+| 用例 | 覆盖 |
+|---|---|
+| `SheetMock.GetSpreadsheetRedisCacheHit` | Redis 缓存命中 → DB 不调用 |
+| `SheetMock.GetSpreadsheetCacheMissThenDbHit` | 缓存双 miss → DB 回源 → 写回 Redis |
+| `SheetMock.GetSpreadsheetWrongOwner` | owner 不匹配 → `success=false` |
 
 ## 测试清单
 
@@ -39,6 +88,12 @@ ctest --test-dir build --output-on-failure
 | `test_auth_service.cpp` | 11 | IsAdminUser(前缀/环境变量/空格/空值), b64enc(间接), 注册+登录, 密码校验, 重复注册, 输入校验 |
 | `test_jwt.cpp` | 5 | 签发+验证, 错误密钥, 篡改检测, 空密钥, Base64URL 格式 |
 
+### 服务 (Mock)
+
+| 文件 | 用例 | 覆盖 |
+|---|---|---|
+| `test_sheet_mock.cpp` | 3 | GetSpreadsheet: 缓存命中/DB回源/权限拒绝 |
+
 ### 辅助函数
 
 | 文件 | 用例 | 覆盖 |
@@ -52,8 +107,9 @@ ctest --test-dir build --output-on-failure
 
 | 模块 | 优先级 | 说明 |
 |---|---|---|
-| `auth_interceptor` JWT payload 解析 | 高 | 需先抽取纯函数, 测试缺字段/过期/格式异常 |
-| `spreadsheet/file` 缓存策略 | 高 | `service_interfaces.h` 已有接口, 需改成依赖注入 |
+| `spreadsheet_service` Create/Update/Delete | 高 | 接口注入已完成, 可直接 mock 扩展更多用例 |
+| `file_service` 缓存策略 | 高 | FileServiceImpl 已注入 IDatabase/IRedisClient, 可复用 MockDB/MockRedis |
+| `auth_interceptor` JWT payload 解析 | 中 | 需先抽取纯函数, 测试缺字段/过期/格式异常 |
 | `search_service` ES DSL 构建 | 中 | 提取 DSL builder, mock ES 客户端 |
 | `database` 分片路由 | 中 | 需 MySQL mock 或嵌入式 MySQL |
 | `redis_client` Lua 脚本 | 低 | 需 Redis, 集成测试更合适 |
