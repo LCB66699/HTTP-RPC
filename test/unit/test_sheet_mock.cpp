@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <thread>
+
 #include "mocks.h"
 #include "spreadsheet_service_impl.h"
 
@@ -98,6 +100,9 @@ TEST(SheetMock, GetSpreadsheetCacheMissThenDbHit) {
     auto status = svc.GetSpreadsheet(&ctx, &req, &resp);
     EXPECT_TRUE(status.ok());
     EXPECT_TRUE(resp.success());
+
+    // 等后台异步刷新线程跑完，避免析构时野指针
+    std::this_thread::sleep_for(std::chrono::milliseconds(50));
 }
 
 // ===== GetSpreadsheet — wrong owner =====
