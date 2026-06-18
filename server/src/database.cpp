@@ -389,8 +389,8 @@ bool Database::Initialize() {
         exec("CREATE TABLE IF NOT EXISTS outbox (id BIGINT AUTO_INCREMENT PRIMARY KEY, event_type VARCHAR(64) NOT NULL, payload JSON NOT NULL, created_at DATETIME DEFAULT NOW())");
     }
 
-    fprintf(stderr, "[DB] schema initialized on %s (conns: write=%zu read=%zu)\n",
-            db_name_.c_str(), write_conns_.size(), read_conns_.size());
+    printf("[DB] schema initialized on %s (conns: write=%zu read=%zu)\n",
+           db_name_.c_str(), write_conns_.size(), read_conns_.size());
     return true;
 }
 
