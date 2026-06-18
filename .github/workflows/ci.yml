@@ -125,3 +125,23 @@ jobs:
         run: |
           docker compose build auth-1 sheet-1 file-1 search grpc-gateway notify-service
           docker compose push auth-1 sheet-1 file-1 search grpc-gateway notify-service
+
+  # ===== Stage 4: 自动部署到 Ubuntu (仅 main 分支) =====
+  deploy:
+    needs: push
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Deploy to Ubuntu server
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USERNAME }}
+          key: ${{ secrets.SSH_KEY }}
+          script: |
+            cd /home/ubuntu/HTTP-RPC
+            echo "${{ secrets.GHCR_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+            docker compose pull auth-1 auth-2 sheet-1 sheet-2 file-1 file-2 search grpc-gateway grpc-gateway-2 notify-service
+            docker compose up -d
+            docker image prune -f
