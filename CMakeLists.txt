@@ -112,7 +112,7 @@ add_executable(cpp_test
     ${SHARED_SRCS}
     ${PROTO_LIB_SRCS})
 target_link_libraries(cpp_test
-    GTest::gtest GTest::gtest_main GTest::gmock
+    GTest::gtest GTest::gtest_main
     gRPC::grpc++ gRPC::grpc++_reflection ${Protobuf_LIBRARIES}
     OpenSSL::SSL OpenSSL::Crypto
     ${MYSQL_LIBRARIES} ${HIREDIS_LIBRARIES} redis++_static pthread)
