@@ -57,7 +57,7 @@ jobs:
           docker compose up -d \
             nginx grpc-gateway \
             auth-1 sheet-1 file-1 search \
-            mysql-auth mysql-spreadsheet-0 mysql-spreadsheet-1 mysql-file-0 mysql-file-1 \
+            mysql-auth mysql-spreadsheet-0 mysql-spreadsheet-0-slave mysql-spreadsheet-1 mysql-file-0 mysql-file-0-slave mysql-file-1 \
             minio minio-init redis-cluster-1 redis-cluster-2 redis-cluster-3 \
             redis-cluster-4 redis-cluster-5 redis-cluster-6 redis-cluster-init \
             elasticsearch es-init jaeger

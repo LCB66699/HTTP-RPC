@@ -49,6 +49,14 @@
     command: --innodb-buffer-pool-size=32M --innodb-log-buffer-size=4M --innodb-log-file-size=16M --performance-schema=OFF --skip-innodb-doublewrite
     environment: { MYSQL_ROOT_PASSWORD: "${MYSQL_ROOT_PASSWORD:-123456}" }
     volumes: ["./deploy/mysql/slave/conf.d:/etc/mysql/conf.d", "./data/mysql-sp-0s:/var/lib/mysql"]
+    networks:
+      default:
+        aliases: [mysql-spreadsheet-r]
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
     depends_on: [mysql-spreadsheet-0]
 
   mysql-spreadsheet-1:
@@ -92,6 +100,14 @@
     command: --innodb-buffer-pool-size=32M --innodb-log-buffer-size=4M --innodb-log-file-size=16M --performance-schema=OFF --skip-innodb-doublewrite
     environment: { MYSQL_ROOT_PASSWORD: "${MYSQL_ROOT_PASSWORD:-123456}" }
     volumes: ["./deploy/mysql/slave/conf.d:/etc/mysql/conf.d", "./data/mysql-f-0s:/var/lib/mysql"]
+    networks:
+      default:
+        aliases: [mysql-file-r]
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
     depends_on: [mysql-file-0]
 
   mysql-file-1:
@@ -361,7 +377,7 @@
       MINIO_PUBLIC_URL: "http://minio:9000"
     command: >
       /app/rpc_server --service spreadsheet --port 50051
-      --mysql-write-host mysql-spreadsheet --mysql-read-hosts mysql-spreadsheet --mysql-password ${MYSQL_ROOT_PASSWORD:-123456} --mysql-db rpc_spreadsheet --mysql-shards 1
+      --mysql-write-host mysql-spreadsheet --mysql-read-hosts mysql-spreadsheet-r --mysql-password ${MYSQL_ROOT_PASSWORD:-123456} --mysql-db rpc_spreadsheet --mysql-shards 1
       --redis-cluster redis-cluster-7000:7000 --redis-cluster redis-cluster-7001:7001 --redis-cluster redis-cluster-7002:7002 --redis-password ${REDIS_PASSWORD:-rpc-redis-123456}
     networks:
       default:
@@ -394,7 +410,7 @@
       MINIO_PUBLIC_URL: "http://minio:9000"
     command: >
       /app/rpc_server --service spreadsheet --port 50051
-      --mysql-write-host mysql-spreadsheet --mysql-read-hosts mysql-spreadsheet --mysql-password ${MYSQL_ROOT_PASSWORD:-123456} --mysql-db rpc_spreadsheet --mysql-shards 1
+      --mysql-write-host mysql-spreadsheet --mysql-read-hosts mysql-spreadsheet-r --mysql-password ${MYSQL_ROOT_PASSWORD:-123456} --mysql-db rpc_spreadsheet --mysql-shards 1
       --redis-cluster redis-cluster-7000:7000 --redis-cluster redis-cluster-7001:7001 --redis-cluster redis-cluster-7002:7002 --redis-password ${REDIS_PASSWORD:-rpc-redis-123456}
     networks:
       default:
@@ -433,7 +449,7 @@
       MINIO_PUBLIC_URL: "http://minio:9000"
     command: >
       /app/rpc_server --service file --port 50051
-      --mysql-write-host mysql-file --mysql-read-hosts mysql-file --mysql-password ${MYSQL_ROOT_PASSWORD:-123456} --mysql-db rpc_file --mysql-shards 1
+      --mysql-write-host mysql-file --mysql-read-hosts mysql-file-r --mysql-password ${MYSQL_ROOT_PASSWORD:-123456} --mysql-db rpc_file --mysql-shards 1
       --redis-cluster redis-cluster-7000:7000 --redis-cluster redis-cluster-7001:7001 --redis-cluster redis-cluster-7002:7002 --redis-password ${REDIS_PASSWORD:-rpc-redis-123456}
     networks:
       default:
@@ -464,7 +480,7 @@
       MINIO_PUBLIC_URL: "http://minio:9000"
     command: >
       /app/rpc_server --service file --port 50051
-      --mysql-write-host mysql-file --mysql-read-hosts mysql-file --mysql-password ${MYSQL_ROOT_PASSWORD:-123456} --mysql-db rpc_file --mysql-shards 1
+      --mysql-write-host mysql-file --mysql-read-hosts mysql-file-r --mysql-password ${MYSQL_ROOT_PASSWORD:-123456} --mysql-db rpc_file --mysql-shards 1
       --redis-cluster redis-cluster-7000:7000 --redis-cluster redis-cluster-7001:7001 --redis-cluster redis-cluster-7002:7002 --redis-password ${REDIS_PASSWORD:-rpc-redis-123456}
     networks:
       default:
