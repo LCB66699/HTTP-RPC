@@ -83,7 +83,7 @@ jobs:
           docker compose ps
 
       - name: Functional tests
-        run: bash test/functional_test.sh
+        run: bash test/e2e/functional_test.sh
 
       - name: Container logs on failure
         if: failure()
