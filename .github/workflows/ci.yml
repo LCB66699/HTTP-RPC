@@ -142,6 +142,7 @@ jobs:
           script: |
             cd /home/ubuntu/HTTP-RPC
             echo "${{ secrets.GHCR_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+            export DOCKER_USER=ghcr.io/lcb66699/http-rpc
             docker compose pull auth-1 auth-2 sheet-1 sheet-2 file-1 file-2 search grpc-gateway grpc-gateway-2 notify-service
             docker compose up -d
             docker image prune -f
