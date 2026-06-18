@@ -17,25 +17,26 @@ TEST(SheetMock, GetSpreadsheetRedisCacheHit) {
     svc.SetDatabase(&db);
     svc.SetRedis(&redis);
 
-    // Ownership check
+    // Ownership check: caller 42 owns sheet 1
     EXPECT_CALL(db, GetSpreadsheetOwner(1, _, _))
         .WillOnce(DoAll(SetArgReferee<1>(42), Return(true)));
 
     EXPECT_CALL(redis, IsConnected()).WillRepeatedly(Return(true));
 
-    // Redis cache hit — serialize a rpc::GetSpreadsheetResponse
+    // Redis returns a cached GetSpreadsheetResponse
     rpc::GetSpreadsheetResponse cached_resp;
     cached_resp.set_success(true);
     auto *s = cached_resp.mutable_spreadsheet();
     s->set_id(1);
     s->set_name("cached-sheet");
-    s->set_description("from-redis");
     std::string ser;
     ASSERT_TRUE(cached_resp.SerializeToString(&ser));
-    EXPECT_CALL(redis, GetJSON("u:42:sheet:1", _))
+
+    // First GetJSON call (data key) returns the cached proto
+    EXPECT_CALL(redis, GetJSON(_, _))
         .WillOnce(DoAll(SetArgReferee<1>(ser), Return(true)));
 
-    // DB must NOT be touched
+    // DB must NOT be touched on cache hit
     EXPECT_CALL(db, GetSpreadsheet(_, _, _)).Times(0);
 
     grpc::ServerContext ctx;
@@ -66,9 +67,14 @@ TEST(SheetMock, GetSpreadsheetCacheMissThenDbHit) {
 
     EXPECT_CALL(redis, IsConnected()).WillRepeatedly(Return(true));
 
-    // Redis: both data and timestamp keys miss
-    EXPECT_CALL(redis, GetJSON("u:42:sheet:2", _)).WillOnce(Return(false));
-    EXPECT_CALL(redis, GetJSON("u:42:sheet:2:ts", _)).WillOnce(Return(false));
+    // Redis: all keys miss
+    EXPECT_CALL(redis, GetJSON(_, _)).WillRepeatedly(Return(false));
+
+    // Redis: allow SetNX/SetJSON/DeleteKey for logical-TTL
+    EXPECT_CALL(redis, SetNX(_, _, _)).WillRepeatedly(Return(true));
+    EXPECT_CALL(redis, SetJSON(_, _, _)).WillRepeatedly(Return(true));
+    EXPECT_CALL(redis, DeleteKey(_)).WillRepeatedly(Return(true));
+    EXPECT_CALL(redis, ExpireKey(_, _)).WillRepeatedly(Return(true));
 
     // DB: hit
     SpreadsheetRow row;
@@ -77,9 +83,6 @@ TEST(SheetMock, GetSpreadsheetCacheMissThenDbHit) {
     row.description = "from-db";
     EXPECT_CALL(db, GetSpreadsheet(2, 42, _))
         .WillOnce(DoAll(SetArgReferee<2>(row), Return(true)));
-
-    // Redis: write-back cache
-    EXPECT_CALL(redis, SetJSON(_, _, _)).Times(2);
 
     grpc::ServerContext ctx;
     rpc::GetSpreadsheetRequest req;
