@@ -23,14 +23,16 @@ TEST(SheetMock, GetSpreadsheetRedisCacheHit) {
 
     EXPECT_CALL(redis, IsConnected()).WillRepeatedly(Return(true));
 
-    // Redis cache hit — serialize a rpc::Spreadsheet proto
-    rpc::Spreadsheet fresh;
-    fresh.set_id(1);
-    fresh.set_name("cached-sheet");
-    fresh.set_description("from-redis");
+    // Redis cache hit — serialize a rpc::GetSpreadsheetResponse
+    rpc::GetSpreadsheetResponse cached_resp;
+    cached_resp.set_success(true);
+    auto *s = cached_resp.mutable_spreadsheet();
+    s->set_id(1);
+    s->set_name("cached-sheet");
+    s->set_description("from-redis");
     std::string ser;
-    ASSERT_TRUE(fresh.SerializeToString(&ser));
-    EXPECT_CALL(redis, GetJSON("sheet:1", _))
+    ASSERT_TRUE(cached_resp.SerializeToString(&ser));
+    EXPECT_CALL(redis, GetJSON("u:42:sheet:1", _))
         .WillOnce(DoAll(SetArgReferee<1>(ser), Return(true)));
 
     // DB must NOT be touched
@@ -65,8 +67,8 @@ TEST(SheetMock, GetSpreadsheetCacheMissThenDbHit) {
     EXPECT_CALL(redis, IsConnected()).WillRepeatedly(Return(true));
 
     // Redis: both data and timestamp keys miss
-    EXPECT_CALL(redis, GetJSON("sheet:2", _)).WillOnce(Return(false));
-    EXPECT_CALL(redis, GetJSON("sheet:2:ts", _)).WillOnce(Return(false));
+    EXPECT_CALL(redis, GetJSON("u:42:sheet:2", _)).WillOnce(Return(false));
+    EXPECT_CALL(redis, GetJSON("u:42:sheet:2:ts", _)).WillOnce(Return(false));
 
     // DB: hit
     SpreadsheetRow row;
