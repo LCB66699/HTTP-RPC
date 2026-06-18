@@ -383,7 +383,14 @@ grpc::Status SpreadsheetServiceImpl::GetSpreadsheet(grpc::ServerContext *context
     }
 
     SpreadsheetRow row;
-    if (!db_->GetSpreadsheet(req->id(), req_uid, row)) {
+    // 同连接可能瞬时不可见已提交数据，短暂重试
+    bool got = false;
+    for (int r = 0; r < 3 && db_; ++r) {
+        got = db_->GetSpreadsheet(req->id(), req_uid, row);
+        if (got) break;
+        std::this_thread::sleep_for(std::chrono::milliseconds(5));
+    }
+    if (!got) {
         // Cache null sentinel to prevent cache penetration
         if (redis_ && redis_->IsConnected()) {
             redis_->SetJSON(cache_key, kNullMarker, RedisClient::JitteredTTL(NULL_TTL, 30));

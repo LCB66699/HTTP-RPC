@@ -299,7 +299,13 @@ grpc::Status FileServiceImpl::GetFile(grpc::ServerContext *context, const rpc::G
     }
 
     FileRow row;
-    if (!db_->GetFile(req->id(), req_uid, row)) {
+    bool got = false;
+    for (int r = 0; r < 3 && db_; ++r) {
+        got = db_->GetFile(req->id(), req_uid, row);
+        if (got) break;
+        std::this_thread::sleep_for(std::chrono::milliseconds(5));
+    }
+    if (!got) {
         if (redis_ && redis_->IsConnected()) {
             redis_->SetJSON(cache_key, kNullMarker, RedisClient::JitteredTTL(NULL_TTL, 30));
             redis_->SetJSON(ts_key, std::to_string(std::time(nullptr)), RedisClient::JitteredTTL(NULL_TTL, 30));
