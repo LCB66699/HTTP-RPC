@@ -81,6 +81,12 @@ Database::Database(const std::string &write_host, int write_port, const std::str
     }
     read_hosts_.push_back(hosts.substr(start));
 
+    // 读写同主机同端口 = 无从库 = 不需要 read_conns
+    // ExecRead 会自动 fallback 到 write_conns
+    bool no_read_replica = (read_hosts_.size() == 1 && read_hosts_[0] == write_host_ && read_port_ == write_port_);
+    if (no_read_replica)
+        read_hosts_.clear();
+
     // 创建写连接池 — 同一主库多条连接, 实现并行写
     write_conns_.reserve(pool_size_);
     for (int i = 0; i < pool_size_; i++) {
