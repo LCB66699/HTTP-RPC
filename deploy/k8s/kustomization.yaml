@@ -17,8 +17,10 @@ resources:
   - sheet/service.yaml
   - file/deployment.yaml
   - file/service.yaml
+  - search/deployment.yaml
   - gateway/deployment.yaml
   - gateway/hpa.yaml
+  - notify/deployment.yaml
   - ingress/ingress.yaml
 
 commonLabels:

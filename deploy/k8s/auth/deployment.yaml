@@ -18,7 +18,7 @@ spec:
     spec:
       containers:
         - name: auth
-          image: http-rpc/server:latest
+          image: ghcr.io/lcb66699/http-rpc/auth:latest
           args:
             - --service=auth
             - --port=50051
