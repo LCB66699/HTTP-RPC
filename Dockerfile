@@ -4,7 +4,7 @@ RUN apt update && apt install -y \
     g++ make cmake git \
     protobuf-compiler-grpc libgrpc++-dev libprotobuf-dev \
     libmysqlclient-dev libhiredis-dev libssl-dev zlib1g-dev \
-    libnghttp2-dev librabbitmq-dev libgtest-dev libcurl4-openssl-dev
+    libnghttp2-dev librabbitmq-dev libgtest-dev libgmock-dev libcurl4-openssl-dev
 RUN cd /usr/src/googletest && cmake . && make -j$(nproc) && cp lib/*.a /usr/lib
 
 # OpenTelemetry C++ (OTLP HTTP exporter, static libs)
