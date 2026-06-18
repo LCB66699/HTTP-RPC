@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  # ===== Stage 1: 快速失败 — lint + 单元测试 (并行) =====
+  # ===== Stage 1: 快速失败 — lint + 单元测试 (并行!) =====
   lint-and-unit:
     runs-on: ubuntu-latest
     timeout-minutes: 10
