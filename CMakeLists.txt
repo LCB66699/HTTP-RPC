@@ -116,6 +116,7 @@ target_link_libraries(cpp_test
     gRPC::grpc++ gRPC::grpc++_reflection ${Protobuf_LIBRARIES}
     OpenSSL::SSL OpenSSL::Crypto
     ${MYSQL_LIBRARIES} ${HIREDIS_LIBRARIES} redis++_static pthread)
+target_link_options(cpp_test PRIVATE -no-pie)
 
 include(GoogleTest)
 gtest_discover_tests(cpp_test)
