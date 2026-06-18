@@ -47,8 +47,13 @@
   mysql-spreadsheet-0-slave:
     image: mysql:8.0
     command: --innodb-buffer-pool-size=32M --innodb-log-buffer-size=4M --innodb-log-file-size=16M --performance-schema=OFF --skip-innodb-doublewrite
-    environment: { MYSQL_ROOT_PASSWORD: "${MYSQL_ROOT_PASSWORD:-123456}" }
-    volumes: ["./deploy/mysql/slave/conf.d:/etc/mysql/conf.d", "./data/mysql-sp-0s:/var/lib/mysql"]
+    environment:
+      MYSQL_ROOT_PASSWORD: "${MYSQL_ROOT_PASSWORD:-123456}"
+      MYSQL_MASTER_HOST: mysql-spreadsheet-0
+    volumes:
+      - "./deploy/mysql/slave/conf.d:/etc/mysql/conf.d"
+      - "./deploy/mysql/slave/init-slave.sh:/docker-entrypoint-initdb.d/init-slave.sh"
+      - "./data/mysql-sp-0s:/var/lib/mysql"
     networks:
       default:
         aliases: [mysql-spreadsheet-r]
@@ -98,8 +103,13 @@
   mysql-file-0-slave:
     image: mysql:8.0
     command: --innodb-buffer-pool-size=32M --innodb-log-buffer-size=4M --innodb-log-file-size=16M --performance-schema=OFF --skip-innodb-doublewrite
-    environment: { MYSQL_ROOT_PASSWORD: "${MYSQL_ROOT_PASSWORD:-123456}" }
-    volumes: ["./deploy/mysql/slave/conf.d:/etc/mysql/conf.d", "./data/mysql-f-0s:/var/lib/mysql"]
+    environment:
+      MYSQL_ROOT_PASSWORD: "${MYSQL_ROOT_PASSWORD:-123456}"
+      MYSQL_MASTER_HOST: mysql-file-0
+    volumes:
+      - "./deploy/mysql/slave/conf.d:/etc/mysql/conf.d"
+      - "./deploy/mysql/slave/init-slave.sh:/docker-entrypoint-initdb.d/init-slave.sh"
+      - "./data/mysql-f-0s:/var/lib/mysql"
     networks:
       default:
         aliases: [mysql-file-r]

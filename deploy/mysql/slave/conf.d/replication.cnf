@@ -3,5 +3,5 @@ server-id=2
 read_only=1
 relay-log=mysql-relay-bin
 relay_log_recovery=1
-skip-slave-start=1
+skip-slave-start=0
 slave_net_timeout=10
