@@ -302,6 +302,7 @@ grpc::Status FileServiceImpl::GetFile(grpc::ServerContext *context, const rpc::G
     bool got = false;
     for (int r = 0; r < 3 && db_; ++r) {
         got = db_->GetFile(req->id(), req_uid, row);
+        if (slog_) LOG_DEBUG(*slog_, "GetFile id=" + std::to_string(req->id()) + " attempt=" + std::to_string(r+1) + " ok=" + std::to_string(got));
         if (got) break;
         std::this_thread::sleep_for(std::chrono::milliseconds(5));
     }

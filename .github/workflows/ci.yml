@@ -91,7 +91,7 @@ jobs:
           echo "=== sheet-1 ==="
           docker compose logs sheet-1 --tail=60
           echo "=== file-1 ==="
-          docker compose logs file-1 --tail=40
+          docker compose logs file-1 --tail=60
           echo "=== grpc-gateway ==="
           docker compose logs grpc-gateway --tail=20
           echo "=== auth-1 ==="
