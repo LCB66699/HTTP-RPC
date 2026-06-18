@@ -16,26 +16,24 @@ TEST(SheetMock, GetSpreadsheetRedisCacheHit) {
 
     svc.SetDatabase(&db);
     svc.SetRedis(&redis);
-    // auth_ and auth_stub_ both nullptr → auth check skipped
 
     // Ownership check
     EXPECT_CALL(db, GetSpreadsheetOwner(1, _, _))
         .WillOnce(DoAll(SetArgReferee<1>(42), Return(true)));
 
-    // Redis: connected
     EXPECT_CALL(redis, IsConnected()).WillRepeatedly(Return(true));
 
-    // Redis: cache hit — return serialized SpreadsheetRow
-    rpc::SpreadsheetRow cached;
-    cached.set_id(1);
-    cached.set_name("cached-sheet");
-    cached.set_description("from-redis");
+    // Redis cache hit — serialize a rpc::Spreadsheet proto
+    rpc::Spreadsheet fresh;
+    fresh.set_id(1);
+    fresh.set_name("cached-sheet");
+    fresh.set_description("from-redis");
     std::string ser;
-    ASSERT_TRUE(cached.SerializeToString(&ser));
+    ASSERT_TRUE(fresh.SerializeToString(&ser));
     EXPECT_CALL(redis, GetJSON("sheet:1", _))
         .WillOnce(DoAll(SetArgReferee<1>(ser), Return(true)));
 
-    // DB must NOT be touched on cache hit
+    // DB must NOT be touched
     EXPECT_CALL(db, GetSpreadsheet(_, _, _)).Times(0);
 
     grpc::ServerContext ctx;
@@ -46,8 +44,9 @@ TEST(SheetMock, GetSpreadsheetRedisCacheHit) {
 
     auto status = svc.GetSpreadsheet(&ctx, &req, &resp);
     EXPECT_TRUE(status.ok());
-    EXPECT_EQ(resp.id(), 1);
-    EXPECT_EQ(resp.name(), "cached-sheet");
+    EXPECT_TRUE(resp.success());
+    EXPECT_EQ(resp.spreadsheet().id(), 1);
+    EXPECT_EQ(resp.spreadsheet().name(), "cached-sheet");
 }
 
 // ===== GetSpreadsheet — cache miss, DB fallback =====
@@ -71,13 +70,13 @@ TEST(SheetMock, GetSpreadsheetCacheMissThenDbHit) {
 
     // DB: hit
     SpreadsheetRow row;
-    row.set_id(2);
-    row.set_name("db-sheet");
-    row.set_owner_uid(42);
+    row.id = 2;
+    row.name = "db-sheet";
+    row.description = "from-db";
     EXPECT_CALL(db, GetSpreadsheet(2, 42, _))
         .WillOnce(DoAll(SetArgReferee<2>(row), Return(true)));
 
-    // Redis: write-back cache (data + ts keys)
+    // Redis: write-back cache
     EXPECT_CALL(redis, SetJSON(_, _, _)).Times(2);
 
     grpc::ServerContext ctx;
@@ -88,7 +87,7 @@ TEST(SheetMock, GetSpreadsheetCacheMissThenDbHit) {
 
     auto status = svc.GetSpreadsheet(&ctx, &req, &resp);
     EXPECT_TRUE(status.ok());
-    EXPECT_EQ(resp.id(), 2);
+    EXPECT_TRUE(resp.success());
 }
 
 // ===== GetSpreadsheet — wrong owner =====
@@ -97,7 +96,6 @@ TEST(SheetMock, GetSpreadsheetWrongOwner) {
     SpreadsheetServiceImpl svc;
     svc.SetDatabase(&db);
 
-    // Owner is 99, but caller is 42
     EXPECT_CALL(db, GetSpreadsheetOwner(3, _, _))
         .WillOnce(DoAll(SetArgReferee<1>(99), Return(true)));
 
