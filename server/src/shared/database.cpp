@@ -37,18 +37,23 @@ bool Database::RunQuery(MYSQL *conn, const std::string &sql, MYSQL_RES **out_res
     return false;
 }
 
-// 转义辅助 — mysql_real_escape_string 是纯客户端函数, 同 charset
-// 下任意连接结果一致
+// ---- sql_param 构造函数 — 强制转义，编译期兜底 ----
+sql_param::sql_param(MYSQL *conn, const std::string &s) : quote_(true) {
+    if (!conn) {
+        val_ = s;
+        return;
+    }
+    val_.resize(s.size() * 2 + 1, '\0');
+    unsigned long len = mysql_real_escape_string(conn, &val_[0], s.c_str(), s.size());
+    val_.resize(len);
+}
+
+// 旧 q() / escape() 保留作为过渡兼容层，内部委托给 sql_param
 static std::string escape(MYSQL *conn, const std::string &s) {
-    if (!conn)
-        return s;
-    std::string out(s.size() * 2 + 1, '\0');
-    unsigned long len = mysql_real_escape_string(conn, &out[0], s.c_str(), s.size());
-    out.resize(len);
-    return out;
+    return sql_param(conn, s).str();
 }
 static std::string q(MYSQL *conn, const std::string &s) {
-    return "'" + escape(conn, s) + "'";
+    return sql_param(conn, s).sql();
 }
 
 // 取任意可用连接供转义用（遍历写池→读池, 返回首个存活连接）
@@ -398,10 +403,9 @@ bool Database::Initialize() {
 
 bool Database::AddUser(const std::string &username, const std::string &password_hash) {
     MYSQL *ec = EscConn();
-    int64_t snowflake_id = snowflake_ ? snowflake_->Next() : 0;
-    std::string sql = "INSERT INTO users (id, username, password_hash) VALUES (" + std::to_string(snowflake_id) + "," +
-                      q(ec, username) + ", " + q(ec, password_hash) + ")";
-    return ExecWrite(sql);
+    int64_t sf_id = snowflake_ ? snowflake_->Next() : 0;
+    return ExecWrite(make_sql("INSERT INTO users (id, username, password_hash) VALUES ({},{},{})",
+                              sf_id, sql_param(ec, username), sql_param(ec, password_hash)));
 }
 
 bool Database::GetUser(const std::string &username, std::string &password_hash_out) {
@@ -413,7 +417,8 @@ bool Database::GetUser(const std::string &username, std::string &password_hash_o
     std::lock_guard<std::mutex> lock(wc->mtx);
     if (!wc->conn)
         return false;
-    std::string sql = "SELECT password_hash FROM users WHERE username=" + q(wc->conn, username);
+    std::string sql = make_sql("SELECT password_hash FROM users WHERE username={}",
+                                sql_param(wc->conn, username));
     MYSQL_RES *res = nullptr;
     if (!RunQuery(wc->conn, sql, &res))
         return false;
@@ -434,7 +439,8 @@ bool Database::UserExists(const std::string &username) {
     std::lock_guard<std::mutex> lock(wc->mtx);
     if (!wc->conn)
         return false;
-    std::string sql = "SELECT 1 FROM users WHERE username=" + q(wc->conn, username);
+    std::string sql = make_sql("SELECT 1 FROM users WHERE username={}",
+                                sql_param(wc->conn, username));
     MYSQL_RES *res = nullptr;
     if (!RunQuery(wc->conn, sql, &res))
         return false;
@@ -452,7 +458,8 @@ int Database::GetTokenVersion(const std::string &username) {
     std::lock_guard<std::mutex> lock(wc->mtx);
     if (!wc->conn)
         return -1;
-    std::string sql = "SELECT token_version FROM users WHERE username=" + q(wc->conn, username);
+    std::string sql = make_sql("SELECT token_version FROM users WHERE username={}",
+                                sql_param(wc->conn, username));
     MYSQL_RES *res = nullptr;
     if (!RunQuery(wc->conn, sql, &res))
         return -1;
@@ -464,8 +471,8 @@ int Database::GetTokenVersion(const std::string &username) {
 
 bool Database::IncrementTokenVersion(const std::string &username) {
     MYSQL *ec = EscConn();
-    std::string sql = "UPDATE users SET token_version = token_version + 1 WHERE username=" + q(ec, username);
-    return ExecWrite(sql);
+    return ExecWrite(make_sql("UPDATE users SET token_version = token_version + 1 WHERE username={}",
+                              sql_param(ec, username)));
 }
 
 int64_t Database::GetUserId(const std::string &username) {
@@ -478,7 +485,8 @@ int64_t Database::GetUserId(const std::string &username) {
     std::lock_guard<std::mutex> lock(wc->mtx);
     if (!wc->conn)
         return -1;
-    std::string sql = "SELECT id FROM users WHERE username=" + q(wc->conn, username);
+    std::string sql = make_sql("SELECT id FROM users WHERE username={}",
+                                sql_param(wc->conn, username));
     MYSQL_RES *res = nullptr;
     if (!RunQuery(wc->conn, sql, &res))
         return -1;
@@ -533,35 +541,33 @@ bool Database::CreateSpreadsheet(int64_t user_id, const std::string &username, c
                                  const std::string &desc, const std::string &headers_json, const std::string &data_json,
                                  int64_t &out_id, const std::string &idempotency_key) {
     MYSQL *ec = EscConn();
-    int64_t snowflake_id = snowflake_ ? snowflake_->Next() : 0;
+    int64_t sf_id = snowflake_ ? snowflake_->Next() : 0;
     int rc = countRows(data_json), cc = countCols(headers_json);
-    std::string cols =
-        "id,user_id,username,name,description,headers_json,data_"
-        "json,row_count,col_count";
-    std::string vals = std::to_string(snowflake_id) + "," + std::to_string(user_id) + "," + q(ec, username) + "," +
-                       q(ec, name) + "," + q(ec, desc) + "," + q(ec, headers_json) + "," + q(ec, data_json) + "," +
-                       std::to_string(rc) + "," + std::to_string(cc);
-    std::string sql;
     if (!idempotency_key.empty()) {
-        cols += ",idempotency_key";
-        vals += "," + q(ec, idempotency_key);
-        sql = "INSERT INTO spreadsheets (" + cols + ") VALUES (" + vals +
-              ")"
-              " ON DUPLICATE KEY UPDATE id=LAST_INSERT_ID(id)";
-    } else {
-        sql = "INSERT INTO spreadsheets (" + cols + ") VALUES (" + vals + ")";
+        return ExecWriteInsert(make_sql(
+            "INSERT INTO spreadsheets (id,user_id,username,name,description,"
+            "headers_json,data_json,row_count,col_count,idempotency_key) VALUES "
+            "({},{},{},{},{},{},{},{},{},{}) ON DUPLICATE KEY UPDATE id=LAST_INSERT_ID(id)",
+            sf_id, user_id, sql_param(ec, username), sql_param(ec, name),
+            sql_param(ec, desc), sql_param(ec, headers_json), sql_param(ec, data_json),
+            rc, cc, sql_param(ec, idempotency_key)), out_id);
     }
-    return ExecWriteInsert(sql, out_id);
+    return ExecWriteInsert(make_sql(
+        "INSERT INTO spreadsheets (id,user_id,username,name,description,"
+        "headers_json,data_json,row_count,col_count) VALUES "
+        "({},{},{},{},{},{},{},{},{})",
+        sf_id, user_id, sql_param(ec, username), sql_param(ec, name),
+        sql_param(ec, desc), sql_param(ec, headers_json), sql_param(ec, data_json),
+        rc, cc), out_id);
 }
 
 bool Database::GetSpreadsheet(int64_t id, int64_t user_id, SpreadsheetRow &out) {
     if (user_id <= 0)
         return false;
-    std::string sql =
+    std::string sql = make_sql(
         "SELECT id,username,name,description,headers_json,data_json,"
         "row_count,col_count,created_at,updated_at,version,storage_path FROM "
-        "spreadsheets WHERE id=" +
-        std::to_string(id) + " AND user_id=" + std::to_string(user_id);
+        "spreadsheets WHERE id={} AND user_id={}", id, user_id);
     return ExecRead(sql, [&](MYSQL_RES *res) {
         MYSQL_ROW row = mysql_fetch_row(res);
         if (!row)
@@ -584,15 +590,14 @@ bool Database::GetSpreadsheet(int64_t id, int64_t user_id, SpreadsheetRow &out) 
 
 bool Database::ListSpreadsheets(int64_t user_id, std::vector<SpreadsheetSummary> &out, int &total, int page,
                                 int page_size, int64_t after_id) {
-    std::string where = "WHERE user_id=" + std::to_string(user_id);
+    std::string where = make_sql("WHERE user_id={}", user_id);
     if (after_id > 0)
-        where += " AND id<" + std::to_string(after_id);
+        where += make_sql(" AND id<{}", after_id);
 
     // Always obtain exact total via COUNT(*) — avoids loading all rows just to
     // count them
     total = 0;
-    std::string count_sql = "SELECT COUNT(*) FROM spreadsheets " + where;
-    ExecRead(count_sql, [&](MYSQL_RES *res) {
+    ExecRead("SELECT COUNT(*) FROM spreadsheets " + where, [&](MYSQL_RES *res) {
         MYSQL_ROW row = mysql_fetch_row(res);
         if (row && row[0])
             total = std::stoi(row[0]);
@@ -602,24 +607,19 @@ bool Database::ListSpreadsheets(int64_t user_id, std::vector<SpreadsheetSummary>
     std::string sql;
     if (page_size > 0) {
         int offset = page * page_size;
-        // Delayed Join: subquery scans only (username, updated_at) covering index
-        // to find ids, then join back to fetch full row data — avoids deep-page row
-        // reads.
+        // Delayed Join: subquery scans covering index for ids, then join to fetch
+        // full row data — avoids deep-page row reads.  WHERE clause is built from
+        // safe int params above, so string concat is safe here.
         sql =
             "SELECT s.id,s.name,s.description,s.row_count,s.col_count,s.updated_at "
             "FROM spreadsheets s "
             "JOIN (SELECT id FROM spreadsheets " +
-            where +
-            " ORDER BY updated_at DESC"
-            " LIMIT " +
-            std::to_string(page_size) + " OFFSET " + std::to_string(offset) +
+            where + make_sql(" ORDER BY updated_at DESC LIMIT {} OFFSET {}", page_size, offset) +
             ") tmp ON s.id=tmp.id "
             "ORDER BY s.updated_at DESC";
     } else {
-        sql =
-            "SELECT id,name,description,row_count,col_count,updated_at "
-            "FROM spreadsheets " +
-            where + " ORDER BY updated_at DESC";
+        sql = "SELECT id,name,description,row_count,col_count,updated_at "
+              "FROM spreadsheets " + where + " ORDER BY updated_at DESC";
     }
     return ExecRead(sql, [&](MYSQL_RES *res) {
         MYSQL_ROW row;
@@ -646,10 +646,11 @@ bool Database::UpdateSpreadsheet(int64_t id, const std::string &name, const std:
                                  const std::string &headers_json, const std::string &data_json, int version) {
     MYSQL *ec = EscConn();
     int rc = countRows(data_json), cc = countCols(headers_json);
-    std::string sql = "UPDATE spreadsheets SET name=" + q(ec, name) + ",description=" + q(ec, desc) +
-                      ",headers_json=" + q(ec, headers_json) + ",data_json=" + q(ec, data_json) +
-                      ",row_count=" + std::to_string(rc) + ",col_count=" + std::to_string(cc) +
-                      ",version = version + 1, updated_at=NOW()" + " WHERE id=" + std::to_string(id);
+    std::string sql = make_sql(
+        "UPDATE spreadsheets SET name={},description={},headers_json={},data_json={},"
+        "row_count={},col_count={},version = version + 1, updated_at=NOW() WHERE id={}",
+        sql_param(ec, name), sql_param(ec, desc), sql_param(ec, headers_json),
+        sql_param(ec, data_json), rc, cc, id);
     if (version > 0) {
         sql += " AND version = " + std::to_string(version);
     }
@@ -675,7 +676,7 @@ bool Database::UpdateSpreadsheet(int64_t id, const std::string &name, const std:
 }
 
 bool Database::DeleteSpreadsheet(int64_t id, int64_t /*user_id*/) {
-    return ExecWrite("DELETE FROM spreadsheets WHERE id=" + std::to_string(id));
+    return ExecWrite(make_sql("DELETE FROM spreadsheets WHERE id={}", id));
 }
 
 bool Database::GetSpreadsheetOwner(int64_t id, int64_t &owner_user_id, int *out_version) {
@@ -687,7 +688,7 @@ bool Database::GetSpreadsheetOwner(int64_t id, int64_t &owner_user_id, int *out_
     std::lock_guard<std::mutex> lock(wc->mtx);
     if (!wc->conn)
         return false;
-    std::string sql = "SELECT user_id, version FROM spreadsheets WHERE id=" + std::to_string(id);
+    std::string sql = make_sql("SELECT user_id, version FROM spreadsheets WHERE id={}", id);
     MYSQL_RES *res = nullptr;
     if (!RunQuery(wc->conn, sql, &res))
         return false;
@@ -707,27 +708,36 @@ bool Database::CreateFile(int64_t user_id, const std::string &username, const st
                           const std::string &mime_type, const std::string &storage_key, int64_t &out_id,
                           const std::string &idempotency_key) {
     MYSQL *ec = EscConn();
-    int64_t snowflake_id = snowflake_ ? snowflake_->Next() : 0;
-    // File body lives in object storage (MinIO); only metadata goes into MySQL.
-    // storage_path holds the MinIO object key; file_content column is left NULL.
-    std::string cols = "id,user_id,username,original_name,size,mime_type";
-    std::string vals = std::to_string(snowflake_id) + "," + std::to_string(user_id) + "," + q(ec, username) + "," +
-                       q(ec, original_name) + "," + std::to_string(size) + "," + q(ec, mime_type);
-    if (!storage_key.empty()) {
-        cols += ",storage_path";
-        vals += "," + q(ec, storage_key);
-    }
-    std::string sql;
+    int64_t sf_id = snowflake_ ? snowflake_->Next() : 0;
     if (!idempotency_key.empty()) {
-        cols += ",idempotency_key";
-        vals += "," + q(ec, idempotency_key);
-        sql = "INSERT INTO files (" + cols + ") VALUES (" + vals +
-              ")"
-              " ON DUPLICATE KEY UPDATE id=LAST_INSERT_ID(id)";
-    } else {
-        sql = "INSERT INTO files (" + cols + ") VALUES (" + vals + ")";
+        if (!storage_key.empty()) {
+            return ExecWriteInsert(make_sql(
+                "INSERT INTO files (id,user_id,username,original_name,size,mime_type,"
+                "storage_path,idempotency_key) VALUES ({},{},{},{},{},{},{},{})"
+                " ON DUPLICATE KEY UPDATE id=LAST_INSERT_ID(id)",
+                sf_id, user_id, sql_param(ec, username), sql_param(ec, original_name),
+                size, sql_param(ec, mime_type), sql_param(ec, storage_key),
+                sql_param(ec, idempotency_key)), out_id);
+        }
+        return ExecWriteInsert(make_sql(
+            "INSERT INTO files (id,user_id,username,original_name,size,mime_type,"
+            "idempotency_key) VALUES ({},{},{},{},{},{},{})"
+            " ON DUPLICATE KEY UPDATE id=LAST_INSERT_ID(id)",
+            sf_id, user_id, sql_param(ec, username), sql_param(ec, original_name),
+            size, sql_param(ec, mime_type), sql_param(ec, idempotency_key)), out_id);
     }
-    return ExecWriteInsert(sql, out_id);
+    if (!storage_key.empty()) {
+        return ExecWriteInsert(make_sql(
+            "INSERT INTO files (id,user_id,username,original_name,size,mime_type,"
+            "storage_path) VALUES ({},{},{},{},{},{},{})",
+            sf_id, user_id, sql_param(ec, username), sql_param(ec, original_name),
+            size, sql_param(ec, mime_type), sql_param(ec, storage_key)), out_id);
+    }
+    return ExecWriteInsert(make_sql(
+        "INSERT INTO files (id,user_id,username,original_name,size,mime_type)"
+        " VALUES ({},{},{},{},{},{})",
+        sf_id, user_id, sql_param(ec, username), sql_param(ec, original_name),
+        size, sql_param(ec, mime_type)), out_id);
 }
 
 bool Database::UpdateFileContent(int64_t id, const std::string &content) {
@@ -738,10 +748,8 @@ bool Database::UpdateFileContent(int64_t id, const std::string &content) {
     std::lock_guard<std::mutex> lock(wc->mtx);
     if (!wc->conn)
         return false;
-    char *esc = (char *)malloc(content.size() * 2 + 1);
-    mysql_real_escape_string(wc->conn, esc, content.data(), (unsigned long)content.size());
-    std::string sql = "UPDATE files SET file_content='" + std::string(esc) + "' WHERE id=" + std::to_string(id);
-    free(esc);
+    std::string sql = make_sql("UPDATE files SET file_content={} WHERE id={}",
+                               sql_param(wc->conn, content), id);
     return mysql_query(wc->conn, sql.c_str()) == 0;
 }
 
@@ -750,10 +758,10 @@ bool Database::GetFile(int64_t id, int64_t user_id, FileRow &out) {
         return false;
     // storage_path is col 7: if non-empty, caller should fetch content from
     // object storage instead of reading the legacy file_content LONGBLOB (col 6)
-    std::string sql =
+    std::string sql = make_sql(
         "SELECT id,username,original_name,size,mime_type,created_at,"
-        "file_content,storage_path FROM files WHERE id=" +
-        std::to_string(id) + " AND user_id=" + std::to_string(user_id);
+        "file_content,storage_path FROM files WHERE id={} AND user_id={}",
+        id, user_id);
     return ExecRead(sql, [&](MYSQL_RES *res) {
         MYSQL_ROW row = mysql_fetch_row(res);
         if (!row)
@@ -776,15 +784,14 @@ bool Database::GetFile(int64_t id, int64_t user_id, FileRow &out) {
 
 bool Database::ListFiles(int64_t user_id, std::vector<FileRow> &out, int &total, int page, int page_size,
                          int64_t after_id) {
-    std::string where = "WHERE user_id=" + std::to_string(user_id);
+    std::string where = make_sql("WHERE user_id={}", user_id);
     if (after_id > 0)
-        where += " AND id<" + std::to_string(after_id);
+        where += make_sql(" AND id<{}", after_id);
 
     // Always obtain exact total via COUNT(*) to avoid loading all rows just to
     // count
     total = 0;
-    std::string count_sql = "SELECT COUNT(*) FROM files " + where;
-    ExecRead(count_sql, [&](MYSQL_RES *res) {
+    ExecRead("SELECT COUNT(*) FROM files " + where, [&](MYSQL_RES *res) {
         MYSQL_ROW row = mysql_fetch_row(res);
         if (row && row[0])
             total = std::stoi(row[0]);
@@ -794,25 +801,21 @@ bool Database::ListFiles(int64_t user_id, std::vector<FileRow> &out, int &total,
     std::string sql;
     if (page_size > 0) {
         int offset = page * page_size;
-        // Delayed Join: subquery uses covering index (username, created_at) for id
-        // lookup, then join back to read full row — avoids scanning large row data
-        // at deep offsets.
+        // Delayed Join: subquery uses covering index for id lookup, then join back
+        // to read full row — avoids scanning large row data at deep offsets.
+        // WHERE clause is built from safe int params above.
         sql =
             "SELECT "
             "f.id,f.username,f.original_name,f.size,f.mime_type,f.created_at "
             "FROM files f "
             "JOIN (SELECT id FROM files " +
-            where +
-            " ORDER BY created_at DESC"
-            " LIMIT " +
-            std::to_string(page_size) + " OFFSET " + std::to_string(offset) +
+            where + make_sql(" ORDER BY created_at DESC LIMIT {} OFFSET {}", page_size, offset) +
             ") tmp ON f.id=tmp.id "
             "ORDER BY f.created_at DESC";
     } else {
         sql =
             "SELECT id,username,original_name,size,mime_type,created_at "
-            "FROM files " +
-            where + " ORDER BY created_at DESC";
+            "FROM files " + where + " ORDER BY created_at DESC";
     }
     return ExecRead(sql, [&](MYSQL_RES *res) {
         MYSQL_ROW row;
@@ -831,7 +834,7 @@ bool Database::ListFiles(int64_t user_id, std::vector<FileRow> &out, int &total,
 }
 
 bool Database::DeleteFile(int64_t id, int64_t /*user_id*/) {
-    return ExecWrite("DELETE FROM files WHERE id=" + std::to_string(id));
+    return ExecWrite(make_sql("DELETE FROM files WHERE id={}", id));
 }
 
 bool Database::GetFileOwner(int64_t id, int64_t &owner_user_id) {
@@ -843,7 +846,7 @@ bool Database::GetFileOwner(int64_t id, int64_t &owner_user_id) {
     std::lock_guard<std::mutex> lock(wc->mtx);
     if (!wc->conn)
         return false;
-    std::string sql = "SELECT user_id FROM files WHERE id=" + std::to_string(id);
+    std::string sql = make_sql("SELECT user_id FROM files WHERE id={}", id);
     MYSQL_RES *res = nullptr;
     if (!RunQuery(wc->conn, sql, &res))
         return false;
@@ -857,7 +860,7 @@ bool Database::GetFileOwner(int64_t id, int64_t &owner_user_id) {
 bool Database::GetFileStoragePath(int64_t id, std::string &storage_path) {
     // 查询 MinIO object key，用于删除时一并清理对象存储
     storage_path.clear();
-    std::string sql = "SELECT storage_path FROM files WHERE id=" + std::to_string(id);
+    std::string sql = make_sql("SELECT storage_path FROM files WHERE id={}", id);
     return ExecRead(sql, [&](MYSQL_RES *res) {
         MYSQL_ROW row = mysql_fetch_row(res);
         if (row && row[0])
@@ -868,7 +871,7 @@ bool Database::GetFileStoragePath(int64_t id, std::string &storage_path) {
 
 bool Database::GetSpreadsheetStoragePath(int64_t id, std::string &storage_path) {
     storage_path.clear();
-    std::string sql = "SELECT storage_path FROM spreadsheets WHERE id=" + std::to_string(id);
+    std::string sql = make_sql("SELECT storage_path FROM spreadsheets WHERE id={}", id);
     return ExecRead(sql, [&](MYSQL_RES *res) {
         MYSQL_ROW row = mysql_fetch_row(res);
         if (row && row[0])
@@ -880,8 +883,8 @@ bool Database::UpdateSpreadsheetStoragePath(int64_t id, const std::string &stora
     auto *ec = EscConn();
     if (!ec)
         return false;
-    std::string sql = "UPDATE spreadsheets SET storage_path=" + q(ec, storage_path) + " WHERE id=" + std::to_string(id);
-    return ExecWrite(sql);
+    return ExecWrite(make_sql("UPDATE spreadsheets SET storage_path={} WHERE id={}",
+                              sql_param(ec, storage_path), id));
 }
 
 // ---- Undo Log (always master — 2PC requires consistency) ----
@@ -889,9 +892,9 @@ bool Database::UpdateSpreadsheetStoragePath(int64_t id, const std::string &stora
 bool Database::WriteUndoLog(const std::string &xid, const std::string &table_name, int64_t row_id,
                             const std::string &before_snapshot) {
     MYSQL *ec = EscConn();
-    std::string sql = "INSERT INTO undo_log (xid,table_name,row_id,before_snapshot) VALUES (" + q(ec, xid) + "," +
-                      q(ec, table_name) + "," + std::to_string(row_id) + "," + q(ec, before_snapshot) + ")";
-    return ExecWrite(sql);
+    return ExecWrite(make_sql(
+        "INSERT INTO undo_log (xid,table_name,row_id,before_snapshot) VALUES ({},{},{},{})",
+        sql_param(ec, xid), sql_param(ec, table_name), row_id, sql_param(ec, before_snapshot)));
 }
 
 bool Database::GetUndoLog(const std::string &xid, std::string &table_name, int64_t &row_id,
@@ -904,10 +907,10 @@ bool Database::GetUndoLog(const std::string &xid, std::string &table_name, int64
     std::lock_guard<std::mutex> lock(wc->mtx);
     if (!wc->conn)
         return false;
-    std::string sql =
+    std::string sql = make_sql(
         "SELECT table_name,row_id,before_snapshot FROM undo_log "
-        "WHERE xid=" +
-        q(wc->conn, xid) + " ORDER BY id DESC LIMIT 1";
+        "WHERE xid={} ORDER BY id DESC LIMIT 1",
+        sql_param(wc->conn, xid));
     MYSQL_RES *res = nullptr;
     if (!RunQuery(wc->conn, sql, &res))
         return false;
@@ -925,11 +928,11 @@ bool Database::GetUndoLog(const std::string &xid, std::string &table_name, int64
 
 bool Database::ClearUndoLog(const std::string &xid) {
     MYSQL *ec = EscConn();
-    return ExecWrite("DELETE FROM undo_log WHERE xid=" + q(ec, xid));
+    return ExecWrite(make_sql("DELETE FROM undo_log WHERE xid={}", sql_param(ec, xid)));
 }
 
 int Database::PurgeOldUndoLogs(int days) {
-    std::string sql = "DELETE FROM undo_log WHERE created_at < NOW() - INTERVAL " + std::to_string(days) + " DAY";
+    std::string sql = make_sql("DELETE FROM undo_log WHERE created_at < NOW() - INTERVAL {} DAY", days);
     if (write_conns_.empty())
         return -1;
     size_t idx = write_idx_.fetch_add(1, std::memory_order_relaxed) % write_conns_.size();
@@ -1152,13 +1155,13 @@ bool Database::InsertOutbox(const std::string &event_type, const std::string &pa
     auto *ec = EscConn();
     if (!ec)
         return false;
-    std::string cols = "event_type, payload";
-    std::string vals = q(ec, event_type) + "," + q(ec, payload);
     if (!trace_context.empty()) {
-        cols += ", trace_context";
-        vals += "," + q(ec, trace_context);
+        return ExecWrite(make_sql(
+            "INSERT INTO outbox (event_type,payload,trace_context) VALUES ({},{},{})",
+            sql_param(ec, event_type), sql_param(ec, payload), sql_param(ec, trace_context)));
     }
-    return ExecWrite("INSERT INTO outbox (" + cols + ") VALUES (" + vals + ")");
+    return ExecWrite(make_sql("INSERT INTO outbox (event_type,payload) VALUES ({},{})",
+                              sql_param(ec, event_type), sql_param(ec, payload)));
 }
 bool ShardedDatabase::InsertOutbox(int64_t user_id, const std::string &event_type, const std::string &payload,
                                    const std::string &trace_context) {
@@ -1206,7 +1209,7 @@ int ShardedDatabase::PurgeOldUndoLogs(int days) {
 
 // ---- Account management helpers ----
 int64_t Database::GetUserIdByPhone(const std::string &phone) {
-    std::string sql = "SELECT id FROM users WHERE phone=" + q(EscConn(), phone);
+    std::string sql = make_sql("SELECT id FROM users WHERE phone={}", sql_param(EscConn(), phone));
     int64_t uid = -1;
     ExecRead(sql, [&](MYSQL_RES *res) {
         MYSQL_ROW row = mysql_fetch_row(res);
@@ -1217,7 +1220,7 @@ int64_t Database::GetUserIdByPhone(const std::string &phone) {
     return uid;
 }
 std::string Database::GetUsernameById(int64_t user_id) {
-    std::string sql = "SELECT username FROM users WHERE id=" + std::to_string(user_id);
+    std::string sql = make_sql("SELECT username FROM users WHERE id={}", user_id);
     std::string name;
     ExecRead(sql, [&](MYSQL_RES *res) {
         MYSQL_ROW row = mysql_fetch_row(res);
@@ -1228,7 +1231,7 @@ std::string Database::GetUsernameById(int64_t user_id) {
     return name;
 }
 bool Database::VerifyUserPassword(int64_t user_id, const std::string &password) {
-    std::string sql = "SELECT password_hash FROM users WHERE id=" + std::to_string(user_id);
+    std::string sql = make_sql("SELECT password_hash FROM users WHERE id={}", user_id);
     std::string stored;
     ExecRead(sql, [&](MYSQL_RES *res) {
         MYSQL_ROW row = mysql_fetch_row(res);
@@ -1240,8 +1243,8 @@ bool Database::VerifyUserPassword(int64_t user_id, const std::string &password) 
 }
 bool Database::UpdateUserPassword(int64_t user_id, const std::string &new_hash) {
     auto *ec = EscConn();
-    std::string sql = "UPDATE users SET password_hash=" + q(ec, new_hash) + " WHERE id=" + std::to_string(user_id);
-    return ExecWrite(sql);
+    return ExecWrite(make_sql("UPDATE users SET password_hash={} WHERE id={}",
+                              sql_param(ec, new_hash), user_id));
 }
 int64_t ShardedDatabase::GetUserIdByPhone(const std::string &phone) {
     for (auto &db : shards_) {
@@ -1277,24 +1280,19 @@ bool Database::CreateFolder(int64_t user_id, const std::string &name, int64_t pa
     auto *ec = EscConn();
     if (!ec)
         return false;
-    std::string sql =
-        "INSERT INTO files (user_id,username,original_name,size,mime_type,folder_id,is_folder,file_content) VALUES (" +
-        std::to_string(user_id) + ",'folder'," + q(ec, name) + ",0,''," + std::to_string(parent_id) + ",1,'')";
-    return ExecWriteInsert(sql, out_id);
+    return ExecWriteInsert(make_sql(
+        "INSERT INTO files (user_id,username,original_name,size,mime_type,"
+        "folder_id,is_folder,file_content) VALUES ({},'folder',{},0,'',{},1,'')",
+        user_id, sql_param(ec, name), parent_id), out_id);
 }
 bool Database::MoveFile(int64_t id, int64_t target_folder_id) {
-    std::string sql =
-        "UPDATE files SET folder_id=" + std::to_string(target_folder_id) + " WHERE id=" + std::to_string(id);
-    return ExecWrite(sql);
+    return ExecWrite(make_sql("UPDATE files SET folder_id={} WHERE id={}", target_folder_id, id));
 }
 int Database::BatchDeleteFiles(int64_t user_id, const std::vector<int64_t> &ids) {
     int count = 0;
-    for (auto id : ids) {
-        std::string sql =
-            "DELETE FROM files WHERE id=" + std::to_string(id) + " AND user_id=" + std::to_string(user_id);
-        if (ExecWrite(sql))
+    for (auto id : ids)
+        if (ExecWrite(make_sql("DELETE FROM files WHERE id={} AND user_id={}", id, user_id)))
             count++;
-    }
     return count;
 }
 bool ShardedDatabase::CreateFolder(int64_t user_id, const std::string &name, int64_t parent_id, int64_t &out_id) {

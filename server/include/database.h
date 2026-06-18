@@ -7,9 +7,63 @@
 #include <functional>
 #include <memory>
 #include <mutex>
+#include <sstream>
 #include <string>
 #include <thread>
+#include <type_traits>
 #include <vector>
+
+// ---- SQL 参数安全包装 — 编译期强制转义，杜绝人工漏写 q() ----
+
+class sql_param {
+   public:
+    // 字符串构造 — 强制 mysql_real_escape_string，编译期兜底
+    sql_param(MYSQL *conn, const std::string &raw);
+
+    // 数值构造 — 直接转字符串，无需转义/加引号
+    sql_param(int64_t val) : val_(std::to_string(val)), quote_(false) {}
+    sql_param(int val) : val_(std::to_string(val)), quote_(false) {}
+    sql_param(unsigned long val) : val_(std::to_string(val)), quote_(false) {}
+
+    const std::string &str() const { return val_; }
+    bool needs_quote() const { return quote_; }
+
+    // 拼入 SQL 的最终形态：字符串自动加单引号，数值裸拼
+    std::string sql() const { return quote_ ? "'" + val_ + "'" : val_; }
+
+   private:
+    std::string val_;
+    bool quote_ = true;
+};
+
+// 类型安全 SQL 构建器
+// 用法: make_sql("INSERT INTO t (a,b) VALUES ({},{})", sql_param(conn, str), 42)
+// 任何非 sql_param 的非算数类型（如 std::string / const char*）都会触发
+// static_assert 编译错误
+template <typename... Args>
+std::string make_sql(const std::string &tmpl, const Args &...args) {
+    std::ostringstream oss;
+    size_t pos = 0;
+    auto append = [&](const auto &arg) {
+        size_t ph = tmpl.find("{}", pos);
+        if (ph != std::string::npos) {
+            oss << tmpl.substr(pos, ph - pos);
+            pos = ph + 2;
+        }
+        using T = std::decay_t<decltype(arg)>;
+        if constexpr (std::is_same_v<T, sql_param>) {
+            oss << arg.sql();
+        } else if constexpr (std::is_arithmetic_v<T>) {
+            oss << arg;
+        } else {
+            static_assert(sizeof(T) == 0,
+                          "make_sql: string argument must be wrapped in sql_param(conn, str)");
+        }
+    };
+    (append(args), ...);
+    oss << tmpl.substr(pos);
+    return oss.str();
+}
 
 class Snowflake;
 
