@@ -69,6 +69,7 @@ var authConn, sheetConn, fileConn *grpc.ClientConn
 var sheetClient SheetClient
 var fileClient FileClient
 var authClient AuthClientI
+var rdb *redis.Client
 
 // cbWithSlow wraps a circuit breaker with a slow-call counter
 type cbWithSlow struct {
@@ -151,7 +152,7 @@ func main() {
 	// Redis
 	redisAddr := getenv("REDIS_ADDR", "redis-cluster-7000:7000")
 	redisPass := getenv("REDIS_PASSWORD", "rpc-redis-123456")
-	rdb := redis.NewClient(&redis.Options{Addr: redisAddr, Password: redisPass})
+	rdb = redis.NewClient(&redis.Options{Addr: redisAddr, Password: redisPass})
 
 	// 熔断器 + 慢调用计数器（每个 C++ 服务一个）
 	newCB := func(name string) *cbWithSlow {
