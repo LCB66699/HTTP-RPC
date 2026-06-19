@@ -18,12 +18,14 @@ WORKDIR /src
 COPY . .
 RUN rm -rf server/generated/*
 
-# cache mount on build/: cmake 只重编译变更的 .cpp
+# cache mount on build/: .o 文件跨构建缓存，只重编译变更的 .cpp
+# 构建完成后二进制 COPY 到 /out 持久化，供运行时阶段使用
 RUN if [ "$DEBUG" = "true" ]; then \
       sed -i 's/-O2/-g -O0/g' CMakeLists.txt; \
     fi
 RUN --mount=type=cache,target=/src/build \
-    cmake -B build && cmake --build build --target rpc_${SERVICE} -j$(nproc)
+    cmake -B build && cmake --build build --target rpc_${SERVICE} -j$(nproc) \
+    && mkdir -p /out && cp build/rpc_${SERVICE} /out/rpc_server
 
 FROM ubuntu:24.04
 
@@ -38,7 +40,7 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
 
 ARG SERVICE=auth
 WORKDIR /app
-COPY --from=builder /src/build/rpc_${SERVICE} /app/rpc_server
+COPY --from=builder /out/rpc_server /app/rpc_server
 COPY --from=builder /src/web-ui /app/web-ui
 
 EXPOSE 50051
