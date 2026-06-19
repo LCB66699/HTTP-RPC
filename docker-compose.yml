@@ -628,6 +628,38 @@
         condition: service_healthy
     restart: unless-stopped
 
+  # ===== Prometheus Monitoring =====
+  prometheus:
+    image: prom/prometheus:v2.54.0
+    volumes:
+      - ./deploy/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./data/prometheus:/prometheus
+    ports:
+      - "9090:9090"
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention.time=7d'
+    depends_on:
+      - grpc-gateway
+      - grpc-gateway-2
+    restart: unless-stopped
+
+  # ===== Grafana Dashboard =====
+  grafana:
+    image: grafana/grafana:11.1.0
+    volumes:
+      - ./data/grafana:/var/lib/grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_INSTALL_PLUGINS=
+    depends_on:
+      - prometheus
+    restart: unless-stopped
+
   # ===== Jaeger Tracing =====
   jaeger:
     image: jaegertracing/all-in-one:1.60
