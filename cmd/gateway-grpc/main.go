@@ -195,7 +195,7 @@ func main() {
 	_ = newCB("search")  // 预留给 Search handler 重试
 
 	// === Auth ===
-	mux.HandleFunc("POST /api/register", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("POST /api/v1/register", func(w http.ResponseWriter, r *http.Request) {
 		var req pb.RegisterRequest
 		json.NewDecoder(r.Body).Decode(&req)
 		if msg, code := validateRegister(req.Username, req.Password); msg != "" {
@@ -205,13 +205,17 @@ func main() {
 
 		resp, _ := authClient.Register(r.Context(), &req)
 		if resp != nil && !resp.Success {
-			writeError(w, nil, resp.GetError(), 0)
+			code := int32(0)
+			if ec, ok := resp.(interface{ GetErrorCode() int32 }); ok {
+				code = ec.GetErrorCode()
+			}
+			writeError(w, nil, resp.GetError(), code)
 			return
 		}
 		setCookies(w, resp.AccessToken, resp.RefreshToken)
 		writeJSON(w, resp)
 	})
-	mux.HandleFunc("POST /api/login", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("POST /api/v1/login", func(w http.ResponseWriter, r *http.Request) {
 		var req pb.LoginRequest
 		json.NewDecoder(r.Body).Decode(&req)
 		if checkLoginRate(req.Username) {
@@ -227,13 +231,17 @@ func main() {
 
 		resp, _ := authClient.Login(r.Context(), &req)
 		if resp != nil && !resp.Success {
-			writeError(w, nil, resp.GetError(), 0)
+			code := int32(0)
+			if ec, ok := resp.(interface{ GetErrorCode() int32 }); ok {
+				code = ec.GetErrorCode()
+			}
+			writeError(w, nil, resp.GetError(), code)
 			return
 		}
 		setCookies(w, resp.AccessToken, resp.RefreshToken)
 		writeJSON(w, resp)
 	})
-	mux.HandleFunc("POST /api/refresh", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("POST /api/v1/refresh", func(w http.ResponseWriter, r *http.Request) {
 		var req pb.RefreshTokenRequest
 		json.NewDecoder(r.Body).Decode(&req)
 		// body 优先，Cookie 兜底
@@ -249,7 +257,7 @@ func main() {
 		setCookies(w, resp.AccessToken, "")
 		writeJSON(w, resp)
 	})
-	mux.HandleFunc("PUT /api/me/password", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("PUT /api/v1/me/password", func(w http.ResponseWriter, r *http.Request) {
 		var body struct {
 			OldPassword string `json:"old_password"`
 			NewPassword string `json:"new_password"`
@@ -269,7 +277,7 @@ func main() {
 		resp, err := authClient.ChangePassword(r.Context(), req)
 		writeGRPCResponse(w, resp, err)
 	})
-	mux.HandleFunc("POST /api/auth/otp/send", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("POST /api/v1/auth/otp/send", func(w http.ResponseWriter, r *http.Request) {
 		var body struct{ Phone string `json:"phone"` }
 		json.NewDecoder(r.Body).Decode(&body)
 		if body.Phone == "" {
@@ -281,7 +289,7 @@ func main() {
 		log.Printf("[OTP] phone=%s code=%s", body.Phone, code)
 		writeJSON(w, map[string]interface{}{"success": true})
 	})
-	mux.HandleFunc("POST /api/auth/phone/login", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("POST /api/v1/auth/phone/login", func(w http.ResponseWriter, r *http.Request) {
 		var body struct {
 			Phone string `json:"phone"`
 			OTP   string `json:"otp"`
@@ -299,10 +307,10 @@ func main() {
 	})
 
 	mux.Handle("GET /api/v1/metrics", metricsHandler())
-	mux.HandleFunc("GET /api/health", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("GET /api/v1/health", func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, map[string]string{"gateway": "READY"})
 	})
-	mux.HandleFunc("GET /api/health/ready", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("GET /api/v1/health/ready", func(w http.ResponseWriter, r *http.Request) {
 		checkConn := func(name string, conn *grpc.ClientConn) string {
 			s := conn.GetState()
 			if s == connectivity.Ready { return "OK" }
@@ -317,18 +325,18 @@ func main() {
 		if !allOK { code = http.StatusServiceUnavailable }
 		writeJSONStatus(w, code, map[string]interface{}{"_all": allOK, "status": status})
 	})
-	mux.HandleFunc("GET /api/me", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("GET /api/v1/me", func(w http.ResponseWriter, r *http.Request) {
 		user := getUserFromCookie(r)
 		uid := extractUID(r)
 		writeJSON(w, map[string]interface{}{"username": user, "user_id": uid})
 	})
-	mux.HandleFunc("GET /api/services", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("GET /api/v1/services", func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, map[string]interface{}{"services": map[string][]string{
 			"auth-service": {}, "sheet-service": {}, "file-service": {}, "search-service": {},
 		}})
 	})
 	// === Sharing ===
-	mux.HandleFunc("POST /api/sheets/{id}/share", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("POST /api/v1/sheets/{id}/share", func(w http.ResponseWriter, r *http.Request) {
 		uid := extractUID(r)
 		var body struct {
 			Username   string `json:"username"`
@@ -342,7 +350,7 @@ func main() {
 		})
 		writeJSON(w, resp)
 	})
-	mux.HandleFunc("DELETE /api/sheets/{id}/share", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("DELETE /api/v1/sheets/{id}/share", func(w http.ResponseWriter, r *http.Request) {
 		uid := extractUID(r)
 		username := r.URL.Query().Get("username")
 		id := parseInt64(r.PathValue("id"))
@@ -352,7 +360,7 @@ func main() {
 		})
 		writeJSON(w, resp)
 	})
-	mux.HandleFunc("GET /api/sheets/{id}/share", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("GET /api/v1/sheets/{id}/share", func(w http.ResponseWriter, r *http.Request) {
 		uid := extractUID(r)
 		id := parseInt64(r.PathValue("id"))
 		resp, _ := sharingClient.ListShares(injectToken(r), &pb.ResourceRequest{
@@ -360,7 +368,7 @@ func main() {
 		})
 		writeJSON(w, resp)
 	})
-	mux.HandleFunc("POST /api/sheets/{id}/share-link", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("POST /api/v1/sheets/{id}/share-link", func(w http.ResponseWriter, r *http.Request) {
 		uid := extractUID(r)
 		id := parseInt64(r.PathValue("id"))
 		resp, _ := sharingClient.CreateShareLink(injectToken(r), &pb.ShareLinkRequest{
@@ -368,7 +376,7 @@ func main() {
 		})
 		writeJSON(w, resp)
 	})
-	mux.HandleFunc("GET /api/s/{token}", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("GET /api/v1/s/{token}", func(w http.ResponseWriter, r *http.Request) {
 		token := r.PathValue("token")
 		resp, _ := sharingClient.GetByToken(injectToken(r), &pb.ShareTokenRequest{Token: token})
 		if resp == nil || !resp.Success {
@@ -385,7 +393,7 @@ func main() {
 		}
 	})
 
-	mux.HandleFunc("GET /api/history", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("GET /api/v1/history", func(w http.ResponseWriter, r *http.Request) {
 		user := getUserFromCookie(r)
 		if user == "" {
 			writeJSONStatus(w, http.StatusUnauthorized, map[string]string{"error": "login required"})
@@ -399,7 +407,7 @@ func main() {
 	})
 
 	// === Search ===
-	mux.HandleFunc("POST /api/search", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("POST /api/v1/search", func(w http.ResponseWriter, r *http.Request) {
 		var body struct {
 			Q    string `json:"q"`
 			Sort string `json:"sort"`
@@ -422,7 +430,7 @@ func main() {
 	})
 
 	// === Sheet CRUD ===
-	mux.HandleFunc("POST /api/sheets", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("POST /api/v1/sheets", func(w http.ResponseWriter, r *http.Request) {
 		var req pb.CreateSpreadsheetRequest
 		json.NewDecoder(r.Body).Decode(&req)
 		uid := extractUID(r)
@@ -430,13 +438,13 @@ func main() {
 		resp, err := sheetClient.CreateSpreadsheet(injectToken(r), &req)
 		writeGRPCResponse(w, resp, err)
 	})
-	mux.HandleFunc("GET /api/sheets", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("GET /api/v1/sheets", func(w http.ResponseWriter, r *http.Request) {
 		resp, err := callWithRetry(r.Context(), cbSheet, 3, "sheet.list", func(ctx context.Context) (*pb.ListSpreadsheetsResponse, error) {
 			return sheetClient.ListSpreadsheets(withAuth(ctx, r), &pb.ListSpreadsheetsRequest{UserId: extractUID(r)})
 		})
 		writeGRPCResponse(w, resp, err)
 	})
-	mux.HandleFunc("GET /api/sheets/{id}", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("GET /api/v1/sheets/{id}", func(w http.ResponseWriter, r *http.Request) {
 		id := parseInt64(r.PathValue("id"))
 		uid := extractUID(r)
 		caller := getUserFromCookie(r)
@@ -463,7 +471,7 @@ func main() {
 			writeJSON(w, resp)
 		}
 	})
-	mux.HandleFunc("PUT /api/sheets/{id}", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("PUT /api/v1/sheets/{id}", func(w http.ResponseWriter, r *http.Request) {
 		var req pb.UpdateSpreadsheetRequest
 		json.NewDecoder(r.Body).Decode(&req)
 		req.Id = parseInt64(r.PathValue("id"))
@@ -471,7 +479,7 @@ func main() {
 		resp, err := sheetClient.UpdateSpreadsheet(injectToken(r), &req)
 		writeGRPCResponse(w, resp, err)
 	})
-	mux.HandleFunc("DELETE /api/sheets/{id}", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("DELETE /api/v1/sheets/{id}", func(w http.ResponseWriter, r *http.Request) {
 		id := parseInt64(r.PathValue("id"))
 		resp, err := callWithRetry(r.Context(), cbSheet, 2, "sheet.delete", func(ctx context.Context) (*pb.DeleteSpreadsheetResponse, error) {
 			return sheetClient.DeleteSpreadsheet(withAuth(ctx, r), &pb.DeleteSpreadsheetRequest{Id: id, UserId: extractUID(r)})
@@ -480,7 +488,7 @@ func main() {
 	})
 
 	// === Photos (复用 File Service, 筛选 image/*) ===
-	mux.HandleFunc("GET /api/photos", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("GET /api/v1/photos", func(w http.ResponseWriter, r *http.Request) {
 		resp, err := fileClient.ListFiles(injectToken(r), &pb.ListFilesRequest{
 			UserId: extractUID(r), MimeFilter: "image/",
 		})
@@ -488,14 +496,14 @@ func main() {
 	})
 
 	// === File CRUD ===
-	mux.HandleFunc("PUT /api/files/{id}/move", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("PUT /api/v1/files/{id}/move", func(w http.ResponseWriter, r *http.Request) {
 		id := parseInt64(r.PathValue("id"))
 		var body struct{ TargetFolderId int64 `json:"target_folder_id"` }
 		json.NewDecoder(r.Body).Decode(&body)
 		resp, err := fileClient.MoveFile(injectToken(r), &pb.MoveFileRequest{Id: id, TargetFolderId: body.TargetFolderId})
 		writeGRPCResponse(w, resp, err)
 	})
-	mux.HandleFunc("POST /api/files/folder", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("POST /api/v1/files/folder", func(w http.ResponseWriter, r *http.Request) {
 		var body struct {
 			Name           string `json:"name"`
 			ParentFolderId int64  `json:"parent_folder_id"`
@@ -507,13 +515,13 @@ func main() {
 		})
 		writeGRPCResponse(w, resp, err)
 	})
-	mux.HandleFunc("GET /api/files", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("GET /api/v1/files", func(w http.ResponseWriter, r *http.Request) {
 		resp, err := callWithRetry(r.Context(), cbFile, 3, "file.list", func(ctx context.Context) (*pb.ListFilesResponse, error) {
 			return fileClient.ListFiles(withAuth(ctx, r), &pb.ListFilesRequest{UserId: extractUID(r)})
 		})
 		writeGRPCResponse(w, resp, err)
 	})
-	mux.HandleFunc("POST /api/files/upload", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("POST /api/v1/files/upload", func(w http.ResponseWriter, r *http.Request) {
 		uid := extractUID(r)
 		log.Printf("[upload] uid=%d", uid)
 		r.ParseMultipartForm(50 << 20)
@@ -530,7 +538,7 @@ func main() {
 		})
 		writeGRPCResponse(w, resp, err)
 	})
-	mux.HandleFunc("GET /api/files/{id}", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("GET /api/v1/files/{id}", func(w http.ResponseWriter, r *http.Request) {
 		id := parseInt64(r.PathValue("id"))
 		uid := extractUID(r)
 		log.Printf("[debug] GetFile id=%d uid=%d", id, uid)
@@ -565,7 +573,7 @@ func main() {
 		}
 		writeJSON(w, resp)
 	})
-	mux.HandleFunc("DELETE /api/files/{id}", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("DELETE /api/v1/files/{id}", func(w http.ResponseWriter, r *http.Request) {
 		id := parseInt64(r.PathValue("id"))
 		uid := extractUID(r)
 		log.Printf("[debug] DeleteFile id=%d uid=%d", id, uid)
@@ -653,7 +661,11 @@ func writeGRPCResponse(w http.ResponseWriter, resp gRPCResponse, err error) {
 		return
 	}
 	if resp == nil || !resp.GetSuccess() {
-		writeError(w, nil, resp.GetError(), 0)
+		code := int32(0)
+		if ec, ok := resp.(interface{ GetErrorCode() int32 }); ok {
+			code = ec.GetErrorCode()
+		}
+		writeError(w, nil, resp.GetError(), code)
 		return
 	}
 	writeJSON(w, resp)

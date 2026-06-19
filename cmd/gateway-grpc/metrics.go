@@ -58,12 +58,9 @@ func (r *statusRecorder) WriteHeader(code int) {
 
 func metricsMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		start := time.Now()
 		sr := &statusRecorder{ResponseWriter: w, status: 200}
 		next.ServeHTTP(sr, r)
-		// r.Pattern 避免参数化路由的基数爆炸（Go 1.22+）
-		httpRequestsTotal.WithLabelValues(r.Method, r.Pattern, strconv.Itoa(sr.status)).Inc()
-		_ = start
+		httpRequestsTotal.WithLabelValues(r.Method, r.URL.Path, strconv.Itoa(sr.status)).Inc()
 	})
 }
 
