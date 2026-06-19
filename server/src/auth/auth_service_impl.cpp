@@ -487,17 +487,3 @@ grpc::Status AuthServiceImpl::LoginByPhone(grpc::ServerContext *, const rpc::Pho
     return grpc::Status::OK;
 }
 
-grpc::Status AuthServiceImpl::SendOTP(grpc::ServerContext *, const rpc::SendOTPRequest *, rpc::SendOTPResponse *resp) {
-    resp->set_success(true);
-    return grpc::Status::OK;
-}
-grpc::Status AuthServiceImpl::BindPhone(grpc::ServerContext *, const rpc::BindPhoneRequest *,
-                                        rpc::BindPhoneResponse *resp) {
-    resp->set_success(true);
-    return grpc::Status::OK;
-}
-grpc::Status AuthServiceImpl::UpdateProfile(grpc::ServerContext *, const rpc::UpdateProfileRequest *,
-                                            rpc::UpdateProfileResponse *resp) {
-    resp->set_success(true);
-    return grpc::Status::OK;
-}

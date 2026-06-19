@@ -10,10 +10,7 @@ service AuthService {
   rpc RefreshToken(RefreshTokenRequest) returns (RefreshTokenResponse);
   rpc ValidateUser(ValidateUserRequest) returns (ValidateUserResponse);
   rpc ChangePassword(ChangePasswordRequest) returns (ChangePasswordResponse);
-  rpc SendOTP(SendOTPRequest) returns (SendOTPResponse);
   rpc LoginByPhone(PhoneLoginRequest) returns (LoginResponse);
-  rpc BindPhone(BindPhoneRequest) returns (BindPhoneResponse);
-  rpc UpdateProfile(UpdateProfileRequest) returns (UpdateProfileResponse);
 }
 
 message LoginRequest {
@@ -80,21 +77,4 @@ message ChangePasswordRequest {
 }
 message ChangePasswordResponse { bool success = 1; string error = 2; int32 error_code = 99; }
 
-message SendOTPRequest { string phone = 1; }
-message SendOTPResponse { bool success = 1; string error = 2; int32 error_code = 99; }
-
 message PhoneLoginRequest { string phone = 1; string otp = 2; }
-
-message BindPhoneRequest {
-  int64 user_id = 1;
-  string phone = 2;
-  string otp = 3;
-}
-message BindPhoneResponse { bool success = 1; string error = 2; int32 error_code = 99; }
-
-message UpdateProfileRequest {
-  int64 user_id = 1;
-  string display_name = 2;
-  string avatar_url = 3;
-}
-message UpdateProfileResponse { bool success = 1; string error = 2; int32 error_code = 99; }
