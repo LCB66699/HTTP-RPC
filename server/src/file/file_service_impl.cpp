@@ -98,6 +98,7 @@ grpc::Status FileServiceImpl::CreateFile(grpc::ServerContext *context, const rpc
     }
 
     // 回退：MinIO 不可用时文件内容存 MySQL LONGBLOB
+    // version=0: 新创建文件，无并发冲突，跳过乐观锁检查
     if (!req->file_content().empty() && storage_key.empty()) {
         db_->UpdateFileContent(id, req->file_content());
     }

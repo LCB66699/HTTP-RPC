@@ -36,9 +36,9 @@ class IDatabase {
                            int64_t after_id = 0) = 0;
     virtual bool DeleteFile(int64_t id, int64_t user_id = 0) = 0;
     virtual bool GetFileOwner(int64_t id, int64_t &owner_user_id) = 0;
-    virtual bool UpdateFileContent(int64_t id, const std::string &content) = 0;
+    virtual bool UpdateFileContent(int64_t id, const std::string &content, int version = 0) = 0;
     virtual bool CreateFolder(int64_t user_id, const std::string &name, int64_t parent_folder_id, int64_t &out_id) = 0;
-    virtual bool MoveFile(int64_t id, int64_t target_folder_id) = 0;
+    virtual bool MoveFile(int64_t id, int64_t target_folder_id, int version = 0) = 0;
     virtual int BatchDeleteFiles(int64_t user_id, const std::vector<int64_t> &ids) = 0;
 };
 

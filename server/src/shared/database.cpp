@@ -311,6 +311,10 @@ bool Database::Initialize() {
                 "ALTER TABLE files        ADD COLUMN idempotency_key CHAR(36) "
                 "UNIQUE NULL DEFAULT NULL");
 
+    // Version columns for optimistic locking — spreadsheets already has it;
+    // files needs it for multi-instance write safety.
+    mysql_query(c, "ALTER TABLE files ADD COLUMN version INT NOT NULL DEFAULT 1");
+
     // user_id columns — integer FK to users.id; avoids username-as-FK design
     // flaw. DEFAULT 0 allows idempotent migration on existing rows (populated
     // below via JOIN).
@@ -732,7 +736,7 @@ bool Database::CreateFile(int64_t user_id, const std::string &username, const st
         size, sql_param(ec, mime_type)), out_id);
 }
 
-bool Database::UpdateFileContent(int64_t id, const std::string &content) {
+bool Database::UpdateFileContent(int64_t id, const std::string &content, int version) {
     if (write_conns_.empty())
         return false;
     size_t idx = write_idx_.fetch_add(1, std::memory_order_relaxed) % write_conns_.size();
@@ -740,9 +744,18 @@ bool Database::UpdateFileContent(int64_t id, const std::string &content) {
     std::lock_guard<std::mutex> lock(wc->mtx);
     if (!wc->conn)
         return false;
-    std::string sql = make_sql("UPDATE files SET file_content={} WHERE id={}",
-                               sql_param(wc->conn, content), id);
-    return mysql_query(wc->conn, sql.c_str()) == 0;
+    std::string sql = make_sql(
+        "UPDATE files SET file_content={}, version = version + 1 WHERE id={}",
+        sql_param(wc->conn, content), id);
+    if (version > 0)
+        sql += make_sql(" AND version={}", version);
+    if (mysql_query(wc->conn, sql.c_str()) != 0) {
+        fprintf(stderr, "[DB] UpdateFileContent error: %s\n", mysql_error(wc->conn));
+        return false;
+    }
+    if (version > 0)
+        return mysql_affected_rows(wc->conn) > 0;
+    return true;
 }
 
 bool Database::GetFile(int64_t id, int64_t user_id, FileRow &out) {
@@ -752,7 +765,7 @@ bool Database::GetFile(int64_t id, int64_t user_id, FileRow &out) {
     // object storage instead of reading the legacy file_content LONGBLOB (col 6)
     std::string sql = make_sql(
         "SELECT id,username,original_name,size,mime_type,created_at,"
-        "file_content,storage_path FROM files WHERE id={} AND user_id={}",
+        "file_content,storage_path,version FROM files WHERE id={} AND user_id={}",
         id, user_id);
     return ExecRead(sql, [&](MYSQL_RES *res) {
         MYSQL_ROW row = mysql_fetch_row(res);
@@ -765,6 +778,7 @@ bool Database::GetFile(int64_t id, int64_t user_id, FileRow &out) {
         out.mime_type = row[4] ? row[4] : "";
         out.created_at = row[5] ? row[5] : "";
         out.storage_path = row[7] ? row[7] : "";
+        out.version = row[8] ? std::stoi(row[8]) : 1;
         if (out.storage_path.empty() && row[6]) {
             unsigned long *lens = mysql_fetch_lengths(res);
             if (lens)
@@ -1117,8 +1131,8 @@ bool ShardedDatabase::CreateFile(int64_t user_id, const std::string &username, c
     return ShardFor(user_id)->CreateFile(user_id, username, original_name, size, mime_type, storage_key, out_id,
                                          idempotency_key);
 }
-bool ShardedDatabase::UpdateFileContent(int64_t id, const std::string &content) {
-    return ShardFor(id)->UpdateFileContent(id, content);
+bool ShardedDatabase::UpdateFileContent(int64_t id, const std::string &content, int version) {
+    return ShardFor(id)->UpdateFileContent(id, content, version);
 }
 bool ShardedDatabase::GetFile(int64_t id, int64_t user_id, FileRow &out) {
     return ShardFor(user_id)->GetFile(id, user_id, out);
@@ -1277,22 +1291,48 @@ bool Database::CreateFolder(int64_t user_id, const std::string &name, int64_t pa
         "folder_id,is_folder,file_content) VALUES ({},'folder',{},0,'',{},1,'')",
         user_id, sql_param(ec, name), parent_id), out_id);
 }
-bool Database::MoveFile(int64_t id, int64_t target_folder_id) {
-    return ExecWrite(make_sql("UPDATE files SET folder_id={} WHERE id={}", target_folder_id, id));
+bool Database::MoveFile(int64_t id, int64_t target_folder_id, int version) {
+    std::string sql = make_sql(
+        "UPDATE files SET folder_id={}, version = version + 1 WHERE id={}",
+        target_folder_id, id);
+    if (version > 0)
+        sql += make_sql(" AND version={}", version);
+    if (version > 0) {
+        if (write_conns_.empty())
+            return false;
+        size_t idx = write_idx_.fetch_add(1, std::memory_order_relaxed) % write_conns_.size();
+        auto &wc = write_conns_[idx];
+        std::lock_guard<std::mutex> lock(wc->mtx);
+        if (!wc->conn)
+            return false;
+        if (mysql_query(wc->conn, sql.c_str()) != 0)
+            return false;
+        return mysql_affected_rows(wc->conn) > 0;
+    }
+    return ExecWrite(sql);
 }
 int Database::BatchDeleteFiles(int64_t user_id, const std::vector<int64_t> &ids) {
-    int count = 0;
-    for (auto id : ids)
-        if (ExecWrite(make_sql("DELETE FROM files WHERE id={} AND user_id={}", id, user_id)))
-            count++;
-    return count;
+    if (ids.empty())
+        return 0;
+    // 单条 SQL，原子执行，避免部分成功部分失败
+    std::string in_list;
+    for (size_t i = 0; i < ids.size(); ++i) {
+        if (i > 0)
+            in_list += ",";
+        in_list += std::to_string(ids[i]);
+    }
+    std::string sql = "DELETE FROM files WHERE id IN (" + in_list +
+                      ") AND user_id=" + std::to_string(user_id);
+    if (!ExecWrite(sql))
+        return 0;
+    return (int)ids.size();
 }
 bool ShardedDatabase::CreateFolder(int64_t user_id, const std::string &name, int64_t parent_id, int64_t &out_id) {
     return ShardFor(user_id)->CreateFolder(user_id, name, parent_id, out_id);
 }
-bool ShardedDatabase::MoveFile(int64_t id, int64_t target_folder_id) {
+bool ShardedDatabase::MoveFile(int64_t id, int64_t target_folder_id, int version) {
     for (auto &db : shards_)
-        if (db->MoveFile(id, target_folder_id))
+        if (db->MoveFile(id, target_folder_id, version))
             return true;
     return false;
 }

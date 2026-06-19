@@ -37,10 +37,10 @@ public:
          int page, int page_size, int64_t after_id), (override));
     MOCK_METHOD(bool, DeleteFile, (int64_t id, int64_t uid), (override));
     MOCK_METHOD(bool, GetFileOwner, (int64_t id, int64_t &owner_uid), (override));
-    MOCK_METHOD(bool, UpdateFileContent, (int64_t id, const std::string &content), (override));
+    MOCK_METHOD(bool, UpdateFileContent, (int64_t id, const std::string &content, int version), (override));
     MOCK_METHOD(bool, CreateFolder,
         (int64_t uid, const std::string &name, int64_t parent_id, int64_t &out_id), (override));
-    MOCK_METHOD(bool, MoveFile, (int64_t id, int64_t target_folder_id), (override));
+    MOCK_METHOD(bool, MoveFile, (int64_t id, int64_t target_folder_id, int version), (override));
     MOCK_METHOD(int, BatchDeleteFiles, (int64_t uid, const std::vector<int64_t> &ids), (override));
 
     // ---- Outbox ----
