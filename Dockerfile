@@ -1,16 +1,15 @@
+# syntax=docker/dockerfile:1
 FROM ubuntu:24.04 AS builder
 
-RUN apt update && apt install -y \
+# cache mounts: apt 下载的 .deb 包和 build 的 .o 文件跨构建持久化
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt,sharing=locked \
+    apt update && apt install -y \
     g++ make cmake git \
     protobuf-compiler-grpc libgrpc++-dev libprotobuf-dev \
     libmysqlclient-dev libhiredis-dev libssl-dev zlib1g-dev \
     libnghttp2-dev librabbitmq-dev libgtest-dev libgmock-dev libcurl4-openssl-dev
 RUN cd /usr/src/googletest && cmake . && make -j$(nproc) && cp lib/*.a /usr/lib
-
-# OpenTelemetry C++ (OTLP HTTP exporter, static libs)
-# OpenTelemetry C++ — not built (OTel-CPP v1.18 proto/grpc linker issues)
-# C++ tracing handled by Go Gateway's otelgrpc interceptor (traceparent injection)
-# If OTel-CPP headers are installed externally, CMake will auto-detect and link
 
 ARG SERVICE=auth
 ARG DEBUG=false
@@ -18,15 +17,20 @@ ARG CACHEBUST=1
 WORKDIR /src
 COPY . .
 RUN rm -rf server/generated/*
+
+# cache mount on build/: cmake 只重编译变更的 .cpp
 RUN if [ "$DEBUG" = "true" ]; then \
       sed -i 's/-O2/-g -O0/g' CMakeLists.txt; \
     fi
-RUN cmake -B build && cmake --build build --target rpc_${SERVICE} -j$(nproc)
+RUN --mount=type=cache,target=/src/build \
+    cmake -B build && cmake --build build --target rpc_${SERVICE} -j$(nproc)
 
 FROM ubuntu:24.04
 
 ARG DEBUG=false
-RUN apt update && apt install -y \
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt,sharing=locked \
+    apt update && apt install -y \
     libgrpc++1.51t64 libmysqlclient21 libhiredis-dev libssl3t64 zlib1g \
     libnghttp2-14 librabbitmq4 apache2-utils curl libcurl4 \
     $(if [ "$DEBUG" = "true" ]; then echo gdb; fi) \
