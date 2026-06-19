@@ -206,7 +206,7 @@ func main() {
 		resp, _ := authClient.Register(r.Context(), &req)
 		if resp != nil && !resp.Success {
 			code := int32(0)
-			if ec, ok := resp.(interface{ GetErrorCode() int32 }); ok {
+			if ec, ok := any(resp).(interface{ GetErrorCode() int32 }); ok {
 				code = ec.GetErrorCode()
 			}
 			writeError(w, nil, resp.GetError(), code)
@@ -232,7 +232,7 @@ func main() {
 		resp, _ := authClient.Login(r.Context(), &req)
 		if resp != nil && !resp.Success {
 			code := int32(0)
-			if ec, ok := resp.(interface{ GetErrorCode() int32 }); ok {
+			if ec, ok := any(resp).(interface{ GetErrorCode() int32 }); ok {
 				code = ec.GetErrorCode()
 			}
 			writeError(w, nil, resp.GetError(), code)
@@ -662,7 +662,7 @@ func writeGRPCResponse(w http.ResponseWriter, resp gRPCResponse, err error) {
 	}
 	if resp == nil || !resp.GetSuccess() {
 		code := int32(0)
-		if ec, ok := resp.(interface{ GetErrorCode() int32 }); ok {
+		if ec, ok := any(resp).(interface{ GetErrorCode() int32 }); ok {
 			code = ec.GetErrorCode()
 		}
 		writeError(w, nil, resp.GetError(), code)
