@@ -74,18 +74,24 @@ bool RedisClient::BatchPushCallEntries(const std::vector<std::pair<std::string, 
     if (!cluster_ || entries.empty())
         return false;
     try {
-        auto pipe = cluster_->pipeline();
+        // 按 username 分组：同一用户的 key 共 slot，用 pipeline 批量；不同用户分 pipeline
+        std::unordered_map<std::string, std::vector<std::string>> groups;
         for (const auto &[json_entry, username] : entries) {
-            if (!username.empty()) {
-                const std::string user_key = "call_history:" + username;
+            if (!username.empty())
+                groups[username].push_back(json_entry);
+        }
+        for (const auto &[username, jsons] : groups) {
+            const std::string user_key = "call_history:" + username;
+            auto pipe = cluster_->pipeline(user_key);
+            for (const auto &json_entry : jsons) {
                 pipe.lpush(user_key, json_entry);
                 pipe.ltrim(user_key, 0, MAX_HISTORY - 1);
-                pipe.expire(user_key, std::chrono::seconds(CALL_HISTORY_TTL_SECONDS));
-                pipe.sadd("call_history:users", username);
-                pipe.expire("call_history:users", std::chrono::seconds(CALL_HISTORY_TTL_SECONDS));
             }
+            pipe.expire(user_key, std::chrono::seconds(CALL_HISTORY_TTL_SECONDS));
+            pipe.sadd("call_history:users", username);
+            pipe.expire("call_history:users", std::chrono::seconds(CALL_HISTORY_TTL_SECONDS));
+            pipe.exec();
         }
-        pipe.exec();
         return true;
     } catch (const sw::redis::Error &e) {
         fprintf(stderr, "[Redis] BatchPushCallEntries failed: %s\n", e.what());
