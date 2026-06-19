@@ -125,7 +125,7 @@ func TestChangePassword_Success(t *testing.T) {
 	orig := authClient
 	authClient = &mockAuthClient{changePwdResp: &pb.ChangePasswordResponse{Success: true}}
 	defer func() { authClient = orig }()
-	req := httptest.NewRequest("PUT", "/api/me/password",
+	req := httptest.NewRequest("PUT", "/api/v1/me/password",
 		strings.NewReader(`{"old_password":"old","new_password":"new1234"}`))
 	req.AddCookie(&http.Cookie{Name: "rpc_at", Value: validTestJWT()})
 	w := httptest.NewRecorder()
@@ -154,7 +154,7 @@ func TestChangePassword_Success(t *testing.T) {
 }
 
 func TestChangePassword_Unauthorized(t *testing.T) {
-	req := httptest.NewRequest("PUT", "/api/me/password",
+	req := httptest.NewRequest("PUT", "/api/v1/me/password",
 		strings.NewReader(`{"old_password":"old","new_password":"new1234"}`))
 	w := httptest.NewRecorder()
 	mux := http.NewServeMux()
@@ -174,7 +174,7 @@ func TestChangePassword_GrpcError(t *testing.T) {
 	orig := authClient
 	authClient = &mockAuthClient{changePwdErr: status.Error(codes.Internal, "DB error")}
 	defer func() { authClient = orig }()
-	req := httptest.NewRequest("PUT", "/api/me/password",
+	req := httptest.NewRequest("PUT", "/api/v1/me/password",
 		strings.NewReader(`{"old_password":"old","new_password":"new1234"}`))
 	req.AddCookie(&http.Cookie{Name: "rpc_at", Value: validTestJWT()})
 	w := httptest.NewRecorder()
@@ -205,7 +205,7 @@ func TestListSheets_CursorFirstPage(t *testing.T) {
 		listResp: &pb.ListSpreadsheetsResponse{Success: true, Total: 50, HasMore: true, NextCursor: "999"},
 	}
 	defer func() { sheetClient = orig }()
-	req := httptest.NewRequest("GET", "/api/sheets?limit=10", nil)
+	req := httptest.NewRequest("GET", "/api/v1/sheets?limit=10", nil)
 	req.AddCookie(&http.Cookie{Name: "rpc_at", Value: validTestJWT()})
 	w := httptest.NewRecorder()
 	mux := http.NewServeMux()
@@ -228,7 +228,7 @@ func TestListSheets_EmptyResult(t *testing.T) {
 		listResp: &pb.ListSpreadsheetsResponse{Success: true, Total: 0, HasMore: false},
 	}
 	defer func() { sheetClient = orig }()
-	req := httptest.NewRequest("GET", "/api/sheets?limit=10", nil)
+	req := httptest.NewRequest("GET", "/api/v1/sheets?limit=10", nil)
 	req.AddCookie(&http.Cookie{Name: "rpc_at", Value: validTestJWT()})
 	w := httptest.NewRecorder()
 	mux := http.NewServeMux()
@@ -247,7 +247,7 @@ func TestCreateFolder_Success(t *testing.T) {
 	orig := fileClient
 	fileClient = &mockFileClient{createFolderResp: &pb.CreateFolderResponse{Success: true, Id: 999}}
 	defer func() { fileClient = orig }()
-	req := httptest.NewRequest("POST", "/api/files/folder", strings.NewReader(`{"name":"test"}`))
+	req := httptest.NewRequest("POST", "/api/v1/files/folder", strings.NewReader(`{"name":"test"}`))
 	req.AddCookie(&http.Cookie{Name: "rpc_at", Value: validTestJWT()})
 	w := httptest.NewRecorder()
 	mux := http.NewServeMux()
@@ -271,7 +271,7 @@ func TestPhoneLogin_Success(t *testing.T) {
 		loginByPhoneResp: &pb.LoginResponse{Success: true, UserId: 1, AccessToken: "at", RefreshToken: "rt", Role: "user"},
 	}
 	defer func() { authClient = orig }()
-	req := httptest.NewRequest("POST", "/api/auth/phone/login",
+	req := httptest.NewRequest("POST", "/api/v1/auth/phone/login",
 		strings.NewReader(`{"phone":"13800138000","otp":"123456"}`))
 	w := httptest.NewRecorder()
 	mux := http.NewServeMux()
@@ -288,7 +288,7 @@ func TestPhoneLogin_Success(t *testing.T) {
 }
 
 func TestOTPSend_ValidPhone(t *testing.T) {
-	req := httptest.NewRequest("POST", "/api/auth/otp/send",
+	req := httptest.NewRequest("POST", "/api/v1/auth/otp/send",
 		strings.NewReader(`{"phone":"13800138000"}`))
 	w := httptest.NewRecorder()
 	mux := http.NewServeMux()
@@ -308,7 +308,7 @@ func TestOTPSend_ValidPhone(t *testing.T) {
 }
 
 func TestOTPSend_EmptyPhone_Rejected(t *testing.T) {
-	req := httptest.NewRequest("POST", "/api/auth/otp/send", strings.NewReader(`{"phone":""}`))
+	req := httptest.NewRequest("POST", "/api/v1/auth/otp/send", strings.NewReader(`{"phone":""}`))
 	w := httptest.NewRecorder()
 	mux := http.NewServeMux()
 	mux.HandleFunc("POST /api/auth/otp/send", func(w http.ResponseWriter, r *http.Request) {
@@ -331,7 +331,7 @@ func TestPhotoList_Success(t *testing.T) {
 	orig := fileClient
 	fileClient = &mockFileClient{listResp: &pb.ListFilesResponse{Success: true, Total: 5}}
 	defer func() { fileClient = orig }()
-	req := httptest.NewRequest("GET", "/api/photos", nil)
+	req := httptest.NewRequest("GET", "/api/v1/photos", nil)
 	req.AddCookie(&http.Cookie{Name: "rpc_at", Value: validTestJWT()})
 	w := httptest.NewRecorder()
 	mux := http.NewServeMux()
@@ -350,7 +350,7 @@ func TestShareLink_Create(t *testing.T) {
 	sharingClient = &mockSharingClient{
 		linkResp: &pb.ShareLinkResponse{Success: true, Token: "abc123"},
 	}
-	req := httptest.NewRequest("POST", "/api/sheets/123/share-link",
+	req := httptest.NewRequest("POST", "/api/v1/sheets/123/share-link",
 		strings.NewReader(`{"permission":"view"}`))
 	req.AddCookie(&http.Cookie{Name: "rpc_at", Value: validTestJWT()})
 	w := httptest.NewRecorder()
@@ -369,7 +369,7 @@ func TestShareLink_Create(t *testing.T) {
 
 func TestShareToken_Access(t *testing.T) {
 	sharingClient = &mockSharingClient{}
-	req := httptest.NewRequest("GET", "/api/s/abc123", nil)
+	req := httptest.NewRequest("GET", "/api/v1/s/abc123", nil)
 	w := httptest.NewRecorder()
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /api/s/{token}", func(w http.ResponseWriter, r *http.Request) {

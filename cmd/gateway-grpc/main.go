@@ -9,10 +9,12 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"os/signal"
 	"regexp"
 	"strconv"
 	"strings"
 	"sync/atomic"
+	"syscall"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -371,9 +373,9 @@ func main() {
 		// Redirect to actual resource based on type
 		switch info.GetResourceType() {
 		case "sheet":
-			http.Redirect(w, r, fmt.Sprintf("/api/sheets/%d", info.GetResourceId()), http.StatusFound)
+			http.Redirect(w, r, fmt.Sprintf("/api/v1/sheets/%d", info.GetResourceId()), http.StatusFound)
 		case "file":
-			http.Redirect(w, r, fmt.Sprintf("/api/files/%d", info.GetResourceId()), http.StatusFound)
+			http.Redirect(w, r, fmt.Sprintf("/api/v1/files/%d", info.GetResourceId()), http.StatusFound)
 		}
 	})
 
@@ -616,8 +618,26 @@ func main() {
 		otelhttp.WithPropagators(otel.GetTextMapPropagator()),
 	)
 
-	log.Printf("[Gateway-gRPC] Listening on :%s", getenv("PORT", "8080"))
-	log.Fatal(http.ListenAndServe(":"+getenv("PORT", "8080"), handler))
+	port := getenv("PORT", "8080")
+	srv := &http.Server{Addr: ":" + port, Handler: handler}
+	go func() {
+		log.Printf("[Gateway-gRPC] Listening on :%s", port)
+		if err := srv.ListenAndServe(); err != http.ErrServerClosed {
+			log.Fatalf("listen: %v", err)
+		}
+	}()
+
+	// 优雅关闭：收到 SIGTERM/SIGINT → 停止接受新连接 → 等待已有请求完成
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+	<-quit
+	log.Println("Shutting down gracefully...")
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	if err := srv.Shutdown(ctx); err != nil {
+		log.Fatalf("shutdown: %v", err)
+	}
+	log.Println("Server stopped")
 }
 
 func setCookies(w http.ResponseWriter, at, rt string) {
@@ -625,7 +645,7 @@ func setCookies(w http.ResponseWriter, at, rt string) {
 		http.SetCookie(w, &http.Cookie{Name: "rpc_at", Value: at, Path: "/", HttpOnly: true, Secure: true, SameSite: http.SameSiteStrictMode})
 	}
 	if rt != "" {
-		http.SetCookie(w, &http.Cookie{Name: "rpc_rt", Value: rt, Path: "/api/refresh", HttpOnly: true, Secure: true, SameSite: http.SameSiteStrictMode})
+		http.SetCookie(w, &http.Cookie{Name: "rpc_rt", Value: rt, Path: "/api/v1/refresh", HttpOnly: true, Secure: true, SameSite: http.SameSiteStrictMode})
 	}
 }
 
@@ -800,9 +820,9 @@ func parseInt64(s string) int64 {
 func jwtMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		path := r.URL.Path
-		if strings.HasPrefix(path, "/api/login") || strings.HasPrefix(path, "/api/register") ||
-			strings.HasPrefix(path, "/api/refresh") || strings.HasPrefix(path, "/api/health") ||
-			strings.HasPrefix(path, "/api/me") {
+		if strings.HasPrefix(path, "/api/v1/login") || strings.HasPrefix(path, "/api/v1/register") ||
+			strings.HasPrefix(path, "/api/v1/refresh") || strings.HasPrefix(path, "/api/v1/health") ||
+			strings.HasPrefix(path, "/api/v1/me") {
 			next.ServeHTTP(w, r)
 			return
 		}

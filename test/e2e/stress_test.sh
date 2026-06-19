@@ -32,13 +32,13 @@ TMPDIR="/tmp/stress_$$"
 mkdir -p "$TMPDIR"
 
 # ---- 登录 ----
-$CURL -X POST "$API/api/login" -H 'Content-Type: application/json' \
+$CURL -X POST "$API/api/v1/login" -H 'Content-Type: application/json' \
     -c "$JAR" -d '{"username":"stress_tester","password":"stress1234"}' > /dev/null 2>&1
 RPC_TOKEN=$(grep 'rpc_at' "$JAR" 2>/dev/null | awk '{print $NF}' | head -1)
 [ -z "$RPC_TOKEN" ] && {
-    $CURL -X POST "$API/api/register" -H 'Content-Type: application/json' \
+    $CURL -X POST "$API/api/v1/register" -H 'Content-Type: application/json' \
         -d '{"username":"stress_tester","password":"stress1234"}' > /dev/null 2>&1
-    $CURL -X POST "$API/api/login" -H 'Content-Type: application/json' \
+    $CURL -X POST "$API/api/v1/login" -H 'Content-Type: application/json' \
         -c "$JAR" -d '{"username":"stress_tester","password":"stress1234"}' > /dev/null 2>&1
     RPC_TOKEN=$(grep 'rpc_at' "$JAR" 2>/dev/null | awk '{print $NF}' | head -1)
 }
@@ -61,14 +61,14 @@ ab_bench() {
 }
 
 GW="http://localhost:8082"
-ab_bench "Health (无鉴权)"        "$GW/api/health" ""
-ab_bench "Sheet List (鉴权+gRPC)" "$GW/api/sheets" "$RPC_TOKEN"
+ab_bench "Health (无鉴权)"        "$GW/api/v1/health" ""
+ab_bench "Sheet List (鉴权+gRPC)" "$GW/api/v1/sheets" "$RPC_TOKEN"
 
 # ===== L2: 经 nginx HTTPS =====
 title "L2: nginx HTTPS ($API, $REQ req x $CONC c)"
 
-ab_bench "Health (TLS)"           "$API/api/health" ""
-ab_bench "Sheet List (TLS+Auth)" "$API/api/sheets" "$RPC_TOKEN"
+ab_bench "Health (TLS)"           "$API/api/v1/health" ""
+ab_bench "Sheet List (TLS+Auth)" "$API/api/v1/sheets" "$RPC_TOKEN"
 
 # ===== L3: 写入压测 =====
 CREATED_IDS="$TMPDIR/created_ids.txt"
@@ -79,14 +79,14 @@ title "L3: 写入压测 (200 次创建→获取→更新→删除循环)"
 START=$(date +%s%N)
 WRITE_OK=0; WRITE_FAIL=0
 for i in $(seq 1 200); do
-    CR=$($CURL -X POST "$API/api/sheets" -H 'Content-Type: application/json' \
+    CR=$($CURL -X POST "$API/api/v1/sheets" -H 'Content-Type: application/json' \
         -b "$JAR" -d "{\"name\":\"stress-$i\",\"headers_json\":\"[]\",\"data_json\":\"[]\"}" 2>/dev/null)
     SID=$(echo "$CR" | sed 's/.*"id"://;s/[},].*//')
     if [ -n "$SID" ] && [ "$SID" != "0" ]; then
-        $CURL "$API/api/sheets/$SID" -b "$JAR" -o /dev/null 2>/dev/null
-        $CURL -X PUT "$API/api/sheets/$SID" -H 'Content-Type: application/json' \
+        $CURL "$API/api/v1/sheets/$SID" -b "$JAR" -o /dev/null 2>/dev/null
+        $CURL -X PUT "$API/api/v1/sheets/$SID" -H 'Content-Type: application/json' \
             -b "$JAR" -d '{"name":"stress-updated","headers_json":"[]","data_json":"[]"}' -o /dev/null 2>/dev/null
-        $CURL -X DELETE "$API/api/sheets/$SID" -b "$JAR" -o /dev/null 2>/dev/null
+        $CURL -X DELETE "$API/api/v1/sheets/$SID" -b "$JAR" -o /dev/null 2>/dev/null
         WRITE_OK=$((WRITE_OK + 1))
     else
         WRITE_FAIL=$((WRITE_FAIL + 1))
@@ -100,21 +100,21 @@ stat "总耗时      " "${WR_MS}ms (avg $(( WR_MS / 200 ))ms/op)"
 # ===== L4: 并发读取稳定性 =====
 title "L4: 并发读取稳定性 (1000 req x 20c, 10s 持续)"
 
-$CURL -X POST "$API/api/sheets" -H 'Content-Type: application/json' \
+$CURL -X POST "$API/api/v1/sheets" -H 'Content-Type: application/json' \
     -b "$JAR" -d '{"name":"read-stress","headers_json":"[\"A\"]","data_json":"[[\"v\"]]"}' > /dev/null 2>&1
-SHEET_ID=$($CURL "$API/api/sheets" -b "$JAR" 2>/dev/null | sed 's/.*"id"://;s/[},].*//')
+SHEET_ID=$($CURL "$API/api/v1/sheets" -b "$JAR" 2>/dev/null | sed 's/.*"id"://;s/[},].*//')
 
-echo "  [混合负载: 70%/api/sheets + 20%/api/sheets/$SHEET_ID + 10%/api/health]"
+echo "  [混合负载: 70%/api/v1/sheets + 20%/api/v1/sheets/$SHEET_ID + 10%/api/v1/health]"
 :> "$TMPDIR/read_codes.txt"
 REQ_COUNT=1000
 for i in $(seq 1 $REQ_COUNT); do
     MOD=$((i % 10))
     if [ "$MOD" -lt 7 ]; then
-        curl -sk -o /dev/null -w "%{http_code}\n" "$API/api/sheets" -b "$JAR" >> "$TMPDIR/read_codes.txt" 2>/dev/null &
+        curl -sk -o /dev/null -w "%{http_code}\n" "$API/api/v1/sheets" -b "$JAR" >> "$TMPDIR/read_codes.txt" 2>/dev/null &
     elif [ "$MOD" -lt 9 ]; then
-        curl -sk -o /dev/null -w "%{http_code}\n" "$API/api/sheets/$SHEET_ID" -b "$JAR" >> "$TMPDIR/read_codes.txt" 2>/dev/null &
+        curl -sk -o /dev/null -w "%{http_code}\n" "$API/api/v1/sheets/$SHEET_ID" -b "$JAR" >> "$TMPDIR/read_codes.txt" 2>/dev/null &
     else
-        curl -sk -o /dev/null -w "%{http_code}\n" "$API/api/health" >> "$TMPDIR/read_codes.txt" 2>/dev/null &
+        curl -sk -o /dev/null -w "%{http_code}\n" "$API/api/v1/health" >> "$TMPDIR/read_codes.txt" 2>/dev/null &
     fi
     [ $((i % 50)) -eq 0 ] && wait
 done
@@ -127,7 +127,7 @@ stat "200 (成功)  " "$TOTAL_OK"
 stat "401 (无鉴权)" "$TOTAL_401"
 stat "429 (限流)  " "$TOTAL_429"
 
-$CURL -X DELETE "$API/api/sheets/$SHEET_ID" -b "$JAR" > /dev/null 2>&1
+$CURL -X DELETE "$API/api/v1/sheets/$SHEET_ID" -b "$JAR" > /dev/null 2>&1
 
 # ===== L5: 长时间浸泡 (可选) =====
 if [ "$LONG_MODE" -eq 1 ]; then
@@ -136,7 +136,7 @@ if [ "$LONG_MODE" -eq 1 ]; then
     START_T=$(date +%s)
     COUNT=0; FAILS=0
     while [ $(($(date +%s) - START_T)) -lt $DURATION ]; do
-        CODE=$(curl -sk -o /dev/null -w "%{http_code}" "$API/api/health" 2>/dev/null)
+        CODE=$(curl -sk -o /dev/null -w "%{http_code}" "$API/api/v1/health" 2>/dev/null)
         [ "$CODE" = "200" ] && COUNT=$((COUNT + 1)) || FAILS=$((FAILS + 1))
         sleep 2
         [ $((COUNT % 50)) -eq 0 ] && [ "$COUNT" -gt 0 ] && \

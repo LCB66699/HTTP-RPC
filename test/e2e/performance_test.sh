@@ -52,17 +52,17 @@ calc_pct() {
 login_and_get_cookie() {
     local user="$1" pass="$2" jar="$3"
     local body
-    body=$(curl -sk -X POST "$API/api/login" \
+    body=$(curl -sk -X POST "$API/api/v1/login" \
         -H 'Content-Type: application/json' \
         -c "$jar" \
         -d "{\"username\":\"$user\",\"password\":\"$pass\"}" 2>/dev/null)
     if echo "$body" | grep -q '"success"'; then
         return 0
     fi
-    curl -sk -X POST "$API/api/register" \
+    curl -sk -X POST "$API/api/v1/register" \
         -H 'Content-Type: application/json' \
         -d "{\"username\":\"$user\",\"password\":\"$pass\"}" > /dev/null 2>&1
-    curl -sk -X POST "$API/api/login" \
+    curl -sk -X POST "$API/api/v1/login" \
         -H 'Content-Type: application/json' \
         -c "$jar" \
         -d "{\"username\":\"$user\",\"password\":\"$pass\"}" > /dev/null 2>&1
@@ -83,18 +83,18 @@ green "Cookie ready"
 # 预热 gRPC 连接池 + Redis 连接池
 echo -n "  预热 gRPC/Redis 连接池..."
 for i in $(seq 1 50); do
-    $CURL -o /dev/null "$API/api/health" 2>/dev/null
+    $CURL -o /dev/null "$API/api/v1/health" 2>/dev/null
 done
 echo " done"
 
 # 预创建一张表，并预热 sheet 查询
-$CURL -o /dev/null -X POST "$API/api/sheets" \
+$CURL -o /dev/null -X POST "$API/api/v1/sheets" \
     -H 'Content-Type: application/json' \
     -b "$JAR" \
     -d '{"name":"perf-test","description":"","headers_json":"[]","data_json":"[]"}' 2>/dev/null || true
 
 for i in $(seq 1 10); do
-    $CURL -o /dev/null "$API/api/sheets" -b "$JAR" 2>/dev/null
+    $CURL -o /dev/null "$API/api/v1/sheets" -b "$JAR" 2>/dev/null
 done
 green "Warmup complete"
 
@@ -103,21 +103,21 @@ green "Warmup complete"
 # =====================================================================
 title "1. 单请求延迟 (RTT)"
 
-LOGIN_T=$($CURL -o /dev/null -w "%{time_total}" -X POST "$API/api/login" \
+LOGIN_T=$($CURL -o /dev/null -w "%{time_total}" -X POST "$API/api/v1/login" \
     -H 'Content-Type: application/json' \
     -d '{"username":"perf_tester","password":"perf1234"}')
 stat "Login               " "${LOGIN_T}s"
 
-NOAUTH_T=$($CURL -o /dev/null -w "%{time_total}" "$API/api/sheets")
+NOAUTH_T=$($CURL -o /dev/null -w "%{time_total}" "$API/api/v1/sheets")
 stat "No Cookie (401)     " "${NOAUTH_T}s"
 
-LIST1_T=$($CURL -o /dev/null -w "%{time_total}" "$API/api/sheets" -b "$JAR")
+LIST1_T=$($CURL -o /dev/null -w "%{time_total}" "$API/api/v1/sheets" -b "$JAR")
 stat "Sheet List (cached) " "${LIST1_T}s"
 
-LIST2_T=$($CURL -o /dev/null -w "%{time_total}" "$API/api/sheets" -b "$JAR")
+LIST2_T=$($CURL -o /dev/null -w "%{time_total}" "$API/api/v1/sheets" -b "$JAR")
 stat "Sheet List (cached) " "${LIST2_T}s"
 
-HEALTH_T=$($CURL -o /dev/null -w "%{time_total}" "$API/api/health")
+HEALTH_T=$($CURL -o /dev/null -w "%{time_total}" "$API/api/v1/health")
 stat "Health Check        " "${HEALTH_T}s"
 
 # =====================================================================
@@ -179,22 +179,22 @@ RUNNER_EOF
         "$name" "$p50_ms" "$p95_ms" "$p99_ms" "$max_ms"
 }
 
-run_concurrent "Health (no auth)"  "$API/api/health"   "GET"  ""  "no"
-run_concurrent "Sheet List"        "$API/api/sheets"   "GET"  ""  "yes"
-run_concurrent "Sheet Get"         "$API/api/sheets/1" "GET" "" "yes"
+run_concurrent "Health (no auth)"  "$API/api/v1/health"   "GET"  ""  "no"
+run_concurrent "Sheet List"        "$API/api/v1/sheets"   "GET"  ""  "yes"
+run_concurrent "Sheet Get"         "$API/api/v1/sheets/1" "GET" "" "yes"
 
 # =====================================================================
 # Phase 3: 缓存命中率
 # =====================================================================
 title "3. Cache-Aside 命中率"
 
-FIRST_ID=$($CURL "$API/api/sheets" -b "$JAR" 2>/dev/null \
+FIRST_ID=$($CURL "$API/api/v1/sheets" -b "$JAR" 2>/dev/null \
     | sed 's/.*"id"://;s/[},].*//')
 [ -z "$FIRST_ID" ] && FIRST_ID=1
 
 HIT=0; MIS=0; FIRST_WRITE=0
 for i in $(seq 1 20); do
-    RES=$($CURL "$API/api/sheets/$FIRST_ID" -b "$JAR" 2>/dev/null)
+    RES=$($CURL "$API/api/v1/sheets/$FIRST_ID" -b "$JAR" 2>/dev/null)
     if echo "$RES" | grep -q '"cache_source":"redis"'; then
         HIT=$((HIT + 1))
     elif echo "$RES" | grep -q '"cache_source":"mysql"'; then
@@ -213,7 +213,7 @@ stat "MySQL 回源   " "$MIS/20"
 title "4. 1MB 文件上传"
 
 dd if=/dev/urandom of=/tmp/perf_large.dat bs=1024 count=1024 2>/dev/null
-UL_T=$($CURL -o /dev/null -w "%{time_total}" -X POST "$API/api/files/upload" \
+UL_T=$($CURL -o /dev/null -w "%{time_total}" -X POST "$API/api/v1/files/upload" \
     -b "$JAR" \
     -F "file=@/tmp/perf_large.dat")
 stat "Upload 1MB          " "${UL_T}s"
@@ -226,7 +226,7 @@ title "5. 负载测试 (300 req, 10c, curl cold-connect)"
 START=$(date +%s%N)
 seq 1 10 | xargs -P 10 -I {} bash -c "
     for j in \$(seq 1 30); do
-        $CURL -o /dev/null '$API/api/health' 2>/dev/null
+        $CURL -o /dev/null '$API/api/v1/health' 2>/dev/null
     done
 "
 END=$(date +%s%N)
@@ -248,7 +248,7 @@ for i in $(seq 1 10); do
     OP_START=$(date +%s%N)
 
     # 创建
-    CR=$($CURL -X POST "$API/api/sheets" \
+    CR=$($CURL -X POST "$API/api/v1/sheets" \
         -H 'Content-Type: application/json' \
         -b "$JAR" \
         -d "{\"name\":\"perf-$i\",\"description\":\"\",\"headers_json\":\"[\\\"A\\\"]\",\"data_json\":\"[[\\\"v\\\"]]\"}")
@@ -256,16 +256,16 @@ for i in $(seq 1 10); do
 
     if [ -n "$SID" ] && [ "$SID" != "0" ]; then
         # 获取
-        $CURL "$API/api/sheets/$SID" -b "$JAR" > /dev/null 2>&1
+        $CURL "$API/api/v1/sheets/$SID" -b "$JAR" > /dev/null 2>&1
 
         # 更新
-        $CURL -X PUT "$API/api/sheets/$SID" \
+        $CURL -X PUT "$API/api/v1/sheets/$SID" \
             -H 'Content-Type: application/json' \
             -b "$JAR" \
             -d "{\"name\":\"perf-$i-updated\",\"description\":\"\",\"headers_json\":\"[\\\"B\\\"]\",\"data_json\":\"[[\\\"w\\\"]]\"}" > /dev/null 2>&1
 
         # 删除
-        $CURL -X DELETE "$API/api/sheets/$SID" -b "$JAR" > /dev/null 2>&1
+        $CURL -X DELETE "$API/api/v1/sheets/$SID" -b "$JAR" > /dev/null 2>&1
 
         echo "ok" >> "$TMPDIR/write_ops"
     else
@@ -301,14 +301,14 @@ title "7. ab 权威 QPS (keep-alive, 1000 req x 10c)"
 
 if command -v ab &>/dev/null; then
     echo "  [健康检查基线 — 纯网关吞吐]"
-    ab -n 1000 -c 10 -k "$API/api/health" 2>&1 \
+    ab -n 1000 -c 10 -k "$API/api/v1/health" 2>&1 \
         | grep -E "Requests per second|50%|95%|99%|100%|Failed requests" || true
 
     echo ""
     echo "  [Sheet List — 鉴权+gRPC+Redis 完整链路]"
     ab -n 1000 -c 10 -k \
         -C "rpc_at=$RPC_TOKEN" \
-        "$API/api/sheets" 2>&1 \
+        "$API/api/v1/sheets" 2>&1 \
         | grep -E "Requests per second|50%|95%|99%|100%|Non-2xx|Failed requests" || true
 else
     warn "ab not installed — install apache2-utils for QPS benchmark"
@@ -327,7 +327,7 @@ if [ -n "$WRK2" ]; then
 
     if [ "$HAS_WRK2" -eq 1 ]; then
         echo "  [健康检查基线 — wrk2 constant-rate 200r/s]"
-        $WRK2 -t4 -c10 -d30s -R200 --latency "$API/api/health" 2>&1 \
+        $WRK2 -t4 -c10 -d30s -R200 --latency "$API/api/v1/health" 2>&1 \
             | grep -E "Requests/sec|Latency|50%|90%|99%" || true
 
         if [ -f "test/wrk_scripts/health.lua" ]; then
@@ -335,11 +335,11 @@ if [ -n "$WRK2" ]; then
             echo "  [wrk2 + Lua 脚本 (详细延迟分布)]"
             $WRK2 -t4 -c10 -d30s -R200 --latency \
                 -s test/wrk_scripts/health.lua \
-                "$API/api/health" 2>&1
+                "$API/api/v1/health" 2>&1
         fi
     else
         echo "  [wrk (非 constant-rate) 30s, 10c]"
-        $WRK2 -t4 -c10 -d30s --latency "$API/api/health" 2>&1 \
+        $WRK2 -t4 -c10 -d30s --latency "$API/api/v1/health" 2>&1 \
             | grep -E "Requests/sec|Latency|50%|90%|99%" || true
     fi
 
@@ -350,11 +350,11 @@ if [ -n "$WRK2" ]; then
         if [ "$HAS_WRK2" -eq 1 ]; then
             RPC_TOKEN="$RPC_TOKEN" $WRK2 -t4 -c10 -d30s -R100 --latency \
                 -s test/wrk_scripts/mixed.lua \
-                "$API/api/sheets" 2>&1
+                "$API/api/v1/sheets" 2>&1
         else
             RPC_TOKEN="$RPC_TOKEN" $WRK2 -t4 -c10 -d30s --latency \
                 -s test/wrk_scripts/mixed.lua \
-                "$API/api/sheets" 2>&1
+                "$API/api/v1/sheets" 2>&1
         fi
     fi
 else

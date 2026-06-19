@@ -1,4 +1,4 @@
-const API = '/api';
+const API = '/api/v1';
 let currentUser = null;
 let authToken = null;
 // 用 window 避免 let TDZ 问题

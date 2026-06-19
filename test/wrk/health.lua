@@ -1,9 +1,9 @@
 -- wrk2 benchmark: pure gateway throughput baseline
--- Usage: wrk -t4 -c10 -d30s -R100 --latency -s health.lua https://localhost/api/health
--- For wrk2 (constant-rate): wrk2 -t4 -c10 -d30s -R100 --latency -s health.lua https://localhost/api/health
+-- Usage: wrk -t4 -c10 -d30s -R100 --latency -s health.lua https://localhost/api/v1/health
+-- For wrk2 (constant-rate): wrk2 -t4 -c10 -d30s -R100 --latency -s health.lua https://localhost/api/v1/health
 
 request = function()
-    return wrk.format("GET", "/api/health")
+    return wrk.format("GET", "/api/v1/health")
 end
 
 -- Optional: report custom latency histogram buckets

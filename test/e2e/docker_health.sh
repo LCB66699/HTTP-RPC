@@ -73,10 +73,10 @@ done
 echo ""
 echo "Phase 2: Service Endpoints..."
 # gRPC Gateway
-if ssh -o ConnectTimeout=5 "$HOST" "curl -sk https://localhost:443/api/health 2>/dev/null | grep -q gateway" 2>/dev/null; then
+if ssh -o ConnectTimeout=5 "$HOST" "curl -sk https://localhost:443/api/v1/health 2>/dev/null | grep -q gateway" 2>/dev/null; then
     green "gRPC-Gateway (HTTPS)"
 else
-    curl -sk "http://$HOST:8082/api/health" 2>/dev/null | grep -q . && green "gRPC-Gateway (:8082)" || red "gRPC-Gateway unreachable"
+    curl -sk "http://$HOST:8082/api/v1/health" 2>/dev/null | grep -q . && green "gRPC-Gateway (:8082)" || red "gRPC-Gateway unreachable"
 fi
 
 # Elasticsearch
@@ -94,7 +94,7 @@ else
 fi
 
 # RabbitMQ Management
-if curl -s -u rpc:rpc-rabbit-123456 "http://$HOST:15672/api/overview" 2>/dev/null | grep -q '"management_version"'; then
+if curl -s -u rpc:rpc-rabbit-123456 "http://$HOST:15672/api/v1/overview" 2>/dev/null | grep -q '"management_version"'; then
     green "RabbitMQ Management (15672)"
 else
     warn "RabbitMQ Management not responding"

@@ -12,7 +12,7 @@ TEST_PASS="test1234"
 
 # CI runner 网络不稳定，轮询 Gateway 直到就绪
 for i in $(seq 1 60); do
-    if curl -sk -o /dev/null -w "%{http_code}" "$API/api/health" 2>/dev/null | grep -q "200"; then
+    if curl -sk -o /dev/null -w "%{http_code}" "$API/api/v1/health" 2>/dev/null | grep -q "200"; then
         break
     fi
     sleep 3
@@ -40,7 +40,7 @@ trap cleanup EXIT
 
 # ---- 0. 连通性检查 ----
 title "0. API 连通性"
-if $CURL -o /dev/null -w "%{http_code}" "$API/api/health" | grep -q "200"; then
+if $CURL -o /dev/null -w "%{http_code}" "$API/api/v1/health" | grep -q "200"; then
     green "API reachable"
 else
     red "API unreachable at $API"
@@ -51,7 +51,7 @@ fi
 title "0.1 Auth 预热"
 WARM_USER="warmup_$(date +%s)"
 for i in $(seq 1 50); do
-    WARM=$($CURL -X POST "$API/api/register" \
+    WARM=$($CURL -X POST "$API/api/v1/register" \
         -H 'Content-Type: application/json' \
         -d "{\"username\":\"$WARM_USER\",\"password\":\"test1234\"}" 2>/dev/null)
     if echo "$WARM" | grep -q '"success":true'; then
@@ -72,7 +72,7 @@ title "1.1 注册新用户（或登录已有）"
 echo "DEBUG: TEST_USER=$TEST_USER"
 # CI runner 慢，MySQL 就绪需要更长时间，最多重试 5 次
 for retry in 1 2 3 4 5; do
-    REG=$($CURL -X POST "$API/api/register" \
+    REG=$($CURL -X POST "$API/api/v1/register" \
         -H 'Content-Type: application/json' \
         -c "$JAR" -D "/tmp/rpc_hdr_$$" \
         -d "{\"username\":\"$TEST_USER\",\"password\":\"test1234\"}")
@@ -88,12 +88,12 @@ if echo "$REG" | grep -q '"success":true'; then
     green "Register OK"
 else
     warn "Register failed, trying login..."
-    REG=$($CURL -X POST "$API/api/login" \
+    REG=$($CURL -X POST "$API/api/v1/login" \
         -H 'Content-Type: application/json' \
         -c "$JAR" -D "/tmp/rpc_hdr_$$" \
         -d "{\"username\":\"$TEST_USER\",\"password\":\"test1234\"}")
     echo "DEBUG: LOGIN=$REG"
-    REG=$($CURL -X POST "$API/api/login" \
+    REG=$($CURL -X POST "$API/api/v1/login" \
         -H 'Content-Type: application/json' \
         -c "$JAR" -D "/tmp/rpc_hdr_$$" \
         -d "{\"username\":\"$TEST_USER\",\"password\":\"test1234\"}")
@@ -109,7 +109,7 @@ REG_TOKEN=$(extract_token "/tmp/rpc_hdr_$$")
 title "1.2 重复注册（应拒绝）"
 REJECTED=0
 for i in 1 2 3; do
-    REG2=$($CURL -X POST "$API/api/register" \
+    REG2=$($CURL -X POST "$API/api/v1/register" \
         -H 'Content-Type: application/json' \
         -d "{\"username\":\"$TEST_USER\",\"password\":\"test1234\"}")
     if echo "$REG2" | grep -q '"error"'; then
@@ -123,7 +123,7 @@ done
 
 title "1.3 登录获取 Cookie"
 rm -f "$JAR"
-LOGIN=$($CURL -X POST "$API/api/login" \
+LOGIN=$($CURL -X POST "$API/api/v1/login" \
     -H 'Content-Type: application/json' \
     -c "$JAR" -D "/tmp/rpc_hdr_$$" \
     -d "{\"username\":\"$TEST_USER\",\"password\":\"test1234\"}")
@@ -142,7 +142,7 @@ grep -i 'set-cookie' "/tmp/rpc_hdr_$$" | grep -qi 'samesite=strict' \
     || warn "Cookie missing SameSite=Strict"
 
 title "1.4 错误密码（应拒绝）"
-LOGIN2=$($CURL -X POST "$API/api/login" \
+LOGIN2=$($CURL -X POST "$API/api/v1/login" \
     -H 'Content-Type: application/json' \
     -d "{\"username\":\"$TEST_USER\",\"password\":\"wrongpass\"}")
 echo "$LOGIN2" | grep -q '"error"' \
@@ -150,7 +150,7 @@ echo "$LOGIN2" | grep -q '"error"' \
     || red "Bad password should fail"
 
 title "1.5 用户名 <3 字符（应拒绝）"
-REG3=$($CURL -X POST "$API/api/register" \
+REG3=$($CURL -X POST "$API/api/v1/register" \
     -H 'Content-Type: application/json' \
     -d '{"username":"ab","password":"test1234"}')
 echo "$REG3" | grep -q '"error"' \
@@ -158,7 +158,7 @@ echo "$REG3" | grep -q '"error"' \
     || red "Should reject short username"
 
 title "1.6 密码 <6 字符（应拒绝）"
-REG4=$($CURL -X POST "$API/api/register" \
+REG4=$($CURL -X POST "$API/api/v1/register" \
     -H 'Content-Type: application/json' \
     -d '{"username":"shortpw_fn","password":"12345"}')
 echo "$REG4" | grep -q '"error"' \
@@ -168,15 +168,15 @@ echo "$REG4" | grep -q '"error"' \
 # ---- 2. 鉴权拦截 ----
 title "2. 鉴权拦截"
 
-title "2.1 无 Cookie → /api/sheets（应 401）"
-CODE=$($CURL -o /dev/null -w "%{http_code}" "$API/api/sheets")
+title "2.1 无 Cookie → /api/v1/sheets（应 401）"
+CODE=$($CURL -o /dev/null -w "%{http_code}" "$API/api/v1/sheets")
 [ "$CODE" = "401" ] \
     && green "No cookie → 401" \
     || red "Expected 401, got $CODE"
 
-title "2.2 伪造 Cookie → /api/sheets（应 401）"
+title "2.2 伪造 Cookie → /api/v1/sheets（应 401）"
 CODE=$($CURL -o /dev/null -w "%{http_code}" \
-    -H "Cookie: rpc_at=fake.jwt.token" "$API/api/sheets")
+    -H "Cookie: rpc_at=fake.jwt.token" "$API/api/v1/sheets")
 [ "$CODE" = "401" ] \
     && green "Fake cookie → 401" \
     || red "Expected 401, got $CODE"
@@ -186,7 +186,7 @@ title "3. 表格 (Spreadsheet)"
 
 title "3.1 创建表格"
 for retry in 1 2 3 4 5 6 7 8 9 10; do
-    CREATE=$($CURL -X POST "$API/api/sheets" \
+    CREATE=$($CURL -X POST "$API/api/v1/sheets" \
         -H 'Content-Type: application/json' \
         -b "$JAR" \
         -d '{"name":"测试表格","description":"自动化测试","headers_json":"[\"A\",\"B\",\"C\"]","data_json":"[[\"a1\",\"b1\",\"c1\"],[\"a2\",\"b2\",\"c2\"]]"}')
@@ -203,17 +203,17 @@ echo "$CREATE" | grep -q '"success":true' \
 sleep 2
 
 title "3.2 列表查询"
-LIST=$($CURL "$API/api/sheets" -b "$JAR")
+LIST=$($CURL "$API/api/v1/sheets" -b "$JAR")
 echo "$LIST" | grep -q '"success":true' \
     && green "List sheets OK" \
     || red "List failed: $LIST"
 
 title "3.2b 游标分页"
-PAGE1=$($CURL "$API/api/sheets?limit=5" -b "$JAR")
+PAGE1=$($CURL "$API/api/v1/sheets?limit=5" -b "$JAR")
 CURSOR=$(echo "$PAGE1" | grep -o '"next_cursor":"[^"]*"' | sed 's/"next_cursor":"//;s/"//')
 HASMORE=$(echo "$PAGE1" | grep -o '"has_more":[^,}]*' | sed 's/"has_more"://')
 if [ -n "$CURSOR" ] && [ "$HASMORE" = "true" ]; then
-    PAGE2=$($CURL "$API/api/sheets?limit=5&after_id=$CURSOR" -b "$JAR")
+    PAGE2=$($CURL "$API/api/v1/sheets?limit=5&after_id=$CURSOR" -b "$JAR")
     echo "$PAGE2" | grep -q '"success":true' \
         && green "Cursor pagination OK" \
         || red "Cursor page2 failed: $PAGE2"
@@ -222,25 +222,25 @@ else
 fi
 
 title "3.2c 旧偏移分页兼容"
-OLD_PAGE=$($CURL "$API/api/sheets?page=0&page_size=5" -b "$JAR")
+OLD_PAGE=$($CURL "$API/api/v1/sheets?page=0&page_size=5" -b "$JAR")
 echo "$OLD_PAGE" | grep -q '"success":true' \
     && green "List sheets OK" \
     || red "List failed: $LIST"
 
 title "3.3 获取单表"
-GET=$($CURL "$API/api/sheets/$SHEET_ID" -b "$JAR")
+GET=$($CURL "$API/api/v1/sheets/$SHEET_ID" -b "$JAR")
 echo "$GET" | grep -q '"success":true' \
     && green "Get sheet OK" \
     || red "Get sheet failed: $GET"
 
 title "3.4 缓存命中（第二次查询）"
-GET2=$($CURL "$API/api/sheets/$SHEET_ID" -b "$JAR")
+GET2=$($CURL "$API/api/v1/sheets/$SHEET_ID" -b "$JAR")
 echo "$GET2" | grep -q '"cache_source":"redis"' \
     && green "Cache HIT (redis)" \
     || warn "Cache MISS (may be first access or Redis unavailable)"
 
 title "3.5 更新表格"
-UPDATE=$($CURL -X PUT "$API/api/sheets/$SHEET_ID" \
+UPDATE=$($CURL -X PUT "$API/api/v1/sheets/$SHEET_ID" \
     -H 'Content-Type: application/json' \
     -b "$JAR" \
     -d '{"name":"已更新","description":"更新测试","headers_json":"[\"X\"]","data_json":"[[\"y\"]]"}')
@@ -249,13 +249,13 @@ echo "$UPDATE" | grep -q '"success":true' \
     || red "Update failed: $UPDATE"
 
 title "3.6 删除表格"
-DELETE=$($CURL -X DELETE "$API/api/sheets/$SHEET_ID" -b "$JAR")
+DELETE=$($CURL -X DELETE "$API/api/v1/sheets/$SHEET_ID" -b "$JAR")
 echo "$DELETE" | grep -q '"success":true' \
     && green "Delete sheet OK" \
     || red "Delete failed: $DELETE"
 
 title "3.7 删除不存在（应拒绝）"
-DEL2=$($CURL -X DELETE "$API/api/sheets/999999" -b "$JAR")
+DEL2=$($CURL -X DELETE "$API/api/v1/sheets/999999" -b "$JAR")
 echo "$DEL2" | grep -q '"error"' \
     && green "Delete nonexistent rejected" \
     || red "Should reject delete of nonexistent sheet"
@@ -265,7 +265,7 @@ title "4. 文件 (File)"
 
 title "4.1 上传文件"
 echo "Hello HTTP-RPC $(date)" > /tmp/rpc_test_upload.txt
-UPLOAD=$($CURL -X POST "$API/api/files/upload" \
+UPLOAD=$($CURL -X POST "$API/api/v1/files/upload" \
     -b "$JAR" \
     -F "file=@/tmp/rpc_test_upload.txt")
 FILE_ID=$(echo "$UPLOAD" | sed 's/.*"id":"*//;s/"*[,}].*//')
@@ -275,20 +275,20 @@ echo "$UPLOAD" | grep -q '"success":true' \
 sleep 2
 
 title "4.2 文件列表"
-FLIST=$($CURL "$API/api/files" -b "$JAR")
+FLIST=$($CURL "$API/api/v1/files" -b "$JAR")
 echo "$FLIST" | grep -q '"success":true' \
     && green "File list OK" \
     || red "File list failed: $FLIST"
 
 title "4.3 下载并校验内容"
 $CURL -L -o /tmp/rpc_test_download.txt \
-    "$API/api/files/$FILE_ID" -b "$JAR" 2>/dev/null
+    "$API/api/v1/files/$FILE_ID" -b "$JAR" 2>/dev/null
 grep -q "Hello HTTP-RPC" /tmp/rpc_test_download.txt 2>/dev/null \
     && green "Download & content verified" \
     || red "Download failed or content mismatch"
 
 title "4.4 删除文件"
-FDEL=$($CURL -X DELETE "$API/api/files/$FILE_ID" -b "$JAR")
+FDEL=$($CURL -X DELETE "$API/api/v1/files/$FILE_ID" -b "$JAR")
 echo "$FDEL" | grep -q '"success":true' \
     && green "Delete file OK" \
     || red "Delete file failed: $FDEL"
@@ -297,7 +297,7 @@ echo "$FDEL" | grep -q '"success":true' \
 title "5. Token 刷新 (RefreshToken)"
 sleep 3
 
-REFRESH_LOGIN=$(curl -sk -X POST "$API/api/login" \
+REFRESH_LOGIN=$(curl -sk -X POST "$API/api/v1/login" \
     -H 'Content-Type: application/json' \
     -d "{\"username\":\"$TEST_USER\",\"password\":\"test1234\"}")
 REFRESH_TOKEN=$(echo "$REFRESH_LOGIN" | python3 -c "import sys,json; print(json.load(sys.stdin).get('refresh_token',''))" 2>/dev/null)
@@ -306,8 +306,8 @@ REFRESH_TOKEN=$(echo "$REFRESH_LOGIN" | python3 -c "import sys,json; print(json.
     || red "No refresh_token in login response"
 
 if [ -n "$REFRESH_TOKEN" ]; then
-    title "5.1 POST /api/refresh"
-    REFRESH_RESP=$($CURL -X POST "$API/api/refresh" \
+    title "5.1 POST /api/v1/refresh"
+    REFRESH_RESP=$($CURL -X POST "$API/api/v1/refresh" \
         -H 'Content-Type: application/json' \
         -b "$JAR" \
         -d "{\"username\":\"$TEST_USER\",\"refresh_token\":\"$REFRESH_TOKEN\"}")
@@ -315,7 +315,7 @@ if [ -n "$REFRESH_TOKEN" ]; then
     if [ -n "$NEW_AT" ]; then
         green "Token refresh OK (new access_token: ${NEW_AT:0:8}...)"
         title "5.2 新 token 验证"
-        NEW_CODE=$(curl -sk -o /dev/null -w "%{http_code}" -H "Cookie: rpc_at=$NEW_AT" "$API/api/sheets?page=0&page_size=1")
+        NEW_CODE=$(curl -sk -o /dev/null -w "%{http_code}" -H "Cookie: rpc_at=$NEW_AT" "$API/api/v1/sheets?page=0&page_size=1")
         [ "$NEW_CODE" = "200" ] \
             && green "Refreshed token accepted" \
             || red "Refreshed token rejected (got $NEW_CODE)"
@@ -323,7 +323,7 @@ if [ -n "$REFRESH_TOKEN" ]; then
         red "Token refresh failed: $REFRESH_RESP"
     fi
     title "5.2 无效 refresh_token 应被拒绝"
-    BAD_REFRESH=$($CURL -X POST "$API/api/refresh" \
+    BAD_REFRESH=$($CURL -X POST "$API/api/v1/refresh" \
         -H 'Content-Type: application/json' \
         -d '{"username":"$TEST_USER","refresh_token":"00000000-0000-0000-0000-000000000000"}')
     echo "$BAD_REFRESH" | grep -q '"error"' \
@@ -337,7 +337,7 @@ fi
 title "6. 搜索 (Elasticsearch)"
 
 SEARCH_REQ="{\"q\":\"$TEST_USER\",\"scope\":\"sheets\"}"
-SEARCH_RES=$($CURL -X POST "$API/api/search" \
+SEARCH_RES=$($CURL -X POST "$API/api/v1/search" \
     -H 'Content-Type: application/json' \
     -b "$JAR" \
     -d "$SEARCH_REQ")
@@ -351,35 +351,35 @@ title "7. 跨用户隔离"
 # 注册第二个用户
 JAR2="/tmp/rpc_func_jar2_$$"
 TEST_USER2="tester2_$(date +%s)"
-$CURL -X POST "$API/api/register" -H 'Content-Type: application/json' \
+$CURL -X POST "$API/api/v1/register" -H 'Content-Type: application/json' \
     -d "{\"username\":\"$TEST_USER2\",\"password\":\"test1234\"}" > /dev/null 2>&1
-$CURL -X POST "$API/api/login" -H 'Content-Type: application/json' \
+$CURL -X POST "$API/api/v1/login" -H 'Content-Type: application/json' \
     -c "$JAR2" -d "{\"username\":\"$TEST_USER2\",\"password\":\"test1234\"}" > /dev/null 2>&1
 
 # user2 创建自己的表
-CREATE2=$($CURL -X POST "$API/api/sheets" -H 'Content-Type: application/json' \
+CREATE2=$($CURL -X POST "$API/api/v1/sheets" -H 'Content-Type: application/json' \
     -b "$JAR2" -d '{"name":"user2私密表","headers_json":"[]","data_json":"[]"}')
 SHEET_ID2=$(echo "$CREATE2" | sed 's/.*"id":"*//;s/"*[,}].*//')
 
 # user1 的列表不应看到 user2 的表
-LIST_CHECK=$($CURL "$API/api/sheets" -b "$JAR")
+LIST_CHECK=$($CURL "$API/api/v1/sheets" -b "$JAR")
 echo "$LIST_CHECK" | grep -q "$SHEET_ID2" \
     && red "Cross-user leak: user1 sees user2 sheet" \
     || green "Cross-user isolation OK"
 
 # user1 不能打开 user2 的表
-CODE_CROSS=$($CURL -o /dev/null -w "%{http_code}" "$API/api/sheets/$SHEET_ID2" -b "$JAR")
+CODE_CROSS=$($CURL -o /dev/null -w "%{http_code}" "$API/api/v1/sheets/$SHEET_ID2" -b "$JAR")
 [ "$CODE_CROSS" != "200" ] \
     && green "Get other user's sheet rejected" \
     || red "Cross-user access allowed"
 
 # 清理
-$CURL -X DELETE "$API/api/sheets/$SHEET_ID2" -b "$JAR2" > /dev/null 2>&1
+$CURL -X DELETE "$API/api/v1/sheets/$SHEET_ID2" -b "$JAR2" > /dev/null 2>&1
 
 # ---- 8. Health ----
 # ---- 6b. 账户管理 ----
 title "6b. 改密码"
-CHPWD=$($CURL -X PUT "$API/api/me/password" \
+CHPWD=$($CURL -X PUT "$API/api/v1/me/password" \
     -H 'Content-Type: application/json' \
     -b "$JAR" \
     -d "{\"old_password\":\"test1234\",\"new_password\":\"newpass456\"}")
@@ -389,7 +389,7 @@ echo "$CHPWD" | grep -q '"success":true' \
 
 # ---- 6c. 文件夹 ----
 title "6c. 创建文件夹"
-FOLDER=$($CURL -X POST "$API/api/files/folder" \
+FOLDER=$($CURL -X POST "$API/api/v1/files/folder" \
     -H 'Content-Type: application/json' \
     -b "$JAR" \
     -d '{"name":"test_folder"}')
@@ -399,14 +399,14 @@ echo "$FOLDER" | grep -q '"success":true' \
 
 # ---- 6d. 相册 ----
 title "6d. 照片列表"
-PHOTOS=$($CURL "$API/api/photos" -b "$JAR")
+PHOTOS=$($CURL "$API/api/v1/photos" -b "$JAR")
 echo "$PHOTOS" | grep -q '"success":true' \
     && green "Photo list OK" \
     || warn "Photo feature not implemented: $PHOTOS"
 
 # ---- 6e. 分享链接 ----
 title "6e. 创建分享链接"
-SHARE=$($CURL -X POST "$API/api/sheets/$SHEET_ID/share-link" \
+SHARE=$($CURL -X POST "$API/api/v1/sheets/$SHEET_ID/share-link" \
     -H 'Content-Type: application/json' \
     -b "$JAR" \
     -d '{"permission":"view"}')
@@ -416,7 +416,7 @@ echo "$SHARE" | grep -q '"token"' \
 
 title "8. 健康检查"
 
-HEALTH=$($CURL "$API/api/health")
+HEALTH=$($CURL "$API/api/v1/health")
 echo "$HEALTH" | grep -q '"gateway"' \
     && green "Health check OK" \
     || red "Health check failed: $HEALTH"

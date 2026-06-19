@@ -7,7 +7,7 @@
 --
 -- Usage:
 --   export RPC_TOKEN="eyJ..."   # get via: bash test/functional_test.sh  (check cookie jar)
---   wrk2 -t4 -c20 -d60s -R200 --latency -s mixed.lua https://localhost/api/sheets
+--   wrk2 -t4 -c20 -d60s -R200 --latency -s mixed.lua https://localhost/api/v1/sheets
 --
 -- Customize load profile via env vars:
 --   MIXED_LIST_PCT=70  MIXED_GET_PCT=20  MIXED_CREATE_PCT=10  (must sum to 100)
@@ -36,14 +36,14 @@ request = function()
 
     if r < list_threshold then
         -- 70%: list spreadsheets (GET)
-        return wrk.format("GET", "/api/sheets?page=0&page_size=20", headers)
+        return wrk.format("GET", "/api/v1/sheets?page=0&page_size=20", headers)
     elseif r < get_threshold then
-        -- 20%: get single sheet (GET /api/sheets/{id})
-        return wrk.format("GET", "/api/sheets/" .. sheet_id, headers)
+        -- 20%: get single sheet (GET /api/v1/sheets/{id})
+        return wrk.format("GET", "/api/v1/sheets/" .. sheet_id, headers)
     else
-        -- 10%: create a new sheet (POST /api/sheets)
+        -- 10%: create a new sheet (POST /api/v1/sheets)
         local body = string.format('{"name":"wrk-%d","headers_json":"[\\"A\\"]","data_json":"[[\\"x\\"]]"}', counter)
-        return wrk.format("POST", "/api/sheets", headers, body)
+        return wrk.format("POST", "/api/v1/sheets", headers, body)
     end
 end
 
