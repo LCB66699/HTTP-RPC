@@ -175,6 +175,14 @@ func main() {
 				log.Printf("[cb] %s: %s → %s", name, from, to)
 				if to == gobreaker.StateClosed {
 					cbs.slowCalls.Store(0)
+					// 上报 Prometheus: 0=Closed, 1=HalfOpen, 2=Open
+					stateVal := 0.0
+					if to == gobreaker.StateHalfOpen {
+						stateVal = 1.0
+					} else if to == gobreaker.StateOpen {
+						stateVal = 2.0
+					}
+					circuitBreakerState.WithLabelValues(name).Set(stateVal)
 				}
 			},
 		})
@@ -293,6 +301,7 @@ func main() {
 		writeJSON(w, resp)
 	})
 
+	mux.Handle("GET /api/v1/metrics", metricsHandler())
 	mux.HandleFunc("GET /api/health", func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, map[string]string{"gateway": "READY"})
 	})
@@ -613,7 +622,7 @@ func main() {
 		writeJSON(w, resp)
 	})
 
-	handler := otelhttp.NewHandler(jwtMiddleware(corsMiddleware(mux)), "gateway-grpc",
+	handler := metricsMiddleware(otelhttp.NewHandler(jwtMiddleware(corsMiddleware(mux)), "gateway-grpc",
 		otelhttp.WithTracerProvider(otel.GetTracerProvider()),
 		otelhttp.WithPropagators(otel.GetTextMapPropagator()),
 	)
