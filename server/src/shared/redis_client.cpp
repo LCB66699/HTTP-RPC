@@ -70,6 +70,29 @@ bool RedisClient::PushCallEntry(const std::string &json_entry, const std::string
     }
 }
 
+bool RedisClient::BatchPushCallEntries(const std::vector<std::pair<std::string, std::string>> &entries) {
+    if (!cluster_ || entries.empty())
+        return false;
+    try {
+        auto pipe = cluster_->pipeline();
+        for (const auto &[json_entry, username] : entries) {
+            if (!username.empty()) {
+                const std::string user_key = "call_history:" + username;
+                pipe.lpush(user_key, json_entry);
+                pipe.ltrim(user_key, 0, MAX_HISTORY - 1);
+                pipe.expire(user_key, std::chrono::seconds(CALL_HISTORY_TTL_SECONDS));
+                pipe.sadd("call_history:users", username);
+                pipe.expire("call_history:users", std::chrono::seconds(CALL_HISTORY_TTL_SECONDS));
+            }
+        }
+        pipe.exec();
+        return true;
+    } catch (const sw::redis::Error &e) {
+        fprintf(stderr, "[Redis] BatchPushCallEntries failed: %s\n", e.what());
+        return false;
+    }
+}
+
 std::vector<std::string> RedisClient::GetCallEntries(int limit, int offset, const std::string &username) const {
     if (!cluster_)
         return {};

@@ -1,21 +1,10 @@
 #pragma once
-#include <cstdint>
-#include <string>
+#include "cache_helpers.h"
 
-// Redis cache key helpers for file service.
-// Extracted from file_service_impl.cpp for testability.
-inline std::string FileVersionKey(int64_t user_id) {
-    return "u:" + std::to_string(user_id) + ":files:version";
-}
+// 向后兼容 thin wrapper — 内部委托到 cache_helpers.h
+inline std::string FileVersionKey(int64_t user_id)     { return ResourceVersionKey("file", user_id); }
 inline std::string FileListCacheKey(int64_t user_id, int64_t version, int page, int page_size) {
-    std::string key = "u:" + std::to_string(user_id) + ":files:v" + std::to_string(version);
-    if (page_size > 0)
-        key += ":p" + std::to_string(page) + ":ps" + std::to_string(page_size);
-    return key;
+    return ResourceListCacheKey("file", user_id, version, page, page_size);
 }
-inline std::string FileCacheKey(int64_t user_id, int64_t file_id) {
-    return "u:" + std::to_string(user_id) + ":file:" + std::to_string(file_id);
-}
-inline std::string FileLockKey(int64_t user_id, int64_t file_id) {
-    return "lock:u:" + std::to_string(user_id) + ":file:" + std::to_string(file_id);
-}
+inline std::string FileCacheKey(int64_t user_id, int64_t file_id)   { return ResourceCacheKey("file", user_id, file_id); }
+inline std::string FileLockKey(int64_t user_id, int64_t file_id)     { return ResourceLockKey("file", user_id, file_id); }

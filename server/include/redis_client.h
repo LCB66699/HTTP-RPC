@@ -27,6 +27,8 @@ class RedisClient : public IRedisClient {
 
     // Call history (list operations)
     bool PushCallEntry(const std::string &json_entry, const std::string &username = "");
+    // 批量写入 — 一次 Pipeline exec 写 N 条，减少网络 RTT
+    bool BatchPushCallEntries(const std::vector<std::pair<std::string, std::string>> &entries);
     std::vector<std::string> GetCallEntries(int limit, int offset, const std::string &username = "") const;
     int64_t GetCallCount(const std::string &username = "") const;
     std::vector<std::string> GetHistoryUsers() const;

@@ -94,15 +94,12 @@ void CallLogger::FlushLoop() {
         }
 
         if (redis_ && redis_->IsConnected()) {
-            for (auto &[json_str, username] : batch) {
-                redis_->PushCallEntry(json_str, username);
-            }
+            redis_->BatchPushCallEntries(batch);
         }
     }
     // 退出前清空剩余
     if (redis_ && redis_->IsConnected() && !pending_.empty()) {
-        for (auto &[json_str, username] : pending_)
-            redis_->PushCallEntry(json_str, username);
+        redis_->BatchPushCallEntries(pending_);
     }
 }
 

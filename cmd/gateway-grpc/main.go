@@ -186,6 +186,11 @@ func main() {
 	mux.HandleFunc("POST /api/register", func(w http.ResponseWriter, r *http.Request) {
 		var req pb.RegisterRequest
 		json.NewDecoder(r.Body).Decode(&req)
+		if msg, code := validateRegister(req.Username, req.Password); msg != "" {
+			writeJSONStatus(w, code, map[string]interface{}{"success": false, "error": msg})
+			return
+		}
+
 		resp, _ := authClient.Register(r.Context(), &req)
 		if resp != nil && !resp.Success {
 			writeError(w, nil, resp.GetError(), resp.GetErrorCode())
@@ -197,6 +202,17 @@ func main() {
 	mux.HandleFunc("POST /api/login", func(w http.ResponseWriter, r *http.Request) {
 		var req pb.LoginRequest
 		json.NewDecoder(r.Body).Decode(&req)
+		if checkLoginRate(req.Username) {
+			writeJSONStatus(w, http.StatusTooManyRequests,
+				map[string]interface{}{"success": false, "error": "Too many attempts, try again later"})
+			return
+		}
+
+		if msg, code := validateLogin(req.Username, req.Password); msg != "" {
+			writeJSONStatus(w, code, map[string]interface{}{"success": false, "error": msg})
+			return
+		}
+
 		resp, _ := authClient.Login(r.Context(), &req)
 		if resp != nil && !resp.Success {
 			writeError(w, nil, resp.GetError(), resp.GetErrorCode())
@@ -228,6 +244,11 @@ func main() {
 		}
 		json.NewDecoder(r.Body).Decode(&body)
 		uid := extractUID(r)
+		if msg, code := validateChangePassword(body.OldPassword, body.NewPassword); msg != "" {
+			writeJSONStatus(w, code, map[string]interface{}{"success": false, "error": msg})
+			return
+		}
+
 		if uid == 0 {
 			http.Error(w, `{"error":"unauthorized"}`, http.StatusUnauthorized)
 			return
@@ -380,6 +401,11 @@ func main() {
 			http.Error(w, `{"error":"Jwt is missing"}`, http.StatusUnauthorized)
 			return
 		}
+		if msg, code := validateSearch(body.Q); msg != "" {
+			writeJSONStatus(w, code, map[string]interface{}{"success": false, "error": msg})
+			return
+		}
+
 		resp, err := searchClient.Search(injectToken(r), &pb.SearchRequest{
 			Query: body.Q, UserId: uid, Sort: body.Sort,
 		})
@@ -630,6 +656,26 @@ func injectToken(r *http.Request) context.Context {
 	return r.Context()
 }
 
+// gRPCResponse 是所有 protobuf 响应的公共接口
+type gRPCResponse interface {
+	GetSuccess() bool
+	GetError() string
+	GetErrorCode() int32
+}
+
+// writeGRPCResponse 统一处理 gRPC 成功/失败 → HTTP 响应
+func writeGRPCResponse(w http.ResponseWriter, resp gRPCResponse, err error) {
+	if err != nil {
+		writeGRPCError(w, err, "internal error")
+		return
+	}
+	if resp == nil || !resp.GetSuccess() {
+		writeError(w, nil, resp.GetError(), resp.GetErrorCode())
+		return
+	}
+	writeJSON(w, resp)
+}
+
 func writeJSON(w http.ResponseWriter, v interface{}) {
 	writeJSONStatus(w, http.StatusOK, v)
 }
@@ -841,4 +887,23 @@ func getenv(key, fallback string) string {
 
 func base64urlEncode(s string) string {
 	return strings.TrimRight(base64.URLEncoding.EncodeToString([]byte(s)), "=")
+}
+
+// checkLoginRate 登录速率限制：每分钟 5 次，超限锁定 5 分钟
+func checkLoginRate(username string) (blocked bool) {
+	if username == "" || rdb == nil {
+		return false
+	}
+	blockKey := "rate:login:" + username + ":blocked"
+	if n, _ := rdb.Exists(context.Background(), blockKey).Result(); n > 0 {
+		return true
+	}
+	minKey := "rate:login:" + username + ":" + time.Now().Format("2006-01-02T15:04")
+	n, _ := rdb.Incr(context.Background(), minKey).Result()
+	rdb.Expire(context.Background(), minKey, 60*time.Second)
+	if n > 5 {
+		rdb.Set(context.Background(), blockKey, "1", 5*time.Minute)
+		return true
+	}
+	return false
 }

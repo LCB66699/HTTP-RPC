@@ -1,21 +1,10 @@
 #pragma once
-#include <cstdint>
-#include <string>
+#include "cache_helpers.h"
 
-// Redis cache key helpers for spreadsheet service.
-// Extracted from spreadsheet_service_impl.cpp for testability.
-inline std::string SheetVersionKey(int64_t user_id) {
-    return "u:" + std::to_string(user_id) + ":sheets:version";
-}
+// 向后兼容 thin wrapper — 内部委托到 cache_helpers.h
+inline std::string SheetVersionKey(int64_t user_id)     { return ResourceVersionKey("sheet", user_id); }
 inline std::string SheetListCacheKey(int64_t user_id, int64_t version, int page, int page_size) {
-    std::string key = "u:" + std::to_string(user_id) + ":sheets:v" + std::to_string(version);
-    if (page_size > 0)
-        key += ":p" + std::to_string(page) + ":ps" + std::to_string(page_size);
-    return key;
+    return ResourceListCacheKey("sheet", user_id, version, page, page_size);
 }
-inline std::string SheetCacheKey(int64_t user_id, int64_t sheet_id) {
-    return "u:" + std::to_string(user_id) + ":sheet:" + std::to_string(sheet_id);
-}
-inline std::string SheetLockKey(int64_t user_id, int64_t sheet_id) {
-    return "lock:u:" + std::to_string(user_id) + ":sheet:" + std::to_string(sheet_id);
-}
+inline std::string SheetCacheKey(int64_t user_id, int64_t sheet_id)   { return ResourceCacheKey("sheet", user_id, sheet_id); }
+inline std::string SheetLockKey(int64_t user_id, int64_t sheet_id)     { return ResourceLockKey("sheet", user_id, sheet_id); }
