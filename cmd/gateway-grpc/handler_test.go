@@ -130,7 +130,7 @@ func TestChangePassword_Success(t *testing.T) {
 	req.AddCookie(&http.Cookie{Name: "rpc_at", Value: validTestJWT()})
 	w := httptest.NewRecorder()
 	mux := http.NewServeMux()
-	mux.HandleFunc("PUT /api/me/password", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("PUT /api/v1/me/password", func(w http.ResponseWriter, r *http.Request) {
 		var body struct{ OldPassword, NewPassword string }
 		json.NewDecoder(r.Body).Decode(&body)
 		uid := extractUID(r)
@@ -158,7 +158,7 @@ func TestChangePassword_Unauthorized(t *testing.T) {
 		strings.NewReader(`{"old_password":"old","new_password":"new1234"}`))
 	w := httptest.NewRecorder()
 	mux := http.NewServeMux()
-	mux.HandleFunc("PUT /api/me/password", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("PUT /api/v1/me/password", func(w http.ResponseWriter, r *http.Request) {
 		if extractUID(r) == 0 {
 			http.Error(w, `{"error":"unauthorized"}`, http.StatusUnauthorized)
 			return
@@ -179,7 +179,7 @@ func TestChangePassword_GrpcError(t *testing.T) {
 	req.AddCookie(&http.Cookie{Name: "rpc_at", Value: validTestJWT()})
 	w := httptest.NewRecorder()
 	mux := http.NewServeMux()
-	mux.HandleFunc("PUT /api/me/password", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("PUT /api/v1/me/password", func(w http.ResponseWriter, r *http.Request) {
 		var body struct{ OldPassword, NewPassword string }
 		json.NewDecoder(r.Body).Decode(&body)
 		uid := extractUID(r)
@@ -209,7 +209,7 @@ func TestListSheets_CursorFirstPage(t *testing.T) {
 	req.AddCookie(&http.Cookie{Name: "rpc_at", Value: validTestJWT()})
 	w := httptest.NewRecorder()
 	mux := http.NewServeMux()
-	mux.HandleFunc("GET /api/sheets", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("GET /api/v1/sheets", func(w http.ResponseWriter, r *http.Request) {
 		resp, _ := sheetClient.ListSpreadsheets(r.Context(), &pb.ListSpreadsheetsRequest{UserId: 12345, Limit: 10})
 		if resp.GetHasMore() && resp.GetNextCursor() == "" {
 			t.Error("has_more=true requires next_cursor")
@@ -232,7 +232,7 @@ func TestListSheets_EmptyResult(t *testing.T) {
 	req.AddCookie(&http.Cookie{Name: "rpc_at", Value: validTestJWT()})
 	w := httptest.NewRecorder()
 	mux := http.NewServeMux()
-	mux.HandleFunc("GET /api/sheets", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("GET /api/v1/sheets", func(w http.ResponseWriter, r *http.Request) {
 		resp, _ := sheetClient.ListSpreadsheets(r.Context(), &pb.ListSpreadsheetsRequest{UserId: 12345, Limit: 10})
 		writeJSON(w, resp)
 	})
@@ -251,7 +251,7 @@ func TestCreateFolder_Success(t *testing.T) {
 	req.AddCookie(&http.Cookie{Name: "rpc_at", Value: validTestJWT()})
 	w := httptest.NewRecorder()
 	mux := http.NewServeMux()
-	mux.HandleFunc("POST /api/files/folder", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("POST /api/v1/files/folder", func(w http.ResponseWriter, r *http.Request) {
 		var body struct{ Name string }
 		json.NewDecoder(r.Body).Decode(&body)
 		uid := extractUID(r)
@@ -275,7 +275,7 @@ func TestPhoneLogin_Success(t *testing.T) {
 		strings.NewReader(`{"phone":"13800138000","otp":"123456"}`))
 	w := httptest.NewRecorder()
 	mux := http.NewServeMux()
-	mux.HandleFunc("POST /api/auth/phone/login", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("POST /api/v1/auth/phone/login", func(w http.ResponseWriter, r *http.Request) {
 		var body struct{ Phone, OTP string }
 		json.NewDecoder(r.Body).Decode(&body)
 		resp, _ := authClient.LoginByPhone(r.Context(), &pb.PhoneLoginRequest{Phone: body.Phone, Otp: body.OTP})
@@ -292,7 +292,7 @@ func TestOTPSend_ValidPhone(t *testing.T) {
 		strings.NewReader(`{"phone":"13800138000"}`))
 	w := httptest.NewRecorder()
 	mux := http.NewServeMux()
-	mux.HandleFunc("POST /api/auth/otp/send", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("POST /api/v1/auth/otp/send", func(w http.ResponseWriter, r *http.Request) {
 		var body struct{ Phone string }
 		json.NewDecoder(r.Body).Decode(&body)
 		if body.Phone == "" {
@@ -311,7 +311,7 @@ func TestOTPSend_EmptyPhone_Rejected(t *testing.T) {
 	req := httptest.NewRequest("POST", "/api/v1/auth/otp/send", strings.NewReader(`{"phone":""}`))
 	w := httptest.NewRecorder()
 	mux := http.NewServeMux()
-	mux.HandleFunc("POST /api/auth/otp/send", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("POST /api/v1/auth/otp/send", func(w http.ResponseWriter, r *http.Request) {
 		var body struct{ Phone string }
 		json.NewDecoder(r.Body).Decode(&body)
 		if body.Phone == "" {
@@ -335,7 +335,7 @@ func TestPhotoList_Success(t *testing.T) {
 	req.AddCookie(&http.Cookie{Name: "rpc_at", Value: validTestJWT()})
 	w := httptest.NewRecorder()
 	mux := http.NewServeMux()
-	mux.HandleFunc("GET /api/photos", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("GET /api/v1/photos", func(w http.ResponseWriter, r *http.Request) {
 		resp, _ := fileClient.ListFiles(r.Context(), &pb.ListFilesRequest{UserId: 12345, MimeFilter: "image/"})
 		writeJSON(w, resp)
 	})
@@ -355,7 +355,7 @@ func TestShareLink_Create(t *testing.T) {
 	req.AddCookie(&http.Cookie{Name: "rpc_at", Value: validTestJWT()})
 	w := httptest.NewRecorder()
 	mux := http.NewServeMux()
-	mux.HandleFunc("POST /api/sheets/{id}/share-link", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("POST /api/v1/sheets/{id}/share-link", func(w http.ResponseWriter, r *http.Request) {
 		resp, _ := sharingClient.CreateShareLink(r.Context(), &pb.ShareLinkRequest{
 			OwnerId: 12345, ResourceType: "sheet", ResourceId: 123, Permission: "view",
 		})
@@ -372,7 +372,7 @@ func TestShareToken_Access(t *testing.T) {
 	req := httptest.NewRequest("GET", "/api/v1/s/abc123", nil)
 	w := httptest.NewRecorder()
 	mux := http.NewServeMux()
-	mux.HandleFunc("GET /api/s/{token}", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("GET /api/v1/s/{token}", func(w http.ResponseWriter, r *http.Request) {
 		token := r.PathValue("token")
 		resp, _ := sharingClient.GetByToken(r.Context(), &pb.ShareTokenRequest{Token: token})
 		if resp == nil || !resp.Success {

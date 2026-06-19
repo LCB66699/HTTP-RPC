@@ -267,11 +267,7 @@ func main() {
 		}
 		req := &pb.ChangePasswordRequest{UserId: uid, OldPassword: body.OldPassword, NewPassword: body.NewPassword}
 		resp, err := authClient.ChangePassword(r.Context(), req)
-		if err != nil || resp == nil || !resp.Success {
-			writeError(w, err, resp.GetError(), resp.GetErrorCode())
-			return
-		}
-		writeJSON(w, resp)
+		writeGRPCResponse(w, resp, err)
 	})
 	mux.HandleFunc("POST /api/auth/otp/send", func(w http.ResponseWriter, r *http.Request) {
 		var body struct{ Phone string `json:"phone"` }
@@ -422,11 +418,7 @@ func main() {
 		resp, err := searchClient.Search(injectToken(r), &pb.SearchRequest{
 			Query: body.Q, UserId: uid, Sort: body.Sort,
 		})
-		if err != nil || resp == nil || !resp.Success {
-			writeError(w, err, resp.GetError(), resp.GetErrorCode())
-			return
-		}
-		writeJSON(w, resp)
+		writeGRPCResponse(w, resp, err)
 	})
 
 	// === Sheet CRUD ===
@@ -436,21 +428,13 @@ func main() {
 		uid := extractUID(r)
 		req.UserId = uid
 		resp, err := sheetClient.CreateSpreadsheet(injectToken(r), &req)
-		if err != nil || resp == nil || !resp.Success {
-			writeError(w, err, resp.GetError(), resp.GetErrorCode())
-			return
-		}
-		writeJSON(w, resp)
+		writeGRPCResponse(w, resp, err)
 	})
 	mux.HandleFunc("GET /api/sheets", func(w http.ResponseWriter, r *http.Request) {
 		resp, err := callWithRetry(r.Context(), cbSheet, 3, "sheet.list", func(ctx context.Context) (*pb.ListSpreadsheetsResponse, error) {
 			return sheetClient.ListSpreadsheets(withAuth(ctx, r), &pb.ListSpreadsheetsRequest{UserId: extractUID(r)})
 		})
-		if err != nil || resp == nil || !resp.Success {
-			writeError(w, err, resp.GetError(), resp.GetErrorCode())
-			return
-		}
-		writeJSON(w, resp)
+		writeGRPCResponse(w, resp, err)
 	})
 	mux.HandleFunc("GET /api/sheets/{id}", func(w http.ResponseWriter, r *http.Request) {
 		id := parseInt64(r.PathValue("id"))
@@ -485,22 +469,14 @@ func main() {
 		req.Id = parseInt64(r.PathValue("id"))
 		req.UserId = extractUID(r)
 		resp, err := sheetClient.UpdateSpreadsheet(injectToken(r), &req)
-		if err != nil || resp == nil || !resp.Success {
-			writeError(w, err, resp.GetError(), resp.GetErrorCode())
-			return
-		}
-		writeJSON(w, resp)
+		writeGRPCResponse(w, resp, err)
 	})
 	mux.HandleFunc("DELETE /api/sheets/{id}", func(w http.ResponseWriter, r *http.Request) {
 		id := parseInt64(r.PathValue("id"))
 		resp, err := callWithRetry(r.Context(), cbSheet, 2, "sheet.delete", func(ctx context.Context) (*pb.DeleteSpreadsheetResponse, error) {
 			return sheetClient.DeleteSpreadsheet(withAuth(ctx, r), &pb.DeleteSpreadsheetRequest{Id: id, UserId: extractUID(r)})
 		})
-		if err != nil || resp == nil || !resp.Success {
-			writeError(w, err, resp.GetError(), resp.GetErrorCode())
-			return
-		}
-		writeJSON(w, resp)
+		writeGRPCResponse(w, resp, err)
 	})
 
 	// === Photos (复用 File Service, 筛选 image/*) ===
@@ -508,11 +484,7 @@ func main() {
 		resp, err := fileClient.ListFiles(injectToken(r), &pb.ListFilesRequest{
 			UserId: extractUID(r), MimeFilter: "image/",
 		})
-		if err != nil || resp == nil || !resp.Success {
-			writeError(w, err, resp.GetError(), resp.GetErrorCode())
-			return
-		}
-		writeJSON(w, resp)
+		writeGRPCResponse(w, resp, err)
 	})
 
 	// === File CRUD ===
@@ -521,11 +493,7 @@ func main() {
 		var body struct{ TargetFolderId int64 `json:"target_folder_id"` }
 		json.NewDecoder(r.Body).Decode(&body)
 		resp, err := fileClient.MoveFile(injectToken(r), &pb.MoveFileRequest{Id: id, TargetFolderId: body.TargetFolderId})
-		if err != nil || resp == nil || !resp.Success {
-			writeError(w, err, resp.GetError(), resp.GetErrorCode())
-			return
-		}
-		writeJSON(w, resp)
+		writeGRPCResponse(w, resp, err)
 	})
 	mux.HandleFunc("POST /api/files/folder", func(w http.ResponseWriter, r *http.Request) {
 		var body struct {
@@ -537,21 +505,13 @@ func main() {
 		resp, err := fileClient.CreateFolder(injectToken(r), &pb.CreateFolderRequest{
 			UserId: uid, Name: body.Name, ParentFolderId: body.ParentFolderId,
 		})
-		if err != nil || resp == nil || !resp.Success {
-			writeError(w, err, resp.GetError(), resp.GetErrorCode())
-			return
-		}
-		writeJSON(w, resp)
+		writeGRPCResponse(w, resp, err)
 	})
 	mux.HandleFunc("GET /api/files", func(w http.ResponseWriter, r *http.Request) {
 		resp, err := callWithRetry(r.Context(), cbFile, 3, "file.list", func(ctx context.Context) (*pb.ListFilesResponse, error) {
 			return fileClient.ListFiles(withAuth(ctx, r), &pb.ListFilesRequest{UserId: extractUID(r)})
 		})
-		if err != nil || resp == nil || !resp.Success {
-			writeError(w, err, resp.GetError(), resp.GetErrorCode())
-			return
-		}
-		writeJSON(w, resp)
+		writeGRPCResponse(w, resp, err)
 	})
 	mux.HandleFunc("POST /api/files/upload", func(w http.ResponseWriter, r *http.Request) {
 		uid := extractUID(r)
@@ -568,11 +528,7 @@ func main() {
 			UserId: uid, OriginalName: h.Filename, Size: int64(len(data)),
 			MimeType: h.Header.Get("Content-Type"), FileContent: data,
 		})
-		if err != nil || resp == nil || !resp.Success {
-			writeError(w, err, resp.GetError(), resp.GetErrorCode())
-			return
-		}
-		writeJSON(w, resp)
+		writeGRPCResponse(w, resp, err)
 	})
 	mux.HandleFunc("GET /api/files/{id}", func(w http.ResponseWriter, r *http.Request) {
 		id := parseInt64(r.PathValue("id"))
@@ -616,11 +572,7 @@ func main() {
 		resp, err := callWithRetry(r.Context(), cbFile, 2, "file.delete", func(ctx context.Context) (*pb.DeleteFileResponse, error) {
 			return fileClient.DeleteFile(withAuth(ctx, r), &pb.DeleteFileRequest{Id: id, UserId: uid})
 		})
-		if err != nil || resp == nil || !resp.Success {
-			writeError(w, err, resp.GetError(), resp.GetErrorCode())
-			return
-		}
-		writeJSON(w, resp)
+		writeGRPCResponse(w, resp, err)
 	})
 
 	handler := metricsMiddleware(otelhttp.NewHandler(jwtMiddleware(corsMiddleware(mux)), "gateway-grpc",

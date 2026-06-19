@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"context"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -68,9 +69,9 @@ func metricsMiddleware(next http.Handler) http.Handler {
 
 // grpcMetricsInterceptor 记录每个 gRPC 调用的延迟
 func grpcMetricsInterceptor() grpc.UnaryClientInterceptor {
-	return func(method string, req, reply any, cc *grpc.ClientConn, invoker grpc.UnaryInvoker, opts ...grpc.CallOption) error {
+	return func(ctx context.Context, method string, req, reply any, cc *grpc.ClientConn, invoker grpc.UnaryInvoker, opts ...grpc.CallOption) error {
 		start := time.Now()
-		err := invoker(method, req, reply, cc, opts...)
+		err := invoker(ctx, method, req, reply, cc, opts...)
 		parts := strings.SplitN(strings.TrimPrefix(method, "/"), "/", 2)
 		service, meth := "unknown", method
 		if len(parts) >= 2 {
