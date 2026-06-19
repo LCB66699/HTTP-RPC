@@ -205,7 +205,7 @@ func main() {
 
 		resp, _ := authClient.Register(r.Context(), &req)
 		if resp != nil && !resp.Success {
-			writeError(w, nil, resp.GetError(), resp.GetErrorCode())
+			writeError(w, nil, resp.GetError(), 0)
 			return
 		}
 		setCookies(w, resp.AccessToken, resp.RefreshToken)
@@ -227,7 +227,7 @@ func main() {
 
 		resp, _ := authClient.Login(r.Context(), &req)
 		if resp != nil && !resp.Success {
-			writeError(w, nil, resp.GetError(), resp.GetErrorCode())
+			writeError(w, nil, resp.GetError(), 0)
 			return
 		}
 		setCookies(w, resp.AccessToken, resp.RefreshToken)
@@ -640,10 +640,10 @@ func injectToken(r *http.Request) context.Context {
 }
 
 // gRPCResponse 是所有 protobuf 响应的公共接口
+// 注意：部分生成的 proto 没有 GetErrorCode，所以接口只要求 GetSuccess/GetError
 type gRPCResponse interface {
 	GetSuccess() bool
 	GetError() string
-	GetErrorCode() int32
 }
 
 // writeGRPCResponse 统一处理 gRPC 成功/失败 → HTTP 响应
@@ -653,7 +653,7 @@ func writeGRPCResponse(w http.ResponseWriter, resp gRPCResponse, err error) {
 		return
 	}
 	if resp == nil || !resp.GetSuccess() {
-		writeError(w, nil, resp.GetError(), resp.GetErrorCode())
+		writeError(w, nil, resp.GetError(), 0)
 		return
 	}
 	writeJSON(w, resp)
