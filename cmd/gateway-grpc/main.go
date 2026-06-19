@@ -130,6 +130,7 @@ func main() {
 	creds := grpc.WithTransportCredentials(insecure.NewCredentials())
 	lb := grpc.WithDefaultServiceConfig(`{"loadBalancingConfig":[{"round_robin":{}}]}`)
 	otelStats := grpc.WithStatsHandler(otelgrpc.NewClientHandler())
+	grpcMetrics := grpc.WithUnaryInterceptor(grpcMetricsInterceptor())
 
 	authAddr := getenv("AUTH_ADDR", "rpc-auth:50051")
 	sheetAddr := getenv("SHEET_ADDR", "rpc-sheet:50051")
@@ -137,16 +138,16 @@ func main() {
 	searchAddr := getenv("SEARCH_ADDR", "rpc-search:50051")
 	log.Printf("Auth=%s Sheet=%s File=%s Search=%s", authAddr, sheetAddr, fileAddr, searchAddr)
 
-	authConn, _ = grpc.NewClient("dns:///"+authAddr, creds, kp, lb, otelStats)
+	authConn, _ = grpc.NewClient("dns:///"+authAddr, creds, kp, lb, otelStats, grpcMetrics)
 	authClient = pb.NewAuthServiceClient(authConn)
 
-	sheetConn, _ = grpc.NewClient("dns:///"+sheetAddr, creds, kp, lb, otelStats)
+	sheetConn, _ = grpc.NewClient("dns:///"+sheetAddr, creds, kp, lb, otelStats, grpcMetrics)
 	sheetClient = pb.NewSpreadsheetServiceClient(sheetConn)
 
-	fileConn, _ = grpc.NewClient("dns:///"+fileAddr, creds, kp, lb, otelStats)
+	fileConn, _ = grpc.NewClient("dns:///"+fileAddr, creds, kp, lb, otelStats, grpcMetrics)
 	fileClient = pb.NewFileServiceClient(fileConn)
 
-	searchConn, _ := grpc.NewClient("dns:///"+searchAddr, creds, kp, lb, otelStats)
+	searchConn, _ := grpc.NewClient("dns:///"+searchAddr, creds, kp, lb, otelStats, grpcMetrics)
 	searchClient := pb.NewSearchServiceClient(searchConn)
 
 	sharingClient := pb.NewSharingServiceClient(authConn)
@@ -175,15 +176,15 @@ func main() {
 				log.Printf("[cb] %s: %s → %s", name, from, to)
 				if to == gobreaker.StateClosed {
 					cbs.slowCalls.Store(0)
-					// 上报 Prometheus: 0=Closed, 1=HalfOpen, 2=Open
-					stateVal := 0.0
-					if to == gobreaker.StateHalfOpen {
-						stateVal = 1.0
-					} else if to == gobreaker.StateOpen {
-						stateVal = 2.0
-					}
-					circuitBreakerState.WithLabelValues(name).Set(stateVal)
 				}
+				stateVal := 0.0
+				if to == gobreaker.StateHalfOpen {
+					stateVal = 1.0
+				} else if to == gobreaker.StateOpen {
+					stateVal = 2.0
+				}
+				circuitBreakerState.WithLabelValues(name).Set(stateVal)
+
 			},
 		})
 		return cbs
@@ -831,7 +832,7 @@ func jwtMiddleware(next http.Handler) http.Handler {
 		path := r.URL.Path
 		if strings.HasPrefix(path, "/api/v1/login") || strings.HasPrefix(path, "/api/v1/register") ||
 			strings.HasPrefix(path, "/api/v1/refresh") || strings.HasPrefix(path, "/api/v1/health") ||
-			strings.HasPrefix(path, "/api/v1/me") {
+			strings.HasPrefix(path, "/api/v1/me") || strings.HasPrefix(path, "/api/v1/metrics") {
 			next.ServeHTTP(w, r)
 			return
 		}
