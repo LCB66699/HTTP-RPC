@@ -221,8 +221,20 @@ func main() {
 		if req.Username == "" {
 			req.Username = gw.GetUserFromCookie(r)
 		}
-		resp, _ := gw.AuthClient.RefreshToken(r.Context(), &req)
-		setCookies(w, resp.AccessToken, "")
+		resp, err := gw.AuthClient.RefreshToken(r.Context(), &req)
+		if err != nil {
+			log.Printf("[refresh] gRPC error: %v", err)
+		}
+		at := ""
+		if resp != nil {
+			at = resp.AccessToken
+			if len(at) > 16 {
+				log.Printf("[refresh] access_token (first 16): %s...", at[:16])
+			} else {
+				log.Printf("[refresh] access_token empty or short (len=%d)", len(at))
+			}
+		}
+		setCookies(w, at, "")
 		gw.WriteJSON(w, resp)
 	})
 	mux.HandleFunc("PUT /api/v1/me/password", func(w http.ResponseWriter, r *http.Request) {

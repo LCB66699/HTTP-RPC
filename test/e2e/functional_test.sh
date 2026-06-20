@@ -311,11 +311,15 @@ if [ -n "$REFRESH_TOKEN" ]; then
         -H 'Content-Type: application/json' \
         -b "$JAR" \
         -d "{\"username\":\"$TEST_USER\",\"refresh_token\":\"$REFRESH_TOKEN\"}")
+    echo "DEBUG[refresh] resp=$REFRESH_RESP"
     NEW_AT=$(echo "$REFRESH_RESP" | python3 -c "import sys,json; print(json.load(sys.stdin).get('access_token',''))" 2>/dev/null)
     if [ -n "$NEW_AT" ]; then
         green "Token refresh OK (new access_token: ${NEW_AT:0:8}...)"
         title "5.2 新 token 验证"
-        NEW_CODE=$(curl -sk -o /dev/null -w "%{http_code}" -H "Cookie: rpc_at=$NEW_AT" "$API/api/v1/sheets?page=0&page_size=1")
+        NEW_RESP=$(curl -sk -w "\n%{http_code}" -H "Cookie: rpc_at=$NEW_AT" "$API/api/v1/sheets?page=0&page_size=1" 2>/dev/null)
+        NEW_CODE=$(echo "$NEW_RESP" | tail -1)
+        NEW_BODY=$(echo "$NEW_RESP" | head -n -1)
+        echo "DEBUG: NEW_AT len=${#NEW_AT} first8=${NEW_AT:0:8} code=$NEW_CODE body=$NEW_BODY"
         [ "$NEW_CODE" = "200" ] \
             && green "Refreshed token accepted" \
             || red "Refreshed token rejected (got $NEW_CODE)"
