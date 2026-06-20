@@ -439,8 +439,13 @@ func main() {
 		writeGRPCResponse(w, resp, err)
 	})
 	mux.HandleFunc("GET /api/v1/sheets", func(w http.ResponseWriter, r *http.Request) {
+		uid := extractUID(r)
+		if uid == 0 {
+			writeJSONStatus(w, http.StatusUnauthorized, map[string]interface{}{"success": false, "error": "Unauthorized"})
+			return
+		}
 		resp, err := callWithRetry(r.Context(), cbSheet, 3, "sheet.list", func(ctx context.Context) (*pb.ListSpreadsheetsResponse, error) {
-			return sheetClient.ListSpreadsheets(withAuth(ctx, r), &pb.ListSpreadsheetsRequest{UserId: extractUID(r)})
+			return sheetClient.ListSpreadsheets(withAuth(ctx, r), &pb.ListSpreadsheetsRequest{UserId: uid})
 		})
 		writeGRPCResponse(w, resp, err)
 	})
@@ -489,8 +494,13 @@ func main() {
 
 	// === Photos (复用 File Service, 筛选 image/*) ===
 	mux.HandleFunc("GET /api/v1/photos", func(w http.ResponseWriter, r *http.Request) {
+		uid := extractUID(r)
+		if uid == 0 {
+			writeJSONStatus(w, http.StatusUnauthorized, map[string]interface{}{"success": false, "error": "Unauthorized"})
+			return
+		}
 		resp, err := fileClient.ListFiles(injectToken(r), &pb.ListFilesRequest{
-			UserId: extractUID(r), MimeFilter: "image/",
+			UserId: uid, MimeFilter: "image/",
 		})
 		writeGRPCResponse(w, resp, err)
 	})
@@ -516,13 +526,22 @@ func main() {
 		writeGRPCResponse(w, resp, err)
 	})
 	mux.HandleFunc("GET /api/v1/files", func(w http.ResponseWriter, r *http.Request) {
+		uid := extractUID(r)
+		if uid == 0 {
+			writeJSONStatus(w, http.StatusUnauthorized, map[string]interface{}{"success": false, "error": "Unauthorized"})
+			return
+		}
 		resp, err := callWithRetry(r.Context(), cbFile, 3, "file.list", func(ctx context.Context) (*pb.ListFilesResponse, error) {
-			return fileClient.ListFiles(withAuth(ctx, r), &pb.ListFilesRequest{UserId: extractUID(r)})
+			return fileClient.ListFiles(withAuth(ctx, r), &pb.ListFilesRequest{UserId: uid})
 		})
 		writeGRPCResponse(w, resp, err)
 	})
 	mux.HandleFunc("POST /api/v1/files/upload", func(w http.ResponseWriter, r *http.Request) {
 		uid := extractUID(r)
+		if uid == 0 {
+			writeJSONStatus(w, http.StatusUnauthorized, map[string]interface{}{"success": false, "error": "Unauthorized"})
+			return
+		}
 		log.Printf("[upload] uid=%d", uid)
 		r.ParseMultipartForm(50 << 20)
 		f, h, _ := r.FormFile("file")
