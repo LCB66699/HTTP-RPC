@@ -71,7 +71,6 @@ int main(int argc, char *argv[]) {
     db->SetMinIdle(db_min_idle);
     db->SetIdleTimeoutSec(db_idle_timeout_sec);
     db->StartHealthCheck();
-    db->StartHealthCheck();
 
     std::unique_ptr<RedisClient> redis;
     if (!redis_cluster_seeds.empty()) {

@@ -929,7 +929,8 @@ int Database::PurgeOldUndoLogs(int days) {
 // ---- 连接池健康检查 ----
 
 void Database::StartHealthCheck() {
-    health_running_ = true;
+    if (health_running_.exchange(true))
+        return;  // 已在运行，防止重复调用导致 std::terminate
     health_check_ = std::thread(&Database::HealthLoop, this);
     printf("[DB] Health check started (every 30s)\n");
 }
