@@ -310,8 +310,7 @@ func main() {
 	})
 	mux.HandleFunc("GET /api/v1/me", func(w http.ResponseWriter, r *http.Request) {
 		user := gw.GetUserFromCookie(r)
-		uid := gw.ExtractUID(r)
-		gw.WriteJSON(w, map[string]interface{}{"username": user, "user_id": uid})
+		gw.WriteJSON(w, map[string]interface{}{"username": user, "user_id": 0})
 	})
 	mux.HandleFunc("GET /api/v1/services", func(w http.ResponseWriter, r *http.Request) {
 		gw.WriteJSON(w, map[string]interface{}{"services": map[string][]string{
@@ -396,18 +395,13 @@ func main() {
 			Sort string `json:"sort"`
 		}
 		json.NewDecoder(r.Body).Decode(&body)
-		uid := gw.ExtractUID(r)
-		if uid == 0 {
-			http.Error(w, `{"error":"Jwt is missing"}`, http.StatusUnauthorized)
-			return
-		}
 		if msg, code := gw.ValidateSearch(body.Q); msg != "" {
 			gw.WriteJSONStatus(w, code, map[string]interface{}{"success": false, "error": msg})
 			return
 		}
 		resp, err := callWithRetry(r.Context(), cbSearch, 3, "search", func(ctx context.Context) (*pb.SearchResponse, error) {
 			return searchClient.Search(withAuth(ctx, r), &pb.SearchRequest{
-				Query: body.Q, UserId: uid, Sort: body.Sort,
+				Query: body.Q, UserId: 0, Sort: body.Sort,
 			})
 		})
 		gw.WriteGRPCResponse(w, resp, err)
@@ -415,38 +409,27 @@ func main() {
 
 	// === Sheet CRUD ===
 	mux.HandleFunc("POST /api/v1/sheets", func(w http.ResponseWriter, r *http.Request) {
-		uid := gw.ExtractUID(r)
-		if uid == 0 {
-			gw.WriteJSONStatus(w, http.StatusUnauthorized, map[string]interface{}{"success": false, "error": "Unauthorized"})
-			return
-		}
 		var req pb.CreateSpreadsheetRequest
 		json.NewDecoder(r.Body).Decode(&req)
-		req.UserId = uid
+		req.UserId = 0
 		resp, err := gw.SheetClient.CreateSpreadsheet(injectToken(r), &req)
 		gw.WriteGRPCResponse(w, resp, err)
 	})
 	mux.HandleFunc("GET /api/v1/sheets", func(w http.ResponseWriter, r *http.Request) {
-		uid := gw.ExtractUID(r)
-		if uid == 0 {
-			gw.WriteJSONStatus(w, http.StatusUnauthorized, map[string]interface{}{"success": false, "error": "Unauthorized"})
-			return
-		}
 		resp, err := callWithRetry(r.Context(), cbSheet, 3, "sheet.list", func(ctx context.Context) (*pb.ListSpreadsheetsResponse, error) {
-			return gw.SheetClient.ListSpreadsheets(withAuth(ctx, r), &pb.ListSpreadsheetsRequest{UserId: uid})
+			return gw.SheetClient.ListSpreadsheets(withAuth(ctx, r), &pb.ListSpreadsheetsRequest{UserId: 0})
 		})
 		gw.WriteGRPCResponse(w, resp, err)
 	})
 	mux.HandleFunc("GET /api/v1/sheets/{id}", func(w http.ResponseWriter, r *http.Request) {
 		id := parseInt64(r.PathValue("id"))
-		uid := gw.ExtractUID(r)
 		caller := gw.GetUserFromCookie(r)
-		if uid == 0 || caller == "" {
+		if caller == "" {
 			gw.WriteJSONStatus(w, http.StatusUnauthorized, map[string]interface{}{"success": false, "error": "Unauthorized"})
 			return
 		}
 		resp, err := callWithRetry(r.Context(), cbSheet, 3, "sheet.get", func(ctx context.Context) (*pb.GetSpreadsheetResponse, error) {
-			return gw.SheetClient.GetSpreadsheet(withAuth(ctx, r), &pb.GetSpreadsheetRequest{Id: id, UserId: uid})
+			return gw.SheetClient.GetSpreadsheet(withAuth(ctx, r), &pb.GetSpreadsheetRequest{Id: id, UserId: 0})
 		})
 		if err != nil {
 			gw.WriteGRPCError(w, err, "Not found")
@@ -465,40 +448,25 @@ func main() {
 		}
 	})
 	mux.HandleFunc("PUT /api/v1/sheets/{id}", func(w http.ResponseWriter, r *http.Request) {
-		uid := gw.ExtractUID(r)
-		if uid == 0 {
-			gw.WriteJSONStatus(w, http.StatusUnauthorized, map[string]interface{}{"success": false, "error": "Unauthorized"})
-			return
-		}
 		var req pb.UpdateSpreadsheetRequest
 		json.NewDecoder(r.Body).Decode(&req)
 		req.Id = parseInt64(r.PathValue("id"))
-		req.UserId = uid
+		req.UserId = 0
 		resp, err := gw.SheetClient.UpdateSpreadsheet(injectToken(r), &req)
 		gw.WriteGRPCResponse(w, resp, err)
 	})
 	mux.HandleFunc("DELETE /api/v1/sheets/{id}", func(w http.ResponseWriter, r *http.Request) {
-		uid := gw.ExtractUID(r)
-		if uid == 0 {
-			gw.WriteJSONStatus(w, http.StatusUnauthorized, map[string]interface{}{"success": false, "error": "Unauthorized"})
-			return
-		}
 		id := parseInt64(r.PathValue("id"))
 		resp, err := callWithRetry(r.Context(), cbSheet, 2, "sheet.delete", func(ctx context.Context) (*pb.DeleteSpreadsheetResponse, error) {
-			return gw.SheetClient.DeleteSpreadsheet(withAuth(ctx, r), &pb.DeleteSpreadsheetRequest{Id: id, UserId: uid})
+			return gw.SheetClient.DeleteSpreadsheet(withAuth(ctx, r), &pb.DeleteSpreadsheetRequest{Id: id, UserId: 0})
 		})
 		gw.WriteGRPCResponse(w, resp, err)
 	})
 
 	// === Photos ===
 	mux.HandleFunc("GET /api/v1/photos", func(w http.ResponseWriter, r *http.Request) {
-		uid := gw.ExtractUID(r)
-		if uid == 0 {
-			gw.WriteJSONStatus(w, http.StatusUnauthorized, map[string]interface{}{"success": false, "error": "Unauthorized"})
-			return
-		}
 		resp, err := gw.FileClient.ListFiles(injectToken(r), &pb.ListFilesRequest{
-			UserId: uid, MimeFilter: "image/",
+			UserId: 0, MimeFilter: "image/",
 		})
 		gw.WriteGRPCResponse(w, resp, err)
 	})
@@ -517,30 +485,18 @@ func main() {
 			ParentFolderId int64  `json:"parent_folder_id"`
 		}
 		json.NewDecoder(r.Body).Decode(&body)
-		uid := gw.ExtractUID(r)
 		resp, err := gw.FileClient.CreateFolder(injectToken(r), &pb.CreateFolderRequest{
-			UserId: uid, Name: body.Name, ParentFolderId: body.ParentFolderId,
+			UserId: 0, Name: body.Name, ParentFolderId: body.ParentFolderId,
 		})
 		gw.WriteGRPCResponse(w, resp, err)
 	})
 	mux.HandleFunc("GET /api/v1/files", func(w http.ResponseWriter, r *http.Request) {
-		uid := gw.ExtractUID(r)
-		if uid == 0 {
-			gw.WriteJSONStatus(w, http.StatusUnauthorized, map[string]interface{}{"success": false, "error": "Unauthorized"})
-			return
-		}
 		resp, err := callWithRetry(r.Context(), cbFile, 3, "file.list", func(ctx context.Context) (*pb.ListFilesResponse, error) {
-			return gw.FileClient.ListFiles(withAuth(ctx, r), &pb.ListFilesRequest{UserId: uid})
+			return gw.FileClient.ListFiles(withAuth(ctx, r), &pb.ListFilesRequest{UserId: 0})
 		})
 		gw.WriteGRPCResponse(w, resp, err)
 	})
 	mux.HandleFunc("POST /api/v1/files/upload", func(w http.ResponseWriter, r *http.Request) {
-		uid := gw.ExtractUID(r)
-		if uid == 0 {
-			gw.WriteJSONStatus(w, http.StatusUnauthorized, map[string]interface{}{"success": false, "error": "Unauthorized"})
-			return
-		}
-		log.Printf("[upload] uid=%d", uid)
 		r.ParseMultipartForm(50 << 20)
 		f, h, _ := r.FormFile("file")
 		if f == nil {
@@ -550,21 +506,15 @@ func main() {
 		defer f.Close()
 		data, _ := io.ReadAll(f)
 		resp, err := gw.FileClient.CreateFile(injectToken(r), &pb.CreateFileRequest{
-			UserId: uid, OriginalName: h.Filename, Size: int64(len(data)),
+			UserId: 0, OriginalName: h.Filename, Size: int64(len(data)),
 			MimeType: h.Header.Get("Content-Type"), FileContent: data,
 		})
 		gw.WriteGRPCResponse(w, resp, err)
 	})
 	mux.HandleFunc("GET /api/v1/files/{id}", func(w http.ResponseWriter, r *http.Request) {
 		id := parseInt64(r.PathValue("id"))
-		uid := gw.ExtractUID(r)
-		log.Printf("[debug] GetFile id=%d uid=%d", id, uid)
-		if uid == 0 {
-			gw.WriteJSONStatus(w, http.StatusUnauthorized, map[string]interface{}{"success": false, "error": "Unauthorized"})
-			return
-		}
 		resp, err := callWithRetry(r.Context(), cbFile, 3, "file.get", func(ctx context.Context) (*pb.GetFileResponse, error) {
-			return gw.FileClient.GetFile(withAuth(ctx, r), &pb.GetFileRequest{Id: id, UserId: uid})
+			return gw.FileClient.GetFile(withAuth(ctx, r), &pb.GetFileRequest{Id: id, UserId: 0})
 		})
 		if err != nil {
 			gw.WriteGRPCError(w, err, "Not found")
@@ -587,10 +537,8 @@ func main() {
 	})
 	mux.HandleFunc("DELETE /api/v1/files/{id}", func(w http.ResponseWriter, r *http.Request) {
 		id := parseInt64(r.PathValue("id"))
-		uid := gw.ExtractUID(r)
-		log.Printf("[debug] DeleteFile id=%d uid=%d", id, uid)
 		resp, err := callWithRetry(r.Context(), cbFile, 2, "file.delete", func(ctx context.Context) (*pb.DeleteFileResponse, error) {
-			return gw.FileClient.DeleteFile(withAuth(ctx, r), &pb.DeleteFileRequest{Id: id, UserId: uid})
+			return gw.FileClient.DeleteFile(withAuth(ctx, r), &pb.DeleteFileRequest{Id: id, UserId: 0})
 		})
 		gw.WriteGRPCResponse(w, resp, err)
 	})
