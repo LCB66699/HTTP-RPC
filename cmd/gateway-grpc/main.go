@@ -575,13 +575,8 @@ func main() {
 			return
 		}
 		if resp.GetDownloadUrl() != "" {
-			dlResp, err := http.Get(resp.GetDownloadUrl())
-			if err == nil {
-				defer dlResp.Body.Close()
-				w.Header().Set("Content-Type", resp.File.GetMimeType())
-				io.Copy(w, dlResp.Body)
-				return
-			}
+			http.Redirect(w, r, resp.GetDownloadUrl(), http.StatusFound)
+			return
 		}
 		if resp.File != nil {
 			w.Header().Set("Content-Type", resp.File.GetMimeType())
