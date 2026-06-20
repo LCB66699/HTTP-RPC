@@ -163,7 +163,7 @@ grpc::Status FileServiceImpl::GetFile(grpc::ServerContext *context, const rpc::G
     for (int retry = 0; retry < 3 && db_; ++retry) {
         found = db_->GetFileOwner(req->id(), owner_uid);
         if (found && owner_uid != 0) break;
-        if (retry < 2) std::this_thread::sleep_for(std::chrono::milliseconds(10));
+        std::this_thread::sleep_for(std::chrono::milliseconds(50 << retry));
     }
     if (slog_) LOG_DEBUG(*slog_, "GetFileOwner id=" + std::to_string(req->id()) +
                                      " found=" + std::to_string(found) + " owner=" + std::to_string(owner_uid) +
@@ -305,7 +305,7 @@ grpc::Status FileServiceImpl::GetFile(grpc::ServerContext *context, const rpc::G
         got = db_->GetFile(req->id(), req_uid, row);
         if (slog_) LOG_DEBUG(*slog_, "GetFile id=" + std::to_string(req->id()) + " attempt=" + std::to_string(r+1) + " ok=" + std::to_string(got));
         if (got) break;
-        std::this_thread::sleep_for(std::chrono::milliseconds(5));
+        std::this_thread::sleep_for(std::chrono::milliseconds(50 << r));
     }
     if (!got) {
         if (redis_ && redis_->IsConnected()) {

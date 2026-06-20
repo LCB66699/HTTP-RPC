@@ -192,11 +192,11 @@ grpc::Status SpreadsheetServiceImpl::GetSpreadsheet(grpc::ServerContext *context
     }
     int64_t owner_uid = 0;
     bool found = false;
-    // 连接池不同连接可能有瞬时可见性差异，重试 3 次
+    // 连接池不同连接可能有瞬时可见性差异，重试 3 次，指数退避
     for (int retry = 0; retry < 3 && db_; ++retry) {
         found = db_->GetSpreadsheetOwner(req->id(), owner_uid);
         if (found && owner_uid != 0) break;
-        std::this_thread::sleep_for(std::chrono::milliseconds(5));
+        std::this_thread::sleep_for(std::chrono::milliseconds(50 << retry));
     }
     if (slog_) LOG_DEBUG(*slog_, "GetOwner id=" + std::to_string(req->id()) +
                                      " owner=" + std::to_string(owner_uid) + " req_uid=" + std::to_string(req->user_id()));
@@ -388,7 +388,7 @@ grpc::Status SpreadsheetServiceImpl::GetSpreadsheet(grpc::ServerContext *context
     for (int r = 0; r < 3 && db_; ++r) {
         got = db_->GetSpreadsheet(req->id(), req_uid, row);
         if (got) break;
-        std::this_thread::sleep_for(std::chrono::milliseconds(5));
+        std::this_thread::sleep_for(std::chrono::milliseconds(50 << r));
     }
     if (!got) {
         // Cache null sentinel to prevent cache penetration

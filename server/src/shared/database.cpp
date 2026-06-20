@@ -69,6 +69,23 @@ MYSQL *Database::EscConn() {
     return nullptr;
 }
 
+Database::WriteConnHandle Database::GetHealthyWriteConn() {
+    if (write_conns_.empty())
+        return {std::unique_lock<std::mutex>{}, nullptr};
+    size_t idx = write_idx_.fetch_add(1, std::memory_order_relaxed) % write_conns_.size();
+    auto &wc = write_conns_[idx];
+    std::unique_lock<std::mutex> lock(wc->mtx);
+    if (wc->conn && mysql_ping(wc->conn) != 0) {
+        fprintf(stderr, "[DB:write#%zu] ping failed, reconnecting\n", idx);
+        mysql_close(wc->conn);
+        wc->conn = nullptr;
+    }
+    if (!wc->conn) {
+        wc->conn = ConnectMYSQL(write_host_, write_port_);
+    }
+    return {std::move(lock), wc->conn};
+}
+
 Database::Database(const std::string &write_host, int write_port, const std::string &read_hosts, int read_port,
                    const std::string &user, const std::string &password, const std::string &db_name,
                    int write_pool_size)
@@ -696,19 +713,12 @@ bool Database::DeleteSpreadsheet(int64_t id, int64_t /*user_id*/) {
 
 bool Database::GetSpreadsheetOwner(int64_t id, int64_t &owner_user_id, int *out_version) {
     // 强一致: 归属校验必须读主库
-    if (write_conns_.empty())
+    auto h = GetHealthyWriteConn();
+    if (!h)
         return false;
-    size_t idx = write_idx_.fetch_add(1, std::memory_order_relaxed) % write_conns_.size();
-    auto &wc = write_conns_[idx];
-    std::lock_guard<std::mutex> lock(wc->mtx);
-    if (!wc->conn) {
-        wc->conn = ConnectMYSQL(write_host_, write_port_);
-        if (!wc->conn)
-            return false;
-    }
     std::string sql = make_sql("SELECT user_id, version FROM spreadsheets WHERE id={}", id);
     MYSQL_RES *res = nullptr;
-    if (!RunQuery(wc->conn, sql, &res))
+    if (!RunQuery(h.conn, sql, &res))
         return false;
     MYSQL_ROW row = mysql_fetch_row(res);
     if (row) {
@@ -867,19 +877,12 @@ bool Database::DeleteFile(int64_t id, int64_t /*user_id*/) {
 
 bool Database::GetFileOwner(int64_t id, int64_t &owner_user_id) {
     // 强一致: 归属校验必须读主库
-    if (write_conns_.empty())
+    auto h = GetHealthyWriteConn();
+    if (!h)
         return false;
-    size_t idx = write_idx_.fetch_add(1, std::memory_order_relaxed) % write_conns_.size();
-    auto &wc = write_conns_[idx];
-    std::lock_guard<std::mutex> lock(wc->mtx);
-    if (!wc->conn) {
-        wc->conn = ConnectMYSQL(write_host_, write_port_);
-        if (!wc->conn)
-            return false;
-    }
     std::string sql = make_sql("SELECT user_id FROM files WHERE id={}", id);
     MYSQL_RES *res = nullptr;
-    if (!RunQuery(wc->conn, sql, &res))
+    if (!RunQuery(h.conn, sql, &res))
         return false;
     MYSQL_ROW row = mysql_fetch_row(res);
     if (row)
