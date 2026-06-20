@@ -78,6 +78,17 @@ Database::ConnHandle Database::GetHealthyWriteConn() {
     std::unique_lock<std::mutex> lock(wc->mtx);
     if (!wc->conn) {
         wc->conn = ConnectMYSQL(write_host_, write_port_);
+    } else {
+        // 空闲超过 5s 则 ping 保活；高并发下 last_used_ms 持续刷新，跳过 ping 消除争用
+        int64_t now = std::chrono::duration_cast<std::chrono::milliseconds>(
+            std::chrono::system_clock::now().time_since_epoch()).count();
+        if (now - wc->last_used_ms.load() > 5000) {
+            if (mysql_ping(wc->conn.get()) != 0) {
+                fprintf(stderr, "[DB:write#%zu] ping failed, reconnecting\n", idx);
+                wc->conn.reset();
+                wc->conn = ConnectMYSQL(write_host_, write_port_);
+            }
+        }
     }
     if (wc->conn)
         wc->last_used_ms.store(
@@ -93,6 +104,16 @@ Database::ConnHandle Database::GetHealthyReadConn() {
         std::unique_lock<std::mutex> lock(rc->mtx);
         if (!rc->conn) {
             rc->conn = ConnectMYSQL(read_hosts_[idx % read_hosts_.size()], read_port_);
+        } else {
+            int64_t now = std::chrono::duration_cast<std::chrono::milliseconds>(
+                std::chrono::system_clock::now().time_since_epoch()).count();
+            if (now - rc->last_used_ms.load() > 5000) {
+                if (mysql_ping(rc->conn.get()) != 0) {
+                    fprintf(stderr, "[DB:read#%zu] ping failed, reconnecting\n", idx);
+                    rc->conn.reset();
+                    rc->conn = ConnectMYSQL(read_hosts_[idx % read_hosts_.size()], read_port_);
+                }
+            }
         }
         if (rc->conn) {
             rc->last_used_ms.store(
