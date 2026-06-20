@@ -410,7 +410,7 @@
       MINIO_ACCESS_KEY: "rpc-minio"
       MINIO_SECRET_KEY: "${MINIO_ROOT_PASSWORD:-rpc-minio-123456}"
       MINIO_BUCKET: "rpc-files"
-      MINIO_PUBLIC_URL: "http://minio:9000"
+      MINIO_PUBLIC_URL: "http://localhost:9000"
     command: >
       /app/rpc_server --service spreadsheet --port 50051
       --mysql-write-host mysql-spreadsheet --mysql-read-hosts mysql-spreadsheet-r --mysql-password ${MYSQL_ROOT_PASSWORD:-123456} --mysql-db rpc_spreadsheet --mysql-shards 2
@@ -443,7 +443,7 @@
       MINIO_ACCESS_KEY: "rpc-minio"
       MINIO_SECRET_KEY: "${MINIO_ROOT_PASSWORD:-rpc-minio-123456}"
       MINIO_BUCKET: "rpc-files"
-      MINIO_PUBLIC_URL: "http://minio:9000"
+      MINIO_PUBLIC_URL: "http://localhost:9000"
     command: >
       /app/rpc_server --service spreadsheet --port 50051
       --mysql-write-host mysql-spreadsheet --mysql-read-hosts mysql-spreadsheet-r --mysql-password ${MYSQL_ROOT_PASSWORD:-123456} --mysql-db rpc_spreadsheet --mysql-shards 2
@@ -482,7 +482,7 @@
       MINIO_ACCESS_KEY: "rpc-minio"
       MINIO_SECRET_KEY: "${MINIO_ROOT_PASSWORD:-rpc-minio-123456}"
       MINIO_BUCKET: "rpc-files"
-      MINIO_PUBLIC_URL: "http://minio:9000"
+      MINIO_PUBLIC_URL: "http://localhost:9000"
     command: >
       /app/rpc_server --service file --port 50051
       --mysql-write-host mysql-file --mysql-read-hosts mysql-file-r --mysql-password ${MYSQL_ROOT_PASSWORD:-123456} --mysql-db rpc_file --mysql-shards 2
@@ -515,7 +515,7 @@
       MINIO_ACCESS_KEY: "rpc-minio"
       MINIO_SECRET_KEY: "${MINIO_ROOT_PASSWORD:-rpc-minio-123456}"
       MINIO_BUCKET: "rpc-files"
-      MINIO_PUBLIC_URL: "http://minio:9000"
+      MINIO_PUBLIC_URL: "http://localhost:9000"
     command: >
       /app/rpc_server --service file --port 50051
       --mysql-write-host mysql-file --mysql-read-hosts mysql-file-r --mysql-password ${MYSQL_ROOT_PASSWORD:-123456} --mysql-db rpc_file --mysql-shards 2
