@@ -34,9 +34,18 @@ TEST(SheetMock, GetSpreadsheetRedisCacheHit) {
     std::string ser;
     ASSERT_TRUE(cached_resp.SerializeToString(&ser));
 
-    // GetJSON returns the cached proto (ts key and data key both hit)
+    // GetJSON returns the cached proto for data key, a valid timestamp for ts key.
+    // Without this, the stale-refresh check (stoll on ts) would throw and spawn a
+    // detached thread that outlives the test, causing use-after-free in the next test.
     EXPECT_CALL(redis, GetJSON(_, _))
-        .WillRepeatedly(DoAll(SetArgReferee<1>(ser), Return(true)));
+        .WillRepeatedly([&ser](const std::string &key, std::string &value) -> bool {
+            if (key.find(":ts") != std::string::npos) {
+                value = std::to_string(std::time(nullptr));
+            } else {
+                value = ser;
+            }
+            return true;
+        });
 
     // Allow other redis calls (lock, etc.)
     EXPECT_CALL(redis, SetNX(_, _, _)).WillRepeatedly(Return(true));

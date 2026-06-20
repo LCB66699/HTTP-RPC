@@ -183,7 +183,7 @@ class Database {
 
     // Backward compat
     bool Exec(const std::string &sql) { return ExecWrite(sql); }
-    MYSQL *GetConnection() { return write_conns_.empty() ? nullptr : write_conns_[0]->conn; }
+    MYSQL *GetConnection() { return write_conns_.empty() ? nullptr : write_conns_[0]->conn.get(); }
 
     // 健康检查：后台线程每 30s PING 连接池，自动重建死连接 + 淘汰空闲连接
     void StartHealthCheck();

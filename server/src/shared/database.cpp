@@ -145,10 +145,10 @@ Database::Database(const std::string &write_host, int write_port, const std::str
 
     // 创建读连接池（从库）
     for (auto &h : read_hosts_) {
-        MYSQL *c = ConnectMYSQL(h, read_port_);
+        auto c = ConnectMYSQL(h, read_port_);
         if (c) {
             auto rc = std::make_unique<PoolConn>();
-            rc->conn = c;
+            rc->conn = std::move(c);
             read_conns_.push_back(std::move(rc));
         } else {
             fprintf(stderr, "[DB] WARNING: read slave %s:%d unavailable\n", h.c_str(), read_port_);
@@ -234,7 +234,7 @@ bool Database::Initialize() {
     for (auto &wcp : write_conns_) {
         if (!wcp->conn) continue;
         std::lock_guard<std::mutex> lock(wcp->mtx);
-        MYSQL *c = wcp->conn;
+        MYSQL *c = wcp->conn.get();
 
         auto exec = [&](const char *sql) {
             if (mysql_query(c, sql) != 0)
@@ -390,7 +390,7 @@ bool Database::Initialize() {
     for (auto &rcp : read_conns_) {
         if (!rcp->conn) continue;
         std::lock_guard<std::mutex> lock(rcp->mtx);
-        MYSQL *c = rcp->conn;
+        MYSQL *c = rcp->conn.get();
         auto exec = [&](const char *sql) {
             if (mysql_query(c, sql) != 0)
                 fprintf(stderr, "[DB] DDL error on read conn: %s\n", mysql_error(c));
@@ -997,7 +997,7 @@ void Database::HealthLoop() {
                 if (pc->conn && (now_ms - last) > idle_timeout_ms) {
                     std::lock_guard<std::mutex> lock(pc->mtx);
                     if (pc->conn && (now_ms - pc->last_used_ms.load()) > idle_timeout_ms) {
-                        fprintf(stderr, "[DB:health] %s conn %zu idle %llds, closing\n",
+                        fprintf(stderr, "[DB:health] %s conn %zu idle %lds, closing\n",
                                 label, i, (now_ms - last) / 1000);
                         pc->conn.reset();
                         alive--;
