@@ -1,4 +1,4 @@
-// Minimal MinIO/S3 client â€” implements PutObject and PresignedGetUrl
+// Minimal MinIO/S3 client â€?implements PutObject and PresignedGetUrl
 // using AWS Signature Version 4 over HTTP(S).
 // Depends only on OpenSSL (already linked for gRPC) and httplib.h.
 #pragma once
@@ -11,7 +11,7 @@
 #include <sstream>
 #include <string>
 
-#include "httplib.h"
+#include "shared/httplib.h"
 
 namespace minio {
 
@@ -86,7 +86,7 @@ inline std::string url_encode(const std::string &s) {
     return enc.str();
 }
 
-// Authority (host or host:port) for SigV4 â€” must match the Host header the
+// Authority (host or host:port) for SigV4 â€?must match the Host header the
 // browser sends when opening the presigned URL, not the internal Docker
 // endpoint.
 inline std::string signing_host_from_public_url(const std::string &public_url) {
@@ -170,15 +170,15 @@ struct Client {
         return true;
     }
 
-    // Authenticated GET object (SigV4) â€” reads from internal `endpoint` only.
-    // Used so downloads can go gateway â†’ gRPC â†’ MinIO without browser â†’
+    // Authenticated GET object (SigV4) â€?reads from internal `endpoint` only.
+    // Used so downloads can go gateway â†?gRPC â†?MinIO without browser â†?
     // :9000/:443.
     bool GetObject(const std::string &key, std::string &out_body) const {
         std::string date8, dt16;
         get_datetime(date8, dt16);
         std::string host = endpoint;
         std::string uri = "/" + bucket + "/" + url_encode_path(key);
-        // Empty request body â€” standard hex(SHA256("")) used by AWS SigV4 for GET.
+        // Empty request body â€?standard hex(SHA256("")) used by AWS SigV4 for GET.
         const std::string payload_hash = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
 
         std::string canon_headers = "host:" + host +
@@ -223,7 +223,7 @@ struct Client {
         return true;
     }
 
-    // DELETE object â€” S3 SigV4 signed, same pattern as GetObject.
+    // DELETE object â€?S3 SigV4 signed, same pattern as GetObject.
     bool DeleteObject(const std::string &key) const {
         std::string date8, dt16;
         get_datetime(date8, dt16);

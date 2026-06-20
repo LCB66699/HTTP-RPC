@@ -2,11 +2,11 @@
 
 #include <nlohmann/json.hpp>
 
-#include "call_logger.h"
+#include "shared/call_logger.h"
 
 using json = nlohmann::json;
 
-// CallLogger with redis=nullptr â€” background flush thread runs harmlessly
+// CallLogger with redis=nullptr â€?background flush thread runs harmlessly
 class CallLoggerTest : public ::testing::Test {
    protected:
     CallLogger logger{100, nullptr};  // max 100 entries, no redis

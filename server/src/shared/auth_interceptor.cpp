@@ -1,9 +1,9 @@
-#include "auth_interceptor.h"
+#include "shared/auth_interceptor.h"
 
 #include <cstdio>
 #include <ctime>
 
-#include "jwt.h"
+#include "shared/jwt.h"
 
 AuthInterceptor::AuthInterceptor(const std::string &jwt_secret) : jwt_secret_(jwt_secret) {}
 
@@ -38,7 +38,7 @@ AuthContext AuthInterceptor::FromToken(const std::string &token, const std::stri
         return auth;
     }
 
-    // 检查 JWT 过期时间（exp 字段，Unix 时间戳）
+    // 检�?JWT 过期时间（exp 字段，Unix 时间戳）
     auto exp_pos = payload.find("\"exp\"");
     if (exp_pos != std::string::npos) {
         auto colon = payload.find(':', exp_pos + 5);

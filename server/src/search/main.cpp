@@ -1,13 +1,13 @@
-// Search Service main — 最轻量，只依赖 httplib
+// Search Service main �?最轻量，只依赖 httplib
 #include <grpcpp/grpcpp.h>
 
 #include <csignal>
 #include <cstdio>
 #include <cstdlib>
 
-#include "health_service_impl.h"
-#include "otel_tracer.h"
-#include "search_service_impl.h"
+#include "shared/health_service_impl.h"
+#include "shared/otel_tracer.h"
+#include "search/search_service_impl.h"
 
 static std::unique_ptr<grpc::Server> g_server;
 static void SignalHandler(int) {

@@ -7,9 +7,9 @@
 #include "generated/rpc_auth.pb.h"
 #include "generated/rpc_spreadsheet.grpc.pb.h"
 #include "generated/rpc_spreadsheet.pb.h"
-#include "circuit_breaker.h"
-#include "minio_client.h"
-#include "service_interfaces.h"
+#include "shared/circuit_breaker.h"
+#include "shared/minio_client.h"
+#include "shared/service_interfaces.h"
 
 class CallLogger;
 class SystemLogger;
@@ -26,7 +26,7 @@ class SpreadsheetServiceImpl final : public rpc::SpreadsheetService::Service {
     void SetMinio(minio::Client *mc) { minio_ = mc; }
     void SetAuthChannel(std::shared_ptr<grpc::Channel> ch) { auth_stub_ = rpc::AuthService::NewStub(ch); }
 
-    // 从 gRPC metadata 提取 token 并调用 Auth.ValidateUser
+    // �?gRPC metadata 提取 token 并调�?Auth.ValidateUser
     bool ValidateCaller(grpc::ServerContext *ctx, int64_t user_id, std::string &out_username,
                         std::string &out_role) const;
 

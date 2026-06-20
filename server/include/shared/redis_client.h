@@ -1,4 +1,4 @@
-// Redis Cluster client — wraps sw::redis::RedisCluster for auto slot routing,
+// Redis Cluster client �?wraps sw::redis::RedisCluster for auto slot routing,
 // MOVED/ASK redirect, topology discovery, connection pooling, and failover.
 #pragma once
 #include <cstdlib>
@@ -8,7 +8,7 @@
 #include <unordered_map>
 #include <vector>
 
-#include "service_interfaces.h"
+#include "shared/service_interfaces.h"
 
 namespace sw {
 namespace redis {
@@ -27,7 +27,7 @@ class RedisClient : public IRedisClient {
 
     // Call history (list operations)
     bool PushCallEntry(const std::string &json_entry, const std::string &username = "");
-    // 批量写入 — 一次 Pipeline exec 写 N 条，减少网络 RTT
+    // 批量写入 �?一�?Pipeline exec �?N 条，减少网络 RTT
     bool BatchPushCallEntries(const std::vector<std::pair<std::string, std::string>> &entries);
     std::vector<std::string> GetCallEntries(int limit, int offset, const std::string &username = "") const;
     int64_t GetCallCount(const std::string &username = "") const;
@@ -48,7 +48,7 @@ class RedisClient : public IRedisClient {
     int64_t GetInt(const std::string &key);
     std::unordered_map<std::string, std::string> HGetAll(const std::string &key) const;
 
-    // Pub/Sub — Publish is cluster-safe; Subscribe needs standalone connection
+    // Pub/Sub �?Publish is cluster-safe; Subscribe needs standalone connection
     bool Publish(const std::string &channel, const std::string &message);
 
     // Subscribe helper: returns a standalone subscriber to one cluster node.
@@ -56,12 +56,12 @@ class RedisClient : public IRedisClient {
     using SubCallback = std::function<void(const std::string &channel, const std::string &msg)>;
     void SubscribeStandalone(const std::string &channel, SubCallback cb);
 
-    // Health check managed internally by the library — no explicit Start/Stop
+    // Health check managed internally by the library �?no explicit Start/Stop
     // needed. Kept for backward compatibility (no-ops).
     void StartHealthCheck() {}
     void StopHealthCheck() {}
 
-    // 给 TTL 加随机偏移，防止缓存雪崩。jitter 为偏移上限（秒）。
+    // �?TTL 加随机偏移，防止缓存雪崩。jitter 为偏移上限（秒）�?
     static int JitteredTTL(int base_ttl, int jitter) { return base_ttl + (std::rand() % (jitter + 1)); }
 
    private:

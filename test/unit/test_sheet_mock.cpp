@@ -3,14 +3,14 @@
 #include <thread>
 
 #include "mocks.h"
-#include "spreadsheet_service_impl.h"
+#include "sheet/spreadsheet_service_impl.h"
 
 using ::testing::_;
 using ::testing::DoAll;
 using ::testing::Return;
 using ::testing::SetArgReferee;
 
-// ===== GetSpreadsheet â€” Redis cache hit =====
+// ===== GetSpreadsheet â€?Redis cache hit =====
 TEST(SheetMock, GetSpreadsheetRedisCacheHit) {
     MockDB db;
     MockRedis redis;
@@ -68,7 +68,7 @@ TEST(SheetMock, GetSpreadsheetRedisCacheHit) {
     EXPECT_EQ(resp.spreadsheet().name(), "cached-sheet");
 }
 
-// ===== GetSpreadsheet â€” cache miss, DB fallback =====
+// ===== GetSpreadsheet â€?cache miss, DB fallback =====
 TEST(SheetMock, GetSpreadsheetCacheMissThenDbHit) {
     MockDB db;
     MockRedis redis;
@@ -114,7 +114,7 @@ TEST(SheetMock, GetSpreadsheetCacheMissThenDbHit) {
     std::this_thread::sleep_for(std::chrono::milliseconds(50));
 }
 
-// ===== GetSpreadsheet â€” wrong owner =====
+// ===== GetSpreadsheet â€?wrong owner =====
 TEST(SheetMock, GetSpreadsheetWrongOwner) {
     MockDB db;
     SpreadsheetServiceImpl svc;

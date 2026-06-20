@@ -1,13 +1,13 @@
-#include "data_helpers.h"
-#include "database.h"
+#include "shared/data_helpers.h"
+#include "shared/database.h"
 
 #include <cstdio>
 #include <cstring>
 #include <fstream>
 #include <sstream>
 
-#include "sha256.h"
-#include "snowflake.h"
+#include "shared/sha256.h"
+#include "shared/snowflake.h"
 
 // ---- connection helpers ----
 
@@ -17,7 +17,7 @@ MysqlPtr Database::ConnectMYSQL(const std::string &host, int port) {
         fprintf(stderr, "[DB] mysql_init failed\n");
         return nullptr;
     }
-    // 重试 5 次应对 Docker DNS 间歇性解析失败 (CR_CONN_HOST_ERROR / ER_BAD_HOST_ERROR)
+    // 重试 5 次应�?Docker DNS 间歇性解析失�?(CR_CONN_HOST_ERROR / ER_BAD_HOST_ERROR)
     for (int attempt = 1; attempt <= 5; attempt++) {
         if (mysql_real_connect(c.get(), host.c_str(), user_.c_str(), password_.c_str(),
                                db_name_.c_str(), port, nullptr, 0)) {
@@ -48,7 +48,7 @@ bool Database::RunQuery(MYSQL *conn, const std::string &sql, MYSQL_RES **out_res
     return false;
 }
 
-// ---- sql_param 构造函数 — 强制转义，编译期兜底 ----
+// ---- sql_param 构造函�?�?强制转义，编译期兜底 ----
 sql_param::sql_param(MYSQL *conn, const std::string &s) : quote_(true) {
     if (!conn) {
         val_ = s;
@@ -59,7 +59,7 @@ sql_param::sql_param(MYSQL *conn, const std::string &s) : quote_(true) {
     val_.resize(len);
 }
 
-// 取任意可用连接供转义用（遍历写池→读池, 返回首个存活连接）
+// 取任意可用连接供转义用（遍历写池→读�? 返回首个存活连接�?
 MYSQL *Database::EscConn() {
     for (auto &wc : write_conns_)
         if (wc->conn)
@@ -77,7 +77,7 @@ Database::ConnHandle Database::GetHealthyWriteConn() {
     for (size_t attempt = 0; attempt < pool_sz; ++attempt) {
         size_t idx = write_idx_.fetch_add(1, std::memory_order_relaxed) % pool_sz;
         auto &wc = write_conns_[idx];
-        {   // 每条连接独立加锁, 失败则释放锁继续试下一条
+        {   // 每条连接独立加锁, 失败则释放锁继续试下一�?
             std::unique_lock<std::mutex> lock(wc->mtx);
             if (!wc->conn) {
                 wc->conn = ConnectMYSQL(write_host_, write_port_);
@@ -133,7 +133,7 @@ Database::ConnHandle Database::GetHealthyReadConn() {
             }
         }
     }
-    // 无从库 或 所有读连接均不可用, 回退到主库
+    // 无从�?�?所有读连接均不可用, 回退到主�?
     return GetHealthyWriteConn();
 }
 
@@ -156,7 +156,7 @@ Database::Database(const std::string &write_host, int write_port, const std::str
     }
     read_hosts_.push_back(hosts.substr(start));
 
-    // 创建写连接池 — 同一主库多条连接, 实现并行写
+    // 创建写连接池 �?同一主库多条连接, 实现并行�?
     write_conns_.reserve(pool_size_);
     for (int i = 0; i < pool_size_; i++) {
         auto wc = std::make_unique<PoolConn>();
@@ -186,7 +186,7 @@ Database::~Database() {
     // MysqlPtr 析构自动 mysql_close，无需手动遍历
 }
 
-// ---- 写操作（主库连接池 round-robin 分发, 每连接独立 mutex） ----
+// ---- 写操作（主库连接�?round-robin 分发, 每连接独�?mutex�?----
 
 bool Database::ExecWrite(const std::string &sql) {
     auto h = GetHealthyWriteConn();
@@ -198,7 +198,7 @@ bool Database::ExecWrite(const std::string &sql) {
     return false;
 }
 
-// 写 + 返回自增ID: INSERT 和 mysql_insert_id 在同一连接同一锁内原子完成
+// �?+ 返回自增ID: INSERT �?mysql_insert_id 在同一连接同一锁内原子完成
 bool Database::ExecWriteInsert(const std::string &sql, int64_t &out_id) {
     auto h = GetHealthyWriteConn();
     if (!h)
@@ -237,13 +237,13 @@ bool Database::ExecRead(const std::string &sql, std::function<bool(MYSQL_RES *)>
     return ok;
 }
 
-// ---- schema init（首连接执行, DDL 全局生效无需在所有连接上重复） ----
+// ---- schema init（首连接执行, DDL 全局生效无需在所有连接上重复�?----
 
 bool Database::Initialize() {
     if (write_conns_.empty())
         return false;
 
-    // 启动时序问题：不管连接是否 null，全部重建确保连到同一个就绪的 MySQL
+    // 启动时序问题：不管连接是�?null，全部重建确保连到同一个就绪的 MySQL
     for (size_t i = 0; i < write_conns_.size(); ++i) {
         write_conns_[i]->conn = ConnectMYSQL(write_host_, write_port_);
         if (!write_conns_[i]->conn)
@@ -335,7 +335,7 @@ bool Database::Initialize() {
     // Trace context for distributed tracing through the outbox
     mysql_query(c, "ALTER TABLE outbox ADD COLUMN trace_context VARCHAR(512) DEFAULT NULL AFTER payload");
 
-    // Idempotency key columns — NULL means "no deduplication" (multiple NULLs
+    // Idempotency key columns �?NULL means "no deduplication" (multiple NULLs
     // allowed by UNIQUE). ON DUPLICATE KEY UPDATE id=LAST_INSERT_ID(id) returns
     // the existing id on replay.
     mysql_query(c,
@@ -345,11 +345,11 @@ bool Database::Initialize() {
                 "ALTER TABLE files        ADD COLUMN idempotency_key CHAR(36) "
                 "UNIQUE NULL DEFAULT NULL");
 
-    // Version columns for optimistic locking — spreadsheets already has it;
+    // Version columns for optimistic locking �?spreadsheets already has it;
     // files needs it for multi-instance write safety.
     mysql_query(c, "ALTER TABLE files ADD COLUMN version INT NOT NULL DEFAULT 1");
 
-    // user_id columns — integer FK to users.id; avoids username-as-FK design
+    // user_id columns �?integer FK to users.id; avoids username-as-FK design
     // flaw. DEFAULT 0 allows idempotent migration on existing rows (populated
     // below via JOIN).
     mysql_query(c, "ALTER TABLE spreadsheets ADD COLUMN user_id BIGINT NOT NULL DEFAULT 0");
@@ -366,7 +366,7 @@ bool Database::Initialize() {
                 "SET f.user_id=u.id WHERE f.user_id=0");
 
     // Replace single-column indexes with composite covering indexes on user_id +
-    // sort column. DROP first (idempotent — fails silently if already removed),
+    // sort column. DROP first (idempotent �?fails silently if already removed),
     // then CREATE.
     mysql_query(c, "ALTER TABLE spreadsheets DROP INDEX idx_sheets_username");
     mysql_query(c, "ALTER TABLE spreadsheets DROP INDEX idx_sheets_user_time");
@@ -384,13 +384,13 @@ bool Database::Initialize() {
     mysql_query(c, "CREATE INDEX idx_undo_xid_id ON undo_log(xid, id DESC)");
     mysql_query(c, "CREATE INDEX idx_undo_created ON undo_log(created_at)");
 
-    // 覆盖索引 — SELECT token_version FROM users WHERE username=X 避免回表
+    // 覆盖索引 �?SELECT token_version FROM users WHERE username=X 避免回表
     mysql_query(c, "ALTER TABLE users DROP INDEX IF EXISTS username");
     mysql_query(c,
                 "ALTER TABLE users ADD UNIQUE INDEX idx_users_user_ver "
                 "(username, token_version)");
 
-    // INT → BIGINT 升级：兼容已有表，MySQL 8.0 支持 ALGORITHM=INSTANT
+    // INT �?BIGINT 升级：兼容已有表，MySQL 8.0 支持 ALGORITHM=INSTANT
     mysql_query(c, "ALTER TABLE users MODIFY COLUMN id BIGINT AUTO_INCREMENT");
     mysql_query(c, "ALTER TABLE spreadsheets MODIFY COLUMN id BIGINT AUTO_INCREMENT");
     mysql_query(c,
@@ -408,7 +408,7 @@ bool Database::Initialize() {
 
     }  // end DDL loop over write_conns_
 
-    // Read connections also need DDL — they may connect before tables are created.
+    // Read connections also need DDL �?they may connect before tables are created.
     // DDL is global but running it on each connection guarantees visibility.
     for (auto &rcp : read_conns_) {
         if (!rcp->conn) continue;
@@ -439,7 +439,7 @@ bool Database::AddUser(const std::string &username, const std::string &password_
 }
 
 bool Database::GetUser(const std::string &username, std::string &password_hash_out) {
-    // 强一致: 密码验证必须读主库
+    // 强一�? 密码验证必须读主�?
     auto h = GetHealthyWriteConn();
     if (!h)
         return false;
@@ -457,7 +457,7 @@ bool Database::GetUser(const std::string &username, std::string &password_hash_o
 }
 
 bool Database::UserExists(const std::string &username) {
-    // 强一致: 查重必须走主库, 避免主从延迟导致重复注册
+    // 强一�? 查重必须走主�? 避免主从延迟导致重复注册
     auto h = GetHealthyWriteConn();
     if (!h)
         return false;
@@ -472,7 +472,7 @@ bool Database::UserExists(const std::string &username) {
 }
 
 int Database::GetTokenVersion(const std::string &username) {
-    // 强一致: token 版本号必须读主库
+    // 强一�? token 版本号必须读主库
     auto h = GetHealthyWriteConn();
     if (!h)
         return -1;
@@ -608,7 +608,7 @@ bool Database::ListSpreadsheets(int64_t user_id, std::vector<SpreadsheetSummary>
     if (after_id > 0)
         where += make_sql(" AND id<{}", after_id);
 
-    // Always obtain exact total via COUNT(*) — avoids loading all rows just to
+    // Always obtain exact total via COUNT(*) �?avoids loading all rows just to
     // count them
     total = 0;
     ExecRead("SELECT COUNT(*) FROM spreadsheets " + where, [&](MYSQL_RES *res) {
@@ -622,7 +622,7 @@ bool Database::ListSpreadsheets(int64_t user_id, std::vector<SpreadsheetSummary>
     if (page_size > 0) {
         int offset = page * page_size;
         // Delayed Join: subquery scans covering index for ids, then join to fetch
-        // full row data — avoids deep-page row reads.  WHERE clause is built from
+        // full row data �?avoids deep-page row reads.  WHERE clause is built from
         // safe int params above, so string concat is safe here.
         sql =
             "SELECT s.id,s.name,s.description,s.row_count,s.col_count,s.updated_at "
@@ -668,9 +668,9 @@ bool Database::UpdateSpreadsheet(int64_t id, const std::string &name, const std:
     if (version > 0) {
         sql += " AND version = " + std::to_string(version);
     }
-    // 乐观锁冲突时 affected_rows=0 → ExecWrite 返回 true(无 SQL 错误)
-    // 业务层通过返回值无法区分"未匹配"和"成功", 需额外检查
-    // 这里改为: version>0 时检查 affected_rows, 不匹配则返回 false
+    // 乐观锁冲突时 affected_rows=0 �?ExecWrite 返回 true(�?SQL 错误)
+    // 业务层通过返回值无法区�?未匹�?�?成功", 需额外检�?
+    // 这里改为: version>0 时检�?affected_rows, 不匹配则返回 false
     if (version > 0) {
         // 走带版本号的更新, 需要检查受影响行数
         auto h = GetHealthyWriteConn();
@@ -690,7 +690,7 @@ bool Database::DeleteSpreadsheet(int64_t id, int64_t /*user_id*/) {
 }
 
 bool Database::GetSpreadsheetOwner(int64_t id, int64_t &owner_user_id, int *out_version) {
-    // 强一致: 归属校验必须读主库
+    // 强一�? 归属校验必须读主�?
     auto h = GetHealthyWriteConn();
     if (!h)
         return false;
@@ -814,7 +814,7 @@ bool Database::ListFiles(int64_t user_id, std::vector<FileRow> &out, int &total,
     if (page_size > 0) {
         int offset = page * page_size;
         // Delayed Join: subquery uses covering index for id lookup, then join back
-        // to read full row — avoids scanning large row data at deep offsets.
+        // to read full row �?avoids scanning large row data at deep offsets.
         // WHERE clause is built from safe int params above.
         sql =
             "SELECT "
@@ -850,7 +850,7 @@ bool Database::DeleteFile(int64_t id, int64_t /*user_id*/) {
 }
 
 bool Database::GetFileOwner(int64_t id, int64_t &owner_user_id) {
-    // 强一致: 归属校验必须读主库
+    // 强一�? 归属校验必须读主�?
     auto h = GetHealthyWriteConn();
     if (!h)
         return false;
@@ -866,7 +866,7 @@ bool Database::GetFileOwner(int64_t id, int64_t &owner_user_id) {
 }
 
 bool Database::GetFileStoragePath(int64_t id, std::string &storage_path) {
-    // 查询 MinIO object key，用于删除时一并清理对象存储
+    // 查询 MinIO object key，用于删除时一并清理对象存�?
     storage_path.clear();
     std::string sql = make_sql("SELECT storage_path FROM files WHERE id={}", id);
     return ExecRead(sql, [&](MYSQL_RES *res) {
@@ -895,7 +895,7 @@ bool Database::UpdateSpreadsheetStoragePath(int64_t id, const std::string &stora
                               sql_param(ec, storage_path), id));
 }
 
-// ---- Undo Log (always master — 2PC requires consistency) ----
+// ---- Undo Log (always master �?2PC requires consistency) ----
 
 bool Database::WriteUndoLog(const std::string &xid, const std::string &table_name, int64_t row_id,
                             const std::string &before_snapshot) {
@@ -907,7 +907,7 @@ bool Database::WriteUndoLog(const std::string &xid, const std::string &table_nam
 
 bool Database::GetUndoLog(const std::string &xid, std::string &table_name, int64_t &row_id,
                           std::string &before_snapshot) {
-    // 2PC 一致性: undo_log 必须读主库
+    // 2PC 一致�? undo_log 必须读主�?
     auto h = GetHealthyWriteConn();
     if (!h)
         return false;
@@ -949,11 +949,11 @@ int Database::PurgeOldUndoLogs(int days) {
     return affected;
 }
 
-// ---- 连接池健康检查 ----
+// ---- 连接池健康检�?----
 
 void Database::StartHealthCheck() {
     if (health_running_.exchange(true))
-        return;  // 已在运行，防止重复调用导致 std::terminate
+        return;  // 已在运行，防止重复调用导�?std::terminate
     health_check_ = std::thread(&Database::HealthLoop, this);
     printf("[DB] Health check started (every 30s)\n");
 }
@@ -970,7 +970,7 @@ void Database::HealthLoop() {
         if (!health_running_)
             break;
 
-        // ——— 第 1 轮: 全部 ping, 死连接重建 ———
+        // ——�?�?1 �? 全部 ping, 死连接重�?——�?
         for (size_t i = 0; i < write_conns_.size(); ++i) {
             auto &wc = write_conns_[i];
             std::lock_guard<std::mutex> lock(wc->mtx);
@@ -993,25 +993,25 @@ void Database::HealthLoop() {
             }
         }
 
-        // ——— 第 2 轮: 空闲连接淘汰 ———
+        // ——�?�?2 �? 空闲连接淘汰 ——�?
         int min_idle = min_idle_.load();
         int idle_timeout_ms = idle_timeout_ms_.load();
         if (min_idle <= 0 && idle_timeout_ms <= 0)
-            continue;  // 未启用空闲淘汰
+            continue;  // 未启用空闲淘�?
 
         int64_t now_ms =
             std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch())
                 .count();
 
         auto evictPool = [&](auto &pool, const char *label) {
-            // 统计存活连接数
+            // 统计存活连接�?
             int alive = 0;
             for (auto &pc : pool)
                 if (pc->conn)
                     alive++;
 
             if (alive <= min_idle)
-                return;  // 已到保底线, 不淘汰
+                return;  // 已到保底�? 不淘�?
 
             for (size_t i = 0; i < pool.size(); ++i) {
                 if (alive <= min_idle)
@@ -1036,7 +1036,7 @@ void Database::HealthLoop() {
 }
 
 // ============================================================
-// ShardedDatabase — hash-routes user_id across N Database shards
+// ShardedDatabase �?hash-routes user_id across N Database shards
 // ============================================================
 
 ShardedDatabase::ShardedDatabase(int shard_count, const std::string &write_host_prefix, int write_port,
@@ -1081,7 +1081,7 @@ Database *ShardedDatabase::ShardForBroadcast() {
     return shards_.empty() ? nullptr : shards_[0].get();
 }
 
-// === Users (auth shard only — shard 0) ===
+// === Users (auth shard only �?shard 0) ===
 
 bool ShardedDatabase::AddUser(const std::string &username, const std::string &password_hash) {
     return shards_[0]->AddUser(username, password_hash);
@@ -1127,7 +1127,7 @@ bool ShardedDatabase::UpdateSpreadsheet(int64_t id, int64_t user_id, const std::
 }
 bool ShardedDatabase::UpdateSpreadsheet(int64_t id, const std::string &name, const std::string &desc,
                                         const std::string &headers_json, const std::string &data_json, int version) {
-    // Legacy: no user_id → broadcast
+    // Legacy: no user_id �?broadcast
     for (auto &db : shards_)
         if (db->UpdateSpreadsheet(id, name, desc, headers_json, data_json, version))
             return true;
@@ -1224,7 +1224,7 @@ bool ShardedDatabase::UpdateSpreadsheetStoragePath(int64_t id, const std::string
     return false;
 }
 
-// === Undo Log (broadcast — 2PC 一致性要求) ===
+// === Undo Log (broadcast �?2PC 一致性要�? ===
 
 bool ShardedDatabase::WriteUndoLog(const std::string &xid, const std::string &table_name, int64_t row_id,
                                    const std::string &before_snapshot) {

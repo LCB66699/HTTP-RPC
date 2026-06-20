@@ -1,10 +1,10 @@
-#include "search_service_impl.h"
-#include "error_codes.h"
+#include "search/search_service_impl.h"
+#include "shared/error_codes.h"
 
 #include <cstdio>
 #include <nlohmann/json.hpp>
 
-#include "httplib.h"
+#include "shared/httplib.h"
 
 grpc::Status SearchServiceImpl::Search(grpc::ServerContext *, const rpc::SearchRequest *req,
                                        rpc::SearchResponse *resp) {
@@ -39,7 +39,7 @@ grpc::Status SearchServiceImpl::Search(grpc::ServerContext *, const rpc::SearchR
     int page = req->page() > 0 ? req->page() : 1;
     int page_size = req->page_size() > 0 ? req->page_size() : 20;
 
-    // 构造 ES DSL
+    // 构�?ES DSL
     nlohmann::json esq;
     esq["from"] = (page - 1) * page_size;
     esq["size"] = page_size;

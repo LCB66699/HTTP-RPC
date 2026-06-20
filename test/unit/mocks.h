@@ -3,8 +3,8 @@
 
 #include <vector>
 
-#include "database.h"
-#include "service_interfaces.h"
+#include "shared/database.h"
+#include "shared/service_interfaces.h"
 
 class MockDB : public IDatabase {
 public:

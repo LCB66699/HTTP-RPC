@@ -1,19 +1,19 @@
-#include "file_service_impl.h"
+#include "file/file_service_impl.h"
 
 #include <atomic>
 #include <chrono>
 #include <cstdio>
 #include <thread>
 
-#include "rpc_interceptor.h"
-#include "call_logger.h"
-#include "circuit_breaker.h"
-#include "database.h"
-#include "error_codes.h"
-#include "file_helpers.h"
-#include "l1_cache.h"
-#include "redis_client.h"
-#include "system_logger.h"
+#include "shared/rpc_interceptor.h"
+#include "shared/call_logger.h"
+#include "shared/circuit_breaker.h"
+#include "shared/database.h"
+#include "shared/error_codes.h"
+#include "shared/file_helpers.h"
+#include "shared/l1_cache.h"
+#include "shared/redis_client.h"
+#include "shared/system_logger.h"
 
 std::string UsernameFromMeta(grpc::ServerContext *ctx) {
     auto it = ctx->client_metadata().find("username");
@@ -38,7 +38,7 @@ bool FileServiceImpl::ValidateCaller(grpc::ServerContext *ctx, int64_t user_id, 
     }
     if (token.empty())
         return false;
-    // 通过熔断器调用 Auth 服务
+    // 通过熔断器调�?Auth 服务
     bool ok = auth_cb_.Call("auth.validate", [&]() -> bool {
         rpc::ValidateUserRequest vu_req;
         rpc::ValidateUserResponse vu_resp;
@@ -73,7 +73,7 @@ grpc::Status FileServiceImpl::CreateFile(grpc::ServerContext *context, const rpc
         return grpc::Status::OK;
     }
 
-    // MinIO 优先：上传内容 → 元数据写 MySQL（storage_path）；回退 LONGBLOB
+    // MinIO 优先：上传内�?�?元数据写 MySQL（storage_path）；回退 LONGBLOB
     int64_t id = 0;
     std::string storage_key;
     if (minio_ && minio_->IsConfigured() && !req->file_content().empty()) {
@@ -99,8 +99,8 @@ grpc::Status FileServiceImpl::CreateFile(grpc::ServerContext *context, const rpc
         return grpc::Status::OK;
     }
 
-    // 回退：MinIO 不可用时文件内容存 MySQL LONGBLOB
-    // version=0: 新创建文件，无并发冲突，跳过乐观锁检查
+    // 回退：MinIO 不可用时文件内容�?MySQL LONGBLOB
+    // version=0: 新创建文件，无并发冲突，跳过乐观锁检�?
     if (!req->file_content().empty() && storage_key.empty()) {
         db_->UpdateFileContent(id, req->file_content());
     }

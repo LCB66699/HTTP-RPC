@@ -1,22 +1,22 @@
-ï»¿// Sheet Service main 
+// Sheet Service main 
 #include <grpcpp/grpcpp.h>
 
 #include <csignal>
 #include <cstdio>
 #include <cstdlib>
 
-#include "rpc_interceptor.h"
-#include "call_logger.h"
-#include "database.h"
-#include "health_service_impl.h"
-#include "l1_cache.h"
-#include "l1_invalidator.h"
-#include "otel_tracer.h"
-#include "rabbit_publisher.h"
-#include "redis_client.h"
-#include "snowflake.h"
-#include "spreadsheet_service_impl.h"
-#include "system_logger.h"
+#include "shared/rpc_interceptor.h"
+#include "shared/call_logger.h"
+#include "shared/database.h"
+#include "shared/health_service_impl.h"
+#include "shared/l1_cache.h"
+#include "shared/l1_invalidator.h"
+#include "shared/otel_tracer.h"
+#include "shared/rabbit_publisher.h"
+#include "shared/redis_client.h"
+#include "shared/snowflake.h"
+#include "sheet/spreadsheet_service_impl.h"
+#include "shared/system_logger.h"
 
 static std::unique_ptr<grpc::Server> g_server;
 static void SignalHandler(int) {
@@ -31,8 +31,8 @@ int main(int argc, char *argv[]) {
     std::string mysql_host = "mysql-spreadsheet", mysql_db = "rpc_spreadsheet";
     std::string mysql_user = "root", mysql_password = "123456";
     int mysql_port = 3306;
-    int db_min_idle = 2;           // å†™æ± æœ€ä½ä¿ç•™è¿æ¥æ•°
-    int db_idle_timeout_sec = 300;  // ç©ºé—²è¶…æ—¶ 5 åˆ†é’Ÿ
+    int db_min_idle = 2;           // Ğ´³Ø×îµÍ±£ÁôÁ¬½ÓÊı
+    int db_idle_timeout_sec = 300;  // ¿ÕÏĞ³¬Ê± 5 ·ÖÖÓ
     std::vector<std::string> redis_cluster_seeds;
     std::string redis_password;
     int redis_pool_size = 4;
@@ -125,7 +125,7 @@ int main(int argc, char *argv[]) {
     builder.SetMaxSendMessageSize(64 * 1024 * 1024);
     builder.SetMaxReceiveMessageSize(64 * 1024 * 1024);
 
-    // gRPC interceptor â€” JWT authentication at transport level
+    // gRPC interceptor ¡ª JWT authentication at transport level
     {
         std::vector<std::unique_ptr<grpc::experimental::ServerInterceptorFactoryInterface>> factories;
         factories.push_back(std::make_unique<RpcAuthInterceptorFactory>(jwt_secret));

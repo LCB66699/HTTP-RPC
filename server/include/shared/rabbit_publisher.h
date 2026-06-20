@@ -5,7 +5,7 @@
 #include <memory>
 #include <string>
 
-#include "service_interfaces.h"
+#include "shared/service_interfaces.h"
 
 class RabbitPublisher : public IRabbitPublisher {
    public:
@@ -14,7 +14,7 @@ class RabbitPublisher : public IRabbitPublisher {
 
     bool Publish(const std::string &exchange, const std::string &routing_key, const std::string &body);
 
-    // 带 W3C traceparent 的事件发布
+    // �?W3C traceparent 的事件发�?
     bool PublishWithTrace(const std::string &exchange, const std::string &routing_key, const std::string &body,
                           const std::string &traceparent, const std::string &tracestate = "");
 

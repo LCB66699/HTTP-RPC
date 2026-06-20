@@ -1,19 +1,19 @@
-#include "spreadsheet_service_impl.h"
+#include "sheet/spreadsheet_service_impl.h"
 
 #include <atomic>
 #include <chrono>
 #include <cstdio>
 #include <thread>
 
-#include "rpc_interceptor.h"
-#include "call_logger.h"
-#include "circuit_breaker.h"
-#include "database.h"
-#include "error_codes.h"
-#include "l1_cache.h"
-#include "redis_client.h"
-#include "sheet_helpers.h"
-#include "system_logger.h"
+#include "shared/rpc_interceptor.h"
+#include "shared/call_logger.h"
+#include "shared/circuit_breaker.h"
+#include "shared/database.h"
+#include "shared/error_codes.h"
+#include "shared/l1_cache.h"
+#include "shared/redis_client.h"
+#include "shared/sheet_helpers.h"
+#include "shared/system_logger.h"
 
 // Extract the username carried in gRPC metadata (set by the gateway for
 // logging).
@@ -24,11 +24,11 @@ std::string UsernameFromMeta(grpc::ServerContext *ctx) {
     return "";
 }
 
-// 调用 Auth 服务验证调用者身份
+// 调用 Auth 服务验证调用者身�?
 bool SpreadsheetServiceImpl::ValidateCaller(grpc::ServerContext *ctx, int64_t user_id, std::string &out_username,
                                             std::string &out_role) const {
     if (!auth_stub_)
-        return true;  // 未配置 Auth 通道时跳过验证（向后兼容）
+        return true;  // 未配�?Auth 通道时跳过验证（向后兼容�?
 
     std::string token;
     auto it = ctx->client_metadata().find("authorization");
@@ -43,7 +43,7 @@ bool SpreadsheetServiceImpl::ValidateCaller(grpc::ServerContext *ctx, int64_t us
     if (token.empty())
         return false;
 
-    // 通过熔断器调用 Auth 服务
+    // 通过熔断器调�?Auth 服务
     bool ok = auth_cb_.Call("auth.validate", [&]() -> bool {
         rpc::ValidateUserRequest vu_req;
         rpc::ValidateUserResponse vu_resp;
@@ -89,7 +89,7 @@ grpc::Status SpreadsheetServiceImpl::CreateSpreadsheet(grpc::ServerContext *cont
         return grpc::Status::OK;
     }
 
-    // MinIO: 上传表格 JSON → 元数据存 MySQL storage_path；回退 MySQL JSON 列
+    // MinIO: 上传表格 JSON �?元数据存 MySQL storage_path；回退 MySQL JSON �?
     std::string storage_key;
     if (minio_ && minio_->IsConfigured()) {
         auto us = std::chrono::duration_cast<std::chrono::microseconds>(
@@ -182,7 +182,7 @@ grpc::Status SpreadsheetServiceImpl::GetSpreadsheet(grpc::ServerContext *context
     std::string vu_user, vu_role;
     if (auth_stub_ && !ValidateCaller(context, req->user_id(), vu_user, vu_role))
         return grpc::Status(grpc::StatusCode::UNAUTHENTICATED, "Auth service rejected");
-    // 校验资源归属：user_id 必须匹配 sheet 所有者
+    // 校验资源归属：user_id 必须匹配 sheet 所有�?
     if (req->user_id() <= 0) {
         resp->set_success(false);
         SET_ERROR(resp, "Not found", rpc_error::NOT_FOUND);
@@ -190,7 +190,7 @@ grpc::Status SpreadsheetServiceImpl::GetSpreadsheet(grpc::ServerContext *context
     }
     int64_t owner_uid = 0;
     bool found = false;
-    // 连接池不同连接可能有瞬时可见性差异，重试 3 次，指数退避
+    // 连接池不同连接可能有瞬时可见性差异，重试 3 次，指数退�?
     for (int retry = 0; retry < 3 && db_; ++retry) {
         found = db_->GetSpreadsheetOwner(req->id(), owner_uid);
         if (found && owner_uid != 0) break;
@@ -215,10 +215,10 @@ grpc::Status SpreadsheetServiceImpl::GetSpreadsheet(grpc::ServerContext *context
     const std::string ts_key = cache_key + ":ts";
     const std::string lock_key = "lock:u:" + std::to_string(req_uid) + ":sheet:" + std::to_string(req->id());
     const std::string kNullMarker = "__NULL__";
-    const int LOGICAL_TTL = 300;    // 逻辑过期 5min，超时触发异步刷新
-    const int PHYSICAL_TTL = 3600;  // 物理过期 1h，防止内存无限增长
-    const int NULL_TTL = 60;        // 空值缓存 1min
-    const int LOCK_TTL = 10;        // 刷新锁 10s，防死锁
+    const int LOGICAL_TTL = 300;    // 逻辑过期 5min，超时触发异步刷�?
+    const int PHYSICAL_TTL = 3600;  // 物理过期 1h，防止内存无限增�?
+    const int NULL_TTL = 60;        // 空值缓�?1min
+    const int LOCK_TTL = 10;        // 刷新�?10s，防死锁
 
     // 辅助函数：从 MinIO 回填 headers/data
     auto fillFromMinIO = [this](SpreadsheetRow &row) {
@@ -235,7 +235,7 @@ grpc::Status SpreadsheetServiceImpl::GetSpreadsheet(grpc::ServerContext *context
         }
     };
 
-    // 异步刷新函数：查 MySQL → 回写 Redis(data+ts) → 释放锁
+    // 异步刷新函数：查 MySQL �?回写 Redis(data+ts) �?释放�?
     auto async_refresh = [this, kNullMarker, &fillFromMinIO](int64_t id, int64_t uid, std::string ck, std::string tk,
                                                              std::string lk) {
         SpreadsheetRow row;
@@ -262,7 +262,7 @@ grpc::Status SpreadsheetServiceImpl::GetSpreadsheet(grpc::ServerContext *context
                     LOG_DEBUG(*slog_, "Get id=" + std::to_string(id) + " ASYNC-REFRESHED key=" + ck);
             }
         } else if (db_ && redis_ && redis_->IsConnected()) {
-            // Not found — cache null marker to prevent penetration
+            // Not found �?cache null marker to prevent penetration
             redis_->SetJSON(ck, kNullMarker, RedisClient::JitteredTTL(NULL_TTL, 30));
             redis_->SetJSON(tk, std::to_string(std::time(nullptr)), RedisClient::JitteredTTL(NULL_TTL, 30));
             if (slog_)
@@ -296,7 +296,7 @@ grpc::Status SpreadsheetServiceImpl::GetSpreadsheet(grpc::ServerContext *context
     if (redis_ && redis_->IsConnected()) {
         std::string cached;
         if (redis_->GetJSON(cache_key, cached)) {
-            // 1a) Null-cache hit — penetration protection
+            // 1a) Null-cache hit �?penetration protection
             if (cached == kNullMarker) {
                 resp->set_success(false);
                 SET_ERROR(resp, "Not found", rpc_error::NOT_FOUND);
@@ -373,7 +373,7 @@ grpc::Status SpreadsheetServiceImpl::GetSpreadsheet(grpc::ServerContext *context
         }
     }
 
-    // 2) Cold start: Redis MISS → MySQL
+    // 2) Cold start: Redis MISS �?MySQL
     if (!db_) {
         resp->set_success(false);
         SET_ERROR(resp, "Database not available", rpc_error::UNAVAILABLE);

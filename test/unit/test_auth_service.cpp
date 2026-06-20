@@ -3,7 +3,7 @@
 #include <cstdlib>
 #include <string>
 
-#include "auth_service_impl.h"
+#include "auth/auth_service_impl.h"
 
 // ---- RAII helper: save/restore env var ----
 class EnvGuard {

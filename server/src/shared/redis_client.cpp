@@ -1,4 +1,4 @@
-#include "redis_client.h"
+#include "shared/redis_client.h"
 
 #include <sw/redis++/redis++.h>
 
@@ -74,7 +74,7 @@ bool RedisClient::BatchPushCallEntries(const std::vector<std::pair<std::string, 
     if (!cluster_ || entries.empty())
         return false;
     try {
-        // 按 username 分组：同一用户的 key 共 slot，用 pipeline 批量；不同用户分 pipeline
+        // �?username 分组：同一用户�?key �?slot，用 pipeline 批量；不同用户分 pipeline
         std::unordered_map<std::string, std::vector<std::string>> groups;
         for (const auto &[json_entry, username] : entries) {
             if (!username.empty())

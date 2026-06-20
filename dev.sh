@@ -47,6 +47,11 @@ case "${1:-up}" in
     docker compose up -d search
     ;;
 
+  notify)
+    docker compose build notify-service
+    docker compose up -d notify-service
+    ;;
+
   test)
     bash test/functional_test.sh "${2:-https://localhost}"
     ;;
@@ -60,7 +65,7 @@ case "${1:-up}" in
     ;;
 
   *)
-    echo "Usage: bash dev.sh {up|down|gateway|auth|sheet|file|search|test|debug <service>}"
+    echo "Usage: bash dev.sh {up|down|gateway|auth|sheet|file|search|notify|test|debug <service>}"
     exit 1
     ;;
 esac
