@@ -1,0 +1,5 @@
+Log: /d/claude-code-demo/HTTP-RPC/test/e2e/logs/functional_20260620_212324.log
+
+
+[1;36m=== 0. API 连通性 ===[0m
+[31m[FAIL][0m API unreachable at https://localhost
