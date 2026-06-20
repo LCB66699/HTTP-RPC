@@ -7,6 +7,7 @@
 #   bash dev.sh auth       重建 + 重启 Auth
 #   bash dev.sh sheet      重建 + 重启 Sheet
 #   bash dev.sh file       重建 + 重启 File
+#   bash dev.sh search     重建 + 重启 Search
 #   bash dev.sh test       跑功能测试
 
 set -e
@@ -41,6 +42,11 @@ case "${1:-up}" in
     docker compose up -d file-1 file-2
     ;;
 
+  search)
+    docker compose build search
+    docker compose up -d search
+    ;;
+
   test)
     bash test/functional_test.sh "${2:-https://localhost}"
     ;;
@@ -54,7 +60,7 @@ case "${1:-up}" in
     ;;
 
   *)
-    echo "Usage: bash dev.sh {up|down|gateway|auth|sheet|file|test|debug <service>}"
+    echo "Usage: bash dev.sh {up|down|gateway|auth|sheet|file|search|test|debug <service>}"
     exit 1
     ;;
 esac
