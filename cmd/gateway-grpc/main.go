@@ -164,7 +164,7 @@ func main() {
 	_ = newCB("auth")
 	cbSheet := newCB("sheet")
 	cbFile := newCB("file")
-	_ = newCB("search")
+	cbSearch := newCB("search")
 
 	// === Auth ===
 	mux.HandleFunc("POST /api/v1/register", func(w http.ResponseWriter, r *http.Request) {
@@ -393,8 +393,10 @@ func main() {
 			gw.WriteJSONStatus(w, code, map[string]interface{}{"success": false, "error": msg})
 			return
 		}
-		resp, err := searchClient.Search(injectToken(r), &pb.SearchRequest{
-			Query: body.Q, UserId: uid, Sort: body.Sort,
+		resp, err := callWithRetry(r.Context(), cbSearch, 3, "search", func(ctx context.Context) (*pb.SearchResponse, error) {
+			return searchClient.Search(withAuth(ctx, r), &pb.SearchRequest{
+				Query: body.Q, UserId: uid, Sort: body.Sort,
+			})
 		})
 		gw.WriteGRPCResponse(w, resp, err)
 	})

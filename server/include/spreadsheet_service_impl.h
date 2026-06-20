@@ -7,6 +7,7 @@
 #include "generated/rpc_auth.pb.h"
 #include "generated/rpc_spreadsheet.grpc.pb.h"
 #include "generated/rpc_spreadsheet.pb.h"
+#include "circuit_breaker.h"
 #include "minio_client.h"
 #include "service_interfaces.h"
 
@@ -51,6 +52,7 @@ class SpreadsheetServiceImpl final : public rpc::SpreadsheetService::Service {
     SystemLogger *slog_ = nullptr;
     AuthInterceptor *auth_ = nullptr;
     std::unique_ptr<rpc::AuthService::Stub> auth_stub_;
+    mutable GrpcCircuitBreaker auth_cb_;
     IRabbitPublisher *rabbit_ = nullptr;
     minio::Client *minio_ = nullptr;
 };

@@ -7,6 +7,7 @@
 #include "generated/rpc_auth.pb.h"
 #include "generated/rpc_file.grpc.pb.h"
 #include "generated/rpc_file.pb.h"
+#include "circuit_breaker.h"
 #include "minio_client.h"
 #include "service_interfaces.h"
 
@@ -53,5 +54,6 @@ class FileServiceImpl final : public rpc::FileService::Service {
     minio::Client *minio_ = nullptr;
     AuthInterceptor *auth_ = nullptr;
     std::unique_ptr<rpc::AuthService::Stub> auth_stub_;
+    mutable GrpcCircuitBreaker auth_cb_;
     IRabbitPublisher *rabbit_ = nullptr;
 };

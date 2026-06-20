@@ -7,6 +7,7 @@
 
 #include "auth_interceptor.h"
 #include "call_logger.h"
+#include "circuit_breaker.h"
 #include "database.h"
 #include "error_codes.h"
 #include "file_helpers.h"
@@ -37,18 +38,22 @@ bool FileServiceImpl::ValidateCaller(grpc::ServerContext *ctx, int64_t user_id, 
     }
     if (token.empty())
         return false;
-    rpc::ValidateUserRequest vu_req;
-    rpc::ValidateUserResponse vu_resp;
-    vu_req.set_token(token);
-    vu_req.set_user_id(user_id);
-    grpc::ClientContext vu_ctx;
-    vu_ctx.set_deadline(std::chrono::system_clock::now() + std::chrono::seconds(2));
-    auto st = auth_stub_->ValidateUser(&vu_ctx, vu_req, &vu_resp);
-    if (!st.ok() || !vu_resp.valid())
-        return false;
-    out_username = vu_resp.username();
-    out_role = vu_resp.role();
-    return true;
+    // 通过熔断器调用 Auth 服务
+    bool ok = auth_cb_.Call("auth.validate", [&]() -> bool {
+        rpc::ValidateUserRequest vu_req;
+        rpc::ValidateUserResponse vu_resp;
+        vu_req.set_token(token);
+        vu_req.set_user_id(user_id);
+        grpc::ClientContext vu_ctx;
+        vu_ctx.set_deadline(std::chrono::system_clock::now() + std::chrono::seconds(2));
+        auto st = auth_stub_->ValidateUser(&vu_ctx, vu_req, &vu_resp);
+        if (!st.ok() || !vu_resp.valid())
+            return false;
+        out_username = vu_resp.username();
+        out_role = vu_resp.role();
+        return true;
+    });
+    return ok;
 }
 
 
