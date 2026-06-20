@@ -679,7 +679,10 @@ grpc::Status SpreadsheetServiceImpl::DeleteSpreadsheet(grpc::ServerContext *cont
     }
 
     int64_t owner_uid = 0;
-    if (!db_->GetSpreadsheetOwner(req->id(), owner_uid) || owner_uid != req->user_id()) {
+    bool fo = db_->GetSpreadsheetOwner(req->id(), owner_uid);
+    fprintf(stderr, "[Delete] id=%ld req_uid=%ld owner_uid=%ld found=%d\n",
+            (long)req->id(), (long)req->user_id(), (long)owner_uid, fo);
+    if (!fo || owner_uid != req->user_id()) {
         resp->set_success(false);
         SET_ERROR(resp, "Not found or permission denied", rpc_error::NOT_FOUND);
         return grpc::Status::OK;
