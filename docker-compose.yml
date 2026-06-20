@@ -125,9 +125,9 @@
     command: --innodb-buffer-pool-size=32M --innodb-log-buffer-size=4M --innodb-log-file-size=16M --performance-schema=OFF --skip-innodb-doublewrite
     environment: { MYSQL_ROOT_PASSWORD: "${MYSQL_ROOT_PASSWORD:-123456}" }
     volumes: ["./deploy/mysql/init.sql:/docker-entrypoint-initdb.d/init.sql", "./data/mysql-f-1:/var/lib/mysql"]
-    networks:
-      default:
-        aliases: [mysql-file]
+    # mysql-file-1 不共享 mysql-file 别名。文件服务当前配了 --mysql-shards 1，
+    # 只有 mysql-file-0 作为 "mysql-file" 提供服务。
+    # mysql-file-1 保留用于未来多分片扩展，届时 file service 改用 --mysql-shards 2。
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
       interval: 5s
