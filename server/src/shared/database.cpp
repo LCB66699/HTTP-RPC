@@ -70,7 +70,7 @@ MYSQL *Database::EscConn() {
     return nullptr;
 }
 
-Database::WriteConnHandle Database::GetHealthyWriteConn() {
+Database::ConnHandle Database::GetHealthyWriteConn() {
     if (write_conns_.empty())
         return {std::unique_lock<std::mutex>{}, nullptr};
     size_t idx = write_idx_.fetch_add(1, std::memory_order_relaxed) % write_conns_.size();
@@ -88,6 +88,30 @@ Database::WriteConnHandle Database::GetHealthyWriteConn() {
             std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch())
                 .count());
     return {std::move(lock), wc->conn.get()};
+}
+
+Database::ConnHandle Database::GetHealthyReadConn() {
+    if (!read_conns_.empty()) {
+        size_t idx = read_idx_.fetch_add(1, std::memory_order_relaxed) % read_conns_.size();
+        auto &rc = read_conns_[idx];
+        std::unique_lock<std::mutex> lock(rc->mtx);
+        if (rc->conn && mysql_ping(rc->conn.get()) != 0) {
+            fprintf(stderr, "[DB:read#%zu] ping failed, reconnecting\n", idx);
+            rc->conn.reset();
+        }
+        if (!rc->conn) {
+            rc->conn = ConnectMYSQL(read_hosts_[idx % read_hosts_.size()], read_port_);
+        }
+        if (rc->conn) {
+            rc->last_used_ms.store(
+                std::chrono::duration_cast<std::chrono::milliseconds>(
+                    std::chrono::system_clock::now().time_since_epoch())
+                    .count());
+            return {std::move(lock), rc->conn.get()};
+        }
+    }
+    // 无从库, 回退到主库
+    return GetHealthyWriteConn();
 }
 
 Database::Database(const std::string &write_host, int write_port, const std::string &read_hosts, int read_port,
@@ -142,60 +166,25 @@ Database::~Database() {
 // ---- 写操作（主库连接池 round-robin 分发, 每连接独立 mutex） ----
 
 bool Database::ExecWrite(const std::string &sql) {
-    if (write_conns_.empty())
+    auto h = GetHealthyWriteConn();
+    if (!h)
         return false;
-    // 原子递增取索引, 无锁分发到不同连接
-    size_t idx = write_idx_.fetch_add(1, std::memory_order_relaxed) % write_conns_.size();
-    auto &wc = write_conns_[idx];
-    // 只锁被选中的连接, 其他连接不受影响
-    std::lock_guard<std::mutex> lock(wc->mtx);
-    if (!wc->conn) {
-        wc->conn = ConnectMYSQL(write_host_, write_port_);
-        if (!wc->conn)
-            return false;
-    }
-    if (mysql_query(wc->conn.get(), sql.c_str()) == 0) {
-        wc->last_used_ms.store(
-            std::chrono::duration_cast<std::chrono::milliseconds>(
-                std::chrono::system_clock::now().time_since_epoch())
-                .count());
+    if (mysql_query(h.conn, sql.c_str()) == 0)
         return true;
-    }
-    unsigned int err = mysql_errno(wc->conn.get());
-    fprintf(stderr, "[DB:write#%zu] error %u: %s\n", idx, err, mysql_error(wc->conn.get()));
-    if (err == CR_SERVER_LOST || err == CR_SERVER_GONE_ERROR) {
-        fprintf(stderr, "[DB:write#%zu] reconnecting...\n", idx);
-        wc->conn = ConnectMYSQL(write_host_, write_port_);
-    }
-    wc->last_used_ms.store(
-        std::chrono::duration_cast<std::chrono::milliseconds>(
-            std::chrono::system_clock::now().time_since_epoch())
-            .count());
+    fprintf(stderr, "[DB:write] error %u: %s\n", mysql_errno(h.conn), mysql_error(h.conn));
     return false;
 }
 
 // 写 + 返回自增ID: INSERT 和 mysql_insert_id 在同一连接同一锁内原子完成
 bool Database::ExecWriteInsert(const std::string &sql, int64_t &out_id) {
-    if (write_conns_.empty())
+    auto h = GetHealthyWriteConn();
+    if (!h)
         return false;
-    size_t idx = write_idx_.fetch_add(1, std::memory_order_relaxed) % write_conns_.size();
-    auto &wc = write_conns_[idx];
-    std::lock_guard<std::mutex> lock(wc->mtx);
-    if (!wc->conn)
-        return false;
-    if (mysql_query(wc->conn.get(), sql.c_str()) != 0) {
-        fprintf(stderr, "[DB:write#%zu] ExecWriteInsert error: %s\n", idx, mysql_error(wc->conn.get()));
-        wc->last_used_ms.store(
-            std::chrono::duration_cast<std::chrono::milliseconds>(
-                std::chrono::system_clock::now().time_since_epoch())
-                .count());
+    if (mysql_query(h.conn, sql.c_str()) != 0) {
+        fprintf(stderr, "[DB:write] ExecWriteInsert error: %s\n", mysql_error(h.conn));
         return false;
     }
-    out_id = mysql_insert_id(wc->conn.get());
-    wc->last_used_ms.store(
-        std::chrono::duration_cast<std::chrono::milliseconds>(
-            std::chrono::system_clock::now().time_since_epoch())
-            .count());
+    out_id = mysql_insert_id(h.conn);
     return true;
 }
 
@@ -213,37 +202,16 @@ MYSQL *Database::GetReadConn() {
 }
 
 bool Database::ExecRead(const std::string &sql, std::function<bool(MYSQL_RES *)> handler) {
-    // 有从库: 走从库
-    if (!read_conns_.empty()) {
-        size_t idx = read_idx_.fetch_add(1, std::memory_order_relaxed) % read_conns_.size();
-        auto &rc = read_conns_[idx];
-        std::lock_guard<std::mutex> lock(rc->mtx);
-        if (rc->conn) {
-            MYSQL_RES *res = nullptr;
-            if (RunQuery(rc->conn.get(), sql, &res)) {
-                bool ok = handler(res);
-                if (res)
-                    mysql_free_result(res);
-                return ok;
-            }
-        }
-    }
-    // 无从库 → 回退到写池
-    if (!write_conns_.empty()) {
-        size_t idx = write_idx_.fetch_add(1, std::memory_order_relaxed) % write_conns_.size();
-        auto &wc = write_conns_[idx];
-        std::lock_guard<std::mutex> lock(wc->mtx);
-        if (wc->conn) {
-            MYSQL_RES *res = nullptr;
-            if (RunQuery(wc->conn.get(), sql, &res)) {
-                bool ok = handler(res);
-                if (res)
-                    mysql_free_result(res);
-                return ok;
-            }
-        }
-    }
-    return false;
+    auto h = GetHealthyReadConn();
+    if (!h)
+        return false;
+    MYSQL_RES *res = nullptr;
+    if (!RunQuery(h.conn, sql, &res))
+        return false;
+    bool ok = handler(res);
+    if (res)
+        mysql_free_result(res);
+    return ok;
 }
 
 // ---- schema init（首连接执行, DDL 全局生效无需在所有连接上重复） ----
@@ -449,20 +417,13 @@ bool Database::AddUser(const std::string &username, const std::string &password_
 
 bool Database::GetUser(const std::string &username, std::string &password_hash_out) {
     // 强一致: 密码验证必须读主库
-    if (write_conns_.empty())
+    auto h = GetHealthyWriteConn();
+    if (!h)
         return false;
-    size_t idx = write_idx_.fetch_add(1, std::memory_order_relaxed) % write_conns_.size();
-    auto &wc = write_conns_[idx];
-    std::lock_guard<std::mutex> lock(wc->mtx);
-    if (!wc->conn) {
-        wc->conn = ConnectMYSQL(write_host_, write_port_);
-        if (!wc->conn)
-            return false;
-    }
     std::string sql = make_sql("SELECT password_hash FROM users WHERE username={}",
-                                sql_param(wc->conn, username));
+                                sql_param(h.conn, username));
     MYSQL_RES *res = nullptr;
-    if (!RunQuery(wc->conn.get(), sql, &res))
+    if (!RunQuery(h.conn, sql, &res))
         return false;
     MYSQL_ROW row = mysql_fetch_row(res);
     bool ok = row != nullptr;
@@ -474,17 +435,13 @@ bool Database::GetUser(const std::string &username, std::string &password_hash_o
 
 bool Database::UserExists(const std::string &username) {
     // 强一致: 查重必须走主库, 避免主从延迟导致重复注册
-    if (write_conns_.empty())
-        return false;
-    size_t idx = write_idx_.fetch_add(1, std::memory_order_relaxed) % write_conns_.size();
-    auto &wc = write_conns_[idx];
-    std::lock_guard<std::mutex> lock(wc->mtx);
-    if (!wc->conn)
+    auto h = GetHealthyWriteConn();
+    if (!h)
         return false;
     std::string sql = make_sql("SELECT 1 FROM users WHERE username={}",
-                                sql_param(wc->conn, username));
+                                sql_param(h.conn, username));
     MYSQL_RES *res = nullptr;
-    if (!RunQuery(wc->conn.get(), sql, &res))
+    if (!RunQuery(h.conn, sql, &res))
         return false;
     bool exists = mysql_fetch_row(res) != nullptr;
     mysql_free_result(res);
@@ -493,17 +450,13 @@ bool Database::UserExists(const std::string &username) {
 
 int Database::GetTokenVersion(const std::string &username) {
     // 强一致: token 版本号必须读主库
-    if (write_conns_.empty())
-        return -1;
-    size_t idx = write_idx_.fetch_add(1, std::memory_order_relaxed) % write_conns_.size();
-    auto &wc = write_conns_[idx];
-    std::lock_guard<std::mutex> lock(wc->mtx);
-    if (!wc->conn)
+    auto h = GetHealthyWriteConn();
+    if (!h)
         return -1;
     std::string sql = make_sql("SELECT token_version FROM users WHERE username={}",
-                                sql_param(wc->conn, username));
+                                sql_param(h.conn, username));
     MYSQL_RES *res = nullptr;
-    if (!RunQuery(wc->conn.get(), sql, &res))
+    if (!RunQuery(h.conn, sql, &res))
         return -1;
     MYSQL_ROW row = mysql_fetch_row(res);
     int ver = (row && row[0]) ? std::stoi(row[0]) : -1;
@@ -520,17 +473,13 @@ bool Database::IncrementTokenVersion(const std::string &username) {
 int64_t Database::GetUserId(const std::string &username) {
     // Must read master to avoid replication lag causing stale id on fresh
     // registration.
-    if (write_conns_.empty())
-        return -1;
-    size_t idx = write_idx_.fetch_add(1, std::memory_order_relaxed) % write_conns_.size();
-    auto &wc = write_conns_[idx];
-    std::lock_guard<std::mutex> lock(wc->mtx);
-    if (!wc->conn)
+    auto h = GetHealthyWriteConn();
+    if (!h)
         return -1;
     std::string sql = make_sql("SELECT id FROM users WHERE username={}",
-                                sql_param(wc->conn, username));
+                                sql_param(h.conn, username));
     MYSQL_RES *res = nullptr;
-    if (!RunQuery(wc->conn.get(), sql, &res))
+    if (!RunQuery(h.conn, sql, &res))
         return -1;
     MYSQL_ROW row = mysql_fetch_row(res);
     int64_t uid = row && row[0] ? std::stoll(row[0]) : -1;
@@ -701,21 +650,14 @@ bool Database::UpdateSpreadsheet(int64_t id, const std::string &name, const std:
     // 这里改为: version>0 时检查 affected_rows, 不匹配则返回 false
     if (version > 0) {
         // 走带版本号的更新, 需要检查受影响行数
-        if (write_conns_.empty())
+        auto h = GetHealthyWriteConn();
+        if (!h)
             return false;
-        size_t idx = write_idx_.fetch_add(1, std::memory_order_relaxed) % write_conns_.size();
-        auto &wc = write_conns_[idx];
-        std::lock_guard<std::mutex> lock(wc->mtx);
-        if (!wc->conn) {
-            wc->conn = ConnectMYSQL(write_host_, write_port_);
-            if (!wc->conn)
-                return false;
-        }
-        if (mysql_query(wc->conn.get(), sql.c_str()) != 0) {
-            fprintf(stderr, "[DB:write#%zu] UpdateSpreadsheet error: %s\n", idx, mysql_error(wc->conn.get()));
+        if (mysql_query(h.conn, sql.c_str()) != 0) {
+            fprintf(stderr, "[DB:write] UpdateSpreadsheet error: %s\n", mysql_error(h.conn));
             return false;
         }
-        return mysql_affected_rows(wc->conn.get()) > 0;
+        return mysql_affected_rows(h.conn) > 0;
     }
     return ExecWrite(sql);
 }
@@ -782,24 +724,20 @@ bool Database::CreateFile(int64_t user_id, const std::string &username, const st
 }
 
 bool Database::UpdateFileContent(int64_t id, const std::string &content, int version) {
-    if (write_conns_.empty())
-        return false;
-    size_t idx = write_idx_.fetch_add(1, std::memory_order_relaxed) % write_conns_.size();
-    auto &wc = write_conns_[idx];
-    std::lock_guard<std::mutex> lock(wc->mtx);
-    if (!wc->conn)
+    auto h = GetHealthyWriteConn();
+    if (!h)
         return false;
     std::string sql = make_sql(
         "UPDATE files SET file_content={}, version = version + 1 WHERE id={}",
-        sql_param(wc->conn, content), id);
+        sql_param(h.conn, content), id);
     if (version > 0)
         sql += make_sql(" AND version={}", version);
-    if (mysql_query(wc->conn.get(), sql.c_str()) != 0) {
-        fprintf(stderr, "[DB] UpdateFileContent error: %s\n", mysql_error(wc->conn.get()));
+    if (mysql_query(h.conn, sql.c_str()) != 0) {
+        fprintf(stderr, "[DB] UpdateFileContent error: %s\n", mysql_error(h.conn));
         return false;
     }
     if (version > 0)
-        return mysql_affected_rows(wc->conn.get()) > 0;
+        return mysql_affected_rows(h.conn) > 0;
     return true;
 }
 
@@ -947,19 +885,15 @@ bool Database::WriteUndoLog(const std::string &xid, const std::string &table_nam
 bool Database::GetUndoLog(const std::string &xid, std::string &table_name, int64_t &row_id,
                           std::string &before_snapshot) {
     // 2PC 一致性: undo_log 必须读主库
-    if (write_conns_.empty())
-        return false;
-    size_t idx = write_idx_.fetch_add(1, std::memory_order_relaxed) % write_conns_.size();
-    auto &wc = write_conns_[idx];
-    std::lock_guard<std::mutex> lock(wc->mtx);
-    if (!wc->conn)
+    auto h = GetHealthyWriteConn();
+    if (!h)
         return false;
     std::string sql = make_sql(
         "SELECT table_name,row_id,before_snapshot FROM undo_log "
         "WHERE xid={} ORDER BY id DESC LIMIT 1",
-        sql_param(wc->conn, xid));
+        sql_param(h.conn, xid));
     MYSQL_RES *res = nullptr;
-    if (!RunQuery(wc->conn.get(), sql, &res))
+    if (!RunQuery(h.conn, sql, &res))
         return false;
     MYSQL_ROW row = mysql_fetch_row(res);
     if (!row) {
@@ -980,18 +914,14 @@ bool Database::ClearUndoLog(const std::string &xid) {
 
 int Database::PurgeOldUndoLogs(int days) {
     std::string sql = make_sql("DELETE FROM undo_log WHERE created_at < NOW() - INTERVAL {} DAY", days);
-    if (write_conns_.empty())
+    auto h = GetHealthyWriteConn();
+    if (!h)
         return -1;
-    size_t idx = write_idx_.fetch_add(1, std::memory_order_relaxed) % write_conns_.size();
-    auto &wc = write_conns_[idx];
-    std::lock_guard<std::mutex> lock(wc->mtx);
-    if (!wc->conn)
-        return -1;
-    if (mysql_query(wc->conn.get(), sql.c_str()) != 0) {
-        fprintf(stderr, "[DB] PurgeOldUndoLogs error: %s\n", mysql_error(wc->conn.get()));
+    if (mysql_query(h.conn, sql.c_str()) != 0) {
+        fprintf(stderr, "[DB] PurgeOldUndoLogs error: %s\n", mysql_error(h.conn));
         return -1;
     }
-    int affected = (int)mysql_affected_rows(wc->conn.get());
+    int affected = (int)mysql_affected_rows(h.conn);
     printf("[DB] PurgeOldUndoLogs: removed %d rows older than %d days\n", affected, days);
     return affected;
 }
@@ -1382,16 +1312,12 @@ bool Database::MoveFile(int64_t id, int64_t target_folder_id, int version) {
     if (version > 0)
         sql += make_sql(" AND version={}", version);
     if (version > 0) {
-        if (write_conns_.empty())
+        auto h = GetHealthyWriteConn();
+        if (!h)
             return false;
-        size_t idx = write_idx_.fetch_add(1, std::memory_order_relaxed) % write_conns_.size();
-        auto &wc = write_conns_[idx];
-        std::lock_guard<std::mutex> lock(wc->mtx);
-        if (!wc->conn)
+        if (mysql_query(h.conn, sql.c_str()) != 0)
             return false;
-        if (mysql_query(wc->conn.get(), sql.c_str()) != 0)
-            return false;
-        return mysql_affected_rows(wc->conn.get()) > 0;
+        return mysql_affected_rows(h.conn) > 0;
     }
     return ExecWrite(sql);
 }

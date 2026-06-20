@@ -224,13 +224,14 @@ class Database {
     bool RunQuery(MYSQL *conn, const std::string &sql, MYSQL_RES **out_res);
     bool ExecRead(const std::string &sql, std::function<bool(MYSQL_RES *)> handler);
 
-    // 选写连接 + ping 存活检测 + 自动重连; 调用方必须持有返回的锁
-    struct WriteConnHandle {
+    // 连接句柄 — 持锁 + 裸指针，析构自动解锁
+    struct ConnHandle {
         std::unique_lock<std::mutex> lock;
         MYSQL *conn = nullptr;
         explicit operator bool() const { return conn != nullptr; }
     };
-    WriteConnHandle GetHealthyWriteConn();
+    ConnHandle GetHealthyWriteConn();
+    ConnHandle GetHealthyReadConn();
 
     std::thread health_check_;
     std::atomic<bool> health_running_{false};
