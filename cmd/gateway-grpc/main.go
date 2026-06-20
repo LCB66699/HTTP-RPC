@@ -431,9 +431,13 @@ func main() {
 
 	// === Sheet CRUD ===
 	mux.HandleFunc("POST /api/v1/sheets", func(w http.ResponseWriter, r *http.Request) {
+		uid := extractUID(r)
+		if uid == 0 {
+			writeJSONStatus(w, http.StatusUnauthorized, map[string]interface{}{"success": false, "error": "Unauthorized"})
+			return
+		}
 		var req pb.CreateSpreadsheetRequest
 		json.NewDecoder(r.Body).Decode(&req)
-		uid := extractUID(r)
 		req.UserId = uid
 		resp, err := sheetClient.CreateSpreadsheet(injectToken(r), &req)
 		writeGRPCResponse(w, resp, err)
@@ -477,17 +481,27 @@ func main() {
 		}
 	})
 	mux.HandleFunc("PUT /api/v1/sheets/{id}", func(w http.ResponseWriter, r *http.Request) {
+		uid := extractUID(r)
+		if uid == 0 {
+			writeJSONStatus(w, http.StatusUnauthorized, map[string]interface{}{"success": false, "error": "Unauthorized"})
+			return
+		}
 		var req pb.UpdateSpreadsheetRequest
 		json.NewDecoder(r.Body).Decode(&req)
 		req.Id = parseInt64(r.PathValue("id"))
-		req.UserId = extractUID(r)
+		req.UserId = uid
 		resp, err := sheetClient.UpdateSpreadsheet(injectToken(r), &req)
 		writeGRPCResponse(w, resp, err)
 	})
 	mux.HandleFunc("DELETE /api/v1/sheets/{id}", func(w http.ResponseWriter, r *http.Request) {
+		uid := extractUID(r)
+		if uid == 0 {
+			writeJSONStatus(w, http.StatusUnauthorized, map[string]interface{}{"success": false, "error": "Unauthorized"})
+			return
+		}
 		id := parseInt64(r.PathValue("id"))
 		resp, err := callWithRetry(r.Context(), cbSheet, 2, "sheet.delete", func(ctx context.Context) (*pb.DeleteSpreadsheetResponse, error) {
-			return sheetClient.DeleteSpreadsheet(withAuth(ctx, r), &pb.DeleteSpreadsheetRequest{Id: id, UserId: extractUID(r)})
+			return sheetClient.DeleteSpreadsheet(withAuth(ctx, r), &pb.DeleteSpreadsheetRequest{Id: id, UserId: uid})
 		})
 		writeGRPCResponse(w, resp, err)
 	})

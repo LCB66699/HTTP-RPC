@@ -706,8 +706,8 @@ grpc::Status SpreadsheetServiceImpl::DeleteSpreadsheet(grpc::ServerContext *cont
     }
 
     if (redis_ && redis_->IsConnected()) {
-        redis_->DeleteKey("sheet:" + std::to_string(req->id()));
-        redis_->DeleteKey("sheet:" + std::to_string(req->id()) + ":ts");
+        redis_->DeleteKey("u:" + std::to_string(req->user_id()) + ":sheet:" + std::to_string(req->id()));
+        redis_->DeleteKey("u:" + std::to_string(req->user_id()) + ":sheet:" + std::to_string(req->id()) + ":ts");
         redis_->Increment(SheetVersionKey(req->user_id()));
         if (slog_)
             LOG_DEBUG(*slog_, "Delete id=" + std::to_string(req->id()) +
