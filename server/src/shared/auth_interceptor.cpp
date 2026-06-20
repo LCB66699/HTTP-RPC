@@ -8,32 +8,32 @@
 AuthInterceptor::AuthInterceptor(const std::string &jwt_secret) : jwt_secret_(jwt_secret) {}
 
 AuthContext AuthInterceptor::Authenticate(grpc::ServerContext *ctx) {
-    AuthContext auth;
     const auto &metadata = ctx->client_metadata();
 
-    // Check for authorization header
     auto it = metadata.find("authorization");
-    if (it == metadata.end()) {
-        // Also check grpcgateway-authorization (grpc-gateway forwarded)
+    if (it == metadata.end())
         it = metadata.find("grpcgateway-authorization");
-    }
     if (it == metadata.end()) {
         fprintf(stderr, "[Auth] Missing authorization header\n");
-        return auth;
+        return {};
     }
 
     std::string val(it->second.data(), it->second.size());
     const std::string prefix = "Bearer ";
     if (val.size() <= prefix.size() || val.substr(0, prefix.size()) != prefix) {
         fprintf(stderr, "[Auth] Invalid authorization format\n");
-        return auth;
+        return {};
     }
 
-    std::string token = val.substr(prefix.size());
+    return FromToken(val.substr(prefix.size()), jwt_secret_);
+}
+
+AuthContext AuthInterceptor::FromToken(const std::string &token, const std::string &jwt_secret) {
+    AuthContext auth;
     std::string payload;
-    fprintf(stderr, "[Auth] verify: secret_len=%zu token_len=%zu token_head=%.20s\n", jwt_secret_.size(), token.size(),
+    fprintf(stderr, "[Auth] verify: secret_len=%zu token_len=%zu token_head=%.20s\n", jwt_secret.size(), token.size(),
             token.data());
-    if (!jwt::verify(token, jwt_secret_, payload)) {
+    if (!jwt::verify(token, jwt_secret, payload)) {
         fprintf(stderr, "[Auth] JWT verification failed\n");
         return auth;
     }

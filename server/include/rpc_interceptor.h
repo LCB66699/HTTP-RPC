@@ -22,7 +22,7 @@ class RpcAuthInterceptor : public grpc::experimental::Interceptor {
     std::string jwt_secret_;
 };
 
-class RpcAuthInterceptorFactory : public grpc::experimental::ServerInterceptorFactory {
+class RpcAuthInterceptorFactory : public grpc::experimental::ServerInterceptorFactoryInterface {
    public:
     explicit RpcAuthInterceptorFactory(std::string jwt_secret);
     grpc::experimental::Interceptor *CreateServerInterceptor() override;

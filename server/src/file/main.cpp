@@ -125,7 +125,7 @@ int main(int argc, char *argv[]) {
 
     // gRPC interceptor — JWT authentication at transport level
     {
-        std::vector<std::unique_ptr<grpc::experimental::ServerInterceptorFactory>> factories;
+        std::vector<std::unique_ptr<grpc::experimental::ServerInterceptorFactoryInterface>> factories;
         factories.push_back(std::make_unique<RpcAuthInterceptorFactory>(jwt_secret));
         builder.experimental().SetInterceptorCreators(std::move(factories));
     }

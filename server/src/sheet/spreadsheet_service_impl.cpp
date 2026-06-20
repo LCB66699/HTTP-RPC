@@ -67,13 +67,9 @@ bool SpreadsheetServiceImpl::ValidateCaller(grpc::ServerContext *ctx, int64_t us
 grpc::Status SpreadsheetServiceImpl::CreateSpreadsheet(grpc::ServerContext *context,
                                                        const rpc::CreateSpreadsheetRequest *req,
                                                        rpc::CreateSpreadsheetResponse *resp) {
-    if (auth_) {
-        AuthContext ac = auth_->Authenticate(context);
-        if (!ac.authenticated)
-            return grpc::Status(grpc::StatusCode::UNAUTHENTICATED, "Invalid or missing token");
-    }
+    if (!g_rpc_auth_ctx.authenticated)
+        return grpc::Status(grpc::StatusCode::UNAUTHENTICATED, "Invalid or missing token");
 
-    // 服务间调用: 向 Auth 服务二次验证用户身份
     std::string vu_user, vu_role;
     if (auth_stub_ && !ValidateCaller(context, req->user_id(), vu_user, vu_role))
         return grpc::Status(grpc::StatusCode::UNAUTHENTICATED, "Auth service rejected");
