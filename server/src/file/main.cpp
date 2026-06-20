@@ -5,7 +5,7 @@
 #include <cstdio>
 #include <cstdlib>
 
-#include "auth_interceptor.h"
+#include "rpc_interceptor.h"
 #include "call_logger.h"
 #include "database.h"
 #include "file_service_impl.h"
@@ -123,10 +123,15 @@ int main(int argc, char *argv[]) {
     builder.SetMaxSendMessageSize(64 * 1024 * 1024);
     builder.SetMaxReceiveMessageSize(64 * 1024 * 1024);
 
+    // gRPC interceptor — JWT authentication at transport level
+    {
+        std::vector<std::unique_ptr<grpc::experimental::ServerInterceptorFactory>> factories;
+        factories.push_back(std::make_unique<RpcAuthInterceptorFactory>(jwt_secret));
+        builder.experimental().SetInterceptorCreators(std::move(factories));
+    }
+
     builder.RegisterService(&health_monitor);
     FileServiceImpl file_service;
-    AuthInterceptor auth_interceptor(jwt_secret);
-    file_service.SetAuthInterceptor(&auth_interceptor);
     const char *env_auth = std::getenv("AUTH_SVC_ADDR");
     std::string auth_addr = env_auth ? env_auth : "rpc-auth:50051";
     grpc::ChannelArguments args;

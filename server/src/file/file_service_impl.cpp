@@ -5,7 +5,7 @@
 #include <cstdio>
 #include <thread>
 
-#include "auth_interceptor.h"
+#include "rpc_interceptor.h"
 #include "call_logger.h"
 #include "circuit_breaker.h"
 #include "database.h"
@@ -59,11 +59,8 @@ bool FileServiceImpl::ValidateCaller(grpc::ServerContext *ctx, int64_t user_id, 
 
 grpc::Status FileServiceImpl::CreateFile(grpc::ServerContext *context, const rpc::CreateFileRequest *req,
                                          rpc::CreateFileResponse *resp) {
-    if (auth_) {
-        AuthContext ac = auth_->Authenticate(context);
-        if (!ac.authenticated)
-            return grpc::Status(grpc::StatusCode::UNAUTHENTICATED, "Invalid or missing token");
-    }
+    if (!g_rpc_auth_ctx.authenticated)
+        return grpc::Status(grpc::StatusCode::UNAUTHENTICATED, "Invalid or missing token");
     std::string vu_user, vu_role;
     if (auth_stub_ && !ValidateCaller(context, req->user_id(), vu_user, vu_role))
         return grpc::Status(grpc::StatusCode::UNAUTHENTICATED, "Auth service rejected");
@@ -149,11 +146,8 @@ grpc::Status FileServiceImpl::CreateFile(grpc::ServerContext *context, const rpc
 
 grpc::Status FileServiceImpl::GetFile(grpc::ServerContext *context, const rpc::GetFileRequest *req,
                                       rpc::GetFileResponse *resp) {
-    if (auth_) {
-        AuthContext ac = auth_->Authenticate(context);
-        if (!ac.authenticated)
-            return grpc::Status(grpc::StatusCode::UNAUTHENTICATED, "Invalid or missing token");
-    }
+    if (!g_rpc_auth_ctx.authenticated)
+        return grpc::Status(grpc::StatusCode::UNAUTHENTICATED, "Invalid or missing token");
     std::string vu_user, vu_role;
     if (auth_stub_ && !ValidateCaller(context, req->user_id(), vu_user, vu_role))
         return grpc::Status(grpc::StatusCode::UNAUTHENTICATED, "Auth service rejected");
@@ -374,11 +368,8 @@ grpc::Status FileServiceImpl::GetFile(grpc::ServerContext *context, const rpc::G
 
 grpc::Status FileServiceImpl::ListFiles(grpc::ServerContext *context, const rpc::ListFilesRequest *req,
                                         rpc::ListFilesResponse *resp) {
-    if (auth_) {
-        AuthContext ac = auth_->Authenticate(context);
-        if (!ac.authenticated)
-            return grpc::Status(grpc::StatusCode::UNAUTHENTICATED, "Invalid or missing token");
-    }
+    if (!g_rpc_auth_ctx.authenticated)
+        return grpc::Status(grpc::StatusCode::UNAUTHENTICATED, "Invalid or missing token");
     std::string vu_user, vu_role;
     if (auth_stub_ && !ValidateCaller(context, req->user_id(), vu_user, vu_role))
         return grpc::Status(grpc::StatusCode::UNAUTHENTICATED, "Auth service rejected");
@@ -463,11 +454,8 @@ grpc::Status FileServiceImpl::ListFiles(grpc::ServerContext *context, const rpc:
 
 grpc::Status FileServiceImpl::DeleteFile(grpc::ServerContext *context, const rpc::DeleteFileRequest *req,
                                          rpc::DeleteFileResponse *resp) {
-    if (auth_) {
-        AuthContext ac = auth_->Authenticate(context);
-        if (!ac.authenticated)
-            return grpc::Status(grpc::StatusCode::UNAUTHENTICATED, "Invalid or missing token");
-    }
+    if (!g_rpc_auth_ctx.authenticated)
+        return grpc::Status(grpc::StatusCode::UNAUTHENTICATED, "Invalid or missing token");
     std::string vu_user, vu_role;
     if (auth_stub_ && !ValidateCaller(context, req->user_id(), vu_user, vu_role))
         return grpc::Status(grpc::StatusCode::UNAUTHENTICATED, "Auth service rejected");
@@ -531,11 +519,8 @@ grpc::Status FileServiceImpl::DeleteFile(grpc::ServerContext *context, const rpc
 
 grpc::Status FileServiceImpl::CreateFolder(grpc::ServerContext *ctx, const rpc::CreateFolderRequest *req,
                                            rpc::CreateFolderResponse *resp) {
-    if (auth_) {
-        AuthContext ac = auth_->Authenticate(ctx);
-        if (!ac.authenticated)
-            return grpc::Status(grpc::StatusCode::UNAUTHENTICATED, "");
-    }
+    if (!g_rpc_auth_ctx.authenticated)
+        return grpc::Status(grpc::StatusCode::UNAUTHENTICATED, "");
     int64_t id = 0;
     bool ok = db_->CreateFolder(req->user_id(), req->name(), req->parent_folder_id(), id);
     resp->set_success(ok);
@@ -547,11 +532,8 @@ grpc::Status FileServiceImpl::CreateFolder(grpc::ServerContext *ctx, const rpc::
 }
 grpc::Status FileServiceImpl::MoveFile(grpc::ServerContext *ctx, const rpc::MoveFileRequest *req,
                                        rpc::MoveFileResponse *resp) {
-    if (auth_) {
-        AuthContext ac = auth_->Authenticate(ctx);
-        if (!ac.authenticated)
-            return grpc::Status(grpc::StatusCode::UNAUTHENTICATED, "");
-    }
+    if (!g_rpc_auth_ctx.authenticated)
+        return grpc::Status(grpc::StatusCode::UNAUTHENTICATED, "");
     bool ok = db_->MoveFile(req->id(), req->target_folder_id());
     resp->set_success(ok);
     if (!ok)
@@ -560,11 +542,8 @@ grpc::Status FileServiceImpl::MoveFile(grpc::ServerContext *ctx, const rpc::Move
 }
 grpc::Status FileServiceImpl::BatchDelete(grpc::ServerContext *ctx, const rpc::BatchDeleteRequest *req,
                                           rpc::BatchDeleteResponse *resp) {
-    if (auth_) {
-        AuthContext ac = auth_->Authenticate(ctx);
-        if (!ac.authenticated)
-            return grpc::Status(grpc::StatusCode::UNAUTHENTICATED, "");
-    }
+    if (!g_rpc_auth_ctx.authenticated)
+        return grpc::Status(grpc::StatusCode::UNAUTHENTICATED, "");
     std::vector<int64_t> ids(req->ids().begin(), req->ids().end());
     int count = db_->BatchDeleteFiles(req->user_id(), ids);
     resp->set_success(count > 0);

@@ -73,7 +73,8 @@ set(SHARED_SRCS
     server/src/shared/auth_interceptor.cpp
     server/src/shared/call_logger.cpp
     server/src/shared/database.cpp
-    server/src/shared/redis_client.cpp)
+    server/src/shared/redis_client.cpp
+    server/src/shared/rpc_interceptor.cpp)
 if(HAS_OTEL)
     list(APPEND SHARED_SRCS server/src/shared/otel_tracer.cpp)
 endif()

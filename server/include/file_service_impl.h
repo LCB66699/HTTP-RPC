@@ -15,8 +15,6 @@ class L1Cache;
 class CallLogger;
 class SystemLogger;
 
-class AuthInterceptor;
-
 class FileServiceImpl final : public rpc::FileService::Service {
    public:
     void SetDatabase(IDatabase *db) { db_ = db; }
@@ -25,7 +23,6 @@ class FileServiceImpl final : public rpc::FileService::Service {
     void SetLogger(CallLogger *logger) { logger_ = logger; }
     void SetSysLog(SystemLogger *slog) { slog_ = slog; }
     void SetMinio(minio::Client *mc) { minio_ = mc; }
-    void SetAuthInterceptor(AuthInterceptor *interceptor) { auth_ = interceptor; }
     void SetRabbitMQ(IRabbitPublisher *rb) { rabbit_ = rb; }
     void SetAuthChannel(std::shared_ptr<grpc::Channel> ch) { auth_stub_ = rpc::AuthService::NewStub(ch); }
 
@@ -52,7 +49,6 @@ class FileServiceImpl final : public rpc::FileService::Service {
     CallLogger *logger_ = nullptr;
     SystemLogger *slog_ = nullptr;
     minio::Client *minio_ = nullptr;
-    AuthInterceptor *auth_ = nullptr;
     std::unique_ptr<rpc::AuthService::Stub> auth_stub_;
     mutable GrpcCircuitBreaker auth_cb_;
     IRabbitPublisher *rabbit_ = nullptr;

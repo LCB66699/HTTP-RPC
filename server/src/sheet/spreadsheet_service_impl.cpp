@@ -5,7 +5,7 @@
 #include <cstdio>
 #include <thread>
 
-#include "auth_interceptor.h"
+#include "rpc_interceptor.h"
 #include "call_logger.h"
 #include "circuit_breaker.h"
 #include "database.h"
@@ -181,11 +181,8 @@ grpc::Status SpreadsheetServiceImpl::CreateSpreadsheet(grpc::ServerContext *cont
 
 grpc::Status SpreadsheetServiceImpl::GetSpreadsheet(grpc::ServerContext *context, const rpc::GetSpreadsheetRequest *req,
                                                     rpc::GetSpreadsheetResponse *resp) {
-    if (auth_) {
-        AuthContext ac = auth_->Authenticate(context);
-        if (!ac.authenticated)
-            return grpc::Status(grpc::StatusCode::UNAUTHENTICATED, "Invalid or missing token");
-    }
+    if (!g_rpc_auth_ctx.authenticated)
+        return grpc::Status(grpc::StatusCode::UNAUTHENTICATED, "Invalid or missing token");
     std::string vu_user, vu_role;
     if (auth_stub_ && !ValidateCaller(context, req->user_id(), vu_user, vu_role))
         return grpc::Status(grpc::StatusCode::UNAUTHENTICATED, "Auth service rejected");
@@ -462,11 +459,8 @@ grpc::Status SpreadsheetServiceImpl::GetSpreadsheet(grpc::ServerContext *context
 grpc::Status SpreadsheetServiceImpl::ListSpreadsheets(grpc::ServerContext *context,
                                                       const rpc::ListSpreadsheetsRequest *req,
                                                       rpc::ListSpreadsheetsResponse *resp) {
-    if (auth_) {
-        AuthContext ac = auth_->Authenticate(context);
-        if (!ac.authenticated)
-            return grpc::Status(grpc::StatusCode::UNAUTHENTICATED, "Invalid or missing token");
-    }
+    if (!g_rpc_auth_ctx.authenticated)
+        return grpc::Status(grpc::StatusCode::UNAUTHENTICATED, "Invalid or missing token");
     std::string vu_user, vu_role;
     if (auth_stub_ && !ValidateCaller(context, req->user_id(), vu_user, vu_role))
         return grpc::Status(grpc::StatusCode::UNAUTHENTICATED, "Auth service rejected");
@@ -575,11 +569,8 @@ grpc::Status SpreadsheetServiceImpl::ListSpreadsheets(grpc::ServerContext *conte
 grpc::Status SpreadsheetServiceImpl::UpdateSpreadsheet(grpc::ServerContext *context,
                                                        const rpc::UpdateSpreadsheetRequest *req,
                                                        rpc::UpdateSpreadsheetResponse *resp) {
-    if (auth_) {
-        AuthContext ac = auth_->Authenticate(context);
-        if (!ac.authenticated)
-            return grpc::Status(grpc::StatusCode::UNAUTHENTICATED, "Invalid or missing token");
-    }
+    if (!g_rpc_auth_ctx.authenticated)
+        return grpc::Status(grpc::StatusCode::UNAUTHENTICATED, "Invalid or missing token");
     std::string vu_user, vu_role;
     if (auth_stub_ && !ValidateCaller(context, req->user_id(), vu_user, vu_role))
         return grpc::Status(grpc::StatusCode::UNAUTHENTICATED, "Auth service rejected");
@@ -666,11 +657,8 @@ grpc::Status SpreadsheetServiceImpl::UpdateSpreadsheet(grpc::ServerContext *cont
 grpc::Status SpreadsheetServiceImpl::DeleteSpreadsheet(grpc::ServerContext *context,
                                                        const rpc::DeleteSpreadsheetRequest *req,
                                                        rpc::DeleteSpreadsheetResponse *resp) {
-    if (auth_) {
-        AuthContext ac = auth_->Authenticate(context);
-        if (!ac.authenticated)
-            return grpc::Status(grpc::StatusCode::UNAUTHENTICATED, "Invalid or missing token");
-    }
+    if (!g_rpc_auth_ctx.authenticated)
+        return grpc::Status(grpc::StatusCode::UNAUTHENTICATED, "Invalid or missing token");
     std::string vu_user, vu_role;
     if (auth_stub_ && !ValidateCaller(context, req->user_id(), vu_user, vu_role))
         return grpc::Status(grpc::StatusCode::UNAUTHENTICATED, "Auth service rejected");

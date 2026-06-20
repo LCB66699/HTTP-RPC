@@ -15,8 +15,6 @@ class CallLogger;
 class SystemLogger;
 class L1Cache;
 
-class AuthInterceptor;
-
 class SpreadsheetServiceImpl final : public rpc::SpreadsheetService::Service {
    public:
     void SetDatabase(IDatabase *db) { db_ = db; }
@@ -24,7 +22,6 @@ class SpreadsheetServiceImpl final : public rpc::SpreadsheetService::Service {
     void SetL1Cache(L1Cache *cache) { l1_ = cache; }
     void SetLogger(CallLogger *logger) { logger_ = logger; }
     void SetSysLog(SystemLogger *slog) { slog_ = slog; }
-    void SetAuthInterceptor(AuthInterceptor *interceptor) { auth_ = interceptor; }
     void SetRabbitMQ(IRabbitPublisher *rb) { rabbit_ = rb; }
     void SetMinio(minio::Client *mc) { minio_ = mc; }
     void SetAuthChannel(std::shared_ptr<grpc::Channel> ch) { auth_stub_ = rpc::AuthService::NewStub(ch); }
@@ -50,7 +47,6 @@ class SpreadsheetServiceImpl final : public rpc::SpreadsheetService::Service {
     L1Cache *l1_ = nullptr;
     CallLogger *logger_ = nullptr;
     SystemLogger *slog_ = nullptr;
-    AuthInterceptor *auth_ = nullptr;
     std::unique_ptr<rpc::AuthService::Stub> auth_stub_;
     mutable GrpcCircuitBreaker auth_cb_;
     IRabbitPublisher *rabbit_ = nullptr;
