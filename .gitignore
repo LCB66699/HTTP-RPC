@@ -8,3 +8,4 @@ test/logs/
 mongo/
 mysql/
 redis/
+!test/e2e/logs/*
