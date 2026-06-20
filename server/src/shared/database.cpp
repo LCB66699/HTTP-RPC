@@ -17,13 +17,23 @@ MYSQL *Database::ConnectMYSQL(const std::string &host, int port) {
         fprintf(stderr, "[DB] mysql_init failed\n");
         return nullptr;
     }
-    if (!mysql_real_connect(c, host.c_str(), user_.c_str(), password_.c_str(), db_name_.c_str(), port, nullptr, 0)) {
-        fprintf(stderr, "[DB] connect %s:%d failed: %s\n", host.c_str(), port, mysql_error(c));
-        mysql_close(c);
-        return nullptr;
+    // 重试 5 次应对 Docker DNS 间歇性解析失败 (CR_CONN_HOST_ERROR / ER_BAD_HOST_ERROR)
+    for (int attempt = 1; attempt <= 5; attempt++) {
+        if (mysql_real_connect(c, host.c_str(), user_.c_str(), password_.c_str(), db_name_.c_str(), port, nullptr, 0)) {
+            mysql_autocommit(c, 1);
+            return c;
+        }
+        unsigned int err = mysql_errno(c);
+        if (attempt < 5) {
+            fprintf(stderr, "[DB] connect %s:%d attempt %d/5 failed (err=%u): %s\n",
+                    host.c_str(), port, attempt, err, mysql_error(c));
+            std::this_thread::sleep_for(std::chrono::milliseconds(500 * attempt));
+        }
     }
-    mysql_autocommit(c, 1);  // 显式开启 autocommit，确保 INSERT 后其他连接立即可见
-    return c;
+    fprintf(stderr, "[DB] connect %s:%d failed after 5 attempts: %s\n",
+            host.c_str(), port, mysql_error(c));
+    mysql_close(c);
+    return nullptr;
 }
 
 bool Database::RunQuery(MYSQL *conn, const std::string &sql, MYSQL_RES **out_res) {
@@ -123,8 +133,11 @@ bool Database::ExecWrite(const std::string &sql) {
     auto &wc = write_conns_[idx];
     // 只锁被选中的连接, 其他连接不受影响
     std::lock_guard<std::mutex> lock(wc->mtx);
-    if (!wc->conn)
-        return false;
+    if (!wc->conn) {
+        wc->conn = ConnectMYSQL(write_host_, write_port_);
+        if (!wc->conn)
+            return false;
+    }
     if (mysql_query(wc->conn, sql.c_str()) == 0)
         return true;
     unsigned int err = mysql_errno(wc->conn);
@@ -411,8 +424,11 @@ bool Database::GetUser(const std::string &username, std::string &password_hash_o
     size_t idx = write_idx_.fetch_add(1, std::memory_order_relaxed) % write_conns_.size();
     auto &wc = write_conns_[idx];
     std::lock_guard<std::mutex> lock(wc->mtx);
-    if (!wc->conn)
-        return false;
+    if (!wc->conn) {
+        wc->conn = ConnectMYSQL(write_host_, write_port_);
+        if (!wc->conn)
+            return false;
+    }
     std::string sql = make_sql("SELECT password_hash FROM users WHERE username={}",
                                 sql_param(wc->conn, username));
     MYSQL_RES *res = nullptr;
@@ -660,8 +676,11 @@ bool Database::UpdateSpreadsheet(int64_t id, const std::string &name, const std:
         size_t idx = write_idx_.fetch_add(1, std::memory_order_relaxed) % write_conns_.size();
         auto &wc = write_conns_[idx];
         std::lock_guard<std::mutex> lock(wc->mtx);
-        if (!wc->conn)
-            return false;
+        if (!wc->conn) {
+            wc->conn = ConnectMYSQL(write_host_, write_port_);
+            if (!wc->conn)
+                return false;
+        }
         if (mysql_query(wc->conn, sql.c_str()) != 0) {
             fprintf(stderr, "[DB:write#%zu] UpdateSpreadsheet error: %s\n", idx, mysql_error(wc->conn));
             return false;
@@ -682,8 +701,11 @@ bool Database::GetSpreadsheetOwner(int64_t id, int64_t &owner_user_id, int *out_
     size_t idx = write_idx_.fetch_add(1, std::memory_order_relaxed) % write_conns_.size();
     auto &wc = write_conns_[idx];
     std::lock_guard<std::mutex> lock(wc->mtx);
-    if (!wc->conn)
-        return false;
+    if (!wc->conn) {
+        wc->conn = ConnectMYSQL(write_host_, write_port_);
+        if (!wc->conn)
+            return false;
+    }
     std::string sql = make_sql("SELECT user_id, version FROM spreadsheets WHERE id={}", id);
     MYSQL_RES *res = nullptr;
     if (!RunQuery(wc->conn, sql, &res))
@@ -850,8 +872,11 @@ bool Database::GetFileOwner(int64_t id, int64_t &owner_user_id) {
     size_t idx = write_idx_.fetch_add(1, std::memory_order_relaxed) % write_conns_.size();
     auto &wc = write_conns_[idx];
     std::lock_guard<std::mutex> lock(wc->mtx);
-    if (!wc->conn)
-        return false;
+    if (!wc->conn) {
+        wc->conn = ConnectMYSQL(write_host_, write_port_);
+        if (!wc->conn)
+            return false;
+    }
     std::string sql = make_sql("SELECT user_id FROM files WHERE id={}", id);
     MYSQL_RES *res = nullptr;
     if (!RunQuery(wc->conn, sql, &res))
@@ -981,7 +1006,11 @@ void Database::HealthLoop() {
             if (wc->conn && mysql_ping(wc->conn) != 0) {
                 fprintf(stderr, "[DB:health] write conn %zu dead, reconnecting\n", i);
                 mysql_close(wc->conn);
+                wc->conn = nullptr;
                 wc->conn = ConnectMYSQL(write_host_, write_port_);
+                // ConnectMYSQL 内部已重试 5 次; 若仍失败, 下一轮 30s 后再试
+                if (wc->conn)
+                    fprintf(stderr, "[DB:health] write conn %zu reconnected\n", i);
             }
         }
 
@@ -991,7 +1020,10 @@ void Database::HealthLoop() {
             if (rc->conn && mysql_ping(rc->conn) != 0) {
                 fprintf(stderr, "[DB:health] read conn %zu dead, reconnecting\n", i);
                 mysql_close(rc->conn);
+                rc->conn = nullptr;
                 rc->conn = ConnectMYSQL(read_hosts_[i % read_hosts_.size()], read_port_);
+                if (rc->conn)
+                    fprintf(stderr, "[DB:health] read conn %zu reconnected\n", i);
             }
         }
     }
