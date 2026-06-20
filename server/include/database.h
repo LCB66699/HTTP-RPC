@@ -13,6 +13,15 @@
 #include <type_traits>
 #include <vector>
 
+// ---- MYSQL 智能指针 — 析构时自动 mysql_close，消除手动关闭 ----
+
+struct MysqlDeleter {
+    void operator()(MYSQL *c) const {
+        if (c) mysql_close(c);
+    }
+};
+using MysqlPtr = std::unique_ptr<MYSQL, MysqlDeleter>;
+
 // ---- SQL 参数安全包装 — 编译期强制转义，杜绝人工漏写 q() ----
 
 class sql_param {
@@ -194,7 +203,7 @@ class Database {
 
     // 连接单元 — 读写连接池共用此结构
     struct PoolConn {
-        MYSQL *conn = nullptr;
+        MysqlPtr conn;                          // 智能指针，reset/赋值自动 mysql_close 旧连接
         std::mutex mtx;
         std::atomic<int64_t> last_used_ms{0};  // 最后一次归还的时间戳(ms)，HealthLoop 读取无需加锁
     };
@@ -207,7 +216,7 @@ class Database {
     std::vector<std::unique_ptr<PoolConn>> read_conns_;
     std::atomic<size_t> read_idx_{0};
 
-    MYSQL *ConnectMYSQL(const std::string &host, int port);
+    MysqlPtr ConnectMYSQL(const std::string &host, int port);
     MYSQL *EscConn();  // 返回一个可用连接, 仅供 mysql_real_escape_string() 用
     bool ExecWrite(const std::string &sql);
     bool ExecWriteInsert(const std::string &sql, int64_t &out_id);
