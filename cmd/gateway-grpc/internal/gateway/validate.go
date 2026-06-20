@@ -1,12 +1,12 @@
-package main
+package gateway
 
 import (
 	"encoding/json"
 	"net/http"
 )
 
-// validateLogin 校验登录请求
-func validateLogin(username, password string) (string, int) {
+// ValidateLogin 校验登录请求
+func ValidateLogin(username, password string) (string, int) {
 	if username == "" {
 		return "username required", http.StatusBadRequest
 	}
@@ -16,8 +16,8 @@ func validateLogin(username, password string) (string, int) {
 	return "", 0
 }
 
-// validateRegister 校验注册请求
-func validateRegister(username, password string) (string, int) {
+// ValidateRegister 校验注册请求
+func ValidateRegister(username, password string) (string, int) {
 	if len(username) < 3 || len(username) > 20 {
 		return "username must be 3-20 characters", http.StatusBadRequest
 	}
@@ -27,8 +27,8 @@ func validateRegister(username, password string) (string, int) {
 	return "", 0
 }
 
-// validateSheetCreate 校验创建表格请求
-func validateSheetCreate(name, headersJSON, dataJSON string) (string, int) {
+// ValidateSheetCreate 校验创建表格请求
+func ValidateSheetCreate(name, headersJSON, dataJSON string) (string, int) {
 	if name == "" {
 		return "name required", http.StatusBadRequest
 	}
@@ -41,13 +41,13 @@ func validateSheetCreate(name, headersJSON, dataJSON string) (string, int) {
 	return "", 0
 }
 
-// validateSheetUpdate 校验更新表格请求
-func validateSheetUpdate(name, headersJSON, dataJSON string) (string, int) {
-	return validateSheetCreate(name, headersJSON, dataJSON)
+// ValidateSheetUpdate 校验更新表格请求
+func ValidateSheetUpdate(name, headersJSON, dataJSON string) (string, int) {
+	return ValidateSheetCreate(name, headersJSON, dataJSON)
 }
 
-// validateFileUpload 校验文件上传 — filename 非空，size > 0
-func validateFileUpload(filename string, size int64) (string, int) {
+// ValidateFileUpload 校验文件上传
+func ValidateFileUpload(filename string, size int64) (string, int) {
 	if filename == "" {
 		return "filename required", http.StatusBadRequest
 	}
@@ -57,16 +57,16 @@ func validateFileUpload(filename string, size int64) (string, int) {
 	return "", 0
 }
 
-// validateSearch 校验搜索请求
-func validateSearch(query string) (string, int) {
+// ValidateSearch 校验搜索请求
+func ValidateSearch(query string) (string, int) {
 	if query == "" {
 		return "q required", http.StatusBadRequest
 	}
 	return "", 0
 }
 
-// validateChangePassword 校验改密请求
-func validateChangePassword(oldPwd, newPwd string) (string, int) {
+// ValidateChangePassword 校验改密请求
+func ValidateChangePassword(oldPwd, newPwd string) (string, int) {
 	if oldPwd == "" || newPwd == "" {
 		return "old_password and new_password required", http.StatusBadRequest
 	}

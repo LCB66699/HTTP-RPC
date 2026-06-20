@@ -10,7 +10,6 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
-	"regexp"
 	"strconv"
 	"strings"
 	"sync/atomic"
@@ -20,6 +19,8 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/redis/go-redis/v9"
 	"github.com/sony/gobreaker/v2"
+
+	gw "github.com/lcb66699/http-rpc/gateway-grpc/internal/gateway"
 	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 	"go.opentelemetry.io/otel"
@@ -41,36 +42,8 @@ import (
 
 var jwtSecret []byte
 
-// ---- DI: 可注入的 gRPC client 接口 ----
-type SheetClient interface {
-	ListSpreadsheets(ctx context.Context, req *pb.ListSpreadsheetsRequest, opts ...grpc.CallOption) (*pb.ListSpreadsheetsResponse, error)
-	GetSpreadsheet(ctx context.Context, req *pb.GetSpreadsheetRequest, opts ...grpc.CallOption) (*pb.GetSpreadsheetResponse, error)
-	CreateSpreadsheet(ctx context.Context, req *pb.CreateSpreadsheetRequest, opts ...grpc.CallOption) (*pb.CreateSpreadsheetResponse, error)
-	UpdateSpreadsheet(ctx context.Context, req *pb.UpdateSpreadsheetRequest, opts ...grpc.CallOption) (*pb.UpdateSpreadsheetResponse, error)
-	DeleteSpreadsheet(ctx context.Context, req *pb.DeleteSpreadsheetRequest, opts ...grpc.CallOption) (*pb.DeleteSpreadsheetResponse, error)
-}
-type FileClient interface {
-	ListFiles(ctx context.Context, req *pb.ListFilesRequest, opts ...grpc.CallOption) (*pb.ListFilesResponse, error)
-	GetFile(ctx context.Context, req *pb.GetFileRequest, opts ...grpc.CallOption) (*pb.GetFileResponse, error)
-	CreateFile(ctx context.Context, req *pb.CreateFileRequest, opts ...grpc.CallOption) (*pb.CreateFileResponse, error)
-	DeleteFile(ctx context.Context, req *pb.DeleteFileRequest, opts ...grpc.CallOption) (*pb.DeleteFileResponse, error)
-	CreateFolder(ctx context.Context, req *pb.CreateFolderRequest, opts ...grpc.CallOption) (*pb.CreateFolderResponse, error)
-	MoveFile(ctx context.Context, req *pb.MoveFileRequest, opts ...grpc.CallOption) (*pb.MoveFileResponse, error)
-	BatchDelete(ctx context.Context, req *pb.BatchDeleteRequest, opts ...grpc.CallOption) (*pb.BatchDeleteResponse, error)
-}
-type AuthClientI interface {
-	Login(ctx context.Context, req *pb.LoginRequest, opts ...grpc.CallOption) (*pb.LoginResponse, error)
-	Register(ctx context.Context, req *pb.RegisterRequest, opts ...grpc.CallOption) (*pb.RegisterResponse, error)
-	RefreshToken(ctx context.Context, req *pb.RefreshTokenRequest, opts ...grpc.CallOption) (*pb.RefreshTokenResponse, error)
-	ChangePassword(ctx context.Context, req *pb.ChangePasswordRequest, opts ...grpc.CallOption) (*pb.ChangePasswordResponse, error)
-	LoginByPhone(ctx context.Context, req *pb.PhoneLoginRequest, opts ...grpc.CallOption) (*pb.LoginResponse, error)
-}
-
 // 真实连接（包级变量，main() 里初始化）
 var authConn, sheetConn, fileConn *grpc.ClientConn
-var sheetClient SheetClient
-var fileClient FileClient
-var authClient AuthClientI
 var rdb *redis.Client
 
 // cbWithSlow wraps a circuit breaker with a slow-call counter
@@ -139,25 +112,25 @@ func main() {
 	log.Printf("Auth=%s Sheet=%s File=%s Search=%s", authAddr, sheetAddr, fileAddr, searchAddr)
 
 	authConn, _ = grpc.NewClient("dns:///"+authAddr, creds, kp, lb, otelStats, grpcMetrics)
-	authClient = pb.NewAuthServiceClient(authConn)
+	gw.AuthClient = pb.NewAuthServiceClient(authConn)
 
 	sheetConn, _ = grpc.NewClient("dns:///"+sheetAddr, creds, kp, lb, otelStats, grpcMetrics)
-	sheetClient = pb.NewSpreadsheetServiceClient(sheetConn)
+	gw.SheetClient = pb.NewSpreadsheetServiceClient(sheetConn)
 
 	fileConn, _ = grpc.NewClient("dns:///"+fileAddr, creds, kp, lb, otelStats, grpcMetrics)
-	fileClient = pb.NewFileServiceClient(fileConn)
+	gw.FileClient = pb.NewFileServiceClient(fileConn)
 
 	searchConn, _ := grpc.NewClient("dns:///"+searchAddr, creds, kp, lb, otelStats, grpcMetrics)
 	searchClient := pb.NewSearchServiceClient(searchConn)
 
-	sharingClient := pb.NewSharingServiceClient(authConn)
+	gw.SharedClient = pb.NewSharingServiceClient(authConn)
 
 	// Redis
 	redisAddr := getenv("REDIS_ADDR", "redis-cluster-7000:7000")
 	redisPass := getenv("REDIS_PASSWORD", "rpc-redis-123456")
 	rdb = redis.NewClient(&redis.Options{Addr: redisAddr, Password: redisPass})
 
-	// 熔断器 + 慢调用计数器（每个 C++ 服务一个）
+	// Circuit breaker setup
 	newCB := func(name string) *cbWithSlow {
 		cbs := &cbWithSlow{}
 		cbs.CircuitBreaker = gobreaker.NewCircuitBreaker[any](gobreaker.Settings{
@@ -184,7 +157,6 @@ func main() {
 					stateVal = 2.0
 				}
 				circuitBreakerState.WithLabelValues(name).Set(stateVal)
-
 			},
 		})
 		return cbs
@@ -192,70 +164,66 @@ func main() {
 	_ = newCB("auth")
 	cbSheet := newCB("sheet")
 	cbFile := newCB("file")
-	_ = newCB("search")  // 预留给 Search handler 重试
+	_ = newCB("search")
 
 	// === Auth ===
 	mux.HandleFunc("POST /api/v1/register", func(w http.ResponseWriter, r *http.Request) {
 		var req pb.RegisterRequest
 		json.NewDecoder(r.Body).Decode(&req)
-		if msg, code := validateRegister(req.Username, req.Password); msg != "" {
-			writeJSONStatus(w, code, map[string]interface{}{"success": false, "error": msg})
+		if msg, code := gw.ValidateRegister(req.Username, req.Password); msg != "" {
+			gw.WriteJSONStatus(w, code, map[string]interface{}{"success": false, "error": msg})
 			return
 		}
-
-		resp, _ := authClient.Register(r.Context(), &req)
+		resp, _ := gw.AuthClient.Register(r.Context(), &req)
 		if resp != nil && !resp.Success {
 			code := int32(0)
 			if ec, ok := any(resp).(interface{ GetErrorCode() int32 }); ok {
 				code = ec.GetErrorCode()
 			}
-			writeError(w, nil, resp.GetError(), code)
+			gw.WriteError(w, nil, resp.GetError(), code)
 			return
 		}
 		setCookies(w, resp.AccessToken, resp.RefreshToken)
-		writeJSON(w, resp)
+		gw.WriteJSON(w, resp)
 	})
 	mux.HandleFunc("POST /api/v1/login", func(w http.ResponseWriter, r *http.Request) {
 		var req pb.LoginRequest
 		json.NewDecoder(r.Body).Decode(&req)
 		if checkLoginRate(req.Username) {
-			writeJSONStatus(w, http.StatusTooManyRequests,
+			gw.WriteJSONStatus(w, http.StatusTooManyRequests,
 				map[string]interface{}{"success": false, "error": "Too many attempts, try again later"})
 			return
 		}
-
-		if msg, code := validateLogin(req.Username, req.Password); msg != "" {
-			writeJSONStatus(w, code, map[string]interface{}{"success": false, "error": msg})
+		if msg, code := gw.ValidateLogin(req.Username, req.Password); msg != "" {
+			gw.WriteJSONStatus(w, code, map[string]interface{}{"success": false, "error": msg})
 			return
 		}
-
-		resp, _ := authClient.Login(r.Context(), &req)
+		resp, _ := gw.AuthClient.Login(r.Context(), &req)
 		if resp != nil && !resp.Success {
 			code := int32(0)
 			if ec, ok := any(resp).(interface{ GetErrorCode() int32 }); ok {
 				code = ec.GetErrorCode()
 			}
-			writeError(w, nil, resp.GetError(), code)
+			gw.WriteError(w, nil, resp.GetError(), code)
 			return
 		}
 		setCookies(w, resp.AccessToken, resp.RefreshToken)
-		writeJSON(w, resp)
+		gw.WriteJSON(w, resp)
 	})
 	mux.HandleFunc("POST /api/v1/refresh", func(w http.ResponseWriter, r *http.Request) {
 		var req pb.RefreshTokenRequest
 		json.NewDecoder(r.Body).Decode(&req)
-		// body 优先，Cookie 兜底
 		if req.RefreshToken == "" {
 			if ck, err := r.Cookie("rpc_rt"); err == nil {
 				req.RefreshToken = ck.Value
 			}
 		}
 		if req.Username == "" {
-			req.Username = getUserFromCookie(r)
+			req.Username = gw.GetUserFromCookie(r)
 		}
-		resp, _ := authClient.RefreshToken(r.Context(), &req)
+		resp, _ := gw.AuthClient.RefreshToken(r.Context(), &req)
 		setCookies(w, resp.AccessToken, "")
-		writeJSON(w, resp)
+		gw.WriteJSON(w, resp)
 	})
 	mux.HandleFunc("PUT /api/v1/me/password", func(w http.ResponseWriter, r *http.Request) {
 		var body struct {
@@ -263,31 +231,30 @@ func main() {
 			NewPassword string `json:"new_password"`
 		}
 		json.NewDecoder(r.Body).Decode(&body)
-		uid := extractUID(r)
-		if msg, code := validateChangePassword(body.OldPassword, body.NewPassword); msg != "" {
-			writeJSONStatus(w, code, map[string]interface{}{"success": false, "error": msg})
+		uid := gw.ExtractUID(r)
+		if msg, code := gw.ValidateChangePassword(body.OldPassword, body.NewPassword); msg != "" {
+			gw.WriteJSONStatus(w, code, map[string]interface{}{"success": false, "error": msg})
 			return
 		}
-
 		if uid == 0 {
 			http.Error(w, `{"error":"unauthorized"}`, http.StatusUnauthorized)
 			return
 		}
 		req := &pb.ChangePasswordRequest{UserId: uid, OldPassword: body.OldPassword, NewPassword: body.NewPassword}
-		resp, err := authClient.ChangePassword(r.Context(), req)
-		writeGRPCResponse(w, resp, err)
+		resp, err := gw.AuthClient.ChangePassword(r.Context(), req)
+		gw.WriteGRPCResponse(w, resp, err)
 	})
 	mux.HandleFunc("POST /api/v1/auth/otp/send", func(w http.ResponseWriter, r *http.Request) {
 		var body struct{ Phone string `json:"phone"` }
 		json.NewDecoder(r.Body).Decode(&body)
 		if body.Phone == "" {
-			writeJSONStatus(w, http.StatusBadRequest, map[string]interface{}{"success": false, "error": "phone required"})
+			gw.WriteJSONStatus(w, http.StatusBadRequest, map[string]interface{}{"success": false, "error": "phone required"})
 			return
 		}
 		code := fmt.Sprintf("%06d", time.Now().UnixNano()%1000000)
 		rdb.Set(r.Context(), "otp:"+body.Phone, code, 5*time.Minute)
 		log.Printf("[OTP] phone=%s code=%s", body.Phone, code)
-		writeJSON(w, map[string]interface{}{"success": true})
+		gw.WriteJSON(w, map[string]interface{}{"success": true})
 	})
 	mux.HandleFunc("POST /api/v1/auth/phone/login", func(w http.ResponseWriter, r *http.Request) {
 		var body struct {
@@ -297,23 +264,25 @@ func main() {
 		json.NewDecoder(r.Body).Decode(&body)
 		stored, _ := rdb.Get(r.Context(), "otp:"+body.Phone).Result()
 		if stored == "" || stored != body.OTP {
-			writeJSONStatus(w, http.StatusUnauthorized, map[string]interface{}{"success": false, "error": "Invalid OTP"})
+			gw.WriteJSONStatus(w, http.StatusUnauthorized, map[string]interface{}{"success": false, "error": "Invalid OTP"})
 			return
 		}
 		rdb.Del(r.Context(), "otp:"+body.Phone)
-		resp, _ := authClient.LoginByPhone(r.Context(), &pb.PhoneLoginRequest{Phone: body.Phone, Otp: body.OTP})
+		resp, _ := gw.AuthClient.LoginByPhone(r.Context(), &pb.PhoneLoginRequest{Phone: body.Phone, Otp: body.OTP})
 		setCookies(w, resp.AccessToken, resp.RefreshToken)
-		writeJSON(w, resp)
+		gw.WriteJSON(w, resp)
 	})
 
 	mux.Handle("GET /api/v1/metrics", metricsHandler())
 	mux.HandleFunc("GET /api/v1/health", func(w http.ResponseWriter, r *http.Request) {
-		writeJSON(w, map[string]string{"gateway": "READY"})
+		gw.WriteJSON(w, map[string]string{"gateway": "READY"})
 	})
 	mux.HandleFunc("GET /api/v1/health/ready", func(w http.ResponseWriter, r *http.Request) {
 		checkConn := func(name string, conn *grpc.ClientConn) string {
 			s := conn.GetState()
-			if s == connectivity.Ready { return "OK" }
+			if s == connectivity.Ready {
+				return "OK"
+			}
 			return s.String()
 		}
 		status := map[string]string{"gateway": "OK"}
@@ -322,69 +291,71 @@ func main() {
 		status["file"] = checkConn("file", fileConn)
 		allOK := status["auth"] == "OK" && status["sheet"] == "OK" && status["file"] == "OK"
 		code := http.StatusOK
-		if !allOK { code = http.StatusServiceUnavailable }
-		writeJSONStatus(w, code, map[string]interface{}{"_all": allOK, "status": status})
+		if !allOK {
+			code = http.StatusServiceUnavailable
+		}
+		gw.WriteJSONStatus(w, code, map[string]interface{}{"_all": allOK, "status": status})
 	})
 	mux.HandleFunc("GET /api/v1/me", func(w http.ResponseWriter, r *http.Request) {
-		user := getUserFromCookie(r)
-		uid := extractUID(r)
-		writeJSON(w, map[string]interface{}{"username": user, "user_id": uid})
+		user := gw.GetUserFromCookie(r)
+		uid := gw.ExtractUID(r)
+		gw.WriteJSON(w, map[string]interface{}{"username": user, "user_id": uid})
 	})
 	mux.HandleFunc("GET /api/v1/services", func(w http.ResponseWriter, r *http.Request) {
-		writeJSON(w, map[string]interface{}{"services": map[string][]string{
+		gw.WriteJSON(w, map[string]interface{}{"services": map[string][]string{
 			"auth-service": {}, "sheet-service": {}, "file-service": {}, "search-service": {},
 		}})
 	})
+
 	// === Sharing ===
 	mux.HandleFunc("POST /api/v1/sheets/{id}/share", func(w http.ResponseWriter, r *http.Request) {
-		uid := extractUID(r)
+		uid := gw.ExtractUID(r)
 		var body struct {
 			Username   string `json:"username"`
 			Permission string `json:"permission"`
 		}
 		json.NewDecoder(r.Body).Decode(&body)
 		id := parseInt64(r.PathValue("id"))
-		resp, _ := sharingClient.Share(injectToken(r), &pb.ShareRequest{
+		resp, _ := gw.SharedClient.Share(injectToken(r), &pb.ShareRequest{
 			OwnerId: uid, ResourceType: "sheet", ResourceId: id,
 			GranteeUsername: body.Username, Permission: body.Permission,
 		})
-		writeJSON(w, resp)
+		gw.WriteJSON(w, resp)
 	})
 	mux.HandleFunc("DELETE /api/v1/sheets/{id}/share", func(w http.ResponseWriter, r *http.Request) {
-		uid := extractUID(r)
+		uid := gw.ExtractUID(r)
 		username := r.URL.Query().Get("username")
 		id := parseInt64(r.PathValue("id"))
-		resp, _ := sharingClient.Revoke(injectToken(r), &pb.RevokeRequest{
+		resp, _ := gw.SharedClient.Revoke(injectToken(r), &pb.RevokeRequest{
 			OwnerId: uid, ResourceType: "sheet", ResourceId: id,
 			GranteeUsername: username,
 		})
-		writeJSON(w, resp)
+		gw.WriteJSON(w, resp)
 	})
 	mux.HandleFunc("GET /api/v1/sheets/{id}/share", func(w http.ResponseWriter, r *http.Request) {
-		uid := extractUID(r)
+		uid := gw.ExtractUID(r)
 		id := parseInt64(r.PathValue("id"))
-		resp, _ := sharingClient.ListShares(injectToken(r), &pb.ResourceRequest{
+		resp, _ := gw.SharedClient.ListShares(injectToken(r), &pb.ResourceRequest{
 			OwnerId: uid, ResourceType: "sheet", ResourceId: id,
 		})
-		writeJSON(w, resp)
+		gw.WriteJSON(w, resp)
 	})
 	mux.HandleFunc("POST /api/v1/sheets/{id}/share-link", func(w http.ResponseWriter, r *http.Request) {
-		uid := extractUID(r)
+		uid := gw.ExtractUID(r)
 		id := parseInt64(r.PathValue("id"))
-		resp, _ := sharingClient.CreateShareLink(injectToken(r), &pb.ShareLinkRequest{
+		resp, _ := gw.SharedClient.CreateShareLink(injectToken(r), &pb.ShareLinkRequest{
 			OwnerId: uid, ResourceType: "sheet", ResourceId: id, Permission: "view",
 		})
-		writeJSON(w, resp)
+		gw.WriteJSON(w, resp)
 	})
 	mux.HandleFunc("GET /api/v1/s/{token}", func(w http.ResponseWriter, r *http.Request) {
 		token := r.PathValue("token")
-		resp, _ := sharingClient.GetByToken(injectToken(r), &pb.ShareTokenRequest{Token: token})
+		resp, _ := gw.SharedClient.GetByToken(injectToken(r), &pb.ShareTokenRequest{Token: token})
 		if resp == nil || !resp.Success {
-			writeJSONStatus(w, http.StatusNotFound, map[string]interface{}{"success": false, "error": "Not found"})
+			gw.WriteJSONStatus(w, http.StatusNotFound, map[string]interface{}{"success": false, "error": "Not found"})
 			return
 		}
 		info := resp.GetInfo()
-		// Redirect to actual resource based on type
 		switch info.GetResourceType() {
 		case "sheet":
 			http.Redirect(w, r, fmt.Sprintf("/api/v1/sheets/%d", info.GetResourceId()), http.StatusFound)
@@ -394,16 +365,16 @@ func main() {
 	})
 
 	mux.HandleFunc("GET /api/v1/history", func(w http.ResponseWriter, r *http.Request) {
-		user := getUserFromCookie(r)
+		user := gw.GetUserFromCookie(r)
 		if user == "" {
-			writeJSONStatus(w, http.StatusUnauthorized, map[string]string{"error": "login required"})
+			gw.WriteJSONStatus(w, http.StatusUnauthorized, map[string]string{"error": "login required"})
 			return
 		}
 		entries, _ := rdb.LRange(r.Context(), "call_logs:"+user, -20, -1).Result()
 		if entries == nil {
 			entries = []string{}
 		}
-		writeJSON(w, map[string]interface{}{"user": user, "count": len(entries), "entries": entries})
+		gw.WriteJSON(w, map[string]interface{}{"user": user, "count": len(entries), "entries": entries})
 	})
 
 	// === Search ===
@@ -413,110 +384,109 @@ func main() {
 			Sort string `json:"sort"`
 		}
 		json.NewDecoder(r.Body).Decode(&body)
-		uid := extractUID(r)
+		uid := gw.ExtractUID(r)
 		if uid == 0 {
 			http.Error(w, `{"error":"Jwt is missing"}`, http.StatusUnauthorized)
 			return
 		}
-		if msg, code := validateSearch(body.Q); msg != "" {
-			writeJSONStatus(w, code, map[string]interface{}{"success": false, "error": msg})
+		if msg, code := gw.ValidateSearch(body.Q); msg != "" {
+			gw.WriteJSONStatus(w, code, map[string]interface{}{"success": false, "error": msg})
 			return
 		}
-
 		resp, err := searchClient.Search(injectToken(r), &pb.SearchRequest{
 			Query: body.Q, UserId: uid, Sort: body.Sort,
 		})
-		writeGRPCResponse(w, resp, err)
+		gw.WriteGRPCResponse(w, resp, err)
 	})
 
 	// === Sheet CRUD ===
 	mux.HandleFunc("POST /api/v1/sheets", func(w http.ResponseWriter, r *http.Request) {
-		uid := extractUID(r)
+		uid := gw.ExtractUID(r)
 		if uid == 0 {
-			writeJSONStatus(w, http.StatusUnauthorized, map[string]interface{}{"success": false, "error": "Unauthorized"})
+			gw.WriteJSONStatus(w, http.StatusUnauthorized, map[string]interface{}{"success": false, "error": "Unauthorized"})
 			return
 		}
 		var req pb.CreateSpreadsheetRequest
 		json.NewDecoder(r.Body).Decode(&req)
 		req.UserId = uid
-		resp, err := sheetClient.CreateSpreadsheet(injectToken(r), &req)
-		writeGRPCResponse(w, resp, err)
+		resp, err := gw.SheetClient.CreateSpreadsheet(injectToken(r), &req)
+		gw.WriteGRPCResponse(w, resp, err)
 	})
 	mux.HandleFunc("GET /api/v1/sheets", func(w http.ResponseWriter, r *http.Request) {
-		uid := extractUID(r)
+		uid := gw.ExtractUID(r)
 		if uid == 0 {
-			writeJSONStatus(w, http.StatusUnauthorized, map[string]interface{}{"success": false, "error": "Unauthorized"})
+			gw.WriteJSONStatus(w, http.StatusUnauthorized, map[string]interface{}{"success": false, "error": "Unauthorized"})
 			return
 		}
 		resp, err := callWithRetry(r.Context(), cbSheet, 3, "sheet.list", func(ctx context.Context) (*pb.ListSpreadsheetsResponse, error) {
-			return sheetClient.ListSpreadsheets(withAuth(ctx, r), &pb.ListSpreadsheetsRequest{UserId: uid})
+			return gw.SheetClient.ListSpreadsheets(withAuth(ctx, r), &pb.ListSpreadsheetsRequest{UserId: uid})
 		})
-		writeGRPCResponse(w, resp, err)
+		gw.WriteGRPCResponse(w, resp, err)
 	})
 	mux.HandleFunc("GET /api/v1/sheets/{id}", func(w http.ResponseWriter, r *http.Request) {
 		id := parseInt64(r.PathValue("id"))
-		uid := extractUID(r)
-		caller := getUserFromCookie(r)
+		uid := gw.ExtractUID(r)
+		caller := gw.GetUserFromCookie(r)
 		if uid == 0 || caller == "" {
-			writeJSONStatus(w, http.StatusUnauthorized, map[string]interface{}{"success": false, "error": "Unauthorized"})
+			gw.WriteJSONStatus(w, http.StatusUnauthorized, map[string]interface{}{"success": false, "error": "Unauthorized"})
 			return
 		}
 		resp, err := callWithRetry(r.Context(), cbSheet, 3, "sheet.get", func(ctx context.Context) (*pb.GetSpreadsheetResponse, error) {
-			return sheetClient.GetSpreadsheet(withAuth(ctx, r), &pb.GetSpreadsheetRequest{Id: id, UserId: uid})
+			return gw.SheetClient.GetSpreadsheet(withAuth(ctx, r), &pb.GetSpreadsheetRequest{Id: id, UserId: uid})
 		})
 		if err != nil {
-			writeGRPCError(w, err, "Not found")
+			gw.WriteGRPCError(w, err, "Not found")
 			return
 		}
 		if resp == nil || !resp.Success {
-			writeJSONStatus(w, http.StatusNotFound, map[string]interface{}{"success": false, "error": "Not found"})
+			gw.WriteJSONStatus(w, http.StatusNotFound, map[string]interface{}{"success": false, "error": "Not found"})
 			return
 		}
 		if resp.Spreadsheet != nil && resp.Spreadsheet.Username != "" && resp.Spreadsheet.Username != caller {
-			writeJSONStatus(w, http.StatusForbidden, map[string]interface{}{"success": false, "error": "Forbidden"})
+			gw.WriteJSONStatus(w, http.StatusForbidden, map[string]interface{}{"success": false, "error": "Forbidden"})
 			return
 		}
 		if resp.Spreadsheet != nil {
-			writeJSON(w, resp)
+			gw.WriteJSON(w, resp)
 		}
 	})
 	mux.HandleFunc("PUT /api/v1/sheets/{id}", func(w http.ResponseWriter, r *http.Request) {
-		uid := extractUID(r)
+		uid := gw.ExtractUID(r)
 		if uid == 0 {
-			writeJSONStatus(w, http.StatusUnauthorized, map[string]interface{}{"success": false, "error": "Unauthorized"})
+			gw.WriteJSONStatus(w, http.StatusUnauthorized, map[string]interface{}{"success": false, "error": "Unauthorized"})
 			return
 		}
 		var req pb.UpdateSpreadsheetRequest
 		json.NewDecoder(r.Body).Decode(&req)
 		req.Id = parseInt64(r.PathValue("id"))
 		req.UserId = uid
-		resp, err := sheetClient.UpdateSpreadsheet(injectToken(r), &req)
-		writeGRPCResponse(w, resp, err)
+		resp, err := gw.SheetClient.UpdateSpreadsheet(injectToken(r), &req)
+		gw.WriteGRPCResponse(w, resp, err)
 	})
 	mux.HandleFunc("DELETE /api/v1/sheets/{id}", func(w http.ResponseWriter, r *http.Request) {
-		uid := extractUID(r)
+		uid := gw.ExtractUID(r)
 		if uid == 0 {
-			writeJSONStatus(w, http.StatusUnauthorized, map[string]interface{}{"success": false, "error": "Unauthorized"})
+			gw.WriteJSONStatus(w, http.StatusUnauthorized, map[string]interface{}{"success": false, "error": "Unauthorized"})
 			return
 		}
 		id := parseInt64(r.PathValue("id"))
 		resp, err := callWithRetry(r.Context(), cbSheet, 2, "sheet.delete", func(ctx context.Context) (*pb.DeleteSpreadsheetResponse, error) {
-			return sheetClient.DeleteSpreadsheet(withAuth(ctx, r), &pb.DeleteSpreadsheetRequest{Id: id, UserId: uid})
+			return gw.SheetClient.DeleteSpreadsheet(withAuth(ctx, r), &pb.DeleteSpreadsheetRequest{Id: id, UserId: uid})
 		})
-		writeGRPCResponse(w, resp, err)
+		gw.WriteGRPCResponse(w, resp, err)
 	})
 
-	// === Photos (复用 File Service, 筛选 image/*) ===
+	// === Photos ===
 	mux.HandleFunc("GET /api/v1/photos", func(w http.ResponseWriter, r *http.Request) {
-		uid := extractUID(r)
+		uid := gw.ExtractUID(r)
 		if uid == 0 {
-			writeJSONStatus(w, http.StatusUnauthorized, map[string]interface{}{"success": false, "error": "Unauthorized"})
+			gw.WriteJSONStatus(w, http.StatusUnauthorized, map[string]interface{}{"success": false, "error": "Unauthorized"})
 			return
 		}
-		resp, err := fileClient.ListFiles(injectToken(r), &pb.ListFilesRequest{
+		resp, err := gw.FileClient.ListFiles(injectToken(r), &pb.ListFilesRequest{
 			UserId: uid, MimeFilter: "image/",
 		})
-		writeGRPCResponse(w, resp, err)
+		gw.WriteGRPCResponse(w, resp, err)
 	})
 
 	// === File CRUD ===
@@ -524,8 +494,8 @@ func main() {
 		id := parseInt64(r.PathValue("id"))
 		var body struct{ TargetFolderId int64 `json:"target_folder_id"` }
 		json.NewDecoder(r.Body).Decode(&body)
-		resp, err := fileClient.MoveFile(injectToken(r), &pb.MoveFileRequest{Id: id, TargetFolderId: body.TargetFolderId})
-		writeGRPCResponse(w, resp, err)
+		resp, err := gw.FileClient.MoveFile(injectToken(r), &pb.MoveFileRequest{Id: id, TargetFolderId: body.TargetFolderId})
+		gw.WriteGRPCResponse(w, resp, err)
 	})
 	mux.HandleFunc("POST /api/v1/files/folder", func(w http.ResponseWriter, r *http.Request) {
 		var body struct {
@@ -533,27 +503,27 @@ func main() {
 			ParentFolderId int64  `json:"parent_folder_id"`
 		}
 		json.NewDecoder(r.Body).Decode(&body)
-		uid := extractUID(r)
-		resp, err := fileClient.CreateFolder(injectToken(r), &pb.CreateFolderRequest{
+		uid := gw.ExtractUID(r)
+		resp, err := gw.FileClient.CreateFolder(injectToken(r), &pb.CreateFolderRequest{
 			UserId: uid, Name: body.Name, ParentFolderId: body.ParentFolderId,
 		})
-		writeGRPCResponse(w, resp, err)
+		gw.WriteGRPCResponse(w, resp, err)
 	})
 	mux.HandleFunc("GET /api/v1/files", func(w http.ResponseWriter, r *http.Request) {
-		uid := extractUID(r)
+		uid := gw.ExtractUID(r)
 		if uid == 0 {
-			writeJSONStatus(w, http.StatusUnauthorized, map[string]interface{}{"success": false, "error": "Unauthorized"})
+			gw.WriteJSONStatus(w, http.StatusUnauthorized, map[string]interface{}{"success": false, "error": "Unauthorized"})
 			return
 		}
 		resp, err := callWithRetry(r.Context(), cbFile, 3, "file.list", func(ctx context.Context) (*pb.ListFilesResponse, error) {
-			return fileClient.ListFiles(withAuth(ctx, r), &pb.ListFilesRequest{UserId: uid})
+			return gw.FileClient.ListFiles(withAuth(ctx, r), &pb.ListFilesRequest{UserId: uid})
 		})
-		writeGRPCResponse(w, resp, err)
+		gw.WriteGRPCResponse(w, resp, err)
 	})
 	mux.HandleFunc("POST /api/v1/files/upload", func(w http.ResponseWriter, r *http.Request) {
-		uid := extractUID(r)
+		uid := gw.ExtractUID(r)
 		if uid == 0 {
-			writeJSONStatus(w, http.StatusUnauthorized, map[string]interface{}{"success": false, "error": "Unauthorized"})
+			gw.WriteJSONStatus(w, http.StatusUnauthorized, map[string]interface{}{"success": false, "error": "Unauthorized"})
 			return
 		}
 		log.Printf("[upload] uid=%d", uid)
@@ -565,29 +535,29 @@ func main() {
 		}
 		defer f.Close()
 		data, _ := io.ReadAll(f)
-		resp, err := fileClient.CreateFile(injectToken(r), &pb.CreateFileRequest{
+		resp, err := gw.FileClient.CreateFile(injectToken(r), &pb.CreateFileRequest{
 			UserId: uid, OriginalName: h.Filename, Size: int64(len(data)),
 			MimeType: h.Header.Get("Content-Type"), FileContent: data,
 		})
-		writeGRPCResponse(w, resp, err)
+		gw.WriteGRPCResponse(w, resp, err)
 	})
 	mux.HandleFunc("GET /api/v1/files/{id}", func(w http.ResponseWriter, r *http.Request) {
 		id := parseInt64(r.PathValue("id"))
-		uid := extractUID(r)
+		uid := gw.ExtractUID(r)
 		log.Printf("[debug] GetFile id=%d uid=%d", id, uid)
 		if uid == 0 {
-			writeJSONStatus(w, http.StatusUnauthorized, map[string]interface{}{"success": false, "error": "Unauthorized"})
+			gw.WriteJSONStatus(w, http.StatusUnauthorized, map[string]interface{}{"success": false, "error": "Unauthorized"})
 			return
 		}
 		resp, err := callWithRetry(r.Context(), cbFile, 3, "file.get", func(ctx context.Context) (*pb.GetFileResponse, error) {
-			return fileClient.GetFile(withAuth(ctx, r), &pb.GetFileRequest{Id: id, UserId: uid})
+			return gw.FileClient.GetFile(withAuth(ctx, r), &pb.GetFileRequest{Id: id, UserId: uid})
 		})
 		if err != nil {
-			writeGRPCError(w, err, "Not found")
+			gw.WriteGRPCError(w, err, "Not found")
 			return
 		}
 		if resp == nil || !resp.Success {
-			writeJSONStatus(w, http.StatusNotFound, map[string]interface{}{"success": false, "error": "Not found"})
+			gw.WriteJSONStatus(w, http.StatusNotFound, map[string]interface{}{"success": false, "error": "Not found"})
 			return
 		}
 		if resp.GetDownloadUrl() != "" {
@@ -604,22 +574,22 @@ func main() {
 			w.Write(resp.FileContent)
 			return
 		}
-		writeJSON(w, resp)
+		gw.WriteJSON(w, resp)
 	})
 	mux.HandleFunc("DELETE /api/v1/files/{id}", func(w http.ResponseWriter, r *http.Request) {
 		id := parseInt64(r.PathValue("id"))
-		uid := extractUID(r)
+		uid := gw.ExtractUID(r)
 		log.Printf("[debug] DeleteFile id=%d uid=%d", id, uid)
 		resp, err := callWithRetry(r.Context(), cbFile, 2, "file.delete", func(ctx context.Context) (*pb.DeleteFileResponse, error) {
-			return fileClient.DeleteFile(withAuth(ctx, r), &pb.DeleteFileRequest{Id: id, UserId: uid})
+			return gw.FileClient.DeleteFile(withAuth(ctx, r), &pb.DeleteFileRequest{Id: id, UserId: uid})
 		})
-		writeGRPCResponse(w, resp, err)
+		gw.WriteGRPCResponse(w, resp, err)
 	})
 
 	handler := metricsMiddleware(otelhttp.NewHandler(jwtMiddleware(corsMiddleware(mux)), "gateway-grpc",
 		otelhttp.WithTracerProvider(otel.GetTracerProvider()),
 		otelhttp.WithPropagators(otel.GetTextMapPropagator()),
-		))
+	))
 
 	port := getenv("PORT", "8080")
 	srv := &http.Server{Addr: ":" + port, Handler: handler}
@@ -630,7 +600,6 @@ func main() {
 		}
 	}()
 
-	// 优雅关闭：收到 SIGTERM/SIGINT → 停止接受新连接 → 等待已有请求完成
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
@@ -680,145 +649,6 @@ func injectToken(r *http.Request) context.Context {
 	return r.Context()
 }
 
-// gRPCResponse 是所有 protobuf 响应的公共接口
-// 注意：部分生成的 proto 没有 GetErrorCode，所以接口只要求 GetSuccess/GetError
-type gRPCResponse interface {
-	GetSuccess() bool
-	GetError() string
-}
-
-// writeGRPCResponse 统一处理 gRPC 成功/失败 → HTTP 响应
-func writeGRPCResponse(w http.ResponseWriter, resp gRPCResponse, err error) {
-	if err != nil {
-		writeGRPCError(w, err, "internal error")
-		return
-	}
-	if resp == nil || !resp.GetSuccess() {
-		code := int32(0)
-		if ec, ok := any(resp).(interface{ GetErrorCode() int32 }); ok {
-			code = ec.GetErrorCode()
-		}
-		writeError(w, nil, resp.GetError(), code)
-		return
-	}
-	writeJSON(w, resp)
-}
-
-func writeJSON(w http.ResponseWriter, v interface{}) {
-	writeJSONStatus(w, http.StatusOK, v)
-}
-
-func writeJSONStatus(w http.ResponseWriter, code int, v interface{}) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(code)
-	data, _ := json.Marshal(v)
-	// Snowflake IDs (17+ digits) exceed JS precision, quote as strings
-	re := regexp.MustCompile(`:(\d{16,})`)
-	data = re.ReplaceAll(data, []byte(`:"$1"`))
-	w.Write(data)
-}
-
-func writeGRPCError(w http.ResponseWriter, err error, fallback string) {
-	code := http.StatusNotFound
-	msg := fallback
-	if err == gobreaker.ErrOpenState {
-		code = http.StatusServiceUnavailable
-		writeJSONStatus(w, code, map[string]interface{}{
-			"success": false, "error": "Service temporarily unavailable (circuit open)",
-			"degraded": true,
-		})
-		return
-	} else if st, ok := status.FromError(err); ok {
-		switch st.Code() {
-		case codes.PermissionDenied, codes.Unauthenticated:
-			code = http.StatusForbidden
-			msg = st.Message()
-		}
-	}
-	writeJSONStatus(w, code, map[string]interface{}{"success": false, "error": msg})
-}
-
-// errorCodeToHTTP 将 C++ 服务返回的 error_code 枚举映射为 HTTP 状态码
-// 0=OK, 1=BAD_REQUEST(400), 2=UNAUTH(401), 3=FORBIDDEN(403),
-// 4=NOT_FOUND(404), 5=CONFLICT(409), 6=INTERNAL(500), 7=UNAVAILABLE(503)
-func errorCodeToHTTP(code int32) int {
-	switch code {
-	case 1:
-		return http.StatusBadRequest
-	case 2:
-		return http.StatusUnauthorized
-	case 3:
-		return http.StatusForbidden
-	case 4:
-		return http.StatusNotFound
-	case 5:
-		return http.StatusConflict
-	case 6:
-		return http.StatusInternalServerError
-	case 7:
-		return http.StatusServiceUnavailable
-	default:
-		return http.StatusOK
-	}
-}
-
-// writeError 统一错误响应：优先用 error_code，fallback 到消息文本
-func writeError(w http.ResponseWriter, err error, respErr string, errorCode int32) {
-	msg := respErr
-	if err != nil {
-		msg = err.Error()
-	}
-	code := errorCodeToHTTP(errorCode)
-	if code == http.StatusOK {
-		// fallback: 如果 error_code 为 0 或未设置，用熔断/gRPC 错误判断
-		writeGRPCError(w, err, msg)
-		return
-	}
-	writeJSONStatus(w, code, map[string]interface{}{"success": false, "error": msg})
-}
-
-func stringifyIDs(v interface{}) interface{} { return v }
-
-func extractUID(r *http.Request) int64 {
-	for _, c := range r.Cookies() {
-		if c.Name != "rpc_at" {
-			continue
-		}
-		parts := strings.SplitN(c.Value, ".", 3)
-		if len(parts) != 3 {
-			break
-		}
-		raw, err := base64.RawURLEncoding.DecodeString(parts[1])
-		if err != nil {
-			break
-		}
-		// JWT payload 里 uid 可能是裸数字也可能是字符串。
-		// 裸数字在 Go JSON 解码时会被解析为 float64，
-		// 对于 17 位 Snowflake ID 会精度丢失甚至溢出。
-		// 用正则直接从 raw JSON 提取，避免 float64 截断。
-		re := regexp.MustCompile(`"uid":("?)(\d+)("?)`)
-		m := re.FindStringSubmatch(string(raw))
-		if m != nil {
-			n, _ := strconv.ParseInt(m[2], 10, 64)
-			return n
-		}
-	}
-	return 0
-}
-
-func getUserFromCookie(r *http.Request) string {
-	for _, c := range r.Cookies() {
-		if c.Name == "rpc_at" {
-			claims := jwt.MapClaims{}
-			jwt.ParseWithClaims(c.Value, &claims, func(t *jwt.Token) (interface{}, error) { return jwtSecret, nil })
-			if u, ok := claims["username"].(string); ok {
-				return u
-			}
-		}
-	}
-	return ""
-}
-
 func parseInt64(s string) int64 {
 	n, _ := strconv.ParseInt(s, 10, 64)
 	return n
@@ -856,8 +686,8 @@ func jwtMiddleware(next http.Handler) http.Handler {
 }
 
 func corsMiddleware(next http.Handler) http.Handler {
-		allowedOrigin := getenv("CORS_ORIGIN", "*")
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	allowedOrigin := getenv("CORS_ORIGIN", "*")
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Access-Control-Allow-Origin", allowedOrigin)
 		w.Header().Set("Access-Control-Allow-Credentials", "true")
 		w.Header().Set("Access-Control-Allow-Methods", "GET,POST,PUT,DELETE,OPTIONS")
@@ -871,7 +701,6 @@ func corsMiddleware(next http.Handler) http.Handler {
 }
 
 // callWithRetry 熔断器（外）+ gRPC 重试（内）
-// ctx 保留原始请求的 trace context，避免每次重试丢失链路。
 func callWithRetry[T any](ctx context.Context, cb *cbWithSlow, maxAttempts int, label string, fn func(context.Context) (T, error)) (T, error) {
 	result, err := cb.Execute(func() (any, error) {
 		var lastErr error
@@ -911,7 +740,9 @@ func callWithRetry[T any](ctx context.Context, cb *cbWithSlow, maxAttempts int, 
 }
 
 func getenv(key, fallback string) string {
-	if v := os.Getenv(key); v != "" { return v }
+	if v := os.Getenv(key); v != "" {
+		return v
+	}
 	return fallback
 }
 

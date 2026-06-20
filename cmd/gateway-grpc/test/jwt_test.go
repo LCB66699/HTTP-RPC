@@ -1,4 +1,4 @@
-package main
+package gateway_test
 
 import (
 	"testing"
@@ -66,7 +66,6 @@ func TestJWTExpiredRejected(t *testing.T) {
 }
 
 func TestJWTNoPaddingBase64(t *testing.T) {
-	// 验证不带 padding 的 base64url 能被正确解析
 	secret := []byte("test-secret-32bytes-here-abcdef!")
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{"test": true})
 	tokenStr, _ := token.SignedString(secret)

@@ -1,4 +1,4 @@
-package main
+package gateway_test
 
 import (
 	"context"
@@ -12,6 +12,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
+	gw "github.com/lcb66699/http-rpc/gateway-grpc/internal/gateway"
 	pb "gateway-grpc/gen/rpc"
 )
 
@@ -92,39 +93,29 @@ func (m *mockFileClient) BatchDelete(ctx context.Context, req *pb.BatchDeleteReq
 	return nil, nil
 }
 
-type SharingClient interface {
-	Share(ctx context.Context, req *pb.ShareRequest, opts ...grpc.CallOption) (*pb.ShareResponse, error)
-	Revoke(ctx context.Context, req *pb.RevokeRequest, opts ...grpc.CallOption) (*pb.RevokeResponse, error)
-	ListShares(ctx context.Context, req *pb.ResourceRequest, opts ...grpc.CallOption) (*pb.ShareListResponse, error)
-	CreateShareLink(ctx context.Context, req *pb.ShareLinkRequest, opts ...grpc.CallOption) (*pb.ShareLinkResponse, error)
-	GetByToken(ctx context.Context, req *pb.ShareTokenRequest, opts ...grpc.CallOption) (*pb.SharedResourceResponse, error)
-}
+type mockSharedClient struct{ linkResp *pb.ShareLinkResponse }
 
-type mockSharingClient struct{ linkResp *pb.ShareLinkResponse }
-
-func (m *mockSharingClient) Share(ctx context.Context, req *pb.ShareRequest, opts ...grpc.CallOption) (*pb.ShareResponse, error) {
+func (m *mockSharedClient) Share(ctx context.Context, req *pb.ShareRequest, opts ...grpc.CallOption) (*pb.ShareResponse, error) {
 	return nil, nil
 }
-func (m *mockSharingClient) Revoke(ctx context.Context, req *pb.RevokeRequest, opts ...grpc.CallOption) (*pb.RevokeResponse, error) {
+func (m *mockSharedClient) Revoke(ctx context.Context, req *pb.RevokeRequest, opts ...grpc.CallOption) (*pb.RevokeResponse, error) {
 	return nil, nil
 }
-func (m *mockSharingClient) ListShares(ctx context.Context, req *pb.ResourceRequest, opts ...grpc.CallOption) (*pb.ShareListResponse, error) {
+func (m *mockSharedClient) ListShares(ctx context.Context, req *pb.ResourceRequest, opts ...grpc.CallOption) (*pb.ShareListResponse, error) {
 	return nil, nil
 }
-func (m *mockSharingClient) CreateShareLink(ctx context.Context, req *pb.ShareLinkRequest, opts ...grpc.CallOption) (*pb.ShareLinkResponse, error) {
+func (m *mockSharedClient) CreateShareLink(ctx context.Context, req *pb.ShareLinkRequest, opts ...grpc.CallOption) (*pb.ShareLinkResponse, error) {
 	return m.linkResp, nil
 }
-func (m *mockSharingClient) GetByToken(ctx context.Context, req *pb.ShareTokenRequest, opts ...grpc.CallOption) (*pb.SharedResourceResponse, error) {
+func (m *mockSharedClient) GetByToken(ctx context.Context, req *pb.ShareTokenRequest, opts ...grpc.CallOption) (*pb.SharedResourceResponse, error) {
 	return nil, nil
 }
-
-var sharingClient SharingClient
 
 // ---- Change Password ----
 func TestChangePassword_Success(t *testing.T) {
-	orig := authClient
-	authClient = &mockAuthClient{changePwdResp: &pb.ChangePasswordResponse{Success: true}}
-	defer func() { authClient = orig }()
+	orig := gw.AuthClient
+	gw.AuthClient = &mockAuthClient{changePwdResp: &pb.ChangePasswordResponse{Success: true}}
+	defer func() { gw.AuthClient = orig }()
 	req := httptest.NewRequest("PUT", "/api/v1/me/password",
 		strings.NewReader(`{"old_password":"old","new_password":"new1234"}`))
 	req.AddCookie(&http.Cookie{Name: "rpc_at", Value: validTestJWT()})
@@ -133,19 +124,19 @@ func TestChangePassword_Success(t *testing.T) {
 	mux.HandleFunc("PUT /api/v1/me/password", func(w http.ResponseWriter, r *http.Request) {
 		var body struct{ OldPassword, NewPassword string }
 		json.NewDecoder(r.Body).Decode(&body)
-		uid := extractUID(r)
+		uid := gw.ExtractUID(r)
 		if uid == 0 {
 			http.Error(w, `{"error":"unauthorized"}`, http.StatusUnauthorized)
 			return
 		}
-		resp, err := authClient.ChangePassword(r.Context(), &pb.ChangePasswordRequest{
+		resp, err := gw.AuthClient.ChangePassword(r.Context(), &pb.ChangePasswordRequest{
 			UserId: uid, OldPassword: body.OldPassword, NewPassword: body.NewPassword,
 		})
 		if err != nil || resp == nil || !resp.Success {
-			writeJSONStatus(w, http.StatusBadRequest, map[string]interface{}{"success": false, "error": "failed"})
+			gw.WriteJSONStatus(w, http.StatusBadRequest, map[string]interface{}{"success": false, "error": "failed"})
 			return
 		}
-		writeJSON(w, resp)
+		gw.WriteJSON(w, resp)
 	})
 	mux.ServeHTTP(w, req)
 	if w.Code != http.StatusOK {
@@ -159,7 +150,7 @@ func TestChangePassword_Unauthorized(t *testing.T) {
 	w := httptest.NewRecorder()
 	mux := http.NewServeMux()
 	mux.HandleFunc("PUT /api/v1/me/password", func(w http.ResponseWriter, r *http.Request) {
-		if extractUID(r) == 0 {
+		if gw.ExtractUID(r) == 0 {
 			http.Error(w, `{"error":"unauthorized"}`, http.StatusUnauthorized)
 			return
 		}
@@ -171,9 +162,9 @@ func TestChangePassword_Unauthorized(t *testing.T) {
 }
 
 func TestChangePassword_GrpcError(t *testing.T) {
-	orig := authClient
-	authClient = &mockAuthClient{changePwdErr: status.Error(codes.Internal, "DB error")}
-	defer func() { authClient = orig }()
+	orig := gw.AuthClient
+	gw.AuthClient = &mockAuthClient{changePwdErr: status.Error(codes.Internal, "DB error")}
+	defer func() { gw.AuthClient = orig }()
 	req := httptest.NewRequest("PUT", "/api/v1/me/password",
 		strings.NewReader(`{"old_password":"old","new_password":"new1234"}`))
 	req.AddCookie(&http.Cookie{Name: "rpc_at", Value: validTestJWT()})
@@ -182,15 +173,15 @@ func TestChangePassword_GrpcError(t *testing.T) {
 	mux.HandleFunc("PUT /api/v1/me/password", func(w http.ResponseWriter, r *http.Request) {
 		var body struct{ OldPassword, NewPassword string }
 		json.NewDecoder(r.Body).Decode(&body)
-		uid := extractUID(r)
-		resp, err := authClient.ChangePassword(r.Context(), &pb.ChangePasswordRequest{
+		uid := gw.ExtractUID(r)
+		resp, err := gw.AuthClient.ChangePassword(r.Context(), &pb.ChangePasswordRequest{
 			UserId: uid, OldPassword: body.OldPassword, NewPassword: body.NewPassword,
 		})
 		if err != nil || resp == nil || !resp.Success {
-			writeJSONStatus(w, http.StatusInternalServerError, map[string]interface{}{"success": false, "error": err.Error()})
+			gw.WriteJSONStatus(w, http.StatusInternalServerError, map[string]interface{}{"success": false, "error": err.Error()})
 			return
 		}
-		writeJSON(w, resp)
+		gw.WriteJSON(w, resp)
 	})
 	mux.ServeHTTP(w, req)
 	if w.Code != http.StatusInternalServerError {
@@ -200,21 +191,21 @@ func TestChangePassword_GrpcError(t *testing.T) {
 
 // ---- Cursor Pagination ----
 func TestListSheets_CursorFirstPage(t *testing.T) {
-	orig := sheetClient
-	sheetClient = &mockSheetClient{
+	orig := gw.SheetClient
+	gw.SheetClient = &mockSheetClient{
 		listResp: &pb.ListSpreadsheetsResponse{Success: true, Total: 50, HasMore: true, NextCursor: "999"},
 	}
-	defer func() { sheetClient = orig }()
+	defer func() { gw.SheetClient = orig }()
 	req := httptest.NewRequest("GET", "/api/v1/sheets?limit=10", nil)
 	req.AddCookie(&http.Cookie{Name: "rpc_at", Value: validTestJWT()})
 	w := httptest.NewRecorder()
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /api/v1/sheets", func(w http.ResponseWriter, r *http.Request) {
-		resp, _ := sheetClient.ListSpreadsheets(r.Context(), &pb.ListSpreadsheetsRequest{UserId: 12345, Limit: 10})
+		resp, _ := gw.SheetClient.ListSpreadsheets(r.Context(), &pb.ListSpreadsheetsRequest{UserId: 12345, Limit: 10})
 		if resp.GetHasMore() && resp.GetNextCursor() == "" {
 			t.Error("has_more=true requires next_cursor")
 		}
-		writeJSON(w, resp)
+		gw.WriteJSON(w, resp)
 	})
 	mux.ServeHTTP(w, req)
 	if !strings.Contains(w.Body.String(), `"has_more":true`) {
@@ -223,18 +214,18 @@ func TestListSheets_CursorFirstPage(t *testing.T) {
 }
 
 func TestListSheets_EmptyResult(t *testing.T) {
-	orig := sheetClient
-	sheetClient = &mockSheetClient{
+	orig := gw.SheetClient
+	gw.SheetClient = &mockSheetClient{
 		listResp: &pb.ListSpreadsheetsResponse{Success: true, Total: 0, HasMore: false},
 	}
-	defer func() { sheetClient = orig }()
+	defer func() { gw.SheetClient = orig }()
 	req := httptest.NewRequest("GET", "/api/v1/sheets?limit=10", nil)
 	req.AddCookie(&http.Cookie{Name: "rpc_at", Value: validTestJWT()})
 	w := httptest.NewRecorder()
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /api/v1/sheets", func(w http.ResponseWriter, r *http.Request) {
-		resp, _ := sheetClient.ListSpreadsheets(r.Context(), &pb.ListSpreadsheetsRequest{UserId: 12345, Limit: 10})
-		writeJSON(w, resp)
+		resp, _ := gw.SheetClient.ListSpreadsheets(r.Context(), &pb.ListSpreadsheetsRequest{UserId: 12345, Limit: 10})
+		gw.WriteJSON(w, resp)
 	})
 	mux.ServeHTTP(w, req)
 	if w.Code != http.StatusOK {
@@ -244,9 +235,9 @@ func TestListSheets_EmptyResult(t *testing.T) {
 
 // ---- Folder ----
 func TestCreateFolder_Success(t *testing.T) {
-	orig := fileClient
-	fileClient = &mockFileClient{createFolderResp: &pb.CreateFolderResponse{Success: true, Id: 999}}
-	defer func() { fileClient = orig }()
+	orig := gw.FileClient
+	gw.FileClient = &mockFileClient{createFolderResp: &pb.CreateFolderResponse{Success: true, Id: 999}}
+	defer func() { gw.FileClient = orig }()
 	req := httptest.NewRequest("POST", "/api/v1/files/folder", strings.NewReader(`{"name":"test"}`))
 	req.AddCookie(&http.Cookie{Name: "rpc_at", Value: validTestJWT()})
 	w := httptest.NewRecorder()
@@ -254,9 +245,9 @@ func TestCreateFolder_Success(t *testing.T) {
 	mux.HandleFunc("POST /api/v1/files/folder", func(w http.ResponseWriter, r *http.Request) {
 		var body struct{ Name string }
 		json.NewDecoder(r.Body).Decode(&body)
-		uid := extractUID(r)
-		resp, _ := fileClient.CreateFolder(r.Context(), &pb.CreateFolderRequest{UserId: uid, Name: body.Name})
-		writeJSON(w, resp)
+		uid := gw.ExtractUID(r)
+		resp, _ := gw.FileClient.CreateFolder(r.Context(), &pb.CreateFolderRequest{UserId: uid, Name: body.Name})
+		gw.WriteJSON(w, resp)
 	})
 	mux.ServeHTTP(w, req)
 	if w.Code != http.StatusOK {
@@ -266,11 +257,11 @@ func TestCreateFolder_Success(t *testing.T) {
 
 // ---- Phone OTP ----
 func TestPhoneLogin_Success(t *testing.T) {
-	orig := authClient
-	authClient = &mockAuthClient{
+	orig := gw.AuthClient
+	gw.AuthClient = &mockAuthClient{
 		loginByPhoneResp: &pb.LoginResponse{Success: true, UserId: 1, AccessToken: "at", RefreshToken: "rt", Role: "user"},
 	}
-	defer func() { authClient = orig }()
+	defer func() { gw.AuthClient = orig }()
 	req := httptest.NewRequest("POST", "/api/v1/auth/phone/login",
 		strings.NewReader(`{"phone":"13800138000","otp":"123456"}`))
 	w := httptest.NewRecorder()
@@ -278,8 +269,8 @@ func TestPhoneLogin_Success(t *testing.T) {
 	mux.HandleFunc("POST /api/v1/auth/phone/login", func(w http.ResponseWriter, r *http.Request) {
 		var body struct{ Phone, OTP string }
 		json.NewDecoder(r.Body).Decode(&body)
-		resp, _ := authClient.LoginByPhone(r.Context(), &pb.PhoneLoginRequest{Phone: body.Phone, Otp: body.OTP})
-		writeJSON(w, resp)
+		resp, _ := gw.AuthClient.LoginByPhone(r.Context(), &pb.PhoneLoginRequest{Phone: body.Phone, Otp: body.OTP})
+		gw.WriteJSON(w, resp)
 	})
 	mux.ServeHTTP(w, req)
 	if w.Code != http.StatusOK {
@@ -299,7 +290,7 @@ func TestOTPSend_ValidPhone(t *testing.T) {
 			w.WriteHeader(http.StatusBadRequest)
 			return
 		}
-		writeJSON(w, map[string]interface{}{"success": true})
+		gw.WriteJSON(w, map[string]interface{}{"success": true})
 	})
 	mux.ServeHTTP(w, req)
 	if w.Code != http.StatusOK {
@@ -318,7 +309,7 @@ func TestOTPSend_EmptyPhone_Rejected(t *testing.T) {
 			http.Error(w, `{"error":"phone required"}`, http.StatusBadRequest)
 			return
 		}
-		writeJSON(w, map[string]interface{}{"success": true})
+		gw.WriteJSON(w, map[string]interface{}{"success": true})
 	})
 	mux.ServeHTTP(w, req)
 	if w.Code != http.StatusBadRequest {
@@ -328,16 +319,16 @@ func TestOTPSend_EmptyPhone_Rejected(t *testing.T) {
 
 // ---- Photo ----
 func TestPhotoList_Success(t *testing.T) {
-	orig := fileClient
-	fileClient = &mockFileClient{listResp: &pb.ListFilesResponse{Success: true, Total: 5}}
-	defer func() { fileClient = orig }()
+	orig := gw.FileClient
+	gw.FileClient = &mockFileClient{listResp: &pb.ListFilesResponse{Success: true, Total: 5}}
+	defer func() { gw.FileClient = orig }()
 	req := httptest.NewRequest("GET", "/api/v1/photos", nil)
 	req.AddCookie(&http.Cookie{Name: "rpc_at", Value: validTestJWT()})
 	w := httptest.NewRecorder()
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /api/v1/photos", func(w http.ResponseWriter, r *http.Request) {
-		resp, _ := fileClient.ListFiles(r.Context(), &pb.ListFilesRequest{UserId: 12345, MimeFilter: "image/"})
-		writeJSON(w, resp)
+		resp, _ := gw.FileClient.ListFiles(r.Context(), &pb.ListFilesRequest{UserId: 12345, MimeFilter: "image/"})
+		gw.WriteJSON(w, resp)
 	})
 	mux.ServeHTTP(w, req)
 	if w.Code != http.StatusOK {
@@ -347,7 +338,7 @@ func TestPhotoList_Success(t *testing.T) {
 
 // ---- Sharing ----
 func TestShareLink_Create(t *testing.T) {
-	sharingClient = &mockSharingClient{
+	gw.SharedClient = &mockSharedClient{
 		linkResp: &pb.ShareLinkResponse{Success: true, Token: "abc123"},
 	}
 	req := httptest.NewRequest("POST", "/api/v1/sheets/123/share-link",
@@ -356,10 +347,10 @@ func TestShareLink_Create(t *testing.T) {
 	w := httptest.NewRecorder()
 	mux := http.NewServeMux()
 	mux.HandleFunc("POST /api/v1/sheets/{id}/share-link", func(w http.ResponseWriter, r *http.Request) {
-		resp, _ := sharingClient.CreateShareLink(r.Context(), &pb.ShareLinkRequest{
+		resp, _ := gw.SharedClient.CreateShareLink(r.Context(), &pb.ShareLinkRequest{
 			OwnerId: 12345, ResourceType: "sheet", ResourceId: 123, Permission: "view",
 		})
-		writeJSON(w, resp)
+		gw.WriteJSON(w, resp)
 	})
 	mux.ServeHTTP(w, req)
 	if !strings.Contains(w.Body.String(), `abc123`) {
@@ -368,18 +359,18 @@ func TestShareLink_Create(t *testing.T) {
 }
 
 func TestShareToken_Access(t *testing.T) {
-	sharingClient = &mockSharingClient{}
+	gw.SharedClient = &mockSharedClient{}
 	req := httptest.NewRequest("GET", "/api/v1/s/abc123", nil)
 	w := httptest.NewRecorder()
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /api/v1/s/{token}", func(w http.ResponseWriter, r *http.Request) {
 		token := r.PathValue("token")
-		resp, _ := sharingClient.GetByToken(r.Context(), &pb.ShareTokenRequest{Token: token})
+		resp, _ := gw.SharedClient.GetByToken(r.Context(), &pb.ShareTokenRequest{Token: token})
 		if resp == nil || !resp.Success {
-			writeJSONStatus(w, http.StatusNotFound, map[string]interface{}{"success": false})
+			gw.WriteJSONStatus(w, http.StatusNotFound, map[string]interface{}{"success": false})
 			return
 		}
-		writeJSON(w, resp)
+		gw.WriteJSON(w, resp)
 	})
 	mux.ServeHTTP(w, req)
 	if w.Code != http.StatusNotFound {
