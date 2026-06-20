@@ -71,7 +71,7 @@ grpc::Status SpreadsheetServiceImpl::CreateSpreadsheet(grpc::ServerContext *cont
         return grpc::Status(grpc::StatusCode::UNAUTHENTICATED, "Invalid or missing token");
 
     std::string vu_user, vu_role;
-    if (auth_stub_ && !ValidateCaller(context, g_rpc_auth_ctx.uid, vu_user, vu_role))
+    if (auth_stub_ && !ValidateCaller(context, g_rpc_auth_ctx.user_id, vu_user, vu_role))
         return grpc::Status(grpc::StatusCode::UNAUTHENTICATED, "Auth service rejected");
 
     auto start = std::chrono::high_resolution_clock::now();
@@ -95,7 +95,7 @@ grpc::Status SpreadsheetServiceImpl::CreateSpreadsheet(grpc::ServerContext *cont
         auto us = std::chrono::duration_cast<std::chrono::microseconds>(
                       std::chrono::high_resolution_clock::now().time_since_epoch())
                       .count();
-        storage_key = std::to_string(g_rpc_auth_ctx.uid) + "/" + std::to_string(us) + ".json";
+        storage_key = std::to_string(g_rpc_auth_ctx.user_id) + "/" + std::to_string(us) + ".json";
         nlohmann::json content;
         content["headers"] = nlohmann::json::parse(req->headers_json().empty() ? "[]" : req->headers_json());
         content["data"] = nlohmann::json::parse(req->data_json().empty() ? "[]" : req->data_json());
@@ -108,8 +108,8 @@ grpc::Status SpreadsheetServiceImpl::CreateSpreadsheet(grpc::ServerContext *cont
     }
 
     int64_t id = 0;
-    if (slog_) LOG_DEBUG(*slog_, "Create req->user_id=" + std::to_string(g_rpc_auth_ctx.uid));
-    bool ok = db_->CreateSpreadsheet(g_rpc_auth_ctx.uid, username, req->name(), req->description(), req->headers_json(),
+    if (slog_) LOG_DEBUG(*slog_, "Create req->user_id=" + std::to_string(g_rpc_auth_ctx.user_id));
+    bool ok = db_->CreateSpreadsheet(g_rpc_auth_ctx.user_id, username, req->name(), req->description(), req->headers_json(),
                                      req->data_json(), id, req->idempotency_key());
     if (!ok && !storage_key.empty()) {
         minio_->DeleteObject(storage_key);  // rollback
@@ -137,24 +137,24 @@ grpc::Status SpreadsheetServiceImpl::CreateSpreadsheet(grpc::ServerContext *cont
 
     // Invalidate list cache
     if (redis_ && redis_->IsConnected()) {
-        redis_->Increment(SheetVersionKey(g_rpc_auth_ctx.uid));
+        redis_->Increment(SheetVersionKey(g_rpc_auth_ctx.user_id));
         if (slog_)
             LOG_DEBUG(*slog_,
-                      "Create id=" + std::to_string(id) + " INCR version for uid=" + std::to_string(g_rpc_auth_ctx.uid));
+                      "Create id=" + std::to_string(id) + " INCR version for uid=" + std::to_string(g_rpc_auth_ctx.user_id));
     }
 
     {
         nlohmann::json ev;
         ev["type"] = "sheet.created";
         ev["id"] = id;
-        ev["user_id"] = g_rpc_auth_ctx.uid;
+        ev["user_id"] = g_rpc_auth_ctx.user_id;
         ev["name"] = req->name();
         if (!storage_key.empty())
             ev["object_key"] = storage_key;
         if (rabbit_)
             rabbit_->Publish("rpc.events", "sheet.created", ev.dump());
         if (db_)
-            db_->InsertOutbox(g_rpc_auth_ctx.uid, "sheet.created", ev.dump());
+            db_->InsertOutbox(g_rpc_auth_ctx.user_id, "sheet.created", ev.dump());
     }
 
     resp->set_success(true);
@@ -171,7 +171,7 @@ grpc::Status SpreadsheetServiceImpl::CreateSpreadsheet(grpc::ServerContext *cont
     }
     if (slog_)
         LOG_INFO(*slog_, "Created id=" + std::to_string(id) + " by " + username +
-                             " (uid=" + std::to_string(g_rpc_auth_ctx.uid) + ")");
+                             " (uid=" + std::to_string(g_rpc_auth_ctx.user_id) + ")");
     return grpc::Status::OK;
 }
 
@@ -180,10 +180,10 @@ grpc::Status SpreadsheetServiceImpl::GetSpreadsheet(grpc::ServerContext *context
     if (!g_rpc_auth_ctx.authenticated)
         return grpc::Status(grpc::StatusCode::UNAUTHENTICATED, "Invalid or missing token");
     std::string vu_user, vu_role;
-    if (auth_stub_ && !ValidateCaller(context, g_rpc_auth_ctx.uid, vu_user, vu_role))
+    if (auth_stub_ && !ValidateCaller(context, g_rpc_auth_ctx.user_id, vu_user, vu_role))
         return grpc::Status(grpc::StatusCode::UNAUTHENTICATED, "Auth service rejected");
     // 校验资源归属：user_id 必须匹配 sheet 所有�?
-    if (g_rpc_auth_ctx.uid <= 0) {
+    if (g_rpc_auth_ctx.user_id <= 0) {
         resp->set_success(false);
         SET_ERROR(resp, "Not found", rpc_error::NOT_FOUND);
         return grpc::Status::OK;
@@ -197,12 +197,12 @@ grpc::Status SpreadsheetServiceImpl::GetSpreadsheet(grpc::ServerContext *context
         std::this_thread::sleep_for(std::chrono::milliseconds(50 << retry));
     }
     if (slog_) LOG_DEBUG(*slog_, "GetOwner id=" + std::to_string(req->id()) +
-                                     " owner=" + std::to_string(owner_uid) + " req_uid=" + std::to_string(g_rpc_auth_ctx.uid));
-    if (found && owner_uid != g_rpc_auth_ctx.uid) {
+                                     " owner=" + std::to_string(owner_uid) + " req_uid=" + std::to_string(g_rpc_auth_ctx.user_id));
+    if (found && owner_uid != g_rpc_auth_ctx.user_id) {
         if (slog_) LOG_DEBUG(*slog_, "Owner mismatch! sheet_id=" + std::to_string(req->id()) +
-                                      " owner=" + std::to_string(owner_uid) + " caller=" + std::to_string(g_rpc_auth_ctx.uid));
+                                      " owner=" + std::to_string(owner_uid) + " caller=" + std::to_string(g_rpc_auth_ctx.user_id));
     }
-    if (!found || owner_uid != g_rpc_auth_ctx.uid) {
+    if (!found || owner_uid != g_rpc_auth_ctx.user_id) {
         resp->set_success(false);
         SET_ERROR(resp, "Not found", rpc_error::NOT_FOUND);
         return grpc::Status::OK;
@@ -210,7 +210,7 @@ grpc::Status SpreadsheetServiceImpl::GetSpreadsheet(grpc::ServerContext *context
     auto start = std::chrono::high_resolution_clock::now();
     std::string username = UsernameFromMeta(context);
 
-    int64_t req_uid = g_rpc_auth_ctx.uid;
+    int64_t req_uid = g_rpc_auth_ctx.user_id;
     const std::string cache_key = "u:" + std::to_string(req_uid) + ":sheet:" + std::to_string(req->id());
     const std::string ts_key = cache_key + ":ts";
     const std::string lock_key = "lock:u:" + std::to_string(req_uid) + ":sheet:" + std::to_string(req->id());
@@ -458,11 +458,11 @@ grpc::Status SpreadsheetServiceImpl::ListSpreadsheets(grpc::ServerContext *conte
     if (!g_rpc_auth_ctx.authenticated)
         return grpc::Status(grpc::StatusCode::UNAUTHENTICATED, "Invalid or missing token");
     std::string vu_user, vu_role;
-    if (auth_stub_ && !ValidateCaller(context, g_rpc_auth_ctx.uid, vu_user, vu_role))
+    if (auth_stub_ && !ValidateCaller(context, g_rpc_auth_ctx.user_id, vu_user, vu_role))
         return grpc::Status(grpc::StatusCode::UNAUTHENTICATED, "Auth service rejected");
     auto start = std::chrono::high_resolution_clock::now();
     std::string username = UsernameFromMeta(context);
-    int64_t uid = g_rpc_auth_ctx.uid;
+    int64_t uid = g_rpc_auth_ctx.user_id;
     int page = req->page();
     int page_size = req->page_size();
 
@@ -568,7 +568,7 @@ grpc::Status SpreadsheetServiceImpl::UpdateSpreadsheet(grpc::ServerContext *cont
     if (!g_rpc_auth_ctx.authenticated)
         return grpc::Status(grpc::StatusCode::UNAUTHENTICATED, "Invalid or missing token");
     std::string vu_user, vu_role;
-    if (auth_stub_ && !ValidateCaller(context, g_rpc_auth_ctx.uid, vu_user, vu_role))
+    if (auth_stub_ && !ValidateCaller(context, g_rpc_auth_ctx.user_id, vu_user, vu_role))
         return grpc::Status(grpc::StatusCode::UNAUTHENTICATED, "Auth service rejected");
     auto start = std::chrono::high_resolution_clock::now();
     std::string username = UsernameFromMeta(context);
@@ -583,37 +583,37 @@ grpc::Status SpreadsheetServiceImpl::UpdateSpreadsheet(grpc::ServerContext *cont
     for (int attempt = 0; attempt < MAX_RETRIES; ++attempt) {
         int64_t owner_uid = 0;
         int version = 0;
-        if (!db_->GetSpreadsheetOwner(req->id(), owner_uid, &version) || owner_uid != g_rpc_auth_ctx.uid) {
+        if (!db_->GetSpreadsheetOwner(req->id(), owner_uid, &version) || owner_uid != g_rpc_auth_ctx.user_id) {
             resp->set_success(false);
             SET_ERROR(resp, "Not found or permission denied", rpc_error::NOT_FOUND);
             return grpc::Status::OK;
         }
 
-        bool ok = db_->UpdateSpreadsheet(req->id(), g_rpc_auth_ctx.uid, req->name(), req->description(),
+        bool ok = db_->UpdateSpreadsheet(req->id(), g_rpc_auth_ctx.user_id, req->name(), req->description(),
                                          req->headers_json(), req->data_json(), version);
 
         if (ok) {
             if (redis_ && redis_->IsConnected()) {
-                redis_->DeleteKey("u:" + std::to_string(g_rpc_auth_ctx.uid) + ":sheet:" + std::to_string(req->id()));
-                redis_->DeleteKey("u:" + std::to_string(g_rpc_auth_ctx.uid) + ":sheet:" + std::to_string(req->id()) +
+                redis_->DeleteKey("u:" + std::to_string(g_rpc_auth_ctx.user_id) + ":sheet:" + std::to_string(req->id()));
+                redis_->DeleteKey("u:" + std::to_string(g_rpc_auth_ctx.user_id) + ":sheet:" + std::to_string(req->id()) +
                                   ":ts");
-                redis_->Increment(SheetVersionKey(g_rpc_auth_ctx.uid));
+                redis_->Increment(SheetVersionKey(g_rpc_auth_ctx.user_id));
                 if (slog_)
                     LOG_DEBUG(*slog_, "Update id=" + std::to_string(req->id()) +
-                                          " INVALIDATED + INCR version uid=" + std::to_string(g_rpc_auth_ctx.uid));
+                                          " INVALIDATED + INCR version uid=" + std::to_string(g_rpc_auth_ctx.user_id));
             }
 
             {
                 nlohmann::json ev;
                 ev["type"] = "sheet.updated";
                 ev["id"] = req->id();
-                ev["user_id"] = g_rpc_auth_ctx.uid;
+                ev["user_id"] = g_rpc_auth_ctx.user_id;
                 ev["name"] = req->name();
                 ev["description"] = req->description();
                 if (rabbit_)
                     rabbit_->Publish("rpc.events", "sheet.updated", ev.dump());
                 if (db_)
-                    db_->InsertOutbox(g_rpc_auth_ctx.uid, "sheet.updated", ev.dump());
+                    db_->InsertOutbox(g_rpc_auth_ctx.user_id, "sheet.updated", ev.dump());
             }
 
             resp->set_success(true);
@@ -656,7 +656,7 @@ grpc::Status SpreadsheetServiceImpl::DeleteSpreadsheet(grpc::ServerContext *cont
     if (!g_rpc_auth_ctx.authenticated)
         return grpc::Status(grpc::StatusCode::UNAUTHENTICATED, "Invalid or missing token");
     std::string vu_user, vu_role;
-    if (auth_stub_ && !ValidateCaller(context, g_rpc_auth_ctx.uid, vu_user, vu_role))
+    if (auth_stub_ && !ValidateCaller(context, g_rpc_auth_ctx.user_id, vu_user, vu_role))
         return grpc::Status(grpc::StatusCode::UNAUTHENTICATED, "Auth service rejected");
     auto start = std::chrono::high_resolution_clock::now();
     std::string username = UsernameFromMeta(context);
@@ -670,14 +670,14 @@ grpc::Status SpreadsheetServiceImpl::DeleteSpreadsheet(grpc::ServerContext *cont
     int64_t owner_uid = 0;
     bool fo = db_->GetSpreadsheetOwner(req->id(), owner_uid);
     fprintf(stderr, "[Delete] id=%ld req_uid=%ld owner_uid=%ld found=%d\n",
-            (long)req->id(), (long)g_rpc_auth_ctx.uid, (long)owner_uid, fo);
-    if (!fo || owner_uid != g_rpc_auth_ctx.uid) {
+            (long)req->id(), (long)g_rpc_auth_ctx.user_id, (long)owner_uid, fo);
+    if (!fo || owner_uid != g_rpc_auth_ctx.user_id) {
         resp->set_success(false);
         SET_ERROR(resp, "Not found or permission denied", rpc_error::NOT_FOUND);
         return grpc::Status::OK;
     }
 
-    bool ok = db_->DeleteSpreadsheet(req->id(), g_rpc_auth_ctx.uid);
+    bool ok = db_->DeleteSpreadsheet(req->id(), g_rpc_auth_ctx.user_id);
 
     if (!ok) {
         resp->set_success(false);
@@ -695,23 +695,23 @@ grpc::Status SpreadsheetServiceImpl::DeleteSpreadsheet(grpc::ServerContext *cont
     }
 
     if (redis_ && redis_->IsConnected()) {
-        redis_->DeleteKey("u:" + std::to_string(g_rpc_auth_ctx.uid) + ":sheet:" + std::to_string(req->id()));
-        redis_->DeleteKey("u:" + std::to_string(g_rpc_auth_ctx.uid) + ":sheet:" + std::to_string(req->id()) + ":ts");
-        redis_->Increment(SheetVersionKey(g_rpc_auth_ctx.uid));
+        redis_->DeleteKey("u:" + std::to_string(g_rpc_auth_ctx.user_id) + ":sheet:" + std::to_string(req->id()));
+        redis_->DeleteKey("u:" + std::to_string(g_rpc_auth_ctx.user_id) + ":sheet:" + std::to_string(req->id()) + ":ts");
+        redis_->Increment(SheetVersionKey(g_rpc_auth_ctx.user_id));
         if (slog_)
             LOG_DEBUG(*slog_, "Delete id=" + std::to_string(req->id()) +
-                                  " INVALIDATED + INCR version uid=" + std::to_string(g_rpc_auth_ctx.uid));
+                                  " INVALIDATED + INCR version uid=" + std::to_string(g_rpc_auth_ctx.user_id));
     }
 
     {
         nlohmann::json ev;
         ev["type"] = "sheet.deleted";
         ev["id"] = req->id();
-        ev["user_id"] = g_rpc_auth_ctx.uid;
+        ev["user_id"] = g_rpc_auth_ctx.user_id;
         if (rabbit_)
             rabbit_->Publish("rpc.events", "sheet.deleted", ev.dump());
         if (db_)
-            db_->InsertOutbox(g_rpc_auth_ctx.uid, "sheet.deleted", ev.dump());
+            db_->InsertOutbox(g_rpc_auth_ctx.user_id, "sheet.deleted", ev.dump());
     }
 
     resp->set_success(true);

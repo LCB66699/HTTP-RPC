@@ -62,7 +62,7 @@ grpc::Status FileServiceImpl::CreateFile(grpc::ServerContext *context, const rpc
     if (!g_rpc_auth_ctx.authenticated)
         return grpc::Status(grpc::StatusCode::UNAUTHENTICATED, "Invalid or missing token");
     std::string vu_user, vu_role;
-    if (auth_stub_ && !ValidateCaller(context, g_rpc_auth_ctx.uid, vu_user, vu_role))
+    if (auth_stub_ && !ValidateCaller(context, g_rpc_auth_ctx.user_id, vu_user, vu_role))
         return grpc::Status(grpc::StatusCode::UNAUTHENTICATED, "Auth service rejected");
     auto start = std::chrono::high_resolution_clock::now();
     std::string username = UsernameFromMeta(context);
@@ -80,7 +80,7 @@ grpc::Status FileServiceImpl::CreateFile(grpc::ServerContext *context, const rpc
         auto us = std::chrono::duration_cast<std::chrono::microseconds>(
                       std::chrono::high_resolution_clock::now().time_since_epoch())
                       .count();
-        storage_key = std::to_string(g_rpc_auth_ctx.uid) + "/" + std::to_string(us);
+        storage_key = std::to_string(g_rpc_auth_ctx.user_id) + "/" + std::to_string(us);
         if (!minio_->PutObject(storage_key, req->file_content(), req->mime_type())) {
             resp->set_success(false);
             SET_ERROR(resp, "MinIO upload failed", rpc_error::INTERNAL);
@@ -88,7 +88,7 @@ grpc::Status FileServiceImpl::CreateFile(grpc::ServerContext *context, const rpc
         }
     }
 
-    bool ok = db_->CreateFile(g_rpc_auth_ctx.uid, username, req->original_name(), req->size(), req->mime_type(),
+    bool ok = db_->CreateFile(g_rpc_auth_ctx.user_id, username, req->original_name(), req->size(), req->mime_type(),
                               storage_key, id, req->idempotency_key());
 
     if (!ok) {
@@ -106,7 +106,7 @@ grpc::Status FileServiceImpl::CreateFile(grpc::ServerContext *context, const rpc
     }
 
     if (redis_ && redis_->IsConnected()) {
-        redis_->Increment(FileVersionKey(g_rpc_auth_ctx.uid));
+        redis_->Increment(FileVersionKey(g_rpc_auth_ctx.user_id));
     }
 
     resp->set_success(true);
@@ -117,7 +117,7 @@ grpc::Status FileServiceImpl::CreateFile(grpc::ServerContext *context, const rpc
         nlohmann::json ev;
         ev["type"] = "file.uploaded";
         ev["file_id"] = id;
-        ev["user_id"] = g_rpc_auth_ctx.uid;
+        ev["user_id"] = g_rpc_auth_ctx.user_id;
         ev["original_name"] = req->original_name();
         ev["mime_type"] = req->mime_type();
         ev["size"] = req->size();
@@ -126,7 +126,7 @@ grpc::Status FileServiceImpl::CreateFile(grpc::ServerContext *context, const rpc
         if (rabbit_)
             rabbit_->Publish("rpc.events", "file.uploaded", ev.dump());
         if (db_)
-            db_->InsertOutbox(g_rpc_auth_ctx.uid, "file.uploaded", ev.dump());
+            db_->InsertOutbox(g_rpc_auth_ctx.user_id, "file.uploaded", ev.dump());
     }
 
     if (logger_) {
@@ -140,7 +140,7 @@ grpc::Status FileServiceImpl::CreateFile(grpc::ServerContext *context, const rpc
     }
     if (slog_)
         LOG_INFO(*slog_, "Created id=" + std::to_string(id) + " '" + req->original_name() + "' by " + username +
-                             " (uid=" + std::to_string(g_rpc_auth_ctx.uid) + ") storage=mysql-blob");
+                             " (uid=" + std::to_string(g_rpc_auth_ctx.user_id) + ") storage=mysql-blob");
     return grpc::Status::OK;
 }
 
@@ -149,10 +149,10 @@ grpc::Status FileServiceImpl::GetFile(grpc::ServerContext *context, const rpc::G
     if (!g_rpc_auth_ctx.authenticated)
         return grpc::Status(grpc::StatusCode::UNAUTHENTICATED, "Invalid or missing token");
     std::string vu_user, vu_role;
-    if (auth_stub_ && !ValidateCaller(context, g_rpc_auth_ctx.uid, vu_user, vu_role))
+    if (auth_stub_ && !ValidateCaller(context, g_rpc_auth_ctx.user_id, vu_user, vu_role))
         return grpc::Status(grpc::StatusCode::UNAUTHENTICATED, "Auth service rejected");
 
-    if (g_rpc_auth_ctx.uid <= 0) {
+    if (g_rpc_auth_ctx.user_id <= 0) {
         resp->set_success(false);
         SET_ERROR(resp, "Not found", rpc_error::NOT_FOUND);
         return grpc::Status::OK;
@@ -166,8 +166,8 @@ grpc::Status FileServiceImpl::GetFile(grpc::ServerContext *context, const rpc::G
     }
     if (slog_) LOG_DEBUG(*slog_, "GetFileOwner id=" + std::to_string(req->id()) +
                                      " found=" + std::to_string(found) + " owner=" + std::to_string(owner_uid) +
-                                     " req_uid=" + std::to_string(g_rpc_auth_ctx.uid));
-    if (!found || owner_uid != g_rpc_auth_ctx.uid) {
+                                     " req_uid=" + std::to_string(g_rpc_auth_ctx.user_id));
+    if (!found || owner_uid != g_rpc_auth_ctx.user_id) {
         resp->set_success(false);
         SET_ERROR(resp, "Not found", rpc_error::NOT_FOUND);
         return grpc::Status::OK;
@@ -176,7 +176,7 @@ grpc::Status FileServiceImpl::GetFile(grpc::ServerContext *context, const rpc::G
     auto start = std::chrono::high_resolution_clock::now();
     std::string username = UsernameFromMeta(context);
 
-    int64_t req_uid = g_rpc_auth_ctx.uid;
+    int64_t req_uid = g_rpc_auth_ctx.user_id;
     const std::string cache_key = "u:" + std::to_string(req_uid) + ":file:" + std::to_string(req->id());
     const std::string ts_key = cache_key + ":ts";
     const std::string lock_key = "lock:u:" + std::to_string(req_uid) + ":file:" + std::to_string(req->id());
@@ -371,11 +371,11 @@ grpc::Status FileServiceImpl::ListFiles(grpc::ServerContext *context, const rpc:
     if (!g_rpc_auth_ctx.authenticated)
         return grpc::Status(grpc::StatusCode::UNAUTHENTICATED, "Invalid or missing token");
     std::string vu_user, vu_role;
-    if (auth_stub_ && !ValidateCaller(context, g_rpc_auth_ctx.uid, vu_user, vu_role))
+    if (auth_stub_ && !ValidateCaller(context, g_rpc_auth_ctx.user_id, vu_user, vu_role))
         return grpc::Status(grpc::StatusCode::UNAUTHENTICATED, "Auth service rejected");
     auto start = std::chrono::high_resolution_clock::now();
     std::string username = UsernameFromMeta(context);
-    int64_t uid = g_rpc_auth_ctx.uid;
+    int64_t uid = g_rpc_auth_ctx.user_id;
     int page = req->page();
     int page_size = req->page_size();
 
@@ -457,7 +457,7 @@ grpc::Status FileServiceImpl::DeleteFile(grpc::ServerContext *context, const rpc
     if (!g_rpc_auth_ctx.authenticated)
         return grpc::Status(grpc::StatusCode::UNAUTHENTICATED, "Invalid or missing token");
     std::string vu_user, vu_role;
-    if (auth_stub_ && !ValidateCaller(context, g_rpc_auth_ctx.uid, vu_user, vu_role))
+    if (auth_stub_ && !ValidateCaller(context, g_rpc_auth_ctx.user_id, vu_user, vu_role))
         return grpc::Status(grpc::StatusCode::UNAUTHENTICATED, "Auth service rejected");
     auto start = std::chrono::high_resolution_clock::now();
     std::string username = UsernameFromMeta(context);
@@ -471,14 +471,14 @@ grpc::Status FileServiceImpl::DeleteFile(grpc::ServerContext *context, const rpc
     int64_t owner_uid = 0;
     bool fo = db_->GetFileOwner(req->id(), owner_uid);
     fprintf(stderr, "[DeleteFile] id=%ld req_uid=%ld owner_uid=%ld found=%d\n",
-            (long)req->id(), (long)g_rpc_auth_ctx.uid, (long)owner_uid, fo);
-    if (!fo || owner_uid != g_rpc_auth_ctx.uid) {
+            (long)req->id(), (long)g_rpc_auth_ctx.user_id, (long)owner_uid, fo);
+    if (!fo || owner_uid != g_rpc_auth_ctx.user_id) {
         resp->set_success(false);
         SET_ERROR(resp, "Not found or permission denied", rpc_error::NOT_FOUND);
         return grpc::Status::OK;
     }
 
-    bool ok = db_->DeleteFile(req->id(), g_rpc_auth_ctx.uid);
+    bool ok = db_->DeleteFile(req->id(), g_rpc_auth_ctx.user_id);
     if (!ok) {
         resp->set_success(false);
         SET_ERROR(resp, "Failed to delete", rpc_error::INTERNAL);
@@ -491,17 +491,17 @@ grpc::Status FileServiceImpl::DeleteFile(grpc::ServerContext *context, const rpc
         nlohmann::json ev;
         ev["type"] = "file.deleted";
         ev["file_id"] = req->id();
-        ev["user_id"] = g_rpc_auth_ctx.uid;
+        ev["user_id"] = g_rpc_auth_ctx.user_id;
         if (rabbit_)
             rabbit_->Publish("rpc.events", "file.deleted", ev.dump());
         if (db_)
-            db_->InsertOutbox(g_rpc_auth_ctx.uid, "file.deleted", ev.dump());
+            db_->InsertOutbox(g_rpc_auth_ctx.user_id, "file.deleted", ev.dump());
     }
 
     if (redis_ && redis_->IsConnected()) {
-        redis_->DeleteKey("u:" + std::to_string(g_rpc_auth_ctx.uid) + ":file:" + std::to_string(req->id()));
-        redis_->DeleteKey("u:" + std::to_string(g_rpc_auth_ctx.uid) + ":file:" + std::to_string(req->id()) + ":ts");
-        redis_->Increment(FileVersionKey(g_rpc_auth_ctx.uid));
+        redis_->DeleteKey("u:" + std::to_string(g_rpc_auth_ctx.user_id) + ":file:" + std::to_string(req->id()));
+        redis_->DeleteKey("u:" + std::to_string(g_rpc_auth_ctx.user_id) + ":file:" + std::to_string(req->id()) + ":ts");
+        redis_->Increment(FileVersionKey(g_rpc_auth_ctx.user_id));
     }
 
     if (logger_) {
@@ -522,7 +522,7 @@ grpc::Status FileServiceImpl::CreateFolder(grpc::ServerContext *ctx, const rpc::
     if (!g_rpc_auth_ctx.authenticated)
         return grpc::Status(grpc::StatusCode::UNAUTHENTICATED, "");
     int64_t id = 0;
-    bool ok = db_->CreateFolder(g_rpc_auth_ctx.uid, req->name(), req->parent_folder_id(), id);
+    bool ok = db_->CreateFolder(g_rpc_auth_ctx.user_id, req->name(), req->parent_folder_id(), id);
     resp->set_success(ok);
     if (ok)
         resp->set_id(id);
@@ -545,7 +545,7 @@ grpc::Status FileServiceImpl::BatchDelete(grpc::ServerContext *ctx, const rpc::B
     if (!g_rpc_auth_ctx.authenticated)
         return grpc::Status(grpc::StatusCode::UNAUTHENTICATED, "");
     std::vector<int64_t> ids(req->ids().begin(), req->ids().end());
-    int count = db_->BatchDeleteFiles(g_rpc_auth_ctx.uid, ids);
+    int count = db_->BatchDeleteFiles(g_rpc_auth_ctx.user_id, ids);
     resp->set_success(count > 0);
     resp->set_deleted_count(count);
     return grpc::Status::OK;
