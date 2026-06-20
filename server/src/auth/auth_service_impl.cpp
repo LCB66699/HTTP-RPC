@@ -133,7 +133,7 @@ grpc::Status AuthServiceImpl::Login(grpc::ServerContext *, const rpc::LoginReque
     std::string payload_str = payload.dump();
     std::string token = jwt::create(payload_str, jwt_secret_);
 
-    // 密码使用完毕，擦除内存中的副�?
+    // 密码使用完毕，擦除内存中的副�?
     {
         std::string pw = req->password();
         if (!pw.empty())
@@ -153,7 +153,7 @@ grpc::Status AuthServiceImpl::Login(grpc::ServerContext *, const rpc::LoginReque
         r["token"] = json("<jwt>");
         logger_->Log(req->username(), "AuthService", "Login", p, r, true, dur);
     }
-    // 签发�?Token
+    // 签发�?Token
     std::string role = IsAdminUser(req->username()) ? "admin" : "user";
     std::string at = CreateAccessToken(req->username(), uid, role);
     std::string rt = CreateRefreshToken(req->username(), uid);
@@ -171,7 +171,7 @@ grpc::Status AuthServiceImpl::Register(grpc::ServerContext *, const rpc::Registe
     auto start = std::chrono::high_resolution_clock::now();
     std::lock_guard<std::mutex> lock(mtx_);
 
-    // 先做输入校验（不查重——交�?INSERT �?UNIQUE 约束，消�?TOCTOU 竞态窗口）
+    // 先做输入校验（不查重——交�?INSERT �?UNIQUE 约束，消�?TOCTOU 竞态窗口）
     if (req->username().size() < 3 || req->username().size() > 20) {
         resp->set_success(false);
         SET_ERROR(resp, "Username must be 3-20 characters", rpc_error::BAD_REQUEST);
@@ -202,7 +202,7 @@ grpc::Status AuthServiceImpl::Register(grpc::ServerContext *, const rpc::Registe
     }
 
     if (db_) {
-        // 直接 INSERT �?UNIQUE 约束兜底，消�?UserExists→AddUser 之间�?TOCTOU 竞�?
+        // 直接 INSERT �?UNIQUE 约束兜底，消�?UserExists→AddUser 之间�?TOCTOU 竞�?
         if (!db_->AddUser(req->username(), sha256::hash_password(req->password()))) {
             bool is_dup = db_->UserExists(req->username());
             resp->set_success(false);
@@ -242,18 +242,18 @@ grpc::Status AuthServiceImpl::Register(grpc::ServerContext *, const rpc::Registe
     std::string payload_str = payload.dump();
     std::string token = jwt::create(payload_str, jwt_secret_);
 
-    // 同步 token_version �?Redis
+    // 同步 token_version �?Redis
     if (redis_ && redis_->IsConnected())
         redis_->SetJSON("token_ver:" + req->username(), std::to_string(ver), 86400);
 
-    // 密码使用完毕，擦除内存中的副�?
+    // 密码使用完毕，擦除内存中的副�?
     {
         std::string pw = req->password();
         if (!pw.empty())
             OPENSSL_cleanse(&pw[0], pw.size());
     }
 
-    // 签发�?Token
+    // 签发�?Token
     std::string role = IsAdminUser(req->username()) ? "admin" : "user";
     std::string at = CreateAccessToken(req->username(), uid, role);
     std::string rt = CreateRefreshToken(req->username(), uid);
@@ -320,12 +320,12 @@ grpc::Status AuthServiceImpl::RefreshToken(grpc::ServerContext *, const rpc::Ref
     try {
         auto j = nlohmann::json::parse(stored);
         stored_rt = j.value("token", "");
-        stored_uid = j.value("uid", 0);
+        stored_uid = j.value("uid", 0LL);
     } catch (...) {
         stored_rt = stored;
     }
     if (stored_rt != req->refresh_token()) {
-        // Token 不匹�?�?盗用检测，撤销所�?
+        // Token 不匹�?�?盗用检测，撤销所�?
         if (redis_) {
             redis_->DeleteKey("rt:" + req->username());
             redis_->DeleteKey("rate:login:" + req->username() + ":total");
@@ -372,7 +372,7 @@ grpc::Status AuthServiceImpl::ValidateUser(grpc::ServerContext *, const rpc::Val
     int64_t uid = req->user_id();
     int64_t token_uid = 0;
 
-    // �?token 中验证身�?
+    // �?token 中验证身�?
     if (!req->token().empty()) {
         std::string payload;
         if (jwt::verify(req->token(), jwt_secret_, payload)) {
@@ -385,7 +385,7 @@ grpc::Status AuthServiceImpl::ValidateUser(grpc::ServerContext *, const rpc::Val
         }
     }
 
-    // 身份比对：请求的 user_id 必须�?JWT 中的 uid 一致（0 表示不限定）
+    // 身份比对：请求的 user_id 必须�?JWT 中的 uid 一致（0 表示不限定）
     if (uid != 0 && token_uid != 0 && uid != token_uid) {
         resp->set_valid(false);
         SET_ERROR(resp, "user_id mismatch", rpc_error::UNAUTHENTICATED);
@@ -394,7 +394,7 @@ grpc::Status AuthServiceImpl::ValidateUser(grpc::ServerContext *, const rpc::Val
     if (uid == 0)
         uid = token_uid;
 
-    // 如果 token 无效或没传，�?username/user_id 查数据库
+    // 如果 token 无效或没传，�?username/user_id 查数据库
     if (username.empty() && !req->username().empty()) {
         username = req->username();
     }

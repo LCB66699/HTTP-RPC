@@ -27,7 +27,7 @@ func ExtractUID(r *http.Request) int64 {
 			log.Printf("[ExtractUID] base64 decode error: %v", err)
 			break
 		}
-		re := regexp.MustCompile(`"uid":("?)(\d+)("?)`)
+		re := regexp.MustCompile(`"uid":("?)(-?\d+)("?)`)
 		m := re.FindStringSubmatch(string(raw))
 		if m != nil {
 			n, _ := strconv.ParseInt(m[2], 10, 64)
