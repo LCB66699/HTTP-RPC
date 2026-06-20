@@ -69,9 +69,9 @@
     command: --innodb-buffer-pool-size=32M --innodb-log-buffer-size=4M --innodb-log-file-size=16M --performance-schema=OFF --skip-innodb-doublewrite
     environment: { MYSQL_ROOT_PASSWORD: "${MYSQL_ROOT_PASSWORD:-123456}" }
     volumes: ["./deploy/mysql/init.sql:/docker-entrypoint-initdb.d/init.sql", "./data/mysql-sp-1:/var/lib/mysql"]
-    networks:
-      default:
-        aliases: [mysql-spreadsheet]
+    # mysql-spreadsheet-1 不共享 mysql-spreadsheet 别名。当前 --mysql-shards 1，
+    # 只有 mysql-spreadsheet-0 作为 "mysql-spreadsheet" 提供服务。
+    # mysql-spreadsheet-1 保留用于未来多分片扩展，届时 sheet service 改用 --mysql-shards 2。
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
       interval: 5s
