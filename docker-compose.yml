@@ -56,7 +56,7 @@
       - "./data/mysql-sp-0s:/var/lib/mysql"
     networks:
       default:
-        aliases: [mysql-spreadsheet-r]
+        aliases: [mysql-spreadsheet-r, mysql-spreadsheet-r-0]
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
       interval: 5s
@@ -69,9 +69,9 @@
     command: --innodb-buffer-pool-size=32M --innodb-log-buffer-size=4M --innodb-log-file-size=16M --performance-schema=OFF --skip-innodb-doublewrite
     environment: { MYSQL_ROOT_PASSWORD: "${MYSQL_ROOT_PASSWORD:-123456}" }
     volumes: ["./deploy/mysql/init.sql:/docker-entrypoint-initdb.d/init.sql", "./data/mysql-sp-1:/var/lib/mysql"]
-    # mysql-spreadsheet-1 不共享 mysql-spreadsheet 别名。当前 --mysql-shards 1，
-    # 只有 mysql-spreadsheet-0 作为 "mysql-spreadsheet" 提供服务。
-    # mysql-spreadsheet-1 保留用于未来多分片扩展，届时 sheet service 改用 --mysql-shards 2。
+    # mysql-spreadsheet-1 不共享 mysql-spreadsheet 别名。--mysql-shards 2 时
+    # 作为分片 1 写主机（ShardFor(user_id%2)==1 → mysql-spreadsheet-1）。
+    # mysql-spreadsheet-0 仍作为 "mysql-spreadsheet" 服务（分片 0 写主机）。
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
       interval: 5s
@@ -81,8 +81,21 @@
   mysql-spreadsheet-1-slave:
     image: mysql:8.0
     command: --innodb-buffer-pool-size=32M --innodb-log-buffer-size=4M --innodb-log-file-size=16M --performance-schema=OFF --skip-innodb-doublewrite
-    environment: { MYSQL_ROOT_PASSWORD: "${MYSQL_ROOT_PASSWORD:-123456}" }
-    volumes: ["./deploy/mysql/slave/conf.d:/etc/mysql/conf.d", "./data/mysql-sp-1s:/var/lib/mysql"]
+    environment:
+      MYSQL_ROOT_PASSWORD: "${MYSQL_ROOT_PASSWORD:-123456}"
+      MYSQL_MASTER_HOST: mysql-spreadsheet-1
+    volumes:
+      - "./deploy/mysql/slave1/conf.d:/etc/mysql/conf.d"
+      - "./deploy/mysql/slave/init-slave.sh:/docker-entrypoint-initdb.d/init-slave.sh"
+      - "./data/mysql-sp-1s:/var/lib/mysql"
+    networks:
+      default:
+        aliases: [mysql-spreadsheet-r-1]
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
     depends_on: [mysql-spreadsheet-1]
 
   # ===== MySQL File (???) =====
@@ -112,7 +125,7 @@
       - "./data/mysql-f-0s:/var/lib/mysql"
     networks:
       default:
-        aliases: [mysql-file-r]
+        aliases: [mysql-file-r, mysql-file-r-0]
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
       interval: 5s
@@ -125,9 +138,9 @@
     command: --innodb-buffer-pool-size=32M --innodb-log-buffer-size=4M --innodb-log-file-size=16M --performance-schema=OFF --skip-innodb-doublewrite
     environment: { MYSQL_ROOT_PASSWORD: "${MYSQL_ROOT_PASSWORD:-123456}" }
     volumes: ["./deploy/mysql/init.sql:/docker-entrypoint-initdb.d/init.sql", "./data/mysql-f-1:/var/lib/mysql"]
-    # mysql-file-1 不共享 mysql-file 别名。文件服务当前配了 --mysql-shards 1，
-    # 只有 mysql-file-0 作为 "mysql-file" 提供服务。
-    # mysql-file-1 保留用于未来多分片扩展，届时 file service 改用 --mysql-shards 2。
+    # mysql-file-1 不共享 mysql-file 别名。--mysql-shards 2 时
+    # 作为分片 1 写主机（ShardFor(user_id%2)==1 → mysql-file-1）。
+    # mysql-file-0 仍作为 "mysql-file" 服务（分片 0 写主机）。
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
       interval: 5s
@@ -137,8 +150,21 @@
   mysql-file-1-slave:
     image: mysql:8.0
     command: --innodb-buffer-pool-size=32M --innodb-log-buffer-size=4M --innodb-log-file-size=16M --performance-schema=OFF --skip-innodb-doublewrite
-    environment: { MYSQL_ROOT_PASSWORD: "${MYSQL_ROOT_PASSWORD:-123456}" }
-    volumes: ["./deploy/mysql/slave/conf.d:/etc/mysql/conf.d", "./data/mysql-f-1s:/var/lib/mysql"]
+    environment:
+      MYSQL_ROOT_PASSWORD: "${MYSQL_ROOT_PASSWORD:-123456}"
+      MYSQL_MASTER_HOST: mysql-file-1
+    volumes:
+      - "./deploy/mysql/slave1/conf.d:/etc/mysql/conf.d"
+      - "./deploy/mysql/slave/init-slave.sh:/docker-entrypoint-initdb.d/init-slave.sh"
+      - "./data/mysql-f-1s:/var/lib/mysql"
+    networks:
+      default:
+        aliases: [mysql-file-r-1]
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
     depends_on: [mysql-file-1]
 
   # ===== Redis Cluster (6 nodes, 3 masters + 3 replicas) =====
@@ -387,7 +413,7 @@
       MINIO_PUBLIC_URL: "http://minio:9000"
     command: >
       /app/rpc_server --service spreadsheet --port 50051
-      --mysql-write-host mysql-spreadsheet --mysql-read-hosts mysql-spreadsheet-r --mysql-password ${MYSQL_ROOT_PASSWORD:-123456} --mysql-db rpc_spreadsheet --mysql-shards 1
+      --mysql-write-host mysql-spreadsheet --mysql-read-hosts mysql-spreadsheet-r --mysql-password ${MYSQL_ROOT_PASSWORD:-123456} --mysql-db rpc_spreadsheet --mysql-shards 2
       --redis-cluster redis-cluster-7000:7000 --redis-cluster redis-cluster-7001:7001 --redis-cluster redis-cluster-7002:7002 --redis-password ${REDIS_PASSWORD:-rpc-redis-123456}
     networks:
       default:
@@ -420,7 +446,7 @@
       MINIO_PUBLIC_URL: "http://minio:9000"
     command: >
       /app/rpc_server --service spreadsheet --port 50051
-      --mysql-write-host mysql-spreadsheet --mysql-read-hosts mysql-spreadsheet-r --mysql-password ${MYSQL_ROOT_PASSWORD:-123456} --mysql-db rpc_spreadsheet --mysql-shards 1
+      --mysql-write-host mysql-spreadsheet --mysql-read-hosts mysql-spreadsheet-r --mysql-password ${MYSQL_ROOT_PASSWORD:-123456} --mysql-db rpc_spreadsheet --mysql-shards 2
       --redis-cluster redis-cluster-7000:7000 --redis-cluster redis-cluster-7001:7001 --redis-cluster redis-cluster-7002:7002 --redis-password ${REDIS_PASSWORD:-rpc-redis-123456}
     networks:
       default:
@@ -459,13 +485,15 @@
       MINIO_PUBLIC_URL: "http://minio:9000"
     command: >
       /app/rpc_server --service file --port 50051
-      --mysql-write-host mysql-file --mysql-read-hosts mysql-file-r --mysql-password ${MYSQL_ROOT_PASSWORD:-123456} --mysql-db rpc_file --mysql-shards 1
+      --mysql-write-host mysql-file --mysql-read-hosts mysql-file-r --mysql-password ${MYSQL_ROOT_PASSWORD:-123456} --mysql-db rpc_file --mysql-shards 2
       --redis-cluster redis-cluster-7000:7000 --redis-cluster redis-cluster-7001:7001 --redis-cluster redis-cluster-7002:7002 --redis-password ${REDIS_PASSWORD:-rpc-redis-123456}
     networks:
       default:
         aliases: [rpc-file]
     depends_on:
       mysql-file-0:
+        condition: service_healthy
+      mysql-file-1:
         condition: service_healthy
       rabbitmq:
         condition: service_healthy
@@ -490,13 +518,15 @@
       MINIO_PUBLIC_URL: "http://minio:9000"
     command: >
       /app/rpc_server --service file --port 50051
-      --mysql-write-host mysql-file --mysql-read-hosts mysql-file-r --mysql-password ${MYSQL_ROOT_PASSWORD:-123456} --mysql-db rpc_file --mysql-shards 1
+      --mysql-write-host mysql-file --mysql-read-hosts mysql-file-r --mysql-password ${MYSQL_ROOT_PASSWORD:-123456} --mysql-db rpc_file --mysql-shards 2
       --redis-cluster redis-cluster-7000:7000 --redis-cluster redis-cluster-7001:7001 --redis-cluster redis-cluster-7002:7002 --redis-password ${REDIS_PASSWORD:-rpc-redis-123456}
     networks:
       default:
         aliases: [rpc-file]
     depends_on:
       mysql-file-0:
+        condition: service_healthy
+      mysql-file-1:
         condition: service_healthy
       rabbitmq:
         condition: service_healthy
