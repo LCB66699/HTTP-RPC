@@ -76,10 +76,6 @@ Database::ConnHandle Database::GetHealthyWriteConn() {
     size_t idx = write_idx_.fetch_add(1, std::memory_order_relaxed) % write_conns_.size();
     auto &wc = write_conns_[idx];
     std::unique_lock<std::mutex> lock(wc->mtx);
-    if (wc->conn && mysql_ping(wc->conn.get()) != 0) {
-        fprintf(stderr, "[DB:write#%zu] ping failed, reconnecting\n", idx);
-        wc->conn.reset();
-    }
     if (!wc->conn) {
         wc->conn = ConnectMYSQL(write_host_, write_port_);
     }
@@ -95,10 +91,6 @@ Database::ConnHandle Database::GetHealthyReadConn() {
         size_t idx = read_idx_.fetch_add(1, std::memory_order_relaxed) % read_conns_.size();
         auto &rc = read_conns_[idx];
         std::unique_lock<std::mutex> lock(rc->mtx);
-        if (rc->conn && mysql_ping(rc->conn.get()) != 0) {
-            fprintf(stderr, "[DB:read#%zu] ping failed, reconnecting\n", idx);
-            rc->conn.reset();
-        }
         if (!rc->conn) {
             rc->conn = ConnectMYSQL(read_hosts_[idx % read_hosts_.size()], read_port_);
         }
