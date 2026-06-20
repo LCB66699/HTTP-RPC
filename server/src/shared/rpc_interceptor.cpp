@@ -34,6 +34,6 @@ void RpcAuthInterceptor::Intercept(grpc::experimental::InterceptorBatchMethods *
 RpcAuthInterceptorFactory::RpcAuthInterceptorFactory(std::string jwt_secret)
     : jwt_secret_(std::move(jwt_secret)) {}
 
-grpc::experimental::Interceptor *RpcAuthInterceptorFactory::CreateServerInterceptor() {
+grpc::experimental::Interceptor *RpcAuthInterceptorFactory::CreateServerInterceptor(grpc::experimental::ServerRpcInfo *info) {
     return new RpcAuthInterceptor(jwt_secret_);
 }

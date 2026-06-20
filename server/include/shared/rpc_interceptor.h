@@ -10,7 +10,7 @@
 // Handlers read this instead of calling AuthInterceptor::Authenticate().
 extern thread_local AuthContext g_rpc_auth_ctx;
 
-// gRPC ServerInterceptor â€?verifies JWT from client metadata at transport level.
+// gRPC ServerInterceptor ï¿½?verifies JWT from client metadata at transport level.
 // On success: populates g_rpc_auth_ctx and proceeds.
 // On failure: resets g_rpc_auth_ctx (handler returns UNAUTHENTICATED).
 class RpcAuthInterceptor : public grpc::experimental::Interceptor {
@@ -25,7 +25,7 @@ class RpcAuthInterceptor : public grpc::experimental::Interceptor {
 class RpcAuthInterceptorFactory : public grpc::experimental::ServerInterceptorFactoryInterface {
    public:
     explicit RpcAuthInterceptorFactory(std::string jwt_secret);
-    grpc::experimental::Interceptor *CreateServerInterceptor() override;
+    grpc::experimental::Interceptor *CreateServerInterceptor(grpc::experimental::ServerRpcInfo *info) override;
 
    private:
     std::string jwt_secret_;
