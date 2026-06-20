@@ -83,6 +83,10 @@ Database::WriteConnHandle Database::GetHealthyWriteConn() {
     if (!wc->conn) {
         wc->conn = ConnectMYSQL(write_host_, write_port_);
     }
+    if (wc->conn)
+        wc->last_used_ms.store(
+            std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch())
+                .count());
     return {std::move(lock), wc->conn};
 }
 
@@ -155,8 +159,13 @@ bool Database::ExecWrite(const std::string &sql) {
         if (!wc->conn)
             return false;
     }
-    if (mysql_query(wc->conn, sql.c_str()) == 0)
+    if (mysql_query(wc->conn, sql.c_str()) == 0) {
+        wc->last_used_ms.store(
+            std::chrono::duration_cast<std::chrono::milliseconds>(
+                std::chrono::system_clock::now().time_since_epoch())
+                .count());
         return true;
+    }
     unsigned int err = mysql_errno(wc->conn);
     fprintf(stderr, "[DB:write#%zu] error %u: %s\n", idx, err, mysql_error(wc->conn));
     if (err == CR_SERVER_LOST || err == CR_SERVER_GONE_ERROR) {
@@ -164,6 +173,10 @@ bool Database::ExecWrite(const std::string &sql) {
         mysql_close(wc->conn);
         wc->conn = ConnectMYSQL(write_host_, write_port_);
     }
+    wc->last_used_ms.store(
+        std::chrono::duration_cast<std::chrono::milliseconds>(
+            std::chrono::system_clock::now().time_since_epoch())
+            .count());
     return false;
 }
 
@@ -178,9 +191,17 @@ bool Database::ExecWriteInsert(const std::string &sql, int64_t &out_id) {
         return false;
     if (mysql_query(wc->conn, sql.c_str()) != 0) {
         fprintf(stderr, "[DB:write#%zu] ExecWriteInsert error: %s\n", idx, mysql_error(wc->conn));
+        wc->last_used_ms.store(
+            std::chrono::duration_cast<std::chrono::milliseconds>(
+                std::chrono::system_clock::now().time_since_epoch())
+                .count());
         return false;
     }
     out_id = mysql_insert_id(wc->conn);
+    wc->last_used_ms.store(
+        std::chrono::duration_cast<std::chrono::milliseconds>(
+            std::chrono::system_clock::now().time_since_epoch())
+            .count());
     return true;
 }
 
@@ -1003,6 +1024,7 @@ void Database::HealthLoop() {
         if (!health_running_)
             break;
 
+        // ——— 第 1 轮: 全部 ping, 死连接重建 ———
         for (size_t i = 0; i < write_conns_.size(); ++i) {
             auto &wc = write_conns_[i];
             std::lock_guard<std::mutex> lock(wc->mtx);
@@ -1011,7 +1033,6 @@ void Database::HealthLoop() {
                 mysql_close(wc->conn);
                 wc->conn = nullptr;
                 wc->conn = ConnectMYSQL(write_host_, write_port_);
-                // ConnectMYSQL 内部已重试 5 次; 若仍失败, 下一轮 30s 后再试
                 if (wc->conn)
                     fprintf(stderr, "[DB:health] write conn %zu reconnected\n", i);
             }
@@ -1029,6 +1050,47 @@ void Database::HealthLoop() {
                     fprintf(stderr, "[DB:health] read conn %zu reconnected\n", i);
             }
         }
+
+        // ——— 第 2 轮: 空闲连接淘汰 ———
+        int min_idle = min_idle_.load();
+        int idle_timeout_ms = idle_timeout_ms_.load();
+        if (min_idle <= 0 && idle_timeout_ms <= 0)
+            continue;  // 未启用空闲淘汰
+
+        int64_t now_ms =
+            std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch())
+                .count();
+
+        auto evictPool = [&](auto &pool, const char *label) {
+            // 统计存活连接数
+            int alive = 0;
+            for (auto &pc : pool)
+                if (pc->conn)
+                    alive++;
+
+            if (alive <= min_idle)
+                return;  // 已到保底线, 不淘汰
+
+            for (size_t i = 0; i < pool.size(); ++i) {
+                if (alive <= min_idle)
+                    break;
+                auto &pc = pool[i];
+                int64_t last = pc->last_used_ms.load();
+                if (pc->conn && (now_ms - last) > idle_timeout_ms) {
+                    std::lock_guard<std::mutex> lock(pc->mtx);
+                    if (pc->conn && (now_ms - pc->last_used_ms.load()) > idle_timeout_ms) {
+                        fprintf(stderr, "[DB:health] %s conn %zu idle %llds, closing\n",
+                                label, i, (now_ms - last) / 1000);
+                        mysql_close(pc->conn);
+                        pc->conn = nullptr;
+                        alive--;
+                    }
+                }
+            }
+        };
+
+        evictPool(write_conns_, "write");
+        evictPool(read_conns_, "read");
     }
 }
 

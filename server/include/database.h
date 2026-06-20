@@ -176,15 +176,19 @@ class Database {
     bool Exec(const std::string &sql) { return ExecWrite(sql); }
     MYSQL *GetConnection() { return write_conns_.empty() ? nullptr : write_conns_[0]->conn; }
 
-    // 健康检查：后台线程每 30s PING 连接池，自动重建死连接
+    // 健康检查：后台线程每 30s PING 连接池，自动重建死连接 + 淘汰空闲连接
     void StartHealthCheck();
     void StopHealthCheck();
+    void SetMinIdle(int n) { min_idle_.store(n); }
+    void SetIdleTimeoutSec(int sec) { idle_timeout_ms_.store(sec * 1000); }
 
    private:
     std::string user_, password_, db_name_;
     std::string write_host_;  // 记录主库host供重连
     int write_port_, read_port_;
     int pool_size_;
+    std::atomic<int> min_idle_{0};              // 最低保留连接数，低于此数不淘汰
+    std::atomic<int> idle_timeout_ms_{300000};   // 空闲超时(ms)，默认 5min
     std::vector<std::string> read_hosts_;
     Snowflake *snowflake_ = nullptr;
 
@@ -192,6 +196,7 @@ class Database {
     struct PoolConn {
         MYSQL *conn = nullptr;
         std::mutex mtx;
+        std::atomic<int64_t> last_used_ms{0};  // 最后一次归还的时间戳(ms)，HealthLoop 读取无需加锁
     };
 
     // 写连接池（主库, 多连接并行写）
@@ -304,6 +309,14 @@ class ShardedDatabase : public IDatabase {
     void StopHealthCheck() {
         for (auto &db : shards_)
             db->StopHealthCheck();
+    }
+    void SetMinIdle(int n) {
+        for (auto &db : shards_)
+            db->SetMinIdle(n);
+    }
+    void SetIdleTimeoutSec(int sec) {
+        for (auto &db : shards_)
+            db->SetIdleTimeoutSec(sec);
     }
 
     int ShardCount() const { return shard_count_; }

@@ -30,6 +30,8 @@ int main(int argc, char *argv[]) {
     std::string mysql_host = "mysql-file", mysql_db = "rpc_file";
     std::string mysql_user = "root", mysql_password = "123456";
     int mysql_port = 3306;
+    int db_min_idle = 2;
+    int db_idle_timeout_sec = 300;
     std::vector<std::string> redis_cluster_seeds;
     std::string redis_password;
     int redis_pool_size = 4;
@@ -56,11 +58,17 @@ int main(int argc, char *argv[]) {
             redis_cluster_seeds.push_back(argv[++i]);
         else if (arg == "--redis-password" && i + 1 < argc)
             redis_password = argv[++i];
+        else if (arg == "--db-min-idle" && i + 1 < argc)
+            db_min_idle = std::atoi(argv[++i]);
+        else if (arg == "--db-idle-timeout-sec" && i + 1 < argc)
+            db_idle_timeout_sec = std::atoi(argv[++i]);
     }
 
     auto db = std::make_unique<ShardedDatabase>(mysql_shards, mysql_host, mysql_port, mysql_host, mysql_port,
                                                 mysql_user, mysql_password, mysql_db, 4);
     db->InitializeAll();
+    db->SetMinIdle(db_min_idle);
+    db->SetIdleTimeoutSec(db_idle_timeout_sec);
     db->StartHealthCheck();
 
     std::unique_ptr<RedisClient> redis;
