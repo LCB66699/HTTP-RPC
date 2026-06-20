@@ -196,7 +196,7 @@ class Database {
     std::string write_host_;  // 记录主库host供重连
     int write_port_, read_port_;
     int pool_size_;
-    std::atomic<int> min_idle_{0};              // 最低保留连接数，低于此数不淘汰
+    std::atomic<int> min_idle_{2};              // 最低保留连接数，低于此数不淘汰
     std::atomic<int> idle_timeout_ms_{300000};   // 空闲超时(ms)，默认 5min
     std::vector<std::string> read_hosts_;
     Snowflake *snowflake_ = nullptr;
