@@ -173,7 +173,7 @@
     volumes:
       - ./deploy/redis/cluster/redis.conf:/usr/local/etc/redis/redis.conf
       - ./data/redis-cluster-1:/data
-    command: redis-server /usr/local/etc/redis/redis.conf --port 7000 --requirepass ${REDIS_PASSWORD:-rpc-redis-123456} --masterauth ${REDIS_PASSWORD:-rpc-redis-123456} --maxmemory 32mb --maxmemory-policy allkeys-lru
+    command: redis-server /usr/local/etc/redis/redis.conf --port 7000 --requirepass ${REDIS_PASSWORD:-rpc-redis-123456} --masterauth ${REDIS_PASSWORD:-rpc-redis-123456} --cluster-announce-hostname redis-cluster-1 --maxmemory 32mb --maxmemory-policy allkeys-lru
     networks:
       default:
         aliases: [redis-cluster, redis-cluster-7000]
@@ -188,31 +188,31 @@
     volumes:
       - ./deploy/redis/cluster/redis.conf:/usr/local/etc/redis/redis.conf
       - ./data/redis-cluster-2:/data
-    command: redis-server /usr/local/etc/redis/redis.conf --port 7001 --requirepass ${REDIS_PASSWORD:-rpc-redis-123456} --masterauth ${REDIS_PASSWORD:-rpc-redis-123456} --maxmemory 32mb --maxmemory-policy allkeys-lru
+    command: redis-server /usr/local/etc/redis/redis.conf --port 7001 --requirepass ${REDIS_PASSWORD:-rpc-redis-123456} --masterauth ${REDIS_PASSWORD:-rpc-redis-123456} --cluster-announce-hostname redis-cluster-2 --maxmemory 32mb --maxmemory-policy allkeys-lru
     networks: { default: { aliases: [redis-cluster, redis-cluster-7001] } }
 
   redis-cluster-3:
     image: redis:7-alpine
     volumes: [./deploy/redis/cluster/redis.conf:/usr/local/etc/redis/redis.conf, ./data/redis-cluster-3:/data]
-    command: redis-server /usr/local/etc/redis/redis.conf --port 7002 --requirepass ${REDIS_PASSWORD:-rpc-redis-123456} --masterauth ${REDIS_PASSWORD:-rpc-redis-123456} --maxmemory 32mb --maxmemory-policy allkeys-lru
+    command: redis-server /usr/local/etc/redis/redis.conf --port 7002 --requirepass ${REDIS_PASSWORD:-rpc-redis-123456} --masterauth ${REDIS_PASSWORD:-rpc-redis-123456} --cluster-announce-hostname redis-cluster-3 --maxmemory 32mb --maxmemory-policy allkeys-lru
     networks: { default: { aliases: [redis-cluster, redis-cluster-7002] } }
 
   redis-cluster-4:
     image: redis:7-alpine
     volumes: [./deploy/redis/cluster/redis.conf:/usr/local/etc/redis/redis.conf, ./data/redis-cluster-4:/data]
-    command: redis-server /usr/local/etc/redis/redis.conf --port 7003 --requirepass ${REDIS_PASSWORD:-rpc-redis-123456} --masterauth ${REDIS_PASSWORD:-rpc-redis-123456} --maxmemory 32mb --maxmemory-policy allkeys-lru
+    command: redis-server /usr/local/etc/redis/redis.conf --port 7003 --requirepass ${REDIS_PASSWORD:-rpc-redis-123456} --masterauth ${REDIS_PASSWORD:-rpc-redis-123456} --cluster-announce-hostname redis-cluster-4 --maxmemory 32mb --maxmemory-policy allkeys-lru
     networks: { default: { aliases: [redis-cluster, redis-cluster-7003] } }
 
   redis-cluster-5:
     image: redis:7-alpine
     volumes: [./deploy/redis/cluster/redis.conf:/usr/local/etc/redis/redis.conf, ./data/redis-cluster-5:/data]
-    command: redis-server /usr/local/etc/redis/redis.conf --port 7004 --requirepass ${REDIS_PASSWORD:-rpc-redis-123456} --masterauth ${REDIS_PASSWORD:-rpc-redis-123456} --maxmemory 32mb --maxmemory-policy allkeys-lru
+    command: redis-server /usr/local/etc/redis/redis.conf --port 7004 --requirepass ${REDIS_PASSWORD:-rpc-redis-123456} --masterauth ${REDIS_PASSWORD:-rpc-redis-123456} --cluster-announce-hostname redis-cluster-5 --maxmemory 32mb --maxmemory-policy allkeys-lru
     networks: { default: { aliases: [redis-cluster, redis-cluster-7004] } }
 
   redis-cluster-6:
     image: redis:7-alpine
     volumes: [./deploy/redis/cluster/redis.conf:/usr/local/etc/redis/redis.conf, ./data/redis-cluster-6:/data]
-    command: redis-server /usr/local/etc/redis/redis.conf --port 7005 --requirepass ${REDIS_PASSWORD:-rpc-redis-123456} --masterauth ${REDIS_PASSWORD:-rpc-redis-123456} --maxmemory 32mb --maxmemory-policy allkeys-lru
+    command: redis-server /usr/local/etc/redis/redis.conf --port 7005 --requirepass ${REDIS_PASSWORD:-rpc-redis-123456} --masterauth ${REDIS_PASSWORD:-rpc-redis-123456} --cluster-announce-hostname redis-cluster-6 --maxmemory 32mb --maxmemory-policy allkeys-lru
     networks: { default: { aliases: [redis-cluster, redis-cluster-7005] } }
 
   redis-cluster-init:

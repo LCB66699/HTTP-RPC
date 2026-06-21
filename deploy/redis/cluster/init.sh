@@ -32,10 +32,25 @@ if [ $elapsed -ge $MAX_WAIT ]; then
     exit 1
 fi
 
-# ---- 1. Check if cluster is already healthy ----
+# ---- 1. Check if cluster is already healthy (ALL nodes must be reachable) ----
+ALL_OK=0
 if redis-cli -c -h redis-cluster-1 -p 7000 -a "$PW" --no-auth-warning cluster info 2>/dev/null | grep -q 'cluster_state:ok'; then
-    echo "=== Redis Cluster healthy ==="
-    exit 0
+    # Double-check: every node must be reachable (no stale IPs)
+    ALL_OK=1
+    for i in $(seq 1 $NODE_COUNT); do
+        port=$((7000 + i - 1))
+        node_info=$(redis-cli -c -h "redis-cluster-$i" -p $port -a "$PW" --no-auth-warning cluster nodes 2>/dev/null)
+        # If any node shows other nodes as "disconnected" or "fail", IP drift likely
+        if echo "$node_info" | grep -qE 'disconnected|fail\?'; then
+            echo "[init] node redis-cluster-$i has disconnected/fail peers, stale IPs likely"
+            ALL_OK=0
+            break
+        fi
+    done
+    if [ $ALL_OK -eq 1 ]; then
+        echo "=== Redis Cluster healthy ==="
+        exit 0
+    fi
 fi
 
 echo "[init] cluster not healthy, checking for stale IPs..."
