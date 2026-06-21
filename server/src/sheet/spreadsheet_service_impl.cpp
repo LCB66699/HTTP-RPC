@@ -158,8 +158,7 @@ grpc::Status SpreadsheetServiceImpl::CreateSpreadsheet(grpc::ServerContext *cont
     }
 
     // Invalidate list cache via outbox
-    if (db_)
-        db_->InsertOutbox(g_rpc_auth_ctx.user_id, "cache:invalidate", SheetVersionKey(g_rpc_auth_ctx.user_id));
+    InvalidateCaches(db_, g_rpc_auth_ctx.user_id, {SheetVersionKey(g_rpc_auth_ctx.user_id)});
 
     resp->set_success(true);
     resp->set_id(id);
@@ -621,10 +620,10 @@ grpc::Status SpreadsheetServiceImpl::UpdateSpreadsheet(grpc::ServerContext *cont
             }
 
             // Invalidate caches via outbox
-            if (db_) {
-                db_->InsertOutbox(g_rpc_auth_ctx.user_id, "cache:invalidate", SheetCacheKey(g_rpc_auth_ctx.user_id, req->id()));
-                db_->InsertOutbox(g_rpc_auth_ctx.user_id, "cache:invalidate", SheetVersionKey(g_rpc_auth_ctx.user_id));
-            }
+            InvalidateCaches(db_, g_rpc_auth_ctx.user_id, {
+                SheetCacheKey(g_rpc_auth_ctx.user_id, req->id()),
+                SheetVersionKey(g_rpc_auth_ctx.user_id)
+            });
 
             resp->set_success(true);
 
@@ -725,10 +724,10 @@ grpc::Status SpreadsheetServiceImpl::DeleteSpreadsheet(grpc::ServerContext *cont
     }
 
     // Invalidate caches via outbox
-    if (db_) {
-        db_->InsertOutbox(g_rpc_auth_ctx.user_id, "cache:invalidate", SheetCacheKey(g_rpc_auth_ctx.user_id, req->id()));
-        db_->InsertOutbox(g_rpc_auth_ctx.user_id, "cache:invalidate", SheetVersionKey(g_rpc_auth_ctx.user_id));
-    }
+    InvalidateCaches(db_, g_rpc_auth_ctx.user_id, {
+        SheetCacheKey(g_rpc_auth_ctx.user_id, req->id()),
+        SheetVersionKey(g_rpc_auth_ctx.user_id)
+    });
 
     resp->set_success(true);
 

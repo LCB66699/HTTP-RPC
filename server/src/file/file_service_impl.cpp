@@ -130,8 +130,7 @@ grpc::Status FileServiceImpl::CreateFile(grpc::ServerContext *context, const rpc
     }
 
     // Invalidate list cache via outbox
-    if (db_)
-        db_->InsertOutbox(g_rpc_auth_ctx.user_id, "cache:invalidate", FileVersionKey(g_rpc_auth_ctx.user_id));
+    InvalidateCaches(db_, g_rpc_auth_ctx.user_id, {FileVersionKey(g_rpc_auth_ctx.user_id)});
 
     if (logger_) {
         auto dur =
@@ -503,10 +502,10 @@ grpc::Status FileServiceImpl::DeleteFile(grpc::ServerContext *context, const rpc
     }
 
     // Invalidate caches via outbox
-    if (db_) {
-        db_->InsertOutbox(g_rpc_auth_ctx.user_id, "cache:invalidate", FileCacheKey(g_rpc_auth_ctx.user_id, req->id()));
-        db_->InsertOutbox(g_rpc_auth_ctx.user_id, "cache:invalidate", FileVersionKey(g_rpc_auth_ctx.user_id));
-    }
+    InvalidateCaches(db_, g_rpc_auth_ctx.user_id, {
+        FileCacheKey(g_rpc_auth_ctx.user_id, req->id()),
+        FileVersionKey(g_rpc_auth_ctx.user_id)
+    });
 
     if (redis_ && redis_->IsConnected()) {
         redis_->DeleteKey("u:" + std::to_string(g_rpc_auth_ctx.user_id) + ":file:" + std::to_string(req->id()));
