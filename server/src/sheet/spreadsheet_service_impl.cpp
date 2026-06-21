@@ -157,6 +157,10 @@ grpc::Status SpreadsheetServiceImpl::CreateSpreadsheet(grpc::ServerContext *cont
             db_->InsertOutbox(g_rpc_auth_ctx.user_id, "sheet.created", ev.dump());
     }
 
+    // Invalidate list cache via outbox
+    if (db_)
+        db_->InsertOutbox(g_rpc_auth_ctx.user_id, "cache:invalidate", SheetVersionKey(g_rpc_auth_ctx.user_id));
+
     resp->set_success(true);
     resp->set_id(id);
 
@@ -616,6 +620,12 @@ grpc::Status SpreadsheetServiceImpl::UpdateSpreadsheet(grpc::ServerContext *cont
                     db_->InsertOutbox(g_rpc_auth_ctx.user_id, "sheet.updated", ev.dump());
             }
 
+            // Invalidate caches via outbox
+            if (db_) {
+                db_->InsertOutbox(g_rpc_auth_ctx.user_id, "cache:invalidate", SheetCacheKey(g_rpc_auth_ctx.user_id, req->id()));
+                db_->InsertOutbox(g_rpc_auth_ctx.user_id, "cache:invalidate", SheetVersionKey(g_rpc_auth_ctx.user_id));
+            }
+
             resp->set_success(true);
 
             if (logger_) {
@@ -712,6 +722,12 @@ grpc::Status SpreadsheetServiceImpl::DeleteSpreadsheet(grpc::ServerContext *cont
             rabbit_->Publish("rpc.events", "sheet.deleted", ev.dump());
         if (db_)
             db_->InsertOutbox(g_rpc_auth_ctx.user_id, "sheet.deleted", ev.dump());
+    }
+
+    // Invalidate caches via outbox
+    if (db_) {
+        db_->InsertOutbox(g_rpc_auth_ctx.user_id, "cache:invalidate", SheetCacheKey(g_rpc_auth_ctx.user_id, req->id()));
+        db_->InsertOutbox(g_rpc_auth_ctx.user_id, "cache:invalidate", SheetVersionKey(g_rpc_auth_ctx.user_id));
     }
 
     resp->set_success(true);

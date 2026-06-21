@@ -8,6 +8,7 @@
 #   bash dev.sh sheet      重建 + 重启 Sheet
 #   bash dev.sh file       重建 + 重启 File
 #   bash dev.sh search     重建 + 重启 Search
+#   bash dev.sh notify     重建 + 重启 Notify (outbox 消费者)
 #   bash dev.sh test       跑功能测试
 
 set -e

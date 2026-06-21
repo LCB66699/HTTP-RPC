@@ -1,17 +1,18 @@
-// Outbox 兜底 — 轮询 MySQL outbox 表，补发 RabbitMQ 事件
+// Outbox 兜底 — 轮询 MySQL outbox 表，补发 RabbitMQ 事件 / Redis cache 失效
 package main
 
 import (
 	"database/sql"
 	"fmt"
 	"log"
+	"strings"
 	"time"
 
 	_ "github.com/go-sql-driver/mysql"
 	amqp "github.com/rabbitmq/amqp091-go"
 )
 
-func startOutboxPoller(ch *amqp.Channel) {
+func startOutboxPoller(ch *amqp.Channel, redisAddr, redisPass string) {
 	// 连接两个 MySQL（spreadsheet + file），每个实例有自己的 outbox 表
 	mysqls := []string{
 		fmt.Sprintf("%s:%s@tcp(%s:%d)/%s",
@@ -27,11 +28,11 @@ func startOutboxPoller(ch *amqp.Channel) {
 	}
 
 	for _, dsn := range mysqls {
-		go pollSingleMySQL(dsn, ch)
+		go pollSingleMySQL(dsn, ch, redisAddr, redisPass)
 	}
 }
 
-func pollSingleMySQL(dsn string, ch *amqp.Channel) {
+func pollSingleMySQL(dsn string, ch *amqp.Channel, redisAddr, redisPass string) {
 	log.Printf("[Outbox] Connecting to dsn...")
 	db, err := sql.Open("mysql", dsn)
 	if err != nil {
@@ -43,12 +44,12 @@ func pollSingleMySQL(dsn string, ch *amqp.Channel) {
 	db.SetMaxIdleConns(1)
 
 	for {
-		pollOutbox(db, ch)
+		pollOutbox(db, ch, redisAddr, redisPass)
 		time.Sleep(2 * time.Second)
 	}
 }
 
-func pollOutbox(db *sql.DB, ch *amqp.Channel) {
+func pollOutbox(db *sql.DB, ch *amqp.Channel, redisAddr, redisPass string) {
 	rows, err := db.Query("SELECT id, event_type, payload, trace_context FROM outbox ORDER BY id LIMIT 100")
 	if err != nil {
 		if err != sql.ErrNoRows {
@@ -66,18 +67,28 @@ func pollOutbox(db *sql.DB, ch *amqp.Channel) {
 		if err := rows.Scan(&id, &eventType, &payload, &traceContext); err != nil {
 			continue
 		}
-		headers := amqp.Table{}
-		if traceContext.Valid && traceContext.String != "" {
-			headers["traceparent"] = traceContext.String
-		}
-		if err := ch.Publish("rpc.events", eventType, false, false,
-			amqp.Publishing{
-				ContentType: "application/json",
-				Body:        []byte(payload),
-				Headers:     headers,
-			}); err != nil {
-			log.Printf("[Outbox] publish error: %v", err)
-			return
+
+		if strings.HasPrefix(eventType, "cache:") {
+			// Cache invalidation → push directly to Redis Pub/Sub
+			if err := redisPublish(redisAddr, redisPass, eventType, payload); err != nil {
+				log.Printf("[Outbox] redis publish error for %s: %v", eventType, err)
+				return
+			}
+		} else {
+			// Normal event → re-publish to RabbitMQ
+			headers := amqp.Table{}
+			if traceContext.Valid && traceContext.String != "" {
+				headers["traceparent"] = traceContext.String
+			}
+			if err := ch.Publish("rpc.events", eventType, false, false,
+				amqp.Publishing{
+					ContentType: "application/json",
+					Body:        []byte(payload),
+					Headers:     headers,
+				}); err != nil {
+				log.Printf("[Outbox] publish error: %v", err)
+				return
+			}
 		}
 		maxID = id
 	}

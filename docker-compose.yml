@@ -647,6 +647,8 @@
       ES_HOST: "http://elasticsearch:9200"
       CANAL_MYSQL_HOST: "mysql-spreadsheet-0"
       MYSQL_ROOT_PASSWORD: "${MYSQL_ROOT_PASSWORD:-123456}"
+      REDIS_ADDR: "redis-cluster-7000:7000"
+      REDIS_PASSWORD: "${REDIS_PASSWORD:-rpc-redis-123456}"
     depends_on:
       rabbitmq:
         condition: service_healthy

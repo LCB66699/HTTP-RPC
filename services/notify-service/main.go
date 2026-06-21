@@ -127,7 +127,9 @@ func main() {
 	ch.QueueBind(q.Name, "sheet.deleted", "rpc.events", false, nil)
 	msgs, _ := ch.Consume(q.Name, "", false, false, false, false, nil)
 
-	startOutboxPoller(ch)
+	redisAddr := getenv("REDIS_ADDR", "redis-cluster-7000:7000")
+	redisPass := getenv("REDIS_PASSWORD", "rpc-redis-123456")
+	startOutboxPoller(ch, redisAddr, redisPass)
 
 	log.Println("[Notify] Listening for events (DLQ: notify.dlq)...")
 	propagator := otel.GetTextMapPropagator()

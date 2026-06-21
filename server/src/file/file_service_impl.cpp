@@ -129,6 +129,10 @@ grpc::Status FileServiceImpl::CreateFile(grpc::ServerContext *context, const rpc
             db_->InsertOutbox(g_rpc_auth_ctx.user_id, "file.uploaded", ev.dump());
     }
 
+    // Invalidate list cache via outbox
+    if (db_)
+        db_->InsertOutbox(g_rpc_auth_ctx.user_id, "cache:invalidate", FileVersionKey(g_rpc_auth_ctx.user_id));
+
     if (logger_) {
         auto dur =
             std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now() - start)
@@ -496,6 +500,12 @@ grpc::Status FileServiceImpl::DeleteFile(grpc::ServerContext *context, const rpc
             rabbit_->Publish("rpc.events", "file.deleted", ev.dump());
         if (db_)
             db_->InsertOutbox(g_rpc_auth_ctx.user_id, "file.deleted", ev.dump());
+    }
+
+    // Invalidate caches via outbox
+    if (db_) {
+        db_->InsertOutbox(g_rpc_auth_ctx.user_id, "cache:invalidate", FileCacheKey(g_rpc_auth_ctx.user_id, req->id()));
+        db_->InsertOutbox(g_rpc_auth_ctx.user_id, "cache:invalidate", FileVersionKey(g_rpc_auth_ctx.user_id));
     }
 
     if (redis_ && redis_->IsConnected()) {
