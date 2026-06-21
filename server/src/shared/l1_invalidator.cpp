@@ -1,9 +1,9 @@
-#include "shared/l1_invalidator.h"
+﻿#include "shared/cache/l1_invalidator.h"
 
 #include <cstdio>
 
-#include "shared/l1_cache.h"
-#include "shared/redis_client.h"
+#include "shared/cache/l1_cache.h"
+#include "shared/client/redis_client.h"
 
 L1CacheInvalidator::L1CacheInvalidator(L1Cache *cache, RedisClient *redis) : cache_(cache), redis_(redis) {}
 

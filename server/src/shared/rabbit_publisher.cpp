@@ -1,4 +1,4 @@
-#include "shared/rabbit_publisher.h"
+﻿#include "shared/client/rabbit_publisher.h"
 
 #include <cstdio>
 #include <nlohmann/json.hpp>

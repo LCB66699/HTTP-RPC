@@ -1,11 +1,11 @@
-#include "shared/health_service_impl.h"
+﻿#include "shared/base/health_service_impl.h"
 
 #include <chrono>
 #include <cstdio>
 #include <nlohmann/json.hpp>
 #include <sstream>
 
-#include "shared/redis_client.h"
+#include "shared/client/redis_client.h"
 
 void HealthMonitorImpl::SetNodeInfo(const std::string &node_id, const std::string &service, const std::string &host,
                                     int port) {
@@ -33,8 +33,8 @@ grpc::Status HealthMonitorImpl::Report(grpc::ServerContext *, const rpc::ReportR
 }
 
 grpc::Status HealthMonitorImpl::Query(grpc::ServerContext *, const rpc::QueryRequest *, rpc::QueryResponse *resp) {
-    // Query 已移�?Gateway �?�?�?Redis KEYS hb:* 聚合
-    // 保留 gRPC 接口兼容，返回空成功
+    // Query 宸茬Щ鑷?Gateway 灞?鈥?浠?Redis KEYS hb:* 鑱氬悎
+    // 淇濈暀 gRPC 鎺ュ彛鍏煎锛岃繑鍥炵┖鎴愬姛
     resp->set_total_online(0);
     resp->set_total_offline(0);
     return grpc::Status::OK;

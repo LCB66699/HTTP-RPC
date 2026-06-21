@@ -1,10 +1,10 @@
-#include "search/search_service_impl.h"
-#include "shared/error_codes.h"
+﻿#include "search/search_service_impl.h"
+#include "shared/base/error_codes.h"
 
 #include <cstdio>
 #include <nlohmann/json.hpp>
 
-#include "shared/httplib.h"
+#include "shared/client/httplib.h"
 
 grpc::Status SearchServiceImpl::Search(grpc::ServerContext *, const rpc::SearchRequest *req,
                                        rpc::SearchResponse *resp) {
@@ -18,7 +18,7 @@ grpc::Status SearchServiceImpl::Search(grpc::ServerContext *, const rpc::SearchR
         return grpc::Status::OK;
     }
 
-    // 确定索引
+    // 纭畾绱㈠紩
     std::string indices;
     bool s_sheets = true, s_files = true;
     if (!req->scope().empty()) {
@@ -39,7 +39,7 @@ grpc::Status SearchServiceImpl::Search(grpc::ServerContext *, const rpc::SearchR
     int page = req->page() > 0 ? req->page() : 1;
     int page_size = req->page_size() > 0 ? req->page_size() : 20;
 
-    // 构�?ES DSL
+    // 鏋勯€?ES DSL
     nlohmann::json esq;
     esq["from"] = (page - 1) * page_size;
     esq["size"] = page_size;
@@ -77,7 +77,7 @@ grpc::Status SearchServiceImpl::Search(grpc::ServerContext *, const rpc::SearchR
     esq["highlight"]["pre_tags"] = nlohmann::json::array({"<em>"});
     esq["highlight"]["post_tags"] = nlohmann::json::array({"</em>"});
 
-    // 调用 ES
+    // 璋冪敤 ES
     httplib::Client es(es_host_);
     es.set_connection_timeout(3, 0);
     es.set_read_timeout(5, 0);

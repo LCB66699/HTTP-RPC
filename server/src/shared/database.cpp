@@ -1,13 +1,13 @@
-#include "shared/data_helpers.h"
-#include "shared/database.h"
+﻿#include "shared/helper/json_helpers.h"
+#include "shared/client/database.h"
 
 #include <cstdio>
 #include <cstring>
 #include <fstream>
 #include <sstream>
 
-#include "shared/sha256.h"
-#include "shared/snowflake.h"
+#include "shared/base/sha256.h"
+#include "shared/base/snowflake.h"
 
 // ---- connection helpers ----
 
@@ -17,7 +17,7 @@ MysqlPtr Database::ConnectMYSQL(const std::string &host, int port) {
         fprintf(stderr, "[DB] mysql_init failed\n");
         return nullptr;
     }
-    // 重试 5 次应�?Docker DNS 间歇性解析失�?(CR_CONN_HOST_ERROR / ER_BAD_HOST_ERROR)
+    // 閲嶈瘯 5 娆″簲锟?Docker DNS 闂存瓏鎬цВ鏋愬け锟?(CR_CONN_HOST_ERROR / ER_BAD_HOST_ERROR)
     for (int attempt = 1; attempt <= 5; attempt++) {
         if (mysql_real_connect(c.get(), host.c_str(), user_.c_str(), password_.c_str(),
                                db_name_.c_str(), port, nullptr, 0)) {
@@ -33,7 +33,7 @@ MysqlPtr Database::ConnectMYSQL(const std::string &host, int port) {
     }
     fprintf(stderr, "[DB] connect %s:%d failed after 5 attempts: %s\n",
             host.c_str(), port, mysql_error(c.get()));
-    // MysqlPtr 析构自动 mysql_close
+    // MysqlPtr 鏋愭瀯鑷姩 mysql_close
     return nullptr;
 }
 
@@ -48,7 +48,7 @@ bool Database::RunQuery(MYSQL *conn, const std::string &sql, MYSQL_RES **out_res
     return false;
 }
 
-// ---- sql_param 构造函�?�?强制转义，编译期兜底 ----
+// ---- sql_param 鏋勯€犲嚱锟?锟?寮哄埗杞箟锛岀紪璇戞湡鍏滃簳 ----
 sql_param::sql_param(MYSQL *conn, const std::string &s) : quote_(true) {
     if (!conn) {
         val_ = s;
@@ -59,7 +59,7 @@ sql_param::sql_param(MYSQL *conn, const std::string &s) : quote_(true) {
     val_.resize(len);
 }
 
-// 取任意可用连接供转义用（遍历写池→读�? 返回首个存活连接�?
+// 鍙栦换鎰忓彲鐢ㄨ繛鎺ヤ緵杞箟鐢紙閬嶅巻鍐欐睜鈫掕锟? 杩斿洖棣栦釜瀛樻椿杩炴帴锟?
 MYSQL *Database::EscConn() {
     for (auto &wc : write_conns_)
         if (wc->conn)
@@ -77,7 +77,7 @@ Database::ConnHandle Database::GetHealthyWriteConn() {
     for (size_t attempt = 0; attempt < pool_sz; ++attempt) {
         size_t idx = write_idx_.fetch_add(1, std::memory_order_relaxed) % pool_sz;
         auto &wc = write_conns_[idx];
-        {   // 每条连接独立加锁, 失败则释放锁继续试下一�?
+        {   // 姣忔潯杩炴帴鐙珛鍔犻攣, 澶辫触鍒欓噴鏀鹃攣缁х画璇曚笅涓€锟?
             std::unique_lock<std::mutex> lock(wc->mtx);
             if (!wc->conn) {
                 wc->conn = ConnectMYSQL(write_host_, write_port_);
@@ -133,7 +133,7 @@ Database::ConnHandle Database::GetHealthyReadConn() {
             }
         }
     }
-    // 无从�?�?所有读连接均不可用, 回退到主�?
+    // 鏃犱粠锟?锟?鎵€鏈夎杩炴帴鍧囦笉鍙敤, 鍥為€€鍒颁富锟?
     return GetHealthyWriteConn();
 }
 
@@ -147,7 +147,7 @@ Database::Database(const std::string &write_host, int write_port, const std::str
       write_port_(write_port),
       read_port_(read_port),
       pool_size_(write_pool_size) {
-    // 拆分读地址
+    // 鎷嗗垎璇诲湴鍧€
     std::string hosts = read_hosts;
     size_t start = 0, end;
     while ((end = hosts.find(',', start)) != std::string::npos) {
@@ -156,7 +156,7 @@ Database::Database(const std::string &write_host, int write_port, const std::str
     }
     read_hosts_.push_back(hosts.substr(start));
 
-    // 创建写连接池 �?同一主库多条连接, 实现并行�?
+    // 鍒涘缓鍐欒繛鎺ユ睜 锟?鍚屼竴涓诲簱澶氭潯杩炴帴, 瀹炵幇骞惰锟?
     write_conns_.reserve(pool_size_);
     for (int i = 0; i < pool_size_; i++) {
         auto wc = std::make_unique<PoolConn>();
@@ -166,7 +166,7 @@ Database::Database(const std::string &write_host, int write_port, const std::str
         write_conns_.push_back(std::move(wc));
     }
 
-    // 创建读连接池（从库）
+    // 鍒涘缓璇昏繛鎺ユ睜锛堜粠搴擄級
     for (auto &h : read_hosts_) {
         auto c = ConnectMYSQL(h, read_port_);
         if (c) {
@@ -183,10 +183,10 @@ Database::Database(const std::string &write_host, int write_port, const std::str
 
 Database::~Database() {
     StopHealthCheck();
-    // MysqlPtr 析构自动 mysql_close，无需手动遍历
+    // MysqlPtr 鏋愭瀯鑷姩 mysql_close锛屾棤闇€鎵嬪姩閬嶅巻
 }
 
-// ---- 写操作（主库连接�?round-robin 分发, 每连接独�?mutex�?----
+// ---- 鍐欐搷浣滐紙涓诲簱杩炴帴锟?round-robin 鍒嗗彂, 姣忚繛鎺ョ嫭锟?mutex锟?----
 
 bool Database::ExecWrite(const std::string &sql) {
     auto h = GetHealthyWriteConn();
@@ -198,7 +198,7 @@ bool Database::ExecWrite(const std::string &sql) {
     return false;
 }
 
-// �?+ 返回自增ID: INSERT �?mysql_insert_id 在同一连接同一锁内原子完成
+// 锟?+ 杩斿洖鑷ID: INSERT 锟?mysql_insert_id 鍦ㄥ悓涓€杩炴帴鍚屼竴閿佸唴鍘熷瓙瀹屾垚
 bool Database::ExecWriteInsert(const std::string &sql, int64_t &out_id) {
     auto h = GetHealthyWriteConn();
     if (!h)
@@ -211,7 +211,7 @@ bool Database::ExecWriteInsert(const std::string &sql, int64_t &out_id) {
     return true;
 }
 
-// ---- 读操作（从库轮询, 无从库时回退到写池） ----
+// ---- 璇绘搷浣滐紙浠庡簱杞, 鏃犱粠搴撴椂鍥為€€鍒板啓姹狅級 ----
 
 MYSQL *Database::GetReadConn() {
     if (read_conns_.empty()) {
@@ -237,13 +237,13 @@ bool Database::ExecRead(const std::string &sql, std::function<bool(MYSQL_RES *)>
     return ok;
 }
 
-// ---- schema init（首连接执行, DDL 全局生效无需在所有连接上重复�?----
+// ---- schema init锛堥杩炴帴鎵ц, DDL 鍏ㄥ眬鐢熸晥鏃犻渶鍦ㄦ墍鏈夎繛鎺ヤ笂閲嶅锟?----
 
 bool Database::Initialize() {
     if (write_conns_.empty())
         return false;
 
-    // 启动时序问题：不管连接是�?null，全部重建确保连到同一个就绪的 MySQL
+    // 鍚姩鏃跺簭闂锛氫笉绠¤繛鎺ユ槸锟?null锛屽叏閮ㄩ噸寤虹‘淇濊繛鍒板悓涓€涓氨缁殑 MySQL
     for (size_t i = 0; i < write_conns_.size(); ++i) {
         write_conns_[i]->conn = ConnectMYSQL(write_host_, write_port_);
         if (!write_conns_[i]->conn)
@@ -253,7 +253,7 @@ bool Database::Initialize() {
         read_conns_[i]->conn = ConnectMYSQL(read_hosts_[i % read_hosts_.size()], read_port_);
     }
 
-    // 每条写连接都执行 DDL，杜绝因连接状态差异导致的 Table not found
+    // 姣忔潯鍐欒繛鎺ラ兘鎵ц DDL锛屾潨缁濆洜杩炴帴鐘舵€佸樊寮傚鑷寸殑 Table not found
     for (auto &wcp : write_conns_) {
         if (!wcp->conn) continue;
         std::lock_guard<std::mutex> lock(wcp->mtx);
@@ -298,7 +298,7 @@ bool Database::Initialize() {
         "payload JSON NOT NULL, "
         "created_at DATETIME DEFAULT NOW())");
 
-    // indexes + migrations (幂等, 失败忽略)
+    // indexes + migrations (骞傜瓑, 澶辫触蹇界暐)
     mysql_query(c, "ALTER TABLE spreadsheets ADD COLUMN version INT NOT NULL DEFAULT 1");
     mysql_query(c, "ALTER TABLE users MODIFY COLUMN password_hash VARCHAR(256) NOT NULL");
     mysql_query(c, "ALTER TABLE users ADD COLUMN token_version INT NOT NULL DEFAULT 0");
@@ -335,7 +335,7 @@ bool Database::Initialize() {
     // Trace context for distributed tracing through the outbox
     mysql_query(c, "ALTER TABLE outbox ADD COLUMN trace_context VARCHAR(512) DEFAULT NULL AFTER payload");
 
-    // Idempotency key columns �?NULL means "no deduplication" (multiple NULLs
+    // Idempotency key columns 锟?NULL means "no deduplication" (multiple NULLs
     // allowed by UNIQUE). ON DUPLICATE KEY UPDATE id=LAST_INSERT_ID(id) returns
     // the existing id on replay.
     mysql_query(c,
@@ -345,11 +345,11 @@ bool Database::Initialize() {
                 "ALTER TABLE files        ADD COLUMN idempotency_key CHAR(36) "
                 "UNIQUE NULL DEFAULT NULL");
 
-    // Version columns for optimistic locking �?spreadsheets already has it;
+    // Version columns for optimistic locking 锟?spreadsheets already has it;
     // files needs it for multi-instance write safety.
     mysql_query(c, "ALTER TABLE files ADD COLUMN version INT NOT NULL DEFAULT 1");
 
-    // user_id columns �?integer FK to users.id; avoids username-as-FK design
+    // user_id columns 锟?integer FK to users.id; avoids username-as-FK design
     // flaw. DEFAULT 0 allows idempotent migration on existing rows (populated
     // below via JOIN).
     mysql_query(c, "ALTER TABLE spreadsheets ADD COLUMN user_id BIGINT NOT NULL DEFAULT 0");
@@ -366,7 +366,7 @@ bool Database::Initialize() {
                 "SET f.user_id=u.id WHERE f.user_id=0");
 
     // Replace single-column indexes with composite covering indexes on user_id +
-    // sort column. DROP first (idempotent �?fails silently if already removed),
+    // sort column. DROP first (idempotent 锟?fails silently if already removed),
     // then CREATE.
     mysql_query(c, "ALTER TABLE spreadsheets DROP INDEX idx_sheets_username");
     mysql_query(c, "ALTER TABLE spreadsheets DROP INDEX idx_sheets_user_time");
@@ -384,13 +384,13 @@ bool Database::Initialize() {
     mysql_query(c, "CREATE INDEX idx_undo_xid_id ON undo_log(xid, id DESC)");
     mysql_query(c, "CREATE INDEX idx_undo_created ON undo_log(created_at)");
 
-    // 覆盖索引 �?SELECT token_version FROM users WHERE username=X 避免回表
+    // 瑕嗙洊绱㈠紩 锟?SELECT token_version FROM users WHERE username=X 閬垮厤鍥炶〃
     mysql_query(c, "ALTER TABLE users DROP INDEX IF EXISTS username");
     mysql_query(c,
                 "ALTER TABLE users ADD UNIQUE INDEX idx_users_user_ver "
                 "(username, token_version)");
 
-    // INT �?BIGINT 升级：兼容已有表，MySQL 8.0 支持 ALGORITHM=INSTANT
+    // INT 锟?BIGINT 鍗囩骇锛氬吋瀹瑰凡鏈夎〃锛孧ySQL 8.0 鏀寔 ALGORITHM=INSTANT
     mysql_query(c, "ALTER TABLE users MODIFY COLUMN id BIGINT AUTO_INCREMENT");
     mysql_query(c, "ALTER TABLE spreadsheets MODIFY COLUMN id BIGINT AUTO_INCREMENT");
     mysql_query(c,
@@ -408,7 +408,7 @@ bool Database::Initialize() {
 
     }  // end DDL loop over write_conns_
 
-    // Read connections also need DDL �?they may connect before tables are created.
+    // Read connections also need DDL 锟?they may connect before tables are created.
     // DDL is global but running it on each connection guarantees visibility.
     for (auto &rcp : read_conns_) {
         if (!rcp->conn) continue;
@@ -439,7 +439,7 @@ bool Database::AddUser(const std::string &username, const std::string &password_
 }
 
 bool Database::GetUser(const std::string &username, std::string &password_hash_out) {
-    // 强一�? 密码验证必须读主�?
+    // 寮轰竴锟? 瀵嗙爜楠岃瘉蹇呴』璇讳富锟?
     auto h = GetHealthyWriteConn();
     if (!h)
         return false;
@@ -457,7 +457,7 @@ bool Database::GetUser(const std::string &username, std::string &password_hash_o
 }
 
 bool Database::UserExists(const std::string &username) {
-    // 强一�? 查重必须走主�? 避免主从延迟导致重复注册
+    // 寮轰竴锟? 鏌ラ噸蹇呴』璧颁富锟? 閬垮厤涓讳粠寤惰繜瀵艰嚧閲嶅娉ㄥ唽
     auto h = GetHealthyWriteConn();
     if (!h)
         return false;
@@ -472,7 +472,7 @@ bool Database::UserExists(const std::string &username) {
 }
 
 int Database::GetTokenVersion(const std::string &username) {
-    // 强一�? token 版本号必须读主库
+    // 寮轰竴锟? token 鐗堟湰鍙峰繀椤昏涓诲簱
     auto h = GetHealthyWriteConn();
     if (!h)
         return -1;
@@ -608,7 +608,7 @@ bool Database::ListSpreadsheets(int64_t user_id, std::vector<SpreadsheetSummary>
     if (after_id > 0)
         where += make_sql(" AND id<{}", after_id);
 
-    // Always obtain exact total via COUNT(*) �?avoids loading all rows just to
+    // Always obtain exact total via COUNT(*) 锟?avoids loading all rows just to
     // count them
     total = 0;
     ExecRead("SELECT COUNT(*) FROM spreadsheets " + where, [&](MYSQL_RES *res) {
@@ -622,7 +622,7 @@ bool Database::ListSpreadsheets(int64_t user_id, std::vector<SpreadsheetSummary>
     if (page_size > 0) {
         int offset = page * page_size;
         // Delayed Join: subquery scans covering index for ids, then join to fetch
-        // full row data �?avoids deep-page row reads.  WHERE clause is built from
+        // full row data 锟?avoids deep-page row reads.  WHERE clause is built from
         // safe int params above, so string concat is safe here.
         sql =
             "SELECT s.id,s.name,s.description,s.row_count,s.col_count,s.updated_at "
@@ -668,11 +668,11 @@ bool Database::UpdateSpreadsheet(int64_t id, const std::string &name, const std:
     if (version > 0) {
         sql += " AND version = " + std::to_string(version);
     }
-    // 乐观锁冲突时 affected_rows=0 �?ExecWrite 返回 true(�?SQL 错误)
-    // 业务层通过返回值无法区�?未匹�?�?成功", 需额外检�?
-    // 这里改为: version>0 时检�?affected_rows, 不匹配则返回 false
+    // 涔愯閿佸啿绐佹椂 affected_rows=0 锟?ExecWrite 杩斿洖 true(锟?SQL 閿欒)
+    // 涓氬姟灞傞€氳繃杩斿洖鍊兼棤娉曞尯锟?鏈尮锟?锟?鎴愬姛", 闇€棰濆妫€锟?
+    // 杩欓噷鏀逛负: version>0 鏃舵锟?affected_rows, 涓嶅尮閰嶅垯杩斿洖 false
     if (version > 0) {
-        // 走带版本号的更新, 需要检查受影响行数
+        // 璧板甫鐗堟湰鍙风殑鏇存柊, 闇€瑕佹鏌ュ彈褰卞搷琛屾暟
         auto h = GetHealthyWriteConn();
         if (!h)
             return false;
@@ -690,7 +690,7 @@ bool Database::DeleteSpreadsheet(int64_t id, int64_t /*user_id*/) {
 }
 
 bool Database::GetSpreadsheetOwner(int64_t id, int64_t &owner_user_id, int *out_version) {
-    // 强一�? 归属校验必须读主�?
+    // 寮轰竴锟? 褰掑睘鏍￠獙蹇呴』璇讳富锟?
     auto h = GetHealthyWriteConn();
     if (!h)
         return false;
@@ -814,7 +814,7 @@ bool Database::ListFiles(int64_t user_id, std::vector<FileRow> &out, int &total,
     if (page_size > 0) {
         int offset = page * page_size;
         // Delayed Join: subquery uses covering index for id lookup, then join back
-        // to read full row �?avoids scanning large row data at deep offsets.
+        // to read full row 锟?avoids scanning large row data at deep offsets.
         // WHERE clause is built from safe int params above.
         sql =
             "SELECT "
@@ -850,7 +850,7 @@ bool Database::DeleteFile(int64_t id, int64_t /*user_id*/) {
 }
 
 bool Database::GetFileOwner(int64_t id, int64_t &owner_user_id) {
-    // 强一�? 归属校验必须读主�?
+    // 寮轰竴锟? 褰掑睘鏍￠獙蹇呴』璇讳富锟?
     auto h = GetHealthyWriteConn();
     if (!h)
         return false;
@@ -866,7 +866,7 @@ bool Database::GetFileOwner(int64_t id, int64_t &owner_user_id) {
 }
 
 bool Database::GetFileStoragePath(int64_t id, std::string &storage_path) {
-    // 查询 MinIO object key，用于删除时一并清理对象存�?
+    // 鏌ヨ MinIO object key锛岀敤浜庡垹闄ゆ椂涓€骞舵竻鐞嗗璞″瓨锟?
     storage_path.clear();
     std::string sql = make_sql("SELECT storage_path FROM files WHERE id={}", id);
     return ExecRead(sql, [&](MYSQL_RES *res) {
@@ -895,7 +895,7 @@ bool Database::UpdateSpreadsheetStoragePath(int64_t id, const std::string &stora
                               sql_param(ec, storage_path), id));
 }
 
-// ---- Undo Log (always master �?2PC requires consistency) ----
+// ---- Undo Log (always master 锟?2PC requires consistency) ----
 
 bool Database::WriteUndoLog(const std::string &xid, const std::string &table_name, int64_t row_id,
                             const std::string &before_snapshot) {
@@ -907,7 +907,7 @@ bool Database::WriteUndoLog(const std::string &xid, const std::string &table_nam
 
 bool Database::GetUndoLog(const std::string &xid, std::string &table_name, int64_t &row_id,
                           std::string &before_snapshot) {
-    // 2PC 一致�? undo_log 必须读主�?
+    // 2PC 涓€鑷达拷? undo_log 蹇呴』璇讳富锟?
     auto h = GetHealthyWriteConn();
     if (!h)
         return false;
@@ -949,11 +949,11 @@ int Database::PurgeOldUndoLogs(int days) {
     return affected;
 }
 
-// ---- 连接池健康检�?----
+// ---- 杩炴帴姹犲仴搴锋锟?----
 
 void Database::StartHealthCheck() {
     if (health_running_.exchange(true))
-        return;  // 已在运行，防止重复调用导�?std::terminate
+        return;  // 宸插湪杩愯锛岄槻姝㈤噸澶嶈皟鐢ㄥ锟?std::terminate
     health_check_ = std::thread(&Database::HealthLoop, this);
     printf("[DB] Health check started (every 30s)\n");
 }
@@ -970,7 +970,7 @@ void Database::HealthLoop() {
         if (!health_running_)
             break;
 
-        // ——�?�?1 �? 全部 ping, 死连接重�?——�?
+        // 鈥斺€旓拷?锟?1 锟? 鍏ㄩ儴 ping, 姝昏繛鎺ラ噸锟?鈥斺€旓拷?
         for (size_t i = 0; i < write_conns_.size(); ++i) {
             auto &wc = write_conns_[i];
             std::lock_guard<std::mutex> lock(wc->mtx);
@@ -993,25 +993,25 @@ void Database::HealthLoop() {
             }
         }
 
-        // ——�?�?2 �? 空闲连接淘汰 ——�?
+        // 鈥斺€旓拷?锟?2 锟? 绌洪棽杩炴帴娣樻卑 鈥斺€旓拷?
         int min_idle = min_idle_.load();
         int idle_timeout_ms = idle_timeout_ms_.load();
         if (min_idle <= 0 && idle_timeout_ms <= 0)
-            continue;  // 未启用空闲淘�?
+            continue;  // 鏈惎鐢ㄧ┖闂叉窐锟?
 
         int64_t now_ms =
             std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch())
                 .count();
 
         auto evictPool = [&](auto &pool, const char *label) {
-            // 统计存活连接�?
+            // 缁熻瀛樻椿杩炴帴锟?
             int alive = 0;
             for (auto &pc : pool)
                 if (pc->conn)
                     alive++;
 
             if (alive <= min_idle)
-                return;  // 已到保底�? 不淘�?
+                return;  // 宸插埌淇濆簳锟? 涓嶆窐锟?
 
             for (size_t i = 0; i < pool.size(); ++i) {
                 if (alive <= min_idle)
@@ -1036,7 +1036,7 @@ void Database::HealthLoop() {
 }
 
 // ============================================================
-// ShardedDatabase �?hash-routes user_id across N Database shards
+// ShardedDatabase 锟?hash-routes user_id across N Database shards
 // ============================================================
 
 ShardedDatabase::ShardedDatabase(int shard_count, const std::string &write_host_prefix, int write_port,
@@ -1081,7 +1081,7 @@ Database *ShardedDatabase::ShardForBroadcast() {
     return shards_.empty() ? nullptr : shards_[0].get();
 }
 
-// === Users (auth shard only �?shard 0) ===
+// === Users (auth shard only 锟?shard 0) ===
 
 bool ShardedDatabase::AddUser(const std::string &username, const std::string &password_hash) {
     return shards_[0]->AddUser(username, password_hash);
@@ -1127,7 +1127,7 @@ bool ShardedDatabase::UpdateSpreadsheet(int64_t id, int64_t user_id, const std::
 }
 bool ShardedDatabase::UpdateSpreadsheet(int64_t id, const std::string &name, const std::string &desc,
                                         const std::string &headers_json, const std::string &data_json, int version) {
-    // Legacy: no user_id �?broadcast
+    // Legacy: no user_id 锟?broadcast
     for (auto &db : shards_)
         if (db->UpdateSpreadsheet(id, name, desc, headers_json, data_json, version))
             return true;
@@ -1224,7 +1224,7 @@ bool ShardedDatabase::UpdateSpreadsheetStoragePath(int64_t id, const std::string
     return false;
 }
 
-// === Undo Log (broadcast �?2PC 一致性要�? ===
+// === Undo Log (broadcast 锟?2PC 涓€鑷存€ц锟? ===
 
 bool ShardedDatabase::WriteUndoLog(const std::string &xid, const std::string &table_name, int64_t row_id,
                                    const std::string &before_snapshot) {
@@ -1348,7 +1348,7 @@ bool Database::MoveFile(int64_t id, int64_t target_folder_id, int version) {
 int Database::BatchDeleteFiles(int64_t user_id, const std::vector<int64_t> &ids) {
     if (ids.empty())
         return 0;
-    // 单条 SQL，原子执行，避免部分成功部分失败
+    // 鍗曟潯 SQL锛屽師瀛愭墽琛岋紝閬垮厤閮ㄥ垎鎴愬姛閮ㄥ垎澶辫触
     std::string in_list;
     for (size_t i = 0; i < ids.size(); ++i) {
         if (i > 0)

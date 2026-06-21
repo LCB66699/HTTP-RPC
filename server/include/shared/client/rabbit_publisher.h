@@ -1,11 +1,11 @@
-#pragma once
+﻿#pragma once
 #include <amqp.h>
 #include <amqp_tcp_socket.h>
 
 #include <memory>
 #include <string>
 
-#include "shared/service_interfaces.h"
+#include "shared/base/service_interfaces.h"
 
 class RabbitPublisher : public IRabbitPublisher {
    public:
@@ -14,7 +14,7 @@ class RabbitPublisher : public IRabbitPublisher {
 
     bool Publish(const std::string &exchange, const std::string &routing_key, const std::string &body);
 
-    // �?W3C traceparent 的事件发�?
+    // 甯?W3C traceparent 鐨勪簨浠跺彂甯?
     bool PublishWithTrace(const std::string &exchange, const std::string &routing_key, const std::string &body,
                           const std::string &traceparent, const std::string &tracestate = "");
 

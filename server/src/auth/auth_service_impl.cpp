@@ -1,4 +1,4 @@
-#include "auth/auth_service_impl.h"
+﻿#include "auth/auth_service_impl.h"
 
 #include <openssl/crypto.h>
 
@@ -9,13 +9,13 @@
 #include <fstream>
 #include <nlohmann/json.hpp>
 
-#include "shared/call_logger.h"
-#include "shared/database.h"
-#include "shared/error_codes.h"
-#include "shared/jwt.h"
-#include "shared/redis_client.h"
-#include "shared/sha256.h"
-#include "shared/system_logger.h"
+#include "shared/base/call_logger.h"
+#include "shared/client/database.h"
+#include "shared/base/error_codes.h"
+#include "shared/client/jwt.h"
+#include "shared/client/redis_client.h"
+#include "shared/base/sha256.h"
+#include "shared/base/system_logger.h"
 
 #ifdef __linux__
 #include <termios.h>
@@ -133,7 +133,7 @@ grpc::Status AuthServiceImpl::Login(grpc::ServerContext *, const rpc::LoginReque
     std::string payload_str = payload.dump();
     std::string token = jwt::create(payload_str, jwt_secret_);
 
-    // 密码使用完毕，擦除内存中的副�?
+    // 瀵嗙爜浣跨敤瀹屾瘯锛屾摝闄ゅ唴瀛樹腑鐨勫壇锟?
     {
         std::string pw = req->password();
         if (!pw.empty())
@@ -153,7 +153,7 @@ grpc::Status AuthServiceImpl::Login(grpc::ServerContext *, const rpc::LoginReque
         r["token"] = json("<jwt>");
         logger_->Log(req->username(), "AuthService", "Login", p, r, true, dur);
     }
-    // 签发�?Token
+    // 绛惧彂锟?Token
     std::string role = IsAdminUser(req->username()) ? "admin" : "user";
     std::string at = CreateAccessToken(req->username(), uid, role);
     std::string rt = CreateRefreshToken(req->username(), uid);
@@ -171,7 +171,7 @@ grpc::Status AuthServiceImpl::Register(grpc::ServerContext *, const rpc::Registe
     auto start = std::chrono::high_resolution_clock::now();
     std::lock_guard<std::mutex> lock(mtx_);
 
-    // 先做输入校验（不查重——交�?INSERT �?UNIQUE 约束，消�?TOCTOU 竞态窗口）
+    // 鍏堝仛杈撳叆鏍￠獙锛堜笉鏌ラ噸鈥斺€斾氦锟?INSERT 锟?UNIQUE 绾︽潫锛屾秷锟?TOCTOU 绔炴€佺獥鍙ｏ級
     if (req->username().size() < 3 || req->username().size() > 20) {
         resp->set_success(false);
         SET_ERROR(resp, "Username must be 3-20 characters", rpc_error::BAD_REQUEST);
@@ -202,7 +202,7 @@ grpc::Status AuthServiceImpl::Register(grpc::ServerContext *, const rpc::Registe
     }
 
     if (db_) {
-        // 直接 INSERT �?UNIQUE 约束兜底，消�?UserExists→AddUser 之间�?TOCTOU 竞�?
+        // 鐩存帴 INSERT 锟?UNIQUE 绾︽潫鍏滃簳锛屾秷锟?UserExists鈫扐ddUser 涔嬮棿锟?TOCTOU 绔烇拷?
         if (!db_->AddUser(req->username(), sha256::hash_password(req->password()))) {
             bool is_dup = db_->UserExists(req->username());
             resp->set_success(false);
@@ -242,18 +242,18 @@ grpc::Status AuthServiceImpl::Register(grpc::ServerContext *, const rpc::Registe
     std::string payload_str = payload.dump();
     std::string token = jwt::create(payload_str, jwt_secret_);
 
-    // 同步 token_version �?Redis
+    // 鍚屾 token_version 锟?Redis
     if (redis_ && redis_->IsConnected())
         redis_->SetJSON("token_ver:" + req->username(), std::to_string(ver), 86400);
 
-    // 密码使用完毕，擦除内存中的副�?
+    // 瀵嗙爜浣跨敤瀹屾瘯锛屾摝闄ゅ唴瀛樹腑鐨勫壇锟?
     {
         std::string pw = req->password();
         if (!pw.empty())
             OPENSSL_cleanse(&pw[0], pw.size());
     }
 
-    // 签发�?Token
+    // 绛惧彂锟?Token
     std::string role = IsAdminUser(req->username()) ? "admin" : "user";
     std::string at = CreateAccessToken(req->username(), uid, role);
     std::string rt = CreateRefreshToken(req->username(), uid);
@@ -325,7 +325,7 @@ grpc::Status AuthServiceImpl::RefreshToken(grpc::ServerContext *, const rpc::Ref
         stored_rt = stored;
     }
     if (stored_rt != req->refresh_token()) {
-        // Token 不匹�?�?盗用检测，撤销所�?
+        // Token 涓嶅尮锟?锟?鐩楃敤妫€娴嬶紝鎾ら攢鎵€锟?
         if (redis_) {
             redis_->DeleteKey("rt:" + req->username());
             redis_->DeleteKey("rate:login:" + req->username() + ":total");
@@ -372,7 +372,7 @@ grpc::Status AuthServiceImpl::ValidateUser(grpc::ServerContext *, const rpc::Val
     int64_t uid = req->user_id();
     int64_t token_uid = 0;
 
-    // �?token 中验证身�?
+    // 锟?token 涓獙璇佽韩锟?
     if (!req->token().empty()) {
         std::string payload;
         if (jwt::verify(req->token(), jwt_secret_, payload)) {
@@ -385,7 +385,7 @@ grpc::Status AuthServiceImpl::ValidateUser(grpc::ServerContext *, const rpc::Val
         }
     }
 
-    // 身份比对：请求的 user_id 必须�?JWT 中的 uid 一致（0 表示不限定）
+    // 韬唤姣斿锛氳姹傜殑 user_id 蹇呴』锟?JWT 涓殑 uid 涓€鑷达紙0 琛ㄧず涓嶉檺瀹氾級
     if (uid != 0 && token_uid != 0 && uid != token_uid) {
         resp->set_valid(false);
         SET_ERROR(resp, "user_id mismatch", rpc_error::UNAUTHENTICATED);
@@ -394,7 +394,7 @@ grpc::Status AuthServiceImpl::ValidateUser(grpc::ServerContext *, const rpc::Val
     if (uid == 0)
         uid = token_uid;
 
-    // 如果 token 无效或没传，�?username/user_id 查数据库
+    // 濡傛灉 token 鏃犳晥鎴栨病浼狅紝锟?username/user_id 鏌ユ暟鎹簱
     if (username.empty() && !req->username().empty()) {
         username = req->username();
     }
@@ -405,7 +405,7 @@ grpc::Status AuthServiceImpl::ValidateUser(grpc::ServerContext *, const rpc::Val
         return grpc::Status::OK;
     }
 
-    // 查数据库确认用户存在
+    // 鏌ユ暟鎹簱纭鐢ㄦ埛瀛樺湪
     if (db_) {
         std::lock_guard<std::mutex> lock(mtx_);
         std::string stored_hash;

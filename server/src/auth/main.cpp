@@ -1,19 +1,19 @@
-// Auth Service main �?独立编译，不引用 Sheet/File/Search
+﻿// Auth Service main 鈥?鐙珛缂栬瘧锛屼笉寮曠敤 Sheet/File/Search
 #include <grpcpp/grpcpp.h>
 
 #include <csignal>
 #include <cstdio>
 #include <cstdlib>
 
-#include "shared/auth_interceptor.h"
+#include "shared/base/auth_interceptor.h"
 #include "auth/auth_service_impl.h"
-#include "shared/call_logger.h"
-#include "shared/database.h"
-#include "shared/health_service_impl.h"
-#include "shared/otel_tracer.h"
-#include "shared/redis_client.h"
-#include "shared/snowflake.h"
-#include "shared/system_logger.h"
+#include "shared/base/call_logger.h"
+#include "shared/client/database.h"
+#include "shared/base/health_service_impl.h"
+#include "shared/base/otel_tracer.h"
+#include "shared/client/redis_client.h"
+#include "shared/base/snowflake.h"
+#include "shared/base/system_logger.h"
 
 static std::unique_ptr<grpc::Server> g_server;
 static void SignalHandler(int) {

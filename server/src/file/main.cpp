@@ -1,21 +1,21 @@
-// File Service main �?独立编译
+﻿// File Service main 鈥?鐙珛缂栬瘧
 #include <grpcpp/grpcpp.h>
 
 #include <csignal>
 #include <cstdio>
 #include <cstdlib>
 
-#include "shared/rpc_interceptor.h"
-#include "shared/call_logger.h"
-#include "shared/database.h"
+#include "shared/base/rpc_interceptor.h"
+#include "shared/base/call_logger.h"
+#include "shared/client/database.h"
 #include "file/file_service_impl.h"
-#include "shared/health_service_impl.h"
-#include "shared/l1_cache.h"
-#include "shared/otel_tracer.h"
-#include "shared/rabbit_publisher.h"
-#include "shared/redis_client.h"
-#include "shared/snowflake.h"
-#include "shared/system_logger.h"
+#include "shared/base/health_service_impl.h"
+#include "shared/cache/l1_cache.h"
+#include "shared/base/otel_tracer.h"
+#include "shared/client/rabbit_publisher.h"
+#include "shared/client/redis_client.h"
+#include "shared/base/snowflake.h"
+#include "shared/base/system_logger.h"
 
 static std::unique_ptr<grpc::Server> g_server;
 static void SignalHandler(int) {
@@ -123,7 +123,7 @@ int main(int argc, char *argv[]) {
     builder.SetMaxSendMessageSize(64 * 1024 * 1024);
     builder.SetMaxReceiveMessageSize(64 * 1024 * 1024);
 
-    // gRPC interceptor �� JWT authentication at transport level
+    // gRPC interceptor — JWT authentication at transport level
     {
         std::vector<std::unique_ptr<grpc::experimental::ServerInterceptorFactoryInterface>> factories;
         factories.push_back(std::make_unique<RpcAuthInterceptorFactory>(jwt_secret));

@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 #include <grpcpp/grpcpp.h>
 
 #include <string>
@@ -7,9 +7,9 @@
 #include "generated/rpc_auth.pb.h"
 #include "generated/rpc_spreadsheet.grpc.pb.h"
 #include "generated/rpc_spreadsheet.pb.h"
-#include "shared/circuit_breaker.h"
-#include "shared/minio_client.h"
-#include "shared/service_interfaces.h"
+#include "shared/cache/circuit_breaker.h"
+#include "shared/client/minio_client.h"
+#include "shared/base/service_interfaces.h"
 
 class CallLogger;
 class SystemLogger;
@@ -26,7 +26,7 @@ class SpreadsheetServiceImpl final : public rpc::SpreadsheetService::Service {
     void SetMinio(minio::Client *mc) { minio_ = mc; }
     void SetAuthChannel(std::shared_ptr<grpc::Channel> ch) { auth_stub_ = rpc::AuthService::NewStub(ch); }
 
-    // �?gRPC metadata 提取 token 并调�?Auth.ValidateUser
+    // 浠?gRPC metadata 鎻愬彇 token 骞惰皟鐢?Auth.ValidateUser
     bool ValidateCaller(grpc::ServerContext *ctx, int64_t user_id, std::string &out_username,
                         std::string &out_role) const;
 

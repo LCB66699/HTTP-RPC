@@ -1,4 +1,4 @@
-// MySQL 读写分离�? 主库�?连接�? + 从库�?连接�?round-robin)
+﻿// MySQL 璇诲啓鍒嗙灞? 涓诲簱鍐?杩炴帴姹? + 浠庡簱璇?杩炴帴姹?round-robin)
 // libmysqlclient C API via TCP 3306
 #pragma once
 #include <mysql/mysql.h>
@@ -13,7 +13,7 @@
 #include <type_traits>
 #include <vector>
 
-// ---- MYSQL 智能指针 �?析构时自�?mysql_close，消除手动关�?----
+// ---- MYSQL 鏅鸿兘鎸囬拡 鈥?鏋愭瀯鏃惰嚜鍔?mysql_close锛屾秷闄ゆ墜鍔ㄥ叧闂?----
 
 struct MysqlDeleter {
     void operator()(MYSQL *c) const {
@@ -22,14 +22,14 @@ struct MysqlDeleter {
 };
 using MysqlPtr = std::unique_ptr<MYSQL, MysqlDeleter>;
 
-// ---- SQL 参数安全包装 �?编译期强制转义，杜绝人工漏写 q() ----
+// ---- SQL 鍙傛暟瀹夊叏鍖呰 鈥?缂栬瘧鏈熷己鍒惰浆涔夛紝鏉滅粷浜哄伐婕忓啓 q() ----
 
 class sql_param {
    public:
-    // 字符串构�?�?强制 mysql_real_escape_string，编译期兜底
+    // 瀛楃涓叉瀯閫?鈥?寮哄埗 mysql_real_escape_string锛岀紪璇戞湡鍏滃簳
     sql_param(MYSQL *conn, const std::string &raw);
 
-    // 数值构�?�?直接转字符串，无需转义/加引�?
+    // 鏁板€兼瀯閫?鈥?鐩存帴杞瓧绗︿覆锛屾棤闇€杞箟/鍔犲紩鍙?
     sql_param(int64_t val) : val_(std::to_string(val)), quote_(false) {}
     sql_param(int val) : val_(std::to_string(val)), quote_(false) {}
     sql_param(unsigned long val) : val_(std::to_string(val)), quote_(false) {}
@@ -37,7 +37,7 @@ class sql_param {
     const std::string &str() const { return val_; }
     bool needs_quote() const { return quote_; }
 
-    // 拼入 SQL 的最终形态：字符串自动加单引号，数值裸�?
+    // 鎷煎叆 SQL 鐨勬渶缁堝舰鎬侊細瀛楃涓茶嚜鍔ㄥ姞鍗曞紩鍙凤紝鏁板€艰８鎷?
     std::string sql() const { return quote_ ? "'" + val_ + "'" : val_; }
 
    private:
@@ -45,10 +45,10 @@ class sql_param {
     bool quote_ = true;
 };
 
-// 类型安全 SQL 构建�?
-// 用法: make_sql("INSERT INTO t (a,b) VALUES ({},{})", sql_param(conn, str), 42)
-// 任何�?sql_param 的非算数类型（如 std::string / const char*）都会触�?
-// static_assert 编译错误
+// 绫诲瀷瀹夊叏 SQL 鏋勫缓鍣?
+// 鐢ㄦ硶: make_sql("INSERT INTO t (a,b) VALUES ({},{})", sql_param(conn, str), 42)
+// 浠讳綍闈?sql_param 鐨勯潪绠楁暟绫诲瀷锛堝 std::string / const char*锛夐兘浼氳Е鍙?
+// static_assert 缂栬瘧閿欒
 template <typename... Args>
 std::string make_sql(const std::string &tmpl, const Args &...args) {
     std::ostringstream oss;
@@ -97,7 +97,7 @@ struct FileRow {
     std::string username, original_name;
     int64_t size = 0;
     std::string mime_type, created_at, file_content;
-    std::string storage_path;  // non-empty �?content lives in object storage, not
+    std::string storage_path;  // non-empty 鈫?content lives in object storage, not
                                // file_content
     int version = 1;
 };
@@ -105,8 +105,8 @@ struct FileRow {
 class Database {
    public:
     // write_host: MySQL master
-    // read_hosts: 从库地址, 逗号分隔
-    // write_pool_size: 写连接池大小, 默认4; 设为1即退化为原单连接模式
+    // read_hosts: 浠庡簱鍦板潃, 閫楀彿鍒嗛殧
+    // write_pool_size: 鍐欒繛鎺ユ睜澶у皬, 榛樿4; 璁句负1鍗抽€€鍖栦负鍘熷崟杩炴帴妯″紡
     Database(const std::string &write_host, int write_port, const std::string &read_hosts, int read_port,
              const std::string &user, const std::string &password, const std::string &db_name, int write_pool_size = 4);
     ~Database();
@@ -129,7 +129,7 @@ class Database {
     bool VerifyUserPassword(int64_t user_id, const std::string &password);
     bool UpdateUserPassword(int64_t user_id, const std::string &new_hash);
 
-    // Spreadsheets �?caller passes user_id (users.id) as the owner key.
+    // Spreadsheets 鈥?caller passes user_id (users.id) as the owner key.
     // username is stored alongside for display; idempotency_key deduplicates
     // retries.
     bool CreateSpreadsheet(int64_t user_id, const std::string &username, const std::string &name,
@@ -149,7 +149,7 @@ class Database {
     // optimistic locking.
     bool GetSpreadsheetOwner(int64_t id, int64_t &owner_user_id, int *out_version = nullptr);
 
-    // Files �?same user_id convention.
+    // Files 鈥?same user_id convention.
     // storage_key: object-storage path returned by MinIO PutObject (empty =
     // legacy BLOB mode).
     bool CreateFile(int64_t user_id, const std::string &username, const std::string &original_name, int64_t size,
@@ -185,7 +185,7 @@ class Database {
     bool Exec(const std::string &sql) { return ExecWrite(sql); }
     MYSQL *GetConnection() { return write_conns_.empty() ? nullptr : write_conns_[0]->conn.get(); }
 
-    // 健康检查：后台线程�?30s PING 连接池，自动重建死连�?+ 淘汰空闲连接
+    // 鍋ュ悍妫€鏌ワ細鍚庡彴绾跨▼姣?30s PING 杩炴帴姹狅紝鑷姩閲嶅缓姝昏繛鎺?+ 娣樻卑绌洪棽杩炴帴
     void StartHealthCheck();
     void StopHealthCheck();
     void SetMinIdle(int n) { min_idle_.store(n); }
@@ -193,38 +193,38 @@ class Database {
 
    private:
     std::string user_, password_, db_name_;
-    std::string write_host_;  // 记录主库host供重�?
+    std::string write_host_;  // 璁板綍涓诲簱host渚涢噸杩?
     int write_port_, read_port_;
     int pool_size_;
-    std::atomic<int> min_idle_{2};              // 最低保留连接数，低于此数不淘汰
-    std::atomic<int> idle_timeout_ms_{300000};   // 空闲超时(ms)，默�?5min
+    std::atomic<int> min_idle_{2};              // 鏈€浣庝繚鐣欒繛鎺ユ暟锛屼綆浜庢鏁颁笉娣樻卑
+    std::atomic<int> idle_timeout_ms_{300000};   // 绌洪棽瓒呮椂(ms)锛岄粯璁?5min
     std::vector<std::string> read_hosts_;
     Snowflake *snowflake_ = nullptr;
 
-    // 连接单元 �?读写连接池共用此结构
+    // 杩炴帴鍗曞厓 鈥?璇诲啓杩炴帴姹犲叡鐢ㄦ缁撴瀯
     struct PoolConn {
-        MysqlPtr conn;                          // 智能指针，reset/赋值自�?mysql_close 旧连�?
+        MysqlPtr conn;                          // 鏅鸿兘鎸囬拡锛宺eset/璧嬪€艰嚜鍔?mysql_close 鏃ц繛鎺?
         std::mutex mtx;
-        std::atomic<int64_t> last_used_ms{0};  // 最后一次归还的时间�?ms)，HealthLoop 读取无需加锁
+        std::atomic<int64_t> last_used_ms{0};  // 鏈€鍚庝竴娆″綊杩樼殑鏃堕棿鎴?ms)锛孒ealthLoop 璇诲彇鏃犻渶鍔犻攣
     };
 
-    // 写连接池（主�? 多连接并行写�?
+    // 鍐欒繛鎺ユ睜锛堜富搴? 澶氳繛鎺ュ苟琛屽啓锛?
     std::vector<std::unique_ptr<PoolConn>> write_conns_;
     std::atomic<size_t> write_idx_{0};
 
-    // 读连接池（从�? round-robin 无锁分发�?
+    // 璇昏繛鎺ユ睜锛堜粠搴? round-robin 鏃犻攣鍒嗗彂锛?
     std::vector<std::unique_ptr<PoolConn>> read_conns_;
     std::atomic<size_t> read_idx_{0};
 
     MysqlPtr ConnectMYSQL(const std::string &host, int port);
-    MYSQL *EscConn();  // 返回一个可用连�? 仅供 mysql_real_escape_string() �?
+    MYSQL *EscConn();  // 杩斿洖涓€涓彲鐢ㄨ繛鎺? 浠呬緵 mysql_real_escape_string() 鐢?
     bool ExecWrite(const std::string &sql);
     bool ExecWriteInsert(const std::string &sql, int64_t &out_id);
     MYSQL *GetReadConn();
     bool RunQuery(MYSQL *conn, const std::string &sql, MYSQL_RES **out_res);
     bool ExecRead(const std::string &sql, std::function<bool(MYSQL_RES *)> handler);
 
-    // 连接句柄 �?持锁 + 裸指针，析构自动解锁
+    // 杩炴帴鍙ユ焺 鈥?鎸侀攣 + 瑁告寚閽堬紝鏋愭瀯鑷姩瑙ｉ攣
     struct ConnHandle {
         std::unique_lock<std::mutex> lock;
         MYSQL *conn = nullptr;
@@ -238,14 +238,14 @@ class Database {
     void HealthLoop();
 };
 
-#include "shared/service_interfaces.h"
+#include "shared/base/service_interfaces.h"
 
 // ---- ShardedDatabase: hash-routes by user_id across N Database shards ----
 class ShardedDatabase : public IDatabase {
    public:
-    // shard_count: 分片�? host_prefix: "mysql-spreadsheet" �?
+    // shard_count: 鍒嗙墖鏁? host_prefix: "mysql-spreadsheet" 鈫?
     // "mysql-spreadsheet-0","mysql-spreadsheet-1"... db_name_prefix:
-    // "rpc_spreadsheet" �?"rpc_spreadsheet_0","rpc_spreadsheet_1"...
+    // "rpc_spreadsheet" 鈫?"rpc_spreadsheet_0","rpc_spreadsheet_1"...
     ShardedDatabase(int shard_count, const std::string &write_host_prefix, int write_port,
                     const std::string &read_hosts_prefix, int read_port, const std::string &user,
                     const std::string &password, const std::string &db_name_prefix, int write_pool_size = 4);
@@ -256,7 +256,7 @@ class ShardedDatabase : public IDatabase {
             db->SetSnowflake(sf);
     }
 
-    // === Users (auth �?single shard) ===
+    // === Users (auth 鈥?single shard) ===
     bool AddUser(const std::string &username, const std::string &password_hash);
     bool GetUser(const std::string &username, std::string &password_hash);
     bool UserExists(const std::string &username);
@@ -331,7 +331,7 @@ class ShardedDatabase : public IDatabase {
 
     int ShardCount() const { return shard_count_; }
     Database *ShardFor(int64_t user_id);
-    Database *ShardForBroadcast();  // 返回第一个分片（用于广播类查询）
+    Database *ShardForBroadcast();  // 杩斿洖绗竴涓垎鐗囷紙鐢ㄤ簬骞挎挱绫绘煡璇級
 
     Database *AuthDB() { return shards_[0].get(); }
 

@@ -1,10 +1,10 @@
-#include "shared/call_logger.h"
+﻿#include "shared/base/call_logger.h"
 
 #include <cstdio>
 #include <ctime>
 #include <sstream>
 
-#include "shared/redis_client.h"
+#include "shared/client/redis_client.h"
 
 static std::string pad2(int n) {
     if (n < 10)
@@ -77,7 +77,7 @@ void CallLogger::Log(const std::string &username, const std::string &service, co
             entries_.pop_front();
         serialized = SerializeEntry(entries_.back());
         pending_.emplace_back(std::move(serialized), entries_.back().username);
-    }  // �?解锁 �?Redis I/O 不在此处
+    }  // 鈫?瑙ｉ攣 鈥?Redis I/O 涓嶅湪姝ゅ
     cv_.notify_one();
 }
 
@@ -97,7 +97,7 @@ void CallLogger::FlushLoop() {
             redis_->BatchPushCallEntries(batch);
         }
     }
-    // 退出前清空剩余
+    // 閫€鍑哄墠娓呯┖鍓╀綑
     if (redis_ && redis_->IsConnected() && !pending_.empty()) {
         redis_->BatchPushCallEntries(pending_);
     }

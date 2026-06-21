@@ -1,4 +1,4 @@
-#include "shared/l1_cache.h"
+﻿#include "shared/cache/l1_cache.h"
 
 #include <algorithm>
 #include <mutex>
@@ -32,7 +32,7 @@ void L1Cache::Set(const std::string &key, const std::string &value) {
 
     auto it = index_.find(key);
     if (it != index_.end()) {
-        // Update existing �?move to front
+        // Update existing 鈥?move to front
         it->second->value = value;
         it->second->expires_at = std::chrono::steady_clock::now() + std::chrono::seconds(ttl_seconds_);
         lru_.splice(lru_.begin(), lru_, it->second);

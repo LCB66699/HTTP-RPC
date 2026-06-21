@@ -1,34 +1,27 @@
-#include "sheet/spreadsheet_service_impl.h"
+﻿#include "sheet/spreadsheet_service_impl.h"
 
 #include <atomic>
 #include <chrono>
 #include <cstdio>
 #include <thread>
 
-#include "shared/rpc_interceptor.h"
-#include "shared/call_logger.h"
-#include "shared/circuit_breaker.h"
-#include "shared/database.h"
-#include "shared/error_codes.h"
-#include "shared/l1_cache.h"
-#include "shared/redis_client.h"
-#include "shared/sheet_helpers.h"
-#include "shared/system_logger.h"
+#include "shared/base/rpc_interceptor.h"
+#include "shared/base/call_logger.h"
+#include "shared/cache/circuit_breaker.h"
+#include "shared/client/database.h"
+#include "shared/base/error_codes.h"
+#include "shared/cache/l1_cache.h"
+#include "shared/client/redis_client.h"
+#include "shared/helper/cache_helpers.h"
+#include "shared/helper/crud_helpers.h"
+#include "shared/helper/handler_helpers.h"
+#include "shared/base/system_logger.h"
 
-// Extract the username carried in gRPC metadata (set by the gateway for
-// logging).
-std::string UsernameFromMeta(grpc::ServerContext *ctx) {
-    auto it = ctx->client_metadata().find("username");
-    if (it != ctx->client_metadata().end())
-        return std::string(it->second.data(), it->second.length());
-    return "";
-}
-
-// 调用 Auth 服务验证调用者身�?
+// 璋冪敤 Auth 鏈嶅姟楠岃瘉璋冪敤鑰呰韩锟?
 bool SpreadsheetServiceImpl::ValidateCaller(grpc::ServerContext *ctx, int64_t user_id, std::string &out_username,
                                             std::string &out_role) const {
     if (!auth_stub_)
-        return true;  // 未配�?Auth 通道时跳过验证（向后兼容�?
+        return true;  // 鏈厤锟?Auth 閫氶亾鏃惰烦杩囬獙璇侊紙鍚戝悗鍏煎锟?
 
     std::string token;
     auto it = ctx->client_metadata().find("authorization");
@@ -43,7 +36,7 @@ bool SpreadsheetServiceImpl::ValidateCaller(grpc::ServerContext *ctx, int64_t us
     if (token.empty())
         return false;
 
-    // 通过熔断器调�?Auth 服务
+    // 閫氳繃鐔旀柇鍣ㄨ皟锟?Auth 鏈嶅姟
     bool ok = auth_cb_.Call("auth.validate", [&]() -> bool {
         rpc::ValidateUserRequest vu_req;
         rpc::ValidateUserResponse vu_resp;
@@ -67,14 +60,11 @@ bool SpreadsheetServiceImpl::ValidateCaller(grpc::ServerContext *ctx, int64_t us
 grpc::Status SpreadsheetServiceImpl::CreateSpreadsheet(grpc::ServerContext *context,
                                                        const rpc::CreateSpreadsheetRequest *req,
                                                        rpc::CreateSpreadsheetResponse *resp) {
-    if (!g_rpc_auth_ctx.authenticated)
-        return grpc::Status(grpc::StatusCode::UNAUTHENTICATED, "Invalid or missing token");
-
-    std::string vu_user, vu_role;
-    if (auth_stub_ && !ValidateCaller(context, g_rpc_auth_ctx.user_id, vu_user, vu_role))
-        return grpc::Status(grpc::StatusCode::UNAUTHENTICATED, "Auth service rejected");
-
-    auto start = std::chrono::high_resolution_clock::now();
+    if (auto fail = requireAuthWith(context, [this](auto ctx, auto uid) {
+            std::string vu, vr; return ValidateCaller(ctx, uid, vu, vr);
+        }))
+        return *fail;
+    ScopeTimer timer;
     std::string username = UsernameFromMeta(context);
 
     if (req->name().empty()) {
@@ -89,7 +79,7 @@ grpc::Status SpreadsheetServiceImpl::CreateSpreadsheet(grpc::ServerContext *cont
         return grpc::Status::OK;
     }
 
-    // MinIO: 上传表格 JSON �?元数据存 MySQL storage_path；回退 MySQL JSON �?
+    // MinIO: 涓婁紶琛ㄦ牸 JSON 锟?鍏冩暟鎹瓨 MySQL storage_path锛涘洖閫€ MySQL JSON 锟?
     std::string storage_key;
     if (minio_ && minio_->IsConfigured()) {
         auto us = std::chrono::duration_cast<std::chrono::microseconds>(
@@ -119,9 +109,7 @@ grpc::Status SpreadsheetServiceImpl::CreateSpreadsheet(grpc::ServerContext *cont
         resp->set_success(false);
         SET_ERROR(resp, "Failed to create spreadsheet", rpc_error::INTERNAL);
         if (logger_) {
-            auto dur =
-                std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now() - start)
-                    .count();
+            auto dur = timer.elapsedUs();
             json p, r;
             p["name"] = json(req->name());
             r["error"] = json("Failed to create spreadsheet");
@@ -135,81 +123,25 @@ grpc::Status SpreadsheetServiceImpl::CreateSpreadsheet(grpc::ServerContext *cont
         db_->UpdateSpreadsheetStoragePath(id, storage_key);
     }
 
-    // Invalidate list cache
-    if (redis_ && redis_->IsConnected()) {
-        redis_->Increment(SheetVersionKey(g_rpc_auth_ctx.user_id));
-        if (slog_)
-            LOG_DEBUG(*slog_,
-                      "Create id=" + std::to_string(id) + " INCR version for uid=" + std::to_string(g_rpc_auth_ctx.user_id));
-    }
-
-    {
-        nlohmann::json ev;
-        ev["type"] = "sheet.created";
-        ev["id"] = id;
-        ev["user_id"] = g_rpc_auth_ctx.user_id;
-        ev["name"] = req->name();
-        if (!storage_key.empty())
-            ev["object_key"] = storage_key;
-        if (rabbit_)
-            rabbit_->Publish("rpc.events", "sheet.created", ev.dump());
-        if (db_)
-            db_->InsertOutbox(g_rpc_auth_ctx.user_id, "sheet.created", ev.dump());
-    }
-
-    // Invalidate list cache via outbox
-    InvalidateCaches(db_, g_rpc_auth_ctx.user_id, {SheetVersionKey(g_rpc_auth_ctx.user_id)});
-
-    resp->set_success(true);
-    resp->set_id(id);
-
-    if (logger_) {
-        auto dur =
-            std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now() - start)
-                .count();
-        json p, r;
-        p["name"] = json(req->name());
-        r["id"] = json(static_cast<double>(id));
-        logger_->Log(username, "SpreadsheetService", "Create", p, r, true, dur);
-    }
-    if (slog_)
-        LOG_INFO(*slog_, "Created id=" + std::to_string(id) + " by " + username +
-                             " (uid=" + std::to_string(g_rpc_auth_ctx.user_id) + ")");
+    nlohmann::json extra;
+    extra["name"] = req->name();
+    if (!storage_key.empty())
+        extra["object_key"] = storage_key;
+    FinishCreate(resp, id, g_rpc_auth_ctx.user_id, username, db_, rabbit_, redis_, logger_, slog_,
+        {"sheet.created", "id", "SpreadsheetService", SheetVersionKey(g_rpc_auth_ctx.user_id)},
+        std::move(extra), timer.elapsedUs());
     return grpc::Status::OK;
 }
 
 grpc::Status SpreadsheetServiceImpl::GetSpreadsheet(grpc::ServerContext *context, const rpc::GetSpreadsheetRequest *req,
                                                     rpc::GetSpreadsheetResponse *resp) {
-    if (!g_rpc_auth_ctx.authenticated)
-        return grpc::Status(grpc::StatusCode::UNAUTHENTICATED, "Invalid or missing token");
-    std::string vu_user, vu_role;
-    if (auth_stub_ && !ValidateCaller(context, g_rpc_auth_ctx.user_id, vu_user, vu_role))
-        return grpc::Status(grpc::StatusCode::UNAUTHENTICATED, "Auth service rejected");
-    // 校验资源归属：user_id 必须匹配 sheet 所有�?
-    if (g_rpc_auth_ctx.user_id <= 0) {
-        resp->set_success(false);
-        SET_ERROR(resp, "Not found", rpc_error::NOT_FOUND);
-        return grpc::Status::OK;
-    }
-    int64_t owner_uid = 0;
-    bool found = false;
-    // 连接池不同连接可能有瞬时可见性差异，重试 3 次，指数退�?
-    for (int retry = 0; retry < 3 && db_; ++retry) {
-        found = db_->GetSpreadsheetOwner(req->id(), owner_uid);
-        if (found && owner_uid != 0) break;
-        std::this_thread::sleep_for(std::chrono::milliseconds(50 << retry));
-    }
-    if (slog_) LOG_DEBUG(*slog_, "GetOwner id=" + std::to_string(req->id()) +
-                                     " owner=" + std::to_string(owner_uid) + " req_uid=" + std::to_string(g_rpc_auth_ctx.user_id));
-    if (found && owner_uid != g_rpc_auth_ctx.user_id) {
-        if (slog_) LOG_DEBUG(*slog_, "Owner mismatch! sheet_id=" + std::to_string(req->id()) +
-                                      " owner=" + std::to_string(owner_uid) + " caller=" + std::to_string(g_rpc_auth_ctx.user_id));
-    }
-    if (!found || owner_uid != g_rpc_auth_ctx.user_id) {
-        resp->set_success(false);
-        SET_ERROR(resp, "Not found", rpc_error::NOT_FOUND);
-        return grpc::Status::OK;
-    }
+    if (auto fail = requireAuthWith(context, [this](auto ctx, auto uid) {
+            std::string vu, vr; return ValidateCaller(ctx, uid, vu, vr);
+        }))
+        return *fail;
+    if (!CheckOwnerWithRetry(req->id(), g_rpc_auth_ctx.user_id, db_,
+            [&](auto id, auto &uid) { return db_->GetSpreadsheetOwner(id, uid); }, slog_))
+        return WriteResult(resp, HandlerResult<>::Fail("Not found", rpc_error::NOT_FOUND)), grpc::Status::OK;
     auto start = std::chrono::high_resolution_clock::now();
     std::string username = UsernameFromMeta(context);
 
@@ -218,12 +150,12 @@ grpc::Status SpreadsheetServiceImpl::GetSpreadsheet(grpc::ServerContext *context
     const std::string ts_key = cache_key + ":ts";
     const std::string lock_key = "lock:u:" + std::to_string(req_uid) + ":sheet:" + std::to_string(req->id());
     const std::string kNullMarker = "__NULL__";
-    const int LOGICAL_TTL = 300;    // 逻辑过期 5min，超时触发异步刷�?
-    const int PHYSICAL_TTL = 3600;  // 物理过期 1h，防止内存无限增�?
-    const int NULL_TTL = 60;        // 空值缓�?1min
-    const int LOCK_TTL = 10;        // 刷新�?10s，防死锁
+    const int LOGICAL_TTL = 300;    // 閫昏緫杩囨湡 5min锛岃秴鏃惰Е鍙戝紓姝ュ埛锟?
+    const int PHYSICAL_TTL = 3600;  // 鐗╃悊杩囨湡 1h锛岄槻姝㈠唴瀛樻棤闄愬锟?
+    const int NULL_TTL = 60;        // 绌哄€肩紦锟?1min
+    const int LOCK_TTL = 10;        // 鍒锋柊锟?10s锛岄槻姝婚攣
 
-    // 辅助函数：从 MinIO 回填 headers/data
+    // 杈呭姪鍑芥暟锛氫粠 MinIO 鍥炲～ headers/data
     auto fillFromMinIO = [this](SpreadsheetRow &row) {
         if (minio_ && minio_->IsConfigured() && !row.storage_path.empty()) {
             std::string body;
@@ -238,7 +170,7 @@ grpc::Status SpreadsheetServiceImpl::GetSpreadsheet(grpc::ServerContext *context
         }
     };
 
-    // 异步刷新函数：查 MySQL �?回写 Redis(data+ts) �?释放�?
+    // 寮傛鍒锋柊鍑芥暟锛氭煡 MySQL 锟?鍥炲啓 Redis(data+ts) 锟?閲婃斁锟?
     auto async_refresh = [this, kNullMarker, &fillFromMinIO](int64_t id, int64_t uid, std::string ck, std::string tk,
                                                              std::string lk) {
         SpreadsheetRow row;
@@ -265,7 +197,7 @@ grpc::Status SpreadsheetServiceImpl::GetSpreadsheet(grpc::ServerContext *context
                     LOG_DEBUG(*slog_, "Get id=" + std::to_string(id) + " ASYNC-REFRESHED key=" + ck);
             }
         } else if (db_ && redis_ && redis_->IsConnected()) {
-            // Not found �?cache null marker to prevent penetration
+            // Not found 锟?cache null marker to prevent penetration
             redis_->SetJSON(ck, kNullMarker, RedisClient::JitteredTTL(NULL_TTL, 30));
             redis_->SetJSON(tk, std::to_string(std::time(nullptr)), RedisClient::JitteredTTL(NULL_TTL, 30));
             if (slog_)
@@ -299,7 +231,7 @@ grpc::Status SpreadsheetServiceImpl::GetSpreadsheet(grpc::ServerContext *context
     if (redis_ && redis_->IsConnected()) {
         std::string cached;
         if (redis_->GetJSON(cache_key, cached)) {
-            // 1a) Null-cache hit �?penetration protection
+            // 1a) Null-cache hit 锟?penetration protection
             if (cached == kNullMarker) {
                 resp->set_success(false);
                 SET_ERROR(resp, "Not found", rpc_error::NOT_FOUND);
@@ -366,7 +298,7 @@ grpc::Status SpreadsheetServiceImpl::GetSpreadsheet(grpc::ServerContext *context
                     r["cache"] = json("redis");
                     logger_->Log(username, "SpreadsheetService", "Get", p, r, true, dur);
                 }
-                return grpc::Status::OK;  // 立即返回，不等待刷新
+                return grpc::Status::OK;  // 绔嬪嵆杩斿洖锛屼笉绛夊緟鍒锋柊
             }
             if (slog_)
                 LOG_ERROR(*slog_, "Get id=" + std::to_string(req->id()) + " ParseFromString FAILED key=" + cache_key);
@@ -376,7 +308,7 @@ grpc::Status SpreadsheetServiceImpl::GetSpreadsheet(grpc::ServerContext *context
         }
     }
 
-    // 2) Cold start: Redis MISS �?MySQL
+    // 2) Cold start: Redis MISS 锟?MySQL
     if (!db_) {
         resp->set_success(false);
         SET_ERROR(resp, "Database not available", rpc_error::UNAVAILABLE);
@@ -384,7 +316,7 @@ grpc::Status SpreadsheetServiceImpl::GetSpreadsheet(grpc::ServerContext *context
     }
 
     SpreadsheetRow row;
-    // 同连接可能瞬时不可见已提交数据，短暂重试
+    // 鍚岃繛鎺ュ彲鑳界灛鏃朵笉鍙宸叉彁浜ゆ暟鎹紝鐭殏閲嶈瘯
     bool got = false;
     for (int r = 0; r < 3 && db_; ++r) {
         got = db_->GetSpreadsheet(req->id(), req_uid, row);
@@ -458,47 +390,24 @@ grpc::Status SpreadsheetServiceImpl::GetSpreadsheet(grpc::ServerContext *context
 grpc::Status SpreadsheetServiceImpl::ListSpreadsheets(grpc::ServerContext *context,
                                                       const rpc::ListSpreadsheetsRequest *req,
                                                       rpc::ListSpreadsheetsResponse *resp) {
-    if (!g_rpc_auth_ctx.authenticated)
-        return grpc::Status(grpc::StatusCode::UNAUTHENTICATED, "Invalid or missing token");
-    std::string vu_user, vu_role;
-    if (auth_stub_ && !ValidateCaller(context, g_rpc_auth_ctx.user_id, vu_user, vu_role))
-        return grpc::Status(grpc::StatusCode::UNAUTHENTICATED, "Auth service rejected");
-    auto start = std::chrono::high_resolution_clock::now();
+    if (auto fail = requireAuthWith(context, [this](auto ctx, auto uid) {
+            std::string vu, vr; return ValidateCaller(ctx, uid, vu, vr);
+        }))
+        return *fail;
+    ScopeTimer timer;
     std::string username = UsernameFromMeta(context);
     int64_t uid = g_rpc_auth_ctx.user_id;
     int page = req->page();
     int page_size = req->page_size();
 
-    std::string version_key = SheetVersionKey(uid);
-
     // 1) Try Redis cache
-    if (redis_ && redis_->IsConnected()) {
-        int64_t version = redis_->GetInt(version_key);
-        std::string cache_key = SheetListCacheKey(uid, version, page, page_size);
-        std::string cached;
-        if (redis_->GetJSON(cache_key, cached)) {
-            if (resp->ParseFromString(cached)) {
-                if (slog_)
-                    LOG_DEBUG(*slog_, "List uid=" + std::to_string(uid) + " v" + std::to_string(version) +
-                                          " HIT key=" + cache_key);
-                resp->set_cache_source("redis");
-                if (logger_) {
-                    auto dur = std::chrono::duration_cast<std::chrono::microseconds>(
-                                   std::chrono::high_resolution_clock::now() - start)
-                                   .count();
-                    json p, r;
-                    r["cache"] = json("redis");
-                    logger_->Log(username, "SpreadsheetService", "List", p, r, true, dur);
-                }
-                return grpc::Status::OK;
-            }
-            if (slog_)
-                LOG_ERROR(*slog_, "List uid=" + std::to_string(uid) + " ParseFromString FAILED key=" + cache_key);
-        } else {
-            if (slog_)
-                LOG_DEBUG(*slog_, "List uid=" + std::to_string(uid) + " v" + std::to_string(version) +
-                                      " MISS key=" + cache_key);
+    if (TryListCache(resp, uid, page, page_size, redis_, "sheet", slog_)) {
+        if (logger_) {
+            json p, r;
+            r["cache"] = json("redis");
+            logger_->Log(username, "SpreadsheetService", "List", p, r, true, timer.elapsedUs());
         }
+        return grpc::Status::OK;
     }
 
     // 2) Fallback to MySQL
@@ -539,24 +448,10 @@ grpc::Status SpreadsheetServiceImpl::ListSpreadsheets(grpc::ServerContext *conte
     resp->set_cache_source("mysql");
 
     // 3) Populate Redis cache
-    if (redis_ && redis_->IsConnected()) {
-        int64_t version = redis_->GetInt(version_key);
-        std::string cache_key = SheetListCacheKey(uid, version, page, page_size);
-        std::string serialized;
-        if (resp->SerializeToString(&serialized)) {
-            if (redis_->SetJSON(cache_key, serialized, 120)) {
-                if (slog_)
-                    LOG_DEBUG(*slog_, "List uid=" + std::to_string(uid) + " v" + std::to_string(version) +
-                                          " POPULATED key=" + cache_key + " size=" + std::to_string(serialized.size()) +
-                                          " ttl=120");
-            }
-        }
-    }
+    PopulateListCache(resp, uid, page, page_size, redis_, "sheet", slog_);
 
     if (logger_) {
-        auto dur =
-            std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now() - start)
-                .count();
+        auto dur = timer.elapsedUs();
         json p, r;
         r["total"] = json(static_cast<double>(total));
         r["cache"] = json("mysql");
@@ -662,84 +557,15 @@ grpc::Status SpreadsheetServiceImpl::UpdateSpreadsheet(grpc::ServerContext *cont
 grpc::Status SpreadsheetServiceImpl::DeleteSpreadsheet(grpc::ServerContext *context,
                                                        const rpc::DeleteSpreadsheetRequest *req,
                                                        rpc::DeleteSpreadsheetResponse *resp) {
-    if (!g_rpc_auth_ctx.authenticated)
-        return grpc::Status(grpc::StatusCode::UNAUTHENTICATED, "Invalid or missing token");
-    std::string vu_user, vu_role;
-    if (auth_stub_ && !ValidateCaller(context, g_rpc_auth_ctx.user_id, vu_user, vu_role))
-        return grpc::Status(grpc::StatusCode::UNAUTHENTICATED, "Auth service rejected");
-    auto start = std::chrono::high_resolution_clock::now();
-    std::string username = UsernameFromMeta(context);
-
-    if (!db_) {
-        resp->set_success(false);
-        SET_ERROR(resp, "Database not available", rpc_error::UNAVAILABLE);
-        return grpc::Status::OK;
-    }
-
-    int64_t owner_uid = 0;
-    bool fo = db_->GetSpreadsheetOwner(req->id(), owner_uid);
-    fprintf(stderr, "[Delete] id=%ld req_uid=%ld owner_uid=%ld found=%d\n",
-            (long)req->id(), (long)g_rpc_auth_ctx.user_id, (long)owner_uid, fo);
-    if (!fo || owner_uid != g_rpc_auth_ctx.user_id) {
-        resp->set_success(false);
-        SET_ERROR(resp, "Not found or permission denied", rpc_error::NOT_FOUND);
-        return grpc::Status::OK;
-    }
-
-    bool ok = db_->DeleteSpreadsheet(req->id(), g_rpc_auth_ctx.user_id);
-
-    if (!ok) {
-        resp->set_success(false);
-        SET_ERROR(resp, "Failed to delete", rpc_error::INTERNAL);
-        if (logger_) {
-            auto dur =
-                std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now() - start)
-                    .count();
-            json p, r;
-            p["id"] = json(static_cast<double>(req->id()));
-            r["error"] = json("Failed to delete");
-            logger_->Log(username, "SpreadsheetService", "Delete", p, r, false, dur);
-        }
-        return grpc::Status::OK;
-    }
-
-    if (redis_ && redis_->IsConnected()) {
-        redis_->DeleteKey("u:" + std::to_string(g_rpc_auth_ctx.user_id) + ":sheet:" + std::to_string(req->id()));
-        redis_->DeleteKey("u:" + std::to_string(g_rpc_auth_ctx.user_id) + ":sheet:" + std::to_string(req->id()) + ":ts");
-        redis_->Increment(SheetVersionKey(g_rpc_auth_ctx.user_id));
-        if (slog_)
-            LOG_DEBUG(*slog_, "Delete id=" + std::to_string(req->id()) +
-                                  " INVALIDATED + INCR version uid=" + std::to_string(g_rpc_auth_ctx.user_id));
-    }
-
-    {
-        nlohmann::json ev;
-        ev["type"] = "sheet.deleted";
-        ev["id"] = req->id();
-        ev["user_id"] = g_rpc_auth_ctx.user_id;
-        if (rabbit_)
-            rabbit_->Publish("rpc.events", "sheet.deleted", ev.dump());
-        if (db_)
-            db_->InsertOutbox(g_rpc_auth_ctx.user_id, "sheet.deleted", ev.dump());
-    }
-
-    // Invalidate caches via outbox
-    InvalidateCaches(db_, g_rpc_auth_ctx.user_id, {
-        SheetCacheKey(g_rpc_auth_ctx.user_id, req->id()),
-        SheetVersionKey(g_rpc_auth_ctx.user_id)
-    });
-
-    resp->set_success(true);
-
-    if (logger_) {
-        auto dur =
-            std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now() - start)
-                .count();
-        json p, r;
-        p["id"] = json(static_cast<double>(req->id()));
-        logger_->Log(username, "SpreadsheetService", "Delete", p, r, true, dur);
-    }
-    if (slog_)
-        LOG_INFO(*slog_, "Deleted id=" + std::to_string(req->id()) + " by " + username);
-    return grpc::Status::OK;
+    if (auto fail = requireAuthWith(context, [this](auto ctx, auto uid) {
+            std::string vu, vr; return ValidateCaller(ctx, uid, vu, vr);
+        }))
+        return *fail;
+    return HandleDelete(resp, req->id(), g_rpc_auth_ctx.user_id, UsernameFromMeta(context),
+        db_, rabbit_, redis_, logger_, slog_,
+        [&](auto id, auto &owner) { return db_->GetSpreadsheetOwner(id, owner); },
+        [&](auto id, auto uid) { return db_->DeleteSpreadsheet(id, uid); },
+        {"sheet.deleted", "id", "SpreadsheetService",
+         SheetCacheKey(g_rpc_auth_ctx.user_id, req->id()),
+         SheetVersionKey(g_rpc_auth_ctx.user_id)});
 }

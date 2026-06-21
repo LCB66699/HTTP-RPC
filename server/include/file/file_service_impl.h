@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 #include <grpcpp/grpcpp.h>
 
 #include <string>
@@ -7,9 +7,9 @@
 #include "generated/rpc_auth.pb.h"
 #include "generated/rpc_file.grpc.pb.h"
 #include "generated/rpc_file.pb.h"
-#include "shared/circuit_breaker.h"
-#include "shared/minio_client.h"
-#include "shared/service_interfaces.h"
+#include "shared/cache/circuit_breaker.h"
+#include "shared/client/minio_client.h"
+#include "shared/base/service_interfaces.h"
 
 class L1Cache;
 class CallLogger;

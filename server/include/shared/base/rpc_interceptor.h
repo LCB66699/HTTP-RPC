@@ -1,16 +1,16 @@
-#pragma once
+﻿#pragma once
 #include <grpcpp/grpcpp.h>
 
 #include <memory>
 #include <string>
 
-#include "shared/auth_interceptor.h"
+#include "shared/base/auth_interceptor.h"
 
 // Set by RpcAuthInterceptor before handler executes.
 // Handlers read this instead of calling AuthInterceptor::Authenticate().
 extern thread_local AuthContext g_rpc_auth_ctx;
 
-// gRPC ServerInterceptor �?verifies JWT from client metadata at transport level.
+// gRPC ServerInterceptor 锟?verifies JWT from client metadata at transport level.
 // On success: populates g_rpc_auth_ctx and proceeds.
 // On failure: resets g_rpc_auth_ctx (handler returns UNAUTHENTICATED).
 class RpcAuthInterceptor : public grpc::experimental::Interceptor {
