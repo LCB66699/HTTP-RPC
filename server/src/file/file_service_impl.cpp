@@ -54,8 +54,8 @@ bool FileServiceImpl::ValidateCaller(grpc::ServerContext *ctx, int64_t user_id, 
 
 grpc::Status FileServiceImpl::CreateFile(grpc::ServerContext *context, const rpc::CreateFileRequest *req,
                                          rpc::CreateFileResponse *resp) {
-    if (auto fail = requireAuthWith(context, [this](auto ctx, auto uid) {
-            std::string vu, vr; return ValidateCaller(ctx, uid, vu, vr);
+    if (auto fail = requireAuthWith(context, [this](auto ctx, auto uid, auto &vu, auto &vr) {
+            return ValidateCaller(ctx, uid, vu, vr);
         }))
         return *fail;
     ScopeTimer timer;
@@ -113,8 +113,8 @@ grpc::Status FileServiceImpl::CreateFile(grpc::ServerContext *context, const rpc
 
 grpc::Status FileServiceImpl::GetFile(grpc::ServerContext *context, const rpc::GetFileRequest *req,
                                       rpc::GetFileResponse *resp) {
-    if (auto fail = requireAuthWith(context, [this](auto ctx, auto uid) {
-            std::string vu, vr; return ValidateCaller(ctx, uid, vu, vr);
+    if (auto fail = requireAuthWith(context, [this](auto ctx, auto uid, auto &vu, auto &vr) {
+            return ValidateCaller(ctx, uid, vu, vr);
         }))
         return *fail;
 
@@ -317,8 +317,8 @@ grpc::Status FileServiceImpl::GetFile(grpc::ServerContext *context, const rpc::G
 
 grpc::Status FileServiceImpl::ListFiles(grpc::ServerContext *context, const rpc::ListFilesRequest *req,
                                         rpc::ListFilesResponse *resp) {
-    if (auto fail = requireAuthWith(context, [this](auto ctx, auto uid) {
-            std::string vu, vr; return ValidateCaller(ctx, uid, vu, vr);
+    if (auto fail = requireAuthWith(context, [this](auto ctx, auto uid, auto &vu, auto &vr) {
+            return ValidateCaller(ctx, uid, vu, vr);
         }))
         return *fail;
     ScopeTimer timer;
@@ -382,8 +382,8 @@ grpc::Status FileServiceImpl::ListFiles(grpc::ServerContext *context, const rpc:
 
 grpc::Status FileServiceImpl::DeleteFile(grpc::ServerContext *context, const rpc::DeleteFileRequest *req,
                                          rpc::DeleteFileResponse *resp) {
-    if (auto fail = requireAuthWith(context, [this](auto ctx, auto uid) {
-            std::string vu, vr; return ValidateCaller(ctx, uid, vu, vr);
+    if (auto fail = requireAuthWith(context, [this](auto ctx, auto uid, auto &vu, auto &vr) {
+            return ValidateCaller(ctx, uid, vu, vr);
         }))
         return *fail;
     return HandleDelete(resp, req->id(), g_rpc_auth_ctx.user_id, UsernameFromMeta(context),

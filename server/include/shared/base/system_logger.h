@@ -22,7 +22,7 @@ inline LogLevel ParseLogLevel(const std::string &s) {
     return LogLevel::INFO;
 }
 
-class RedisClient;
+#include "shared/client/redis_client.h"
 
 class SystemLogger {
    public:

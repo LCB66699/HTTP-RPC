@@ -60,8 +60,8 @@ bool SpreadsheetServiceImpl::ValidateCaller(grpc::ServerContext *ctx, int64_t us
 grpc::Status SpreadsheetServiceImpl::CreateSpreadsheet(grpc::ServerContext *context,
                                                        const rpc::CreateSpreadsheetRequest *req,
                                                        rpc::CreateSpreadsheetResponse *resp) {
-    if (auto fail = requireAuthWith(context, [this](auto ctx, auto uid) {
-            std::string vu, vr; return ValidateCaller(ctx, uid, vu, vr);
+    if (auto fail = requireAuthWith(context, [this](auto ctx, auto uid, auto &vu, auto &vr) {
+            return ValidateCaller(ctx, uid, vu, vr);
         }))
         return *fail;
     ScopeTimer timer;
@@ -135,8 +135,8 @@ grpc::Status SpreadsheetServiceImpl::CreateSpreadsheet(grpc::ServerContext *cont
 
 grpc::Status SpreadsheetServiceImpl::GetSpreadsheet(grpc::ServerContext *context, const rpc::GetSpreadsheetRequest *req,
                                                     rpc::GetSpreadsheetResponse *resp) {
-    if (auto fail = requireAuthWith(context, [this](auto ctx, auto uid) {
-            std::string vu, vr; return ValidateCaller(ctx, uid, vu, vr);
+    if (auto fail = requireAuthWith(context, [this](auto ctx, auto uid, auto &vu, auto &vr) {
+            return ValidateCaller(ctx, uid, vu, vr);
         }))
         return *fail;
     if (!CheckOwnerWithRetry(req->id(), g_rpc_auth_ctx.user_id, db_,
@@ -390,8 +390,8 @@ grpc::Status SpreadsheetServiceImpl::GetSpreadsheet(grpc::ServerContext *context
 grpc::Status SpreadsheetServiceImpl::ListSpreadsheets(grpc::ServerContext *context,
                                                       const rpc::ListSpreadsheetsRequest *req,
                                                       rpc::ListSpreadsheetsResponse *resp) {
-    if (auto fail = requireAuthWith(context, [this](auto ctx, auto uid) {
-            std::string vu, vr; return ValidateCaller(ctx, uid, vu, vr);
+    if (auto fail = requireAuthWith(context, [this](auto ctx, auto uid, auto &vu, auto &vr) {
+            return ValidateCaller(ctx, uid, vu, vr);
         }))
         return *fail;
     ScopeTimer timer;
@@ -557,8 +557,8 @@ grpc::Status SpreadsheetServiceImpl::UpdateSpreadsheet(grpc::ServerContext *cont
 grpc::Status SpreadsheetServiceImpl::DeleteSpreadsheet(grpc::ServerContext *context,
                                                        const rpc::DeleteSpreadsheetRequest *req,
                                                        rpc::DeleteSpreadsheetResponse *resp) {
-    if (auto fail = requireAuthWith(context, [this](auto ctx, auto uid) {
-            std::string vu, vr; return ValidateCaller(ctx, uid, vu, vr);
+    if (auto fail = requireAuthWith(context, [this](auto ctx, auto uid, auto &vu, auto &vr) {
+            return ValidateCaller(ctx, uid, vu, vr);
         }))
         return *fail;
     return HandleDelete(resp, req->id(), g_rpc_auth_ctx.user_id, UsernameFromMeta(context),

@@ -25,6 +25,18 @@ struct HandlerResult {
     }
 };
 
+template <>
+struct HandlerResult<void> {
+    bool ok = true;
+    std::string error;
+    int error_code = 0;
+
+    static HandlerResult Success() { return {true, {}, 0}; }
+    static HandlerResult Fail(std::string msg, int code) {
+        return {false, std::move(msg), code};
+    }
+};
+
 // Write HandlerResult to a protobuf response (must have set_success/set_error/set_error_code).
 template <typename Resp>
 void WriteResult(Resp *resp, const HandlerResult<> &r) {
