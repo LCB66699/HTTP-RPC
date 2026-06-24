@@ -17,11 +17,11 @@
 #include "shared/helper/handler_helpers.h"
 #include "shared/base/system_logger.h"
 
-// 璋冪敤 Auth 鏈嶅姟楠岃瘉璋冪敤鑰呰韩锟?
+// 调用 Auth 服务验证调用者身份
 bool SpreadsheetServiceImpl::ValidateCaller(grpc::ServerContext *ctx, int64_t user_id, std::string &out_username,
                                             std::string &out_role) const {
     if (!auth_stub_)
-        return true;  // 鏈厤锟?Auth 閫氶亾鏃惰烦杩囬獙璇侊紙鍚戝悗鍏煎锟?
+        return true;  // 未配置 Auth 通道时跳过验证（向后兼容）
 
     std::string token;
     auto it = ctx->client_metadata().find("authorization");
@@ -36,7 +36,7 @@ bool SpreadsheetServiceImpl::ValidateCaller(grpc::ServerContext *ctx, int64_t us
     if (token.empty())
         return false;
 
-    // 閫氳繃鐔旀柇鍣ㄨ皟锟?Auth 鏈嶅姟
+    // 通过熔断器调用 Auth 服务
     bool ok = auth_cb_.Call("auth.validate", [&]() -> bool {
         rpc::ValidateUserRequest vu_req;
         rpc::ValidateUserResponse vu_resp;
@@ -79,31 +79,10 @@ grpc::Status SpreadsheetServiceImpl::CreateSpreadsheet(grpc::ServerContext *cont
         return grpc::Status::OK;
     }
 
-    // MinIO: 涓婁紶琛ㄦ牸 JSON 锟?鍏冩暟鎹瓨 MySQL storage_path锛涘洖閫€ MySQL JSON 锟?
-    std::string storage_key;
-    if (minio_ && minio_->IsConfigured()) {
-        auto us = std::chrono::duration_cast<std::chrono::microseconds>(
-                      std::chrono::high_resolution_clock::now().time_since_epoch())
-                      .count();
-        storage_key = std::to_string(g_rpc_auth_ctx.user_id) + "/" + std::to_string(us) + ".json";
-        nlohmann::json content;
-        content["headers"] = nlohmann::json::parse(req->headers_json().empty() ? "[]" : req->headers_json());
-        content["data"] = nlohmann::json::parse(req->data_json().empty() ? "[]" : req->data_json());
-        std::string body = content.dump();
-        if (!minio_->PutObject(storage_key, body, "application/json")) {
-            resp->set_success(false);
-            SET_ERROR(resp, "MinIO upload failed", rpc_error::INTERNAL);
-            return grpc::Status::OK;
-        }
-    }
-
     int64_t id = 0;
     if (slog_) LOG_DEBUG(*slog_, "Create req->user_id=" + std::to_string(g_rpc_auth_ctx.user_id));
     bool ok = db_->CreateSpreadsheet(g_rpc_auth_ctx.user_id, username, req->name(), req->description(), req->headers_json(),
                                      req->data_json(), id, req->idempotency_key());
-    if (!ok && !storage_key.empty()) {
-        minio_->DeleteObject(storage_key);  // rollback
-    }
 
     if (!ok) {
         resp->set_success(false);
@@ -118,15 +97,20 @@ grpc::Status SpreadsheetServiceImpl::CreateSpreadsheet(grpc::ServerContext *cont
         return grpc::Status::OK;
     }
 
-    // Write storage_path back to MySQL after MinIO upload
-    if (!storage_key.empty() && db_) {
-        db_->UpdateSpreadsheetStoragePath(id, storage_key);
+    // Store cells/headers in MongoDB
+    if (mongo_) {
+        if (!mongo_->UpsertSheetCells(id, g_rpc_auth_ctx.user_id, req->headers_json(), req->data_json())) {
+            db_->DeleteSpreadsheet(id, g_rpc_auth_ctx.user_id);
+            resp->set_success(false);
+            SET_ERROR(resp, "MongoDB write failed", rpc_error::INTERNAL);
+            return grpc::Status::OK;
+        }
     }
 
     nlohmann::json extra;
     extra["name"] = req->name();
-    if (!storage_key.empty())
-        extra["object_key"] = storage_key;
+    extra["headers"] = nlohmann::json::parse(req->headers_json().empty() ? "[]" : req->headers_json());
+    extra["cells"] = nlohmann::json::parse(req->data_json().empty() ? "[]" : req->data_json());
     FinishCreate(resp, id, g_rpc_auth_ctx.user_id, username, db_, rabbit_, redis_, logger_, slog_,
         {"sheet.created", "id", "SpreadsheetService", SheetVersionKey(g_rpc_auth_ctx.user_id)},
         std::move(extra), timer.elapsedUs());
@@ -150,32 +134,24 @@ grpc::Status SpreadsheetServiceImpl::GetSpreadsheet(grpc::ServerContext *context
     const std::string ts_key = cache_key + ":ts";
     const std::string lock_key = "lock:u:" + std::to_string(req_uid) + ":sheet:" + std::to_string(req->id());
     const std::string kNullMarker = "__NULL__";
-    const int LOGICAL_TTL = 300;    // 閫昏緫杩囨湡 5min锛岃秴鏃惰Е鍙戝紓姝ュ埛锟?
-    const int PHYSICAL_TTL = 3600;  // 鐗╃悊杩囨湡 1h锛岄槻姝㈠唴瀛樻棤闄愬锟?
-    const int NULL_TTL = 60;        // 绌哄€肩紦锟?1min
-    const int LOCK_TTL = 10;        // 鍒锋柊锟?10s锛岄槻姝婚攣
+    const int LOGICAL_TTL = 300;    // 逻辑过期 5min，超时触发异步刷新
+    const int PHYSICAL_TTL = 3600;  // 物理过期 1h，防止内存无限增长
+    const int NULL_TTL = 60;        // 空值缓存 1min
+    const int LOCK_TTL = 10;        // 刷新锁 10s，防止死锁
 
-    // 杈呭姪鍑芥暟锛氫粠 MinIO 鍥炲～ headers/data
-    auto fillFromMinIO = [this](SpreadsheetRow &row) {
-        if (minio_ && minio_->IsConfigured() && !row.storage_path.empty()) {
-            std::string body;
-            if (minio_->GetObject(row.storage_path, body)) {
-                try {
-                    auto j = nlohmann::json::parse(body);
-                    row.headers_json = j.value("headers", nlohmann::json::array()).dump();
-                    row.data_json = j.value("data", nlohmann::json::array()).dump();
-                } catch (...) {
-                }
-            }
+    // 辅助函数：从 MongoDB 回填 headers/data
+    auto fillFromMongo = [this](SpreadsheetRow &row) {
+        if (mongo_) {
+            mongo_->GetSheetCells(row.id, row.headers_json, row.data_json);
         }
     };
 
-    // 寮傛鍒锋柊鍑芥暟锛氭煡 MySQL 锟?鍥炲啓 Redis(data+ts) 锟?閲婃斁锟?
-    auto async_refresh = [this, kNullMarker, &fillFromMinIO](int64_t id, int64_t uid, std::string ck, std::string tk,
+    // 异步刷新函数：查 MySQL -> 回写 Redis(data+ts) -> 释放锁
+    auto async_refresh = [this, kNullMarker, &fillFromMongo](int64_t id, int64_t uid, std::string ck, std::string tk,
                                                              std::string lk) {
         SpreadsheetRow row;
         if (db_ && db_->GetSpreadsheet(id, uid, row)) {
-            fillFromMinIO(row);
+            fillFromMongo(row);
             rpc::GetSpreadsheetResponse fresh;
             auto *s = fresh.mutable_spreadsheet();
             s->set_id(row.id);
@@ -197,7 +173,7 @@ grpc::Status SpreadsheetServiceImpl::GetSpreadsheet(grpc::ServerContext *context
                     LOG_DEBUG(*slog_, "Get id=" + std::to_string(id) + " ASYNC-REFRESHED key=" + ck);
             }
         } else if (db_ && redis_ && redis_->IsConnected()) {
-            // Not found 锟?cache null marker to prevent penetration
+            // Not found -> cache null marker to prevent penetration
             redis_->SetJSON(ck, kNullMarker, RedisClient::JitteredTTL(NULL_TTL, 30));
             redis_->SetJSON(tk, std::to_string(std::time(nullptr)), RedisClient::JitteredTTL(NULL_TTL, 30));
             if (slog_)
@@ -298,7 +274,7 @@ grpc::Status SpreadsheetServiceImpl::GetSpreadsheet(grpc::ServerContext *context
                     r["cache"] = json("redis");
                     logger_->Log(username, "SpreadsheetService", "Get", p, r, true, dur);
                 }
-                return grpc::Status::OK;  // 绔嬪嵆杩斿洖锛屼笉绛夊緟鍒锋柊
+                return grpc::Status::OK;  // 立即返回，不等待刷新
             }
             if (slog_)
                 LOG_ERROR(*slog_, "Get id=" + std::to_string(req->id()) + " ParseFromString FAILED key=" + cache_key);
@@ -308,7 +284,7 @@ grpc::Status SpreadsheetServiceImpl::GetSpreadsheet(grpc::ServerContext *context
         }
     }
 
-    // 2) Cold start: Redis MISS 锟?MySQL
+    // 2) Cold start: Redis MISS -> MySQL
     if (!db_) {
         resp->set_success(false);
         SET_ERROR(resp, "Database not available", rpc_error::UNAVAILABLE);
@@ -316,7 +292,7 @@ grpc::Status SpreadsheetServiceImpl::GetSpreadsheet(grpc::ServerContext *context
     }
 
     SpreadsheetRow row;
-    // 鍚岃繛鎺ュ彲鑳界灛鏃朵笉鍙宸叉彁浜ゆ暟鎹紝鐭殏閲嶈瘯
+    // 同连接可能瞬时不可见已提交数据，短暂重试
     bool got = false;
     for (int r = 0; r < 3 && db_; ++r) {
         got = db_->GetSpreadsheet(req->id(), req_uid, row);
@@ -346,7 +322,7 @@ grpc::Status SpreadsheetServiceImpl::GetSpreadsheet(grpc::ServerContext *context
     }
 
     // 3) Populate response (MinIO first, MySQL fallback)
-    fillFromMinIO(row);
+    fillFromMongo(row);
     auto *sheet = resp->mutable_spreadsheet();
     sheet->set_id(row.id);
     sheet->set_username(row.username);
@@ -491,6 +467,12 @@ grpc::Status SpreadsheetServiceImpl::UpdateSpreadsheet(grpc::ServerContext *cont
                                          req->headers_json(), req->data_json(), version);
 
         if (ok) {
+            // Store cells/headers in MongoDB
+            if (mongo_) {
+                mongo_->UpsertSheetCells(req->id(), g_rpc_auth_ctx.user_id,
+                                         req->headers_json(), req->data_json());
+            }
+
             if (redis_ && redis_->IsConnected()) {
                 redis_->DeleteKey("u:" + std::to_string(g_rpc_auth_ctx.user_id) + ":sheet:" + std::to_string(req->id()));
                 redis_->DeleteKey("u:" + std::to_string(g_rpc_auth_ctx.user_id) + ":sheet:" + std::to_string(req->id()) +
@@ -508,6 +490,8 @@ grpc::Status SpreadsheetServiceImpl::UpdateSpreadsheet(grpc::ServerContext *cont
                 ev["user_id"] = g_rpc_auth_ctx.user_id;
                 ev["name"] = req->name();
                 ev["description"] = req->description();
+                ev["headers"] = nlohmann::json::parse(req->headers_json().empty() ? "[]" : req->headers_json());
+                ev["cells"] = nlohmann::json::parse(req->data_json().empty() ? "[]" : req->data_json());
                 if (rabbit_)
                     rabbit_->Publish("rpc.events", "sheet.updated", ev.dump());
                 if (db_)
@@ -564,7 +548,10 @@ grpc::Status SpreadsheetServiceImpl::DeleteSpreadsheet(grpc::ServerContext *cont
     return HandleDelete(resp, req->id(), g_rpc_auth_ctx.user_id, UsernameFromMeta(context),
         db_, rabbit_, redis_, logger_, slog_,
         [&](auto id, auto &owner) { return db_->GetSpreadsheetOwner(id, owner); },
-        [&](auto id, auto uid) { return db_->DeleteSpreadsheet(id, uid); },
+        [&](auto id, auto uid) {
+            if (mongo_) mongo_->DeleteSheetCells(id);
+            return db_->DeleteSpreadsheet(id, uid);
+        },
         {"sheet.deleted", "id", "SpreadsheetService",
          SheetCacheKey(g_rpc_auth_ctx.user_id, req->id()),
          SheetVersionKey(g_rpc_auth_ctx.user_id)});

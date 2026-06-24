@@ -14,6 +14,7 @@
 #include "shared/base/otel_tracer.h"
 #include "shared/client/rabbit_publisher.h"
 #include "shared/client/redis_client.h"
+#include "shared/client/mongo_client.h"
 #include "shared/base/snowflake.h"
 #include "sheet/spreadsheet_service_impl.h"
 #include "shared/base/system_logger.h"
@@ -149,6 +150,15 @@ int main(int argc, char *argv[]) {
         sheet_service.SetRabbitMQ(rabbit_pub.get());
     if (minio_client.IsConfigured())
         sheet_service.SetMinio(&minio_client);
+
+    const char *env_mongo = std::getenv("MONGODB_URI");
+    std::string mongo_uri = env_mongo ? env_mongo : "mongodb://mongodb:27017";
+    auto mongo_client = std::make_unique<MongoClient>(mongo_uri, "rpc_sheets");
+    if (mongo_client->Connect())
+        sheet_service.SetMongo(mongo_client.get());
+    else
+        printf("[Sheet] WARNING: MongoDB not available, cells will not be persisted\n");
+
     builder.RegisterService(&sheet_service);
 
     g_server = builder.BuildAndStart();

@@ -242,20 +242,9 @@ func handleSheetUpsert(event map[string]interface{}) bool {
 	name, _ := event["name"].(string)
 	desc, _ := event["description"].(string)
 
-	// Fetch content from MinIO if object_key present
-	var cells, headers interface{}
-	if objectKey, ok := event["object_key"].(string); ok && objectKey != "" && minioCli != nil {
-		obj, err := minioCli.GetObject(context.Background(), minioBucket, objectKey, minio.GetObjectOptions{})
-		if err == nil {
-			defer obj.Close()
-			var sheetData map[string]interface{}
-			if json.NewDecoder(obj).Decode(&sheetData) == nil {
-				cells = sheetData["data"]
-				headers = sheetData["headers"]
-				log.Printf("[Notify] MinIO sheet content fetched: %s", objectKey)
-			}
-		}
-	}
+	// Use cells/headers from event payload (set by C++ sheet service from MongoDB)
+	cells := event["cells"]
+	headers := event["headers"]
 
 	doc := map[string]interface{}{
 		"sheet_id": sheetID, "user_id": userID,
@@ -276,6 +265,22 @@ func handleSheetUpsert(event map[string]interface{}) bool {
 	esDoc := map[string]interface{}{
 		"id": sheetID, "user_id": userID,
 		"name": name, "description": desc, "type": "sheet",
+	}
+	// Index cell content for full-text search
+	if cells != nil {
+		if cellArr, ok := cells.([]interface{}); ok {
+			var cellText string
+			for _, row := range cellArr {
+				if r, ok := row.([]interface{}); ok {
+					for _, c := range r {
+						if s, ok := c.(string); ok {
+							cellText += s + " "
+						}
+					}
+				}
+			}
+			esDoc["cell_content"] = cellText
+		}
 	}
 	body, _ := json.Marshal(esDoc)
 	if _, err := esClient.Index("sheets_search", bytes.NewReader(body),

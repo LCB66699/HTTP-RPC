@@ -9,6 +9,7 @@
 #include "generated/rpc_spreadsheet.pb.h"
 #include "shared/cache/circuit_breaker.h"
 #include "shared/client/minio_client.h"
+#include "shared/client/mongo_client.h"
 #include "shared/base/service_interfaces.h"
 
 class CallLogger;
@@ -24,6 +25,7 @@ class SpreadsheetServiceImpl final : public rpc::SpreadsheetService::Service {
     void SetSysLog(SystemLogger *slog) { slog_ = slog; }
     void SetRabbitMQ(IRabbitPublisher *rb) { rabbit_ = rb; }
     void SetMinio(minio::Client *mc) { minio_ = mc; }
+    void SetMongo(MongoClient *mc) { mongo_ = mc; }
     void SetAuthChannel(std::shared_ptr<grpc::Channel> ch) { auth_stub_ = rpc::AuthService::NewStub(ch); }
 
     // 浠?gRPC metadata 鎻愬彇 token 骞惰皟鐢?Auth.ValidateUser
@@ -51,4 +53,5 @@ class SpreadsheetServiceImpl final : public rpc::SpreadsheetService::Service {
     mutable GrpcCircuitBreaker auth_cb_;
     IRabbitPublisher *rabbit_ = nullptr;
     minio::Client *minio_ = nullptr;
+    MongoClient *mongo_ = nullptr;
 };
