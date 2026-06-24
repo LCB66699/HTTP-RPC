@@ -48,13 +48,32 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Cache upstream images (MySQL, Redis, ES, MinIO, Nginx, Jaeger)
+      - name: Login to Docker Hub
+        if: env.DOCKERHUB_TOKEN != ''
+        env:
+          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+        run: echo "$DOCKERHUB_TOKEN" | docker login -u lcb66699 --password-stdin 2>/dev/null || true
+
+      - name: Pull upstream images (with retry)
         run: |
-          docker compose pull --ignore-pull-failures \
-            nginx redis-cluster-1 redis-cluster-2 redis-cluster-3 \
-            redis-cluster-4 redis-cluster-5 redis-cluster-6 \
-            mysql-auth mysql-spreadsheet-0 mysql-spreadsheet-1 \
-            mysql-file-0 mysql-file-1 minio elasticsearch jaeger
+          IMAGES="nginx redis-cluster-1 redis-cluster-2 redis-cluster-3 \
+                  redis-cluster-4 redis-cluster-5 redis-cluster-6 \
+                  mysql-auth mysql-spreadsheet-0 mysql-spreadsheet-1 \
+                  mysql-file-0 mysql-file-1 minio elasticsearch jaeger"
+          for img in $IMAGES; do
+            for attempt in 1 2 3; do
+              echo "[pull] $img attempt $attempt"
+              if docker compose pull "$img" 2>&1; then
+                echo "[pull] $img OK"
+                break
+              fi
+              if [ "$attempt" -eq 3 ]; then
+                echo "[pull] $img FAILED after 3 attempts, continuing"
+              else
+                sleep $((attempt * 10))
+              fi
+            done
+          done
 
       - name: Build images (BuildKit with cache mounts)
         env:
@@ -69,7 +88,7 @@ jobs:
         run: |
           docker compose down -v --remove-orphans 2>/dev/null || true
           rm -rf data/ 2>/dev/null || true
-          docker compose up -d \
+          docker compose up -d --no-build \
             nginx grpc-gateway \
             auth-1 sheet-1 file-1 search \
             mysql-auth mysql-spreadsheet-0 mysql-spreadsheet-0-slave mysql-spreadsheet-1 mysql-file-0 mysql-file-0-slave mysql-file-1 \
