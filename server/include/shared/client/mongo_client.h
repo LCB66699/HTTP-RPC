@@ -3,12 +3,14 @@
 #include <memory>
 #include <string>
 
+#include "shared/base/service_interfaces.h"
+
 namespace mongocxx {
 class client;
 class collection;
 }  // namespace mongocxx
 
-class MongoClient {
+class MongoClient : public IMongoClient {
    public:
     MongoClient(const std::string &uri, const std::string &database);
     ~MongoClient();
@@ -17,10 +19,10 @@ class MongoClient {
 
     bool UpsertSheetCells(int64_t sheet_id, int64_t user_id,
                           const std::string &headers_json,
-                          const std::string &data_json);
+                          const std::string &data_json) override;
     bool GetSheetCells(int64_t sheet_id, std::string &headers_json,
-                       std::string &data_json);
-    bool DeleteSheetCells(int64_t sheet_id);
+                       std::string &data_json) override;
+    bool DeleteSheetCells(int64_t sheet_id) override;
 
    private:
     std::string uri_;

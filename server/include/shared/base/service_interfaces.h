@@ -60,3 +60,14 @@ class IRabbitPublisher {
     virtual ~IRabbitPublisher() = default;
     virtual bool Publish(const std::string &exchange, const std::string &routing_key, const std::string &body) = 0;
 };
+
+class IMongoClient {
+   public:
+    virtual ~IMongoClient() = default;
+    virtual bool UpsertSheetCells(int64_t sheet_id, int64_t user_id,
+                                  const std::string &headers_json,
+                                  const std::string &data_json) = 0;
+    virtual bool GetSheetCells(int64_t sheet_id, std::string &headers_json,
+                               std::string &data_json) = 0;
+    virtual bool DeleteSheetCells(int64_t sheet_id) = 0;
+};
