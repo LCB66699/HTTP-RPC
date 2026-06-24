@@ -13,29 +13,33 @@ RedisClient::~RedisClient() {
 }
 
 bool RedisClient::Connect() {
-    try {
-        sw::redis::ConnectionOptions opts;
-        // Use first seed as initial connection point
-        auto colon = cluster_seeds_[0].find(':');
-        opts.host = cluster_seeds_[0].substr(0, colon);
-        opts.port = std::stoi(cluster_seeds_[0].substr(colon + 1));
-        if (!password_.empty()) {
-            opts.password = password_;
+    sw::redis::ConnectionPoolOptions pool_opts;
+    pool_opts.size = pool_size_;
+    pool_opts.wait_timeout = std::chrono::milliseconds(100);
+
+    for (size_t i = 0; i < cluster_seeds_.size(); ++i) {
+        try {
+            sw::redis::ConnectionOptions opts;
+            auto colon = cluster_seeds_[i].find(':');
+            opts.host = cluster_seeds_[i].substr(0, colon);
+            opts.port = std::stoi(cluster_seeds_[i].substr(colon + 1));
+            if (!password_.empty()) {
+                opts.password = password_;
+            }
+            opts.connect_timeout = std::chrono::milliseconds(500);
+            opts.socket_timeout = std::chrono::milliseconds(1000);
+
+            cluster_ = std::make_unique<sw::redis::RedisCluster>(opts, pool_opts);
+            printf("[Redis] Cluster connected via seed %zu/%zu (%s), pool: %d/seed\n",
+                   i + 1, cluster_seeds_.size(), cluster_seeds_[i].c_str(), pool_size_);
+            return true;
+        } catch (const sw::redis::Error &e) {
+            fprintf(stderr, "[Redis] Seed %zu/%zu (%s) failed: %s\n",
+                    i + 1, cluster_seeds_.size(), cluster_seeds_[i].c_str(), e.what());
         }
-        opts.connect_timeout = std::chrono::milliseconds(500);
-        opts.socket_timeout = std::chrono::milliseconds(1000);
-
-        sw::redis::ConnectionPoolOptions pool_opts;
-        pool_opts.size = pool_size_;
-        pool_opts.wait_timeout = std::chrono::milliseconds(100);
-
-        cluster_ = std::make_unique<sw::redis::RedisCluster>(opts, pool_opts);
-        printf("[Redis] Cluster connected (seeds: %zu, pool: %d/seed)\n", cluster_seeds_.size(), pool_size_);
-        return true;
-    } catch (const sw::redis::Error &e) {
-        fprintf(stderr, "[Redis] Cluster connect failed: %s\n", e.what());
-        return false;
     }
+    fprintf(stderr, "[Redis] All %zu seeds exhausted, cluster connect failed\n", cluster_seeds_.size());
+    return false;
 }
 
 bool RedisClient::IsConnected() const {
@@ -74,7 +78,7 @@ bool RedisClient::BatchPushCallEntries(const std::vector<std::pair<std::string, 
     if (!cluster_ || entries.empty())
         return false;
     try {
-        // 鎸?username 鍒嗙粍锛氬悓涓€鐢ㄦ埛鐨?key 鍏?slot锛岀敤 pipeline 鎵归噺锛涗笉鍚岀敤鎴峰垎 pipeline
+        // 按 username 分组：同一用户的 key 同 slot，用 pipeline 批量；不同用户分 pipeline
         std::unordered_map<std::string, std::vector<std::string>> groups;
         for (const auto &[json_entry, username] : entries) {
             if (!username.empty())
