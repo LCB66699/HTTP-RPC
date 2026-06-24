@@ -13,7 +13,10 @@ find_package(PkgConfig REQUIRED)
 pkg_check_modules(MYSQL REQUIRED mysqlclient)
 pkg_check_modules(HIREDIS REQUIRED hiredis)
 pkg_check_modules(RABBITMQ REQUIRED librabbitmq)
-pkg_check_modules(MONGOCXX REQUIRED libmongocxx)
+pkg_check_modules(MONGOCXX libmongocxx)
+if(MONGOCXX_FOUND)
+    add_compile_definitions(MONGOCXX_FOUND)
+endif()
 find_package(GTest REQUIRED)
 
 # Redis++ — build as subproject
@@ -75,8 +78,10 @@ set(SHARED_SRCS
     server/src/shared/call_logger.cpp
     server/src/shared/database.cpp
     server/src/shared/redis_client.cpp
-    server/src/shared/rpc_interceptor.cpp
-    server/src/shared/mongo_client.cpp)
+    server/src/shared/rpc_interceptor.cpp)
+if(MONGOCXX_FOUND)
+    list(APPEND SHARED_SRCS server/src/shared/mongo_client.cpp)
+endif()
 if(HAS_OTEL)
     list(APPEND SHARED_SRCS server/src/shared/otel_tracer.cpp)
 endif()
@@ -88,8 +93,11 @@ function(add_rpc_service NAME MAIN_SRC EXTRA_SRCS)
         gRPC::grpc++ gRPC::grpc++_reflection ${Protobuf_LIBRARIES}
         OpenSSL::SSL OpenSSL::Crypto
         ${MYSQL_LIBRARIES} ${HIREDIS_LIBRARIES} redis++_static pthread nghttp2
-        ${RABBITMQ_LIBRARIES} ${MONGOCXX_LIBRARIES}
+        ${RABBITMQ_LIBRARIES}
         ${OTEL_LIBS})
+    if(MONGOCXX_FOUND)
+        target_link_libraries(rpc_${NAME} ${MONGOCXX_LIBRARIES})
+    endif()
     if(HAS_OTEL)
         target_compile_definitions(rpc_${NAME} PRIVATE HAS_OTEL=1)
     endif()
@@ -118,8 +126,10 @@ target_link_libraries(cpp_test
     GTest::gtest GTest::gtest_main
     gRPC::grpc++ gRPC::grpc++_reflection ${Protobuf_LIBRARIES}
     OpenSSL::SSL OpenSSL::Crypto
-    ${MYSQL_LIBRARIES} ${HIREDIS_LIBRARIES} redis++_static pthread gmock
-    ${MONGOCXX_LIBRARIES})
+    ${MYSQL_LIBRARIES} ${HIREDIS_LIBRARIES} redis++_static pthread gmock)
+if(MONGOCXX_FOUND)
+    target_link_libraries(cpp_test ${MONGOCXX_LIBRARIES})
+endif()
 target_link_options(cpp_test PRIVATE -no-pie)
 
 enable_testing()

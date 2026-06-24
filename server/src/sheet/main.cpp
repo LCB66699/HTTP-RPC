@@ -151,6 +151,7 @@ int main(int argc, char *argv[]) {
     if (minio_client.IsConfigured())
         sheet_service.SetMinio(&minio_client);
 
+#ifdef MONGOCXX_FOUND
     const char *env_mongo = std::getenv("MONGODB_URI");
     std::string mongo_uri = env_mongo ? env_mongo : "mongodb://mongodb:27017";
     auto mongo_client = std::make_unique<MongoClient>(mongo_uri, "rpc_sheets");
@@ -158,6 +159,9 @@ int main(int argc, char *argv[]) {
         sheet_service.SetMongo(mongo_client.get());
     else
         printf("[Sheet] WARNING: MongoDB not available, cells will not be persisted\n");
+#else
+    printf("[Sheet] MongoDB support not compiled in\n");
+#endif
 
     builder.RegisterService(&sheet_service);
 
