@@ -60,6 +60,7 @@ public:
     MOCK_METHOD(bool, DeleteKey, (const std::string &key), (override));
     MOCK_METHOD(bool, ExpireKey, (const std::string &key, int ttl), (override));
     MOCK_METHOD(int64_t, GetInt, (const std::string &key), (override));
+    MOCK_METHOD(bool, Publish, (const std::string &channel, const std::string &message), (override));
 };
 
 class MockRabbit : public IRabbitPublisher {

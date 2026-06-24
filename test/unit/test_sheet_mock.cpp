@@ -265,6 +265,7 @@ TEST(SheetMock, UpdateSpreadsheetMongoUpsert) {
     EXPECT_CALL(redis, IsConnected()).WillRepeatedly(Return(true));
     EXPECT_CALL(redis, DeleteKey(_)).WillRepeatedly(Return(true));
     EXPECT_CALL(redis, Increment(_)).WillRepeatedly(Return(1));
+    EXPECT_CALL(redis, Publish(_, _)).WillRepeatedly(Return(true));
 
     grpc::ServerContext ctx;
     rpc::UpdateSpreadsheetRequest req;
@@ -305,6 +306,7 @@ TEST(SheetMock, UpdateSpreadsheetMongoFailBestEffort) {
     EXPECT_CALL(redis, IsConnected()).WillRepeatedly(Return(true));
     EXPECT_CALL(redis, DeleteKey(_)).WillRepeatedly(Return(true));
     EXPECT_CALL(redis, Increment(_)).WillRepeatedly(Return(1));
+    EXPECT_CALL(redis, Publish(_, _)).WillRepeatedly(Return(true));
 
     grpc::ServerContext ctx;
     rpc::UpdateSpreadsheetRequest req;
@@ -344,6 +346,7 @@ TEST(SheetMock, DeleteSpreadsheetMongoDelete) {
     EXPECT_CALL(redis, IsConnected()).WillRepeatedly(Return(true));
     EXPECT_CALL(redis, DeleteKey(_)).WillRepeatedly(Return(true));
     EXPECT_CALL(redis, Increment(_)).WillRepeatedly(Return(1));
+    EXPECT_CALL(redis, Publish(_, _)).WillRepeatedly(Return(true));
 
     grpc::ServerContext ctx;
     rpc::DeleteSpreadsheetRequest req;

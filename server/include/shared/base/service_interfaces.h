@@ -53,6 +53,7 @@ class IRedisClient {
     virtual bool DeleteKey(const std::string &key) = 0;
     virtual bool ExpireKey(const std::string &key, int ttl) = 0;
     virtual int64_t GetInt(const std::string &key) = 0;
+    virtual bool Publish(const std::string &channel, const std::string &message) = 0;
 };
 
 class IRabbitPublisher {
