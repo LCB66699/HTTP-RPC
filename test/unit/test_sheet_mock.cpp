@@ -3,6 +3,7 @@
 #include <thread>
 
 #include "mocks.h"
+#include "shared/base/rpc_interceptor.h"
 #include "sheet/spreadsheet_service_impl.h"
 
 using ::testing::_;
@@ -10,7 +11,21 @@ using ::testing::DoAll;
 using ::testing::Return;
 using ::testing::SetArgReferee;
 
-// ===== GetSpreadsheet �?Redis cache hit =====
+// RAII guard: set g_rpc_auth_ctx, restore on teardown
+class AuthGuard {
+public:
+    AuthGuard(int64_t uid, const std::string &user = "test") {
+        saved_ = g_rpc_auth_ctx;
+        g_rpc_auth_ctx.authenticated = true;
+        g_rpc_auth_ctx.user_id = uid;
+        g_rpc_auth_ctx.username = user;
+    }
+    ~AuthGuard() { g_rpc_auth_ctx = saved_; }
+private:
+    AuthContext saved_;
+};
+
+// ===== GetSpreadsheet �?Redis cache hit =====
 TEST(SheetMock, GetSpreadsheetRedisCacheHit) {
     MockDB db;
     MockRedis redis;
@@ -68,7 +83,7 @@ TEST(SheetMock, GetSpreadsheetRedisCacheHit) {
     EXPECT_EQ(resp.spreadsheet().name(), "cached-sheet");
 }
 
-// ===== GetSpreadsheet �?cache miss, DB fallback =====
+// ===== GetSpreadsheet �?cache miss, DB fallback =====
 TEST(SheetMock, GetSpreadsheetCacheMissThenDbHit) {
     MockDB db;
     MockRedis redis;
@@ -114,7 +129,7 @@ TEST(SheetMock, GetSpreadsheetCacheMissThenDbHit) {
     std::this_thread::sleep_for(std::chrono::milliseconds(50));
 }
 
-// ===== GetSpreadsheet �?wrong owner =====
+// ===== GetSpreadsheet �?wrong owner =====
 TEST(SheetMock, GetSpreadsheetWrongOwner) {
     MockDB db;
     SpreadsheetServiceImpl svc;
@@ -132,4 +147,210 @@ TEST(SheetMock, GetSpreadsheetWrongOwner) {
     auto status = svc.GetSpreadsheet(&ctx, &req, &resp);
     EXPECT_TRUE(status.ok());
     EXPECT_FALSE(resp.success());
+}
+
+// ===== GetSpreadsheet — DB hit + Mongo fills cells =====
+TEST(SheetMock, GetSpreadsheetMongoFillsCells) {
+    AuthGuard auth(42);
+    MockDB db;
+    MockRedis redis;
+    MockMongo mongo;
+    SpreadsheetServiceImpl svc;
+
+    svc.SetDatabase(&db);
+    svc.SetRedis(&redis);
+    svc.SetMongo(&mongo);
+
+    EXPECT_CALL(db, GetSpreadsheetOwner(1, _, _))
+        .WillOnce(DoAll(SetArgReferee<1>(42), Return(true)));
+
+    EXPECT_CALL(redis, IsConnected()).WillRepeatedly(Return(true));
+    EXPECT_CALL(redis, GetJSON(_, _)).WillRepeatedly(Return(false));
+    EXPECT_CALL(redis, SetNX(_, _, _)).WillRepeatedly(Return(true));
+    EXPECT_CALL(redis, SetJSON(_, _, _)).WillRepeatedly(Return(true));
+    EXPECT_CALL(redis, DeleteKey(_)).WillRepeatedly(Return(true));
+    EXPECT_CALL(redis, ExpireKey(_, _)).WillRepeatedly(Return(true));
+
+    SpreadsheetRow row;
+    row.id = 1;
+    row.name = "mongo-sheet";
+    EXPECT_CALL(db, GetSpreadsheet(1, 42, _))
+        .WillOnce(DoAll(SetArgReferee<2>(row), Return(true)));
+
+    // Mongo returns cells
+    EXPECT_CALL(mongo, GetSheetCells(1, _, _))
+        .WillOnce(DoAll(SetArgReferee<1>("[\"A\",\"B\"]"),
+                        SetArgReferee<2>("[[\"x\",\"y\"]]"),
+                        Return(true)));
+
+    grpc::ServerContext ctx;
+    rpc::GetSpreadsheetRequest req;
+    rpc::GetSpreadsheetResponse resp;
+    req.set_id(1);
+    req.set_user_id(42);
+
+    auto status = svc.GetSpreadsheet(&ctx, &req, &resp);
+    EXPECT_TRUE(status.ok());
+    EXPECT_TRUE(resp.success());
+    EXPECT_EQ(resp.spreadsheet().headers_json(), "[\"A\",\"B\"]");
+    EXPECT_EQ(resp.spreadsheet().data_json(), "[[\"x\",\"y\"]]");
+    std::this_thread::sleep_for(std::chrono::milliseconds(50));
+}
+
+// ===== GetSpreadsheet — Mongo miss, cells remain empty =====
+TEST(SheetMock, GetSpreadsheetMongoMissFallback) {
+    AuthGuard auth(42);
+    MockDB db;
+    MockRedis redis;
+    MockMongo mongo;
+    SpreadsheetServiceImpl svc;
+
+    svc.SetDatabase(&db);
+    svc.SetRedis(&redis);
+    svc.SetMongo(&mongo);
+
+    EXPECT_CALL(db, GetSpreadsheetOwner(2, _, _))
+        .WillOnce(DoAll(SetArgReferee<1>(42), Return(true)));
+
+    EXPECT_CALL(redis, IsConnected()).WillRepeatedly(Return(true));
+    EXPECT_CALL(redis, GetJSON(_, _)).WillRepeatedly(Return(false));
+    EXPECT_CALL(redis, SetNX(_, _, _)).WillRepeatedly(Return(true));
+    EXPECT_CALL(redis, SetJSON(_, _, _)).WillRepeatedly(Return(true));
+    EXPECT_CALL(redis, DeleteKey(_)).WillRepeatedly(Return(true));
+    EXPECT_CALL(redis, ExpireKey(_, _)).WillRepeatedly(Return(true));
+
+    SpreadsheetRow row;
+    row.id = 2;
+    row.name = "no-mongo";
+    EXPECT_CALL(db, GetSpreadsheet(2, 42, _))
+        .WillOnce(DoAll(SetArgReferee<2>(row), Return(true)));
+
+    // Mongo returns false — cells stay empty
+    EXPECT_CALL(mongo, GetSheetCells(2, _, _))
+        .WillOnce(Return(false));
+
+    grpc::ServerContext ctx;
+    rpc::GetSpreadsheetRequest req;
+    rpc::GetSpreadsheetResponse resp;
+    req.set_id(2);
+    req.set_user_id(42);
+
+    auto status = svc.GetSpreadsheet(&ctx, &req, &resp);
+    EXPECT_TRUE(status.ok());
+    EXPECT_TRUE(resp.success());
+    std::this_thread::sleep_for(std::chrono::milliseconds(50));
+}
+
+// ===== UpdateSpreadsheet — Mongo upsert on successful update =====
+TEST(SheetMock, UpdateSpreadsheetMongoUpsert) {
+    AuthGuard auth(42);
+    MockDB db;
+    MockRedis redis;
+    MockMongo mongo;
+    SpreadsheetServiceImpl svc;
+
+    svc.SetDatabase(&db);
+    svc.SetRedis(&redis);
+    svc.SetMongo(&mongo);
+
+    EXPECT_CALL(db, GetSpreadsheetOwner(3, _, _))
+        .WillOnce(DoAll(SetArgReferee<1>(42), Return(true)));
+
+    EXPECT_CALL(db, UpdateSpreadsheet(3, 42, "updated", "desc", "[\"H\"]", "[[\"X\"]]", 0))
+        .WillOnce(Return(true));
+
+    EXPECT_CALL(mongo, UpsertSheetCells(3, 42, "[\"H\"]", "[[\"X\"]]"))
+        .WillOnce(Return(true));
+
+    EXPECT_CALL(redis, IsConnected()).WillRepeatedly(Return(true));
+    EXPECT_CALL(redis, DeleteKey(_)).WillRepeatedly(Return(true));
+    EXPECT_CALL(redis, Increment(_)).WillRepeatedly(Return(1));
+
+    grpc::ServerContext ctx;
+    rpc::UpdateSpreadsheetRequest req;
+    rpc::UpdateSpreadsheetResponse resp;
+    req.set_id(3);
+    req.set_name("updated");
+    req.set_description("desc");
+    req.set_headers_json("[\"H\"]");
+    req.set_data_json("[[\"X\"]]");
+
+    auto status = svc.UpdateSpreadsheet(&ctx, &req, &resp);
+    EXPECT_TRUE(status.ok());
+    EXPECT_TRUE(resp.success());
+}
+
+// ===== UpdateSpreadsheet — Mongo fail does not rollback DB (best-effort) =====
+TEST(SheetMock, UpdateSpreadsheetMongoFailBestEffort) {
+    AuthGuard auth(42);
+    MockDB db;
+    MockRedis redis;
+    MockMongo mongo;
+    SpreadsheetServiceImpl svc;
+
+    svc.SetDatabase(&db);
+    svc.SetRedis(&redis);
+    svc.SetMongo(&mongo);
+
+    EXPECT_CALL(db, GetSpreadsheetOwner(4, _, _))
+        .WillOnce(DoAll(SetArgReferee<1>(42), Return(true)));
+
+    EXPECT_CALL(db, UpdateSpreadsheet(4, 42, "ok", "desc", "[]", "[]", 0))
+        .WillOnce(Return(true));
+
+    // Mongo fails — but DB already committed, no rollback
+    EXPECT_CALL(mongo, UpsertSheetCells(4, 42, "[]", "[]"))
+        .WillOnce(Return(false));
+
+    EXPECT_CALL(redis, IsConnected()).WillRepeatedly(Return(true));
+    EXPECT_CALL(redis, DeleteKey(_)).WillRepeatedly(Return(true));
+    EXPECT_CALL(redis, Increment(_)).WillRepeatedly(Return(1));
+
+    grpc::ServerContext ctx;
+    rpc::UpdateSpreadsheetRequest req;
+    rpc::UpdateSpreadsheetResponse resp;
+    req.set_id(4);
+    req.set_name("ok");
+    req.set_description("desc");
+    req.set_headers_json("[]");
+    req.set_data_json("[]");
+
+    auto status = svc.UpdateSpreadsheet(&ctx, &req, &resp);
+    EXPECT_TRUE(status.ok());
+    EXPECT_TRUE(resp.success());  // DB wrote, Mongo is best-effort
+}
+
+// ===== DeleteSpreadsheet — Mongo delete on success =====
+TEST(SheetMock, DeleteSpreadsheetMongoDelete) {
+    AuthGuard auth(42);
+    MockDB db;
+    MockRedis redis;
+    MockMongo mongo;
+    SpreadsheetServiceImpl svc;
+
+    svc.SetDatabase(&db);
+    svc.SetRedis(&redis);
+    svc.SetMongo(&mongo);
+
+    EXPECT_CALL(db, GetSpreadsheetOwner(5, _, _))
+        .WillOnce(DoAll(SetArgReferee<1>(42), Return(true)));
+
+    EXPECT_CALL(mongo, DeleteSheetCells(5))
+        .WillOnce(Return(true));
+
+    EXPECT_CALL(db, DeleteSpreadsheet(5, 42))
+        .WillOnce(Return(true));
+
+    EXPECT_CALL(redis, IsConnected()).WillRepeatedly(Return(true));
+    EXPECT_CALL(redis, DeleteKey(_)).WillRepeatedly(Return(true));
+    EXPECT_CALL(redis, Increment(_)).WillRepeatedly(Return(1));
+
+    grpc::ServerContext ctx;
+    rpc::DeleteSpreadsheetRequest req;
+    rpc::DeleteSpreadsheetResponse resp;
+    req.set_id(5);
+
+    auto status = svc.DeleteSpreadsheet(&ctx, &req, &resp);
+    EXPECT_TRUE(status.ok());
+    EXPECT_TRUE(resp.success());
 }

@@ -3,8 +3,9 @@
 
 #include <vector>
 
-#include "shared/database.h"
-#include "shared/service_interfaces.h"
+#include "shared/client/database.h"
+#include "shared/base/service_interfaces.h"
+#include "shared/client/mongo_client.h"
 
 class MockDB : public IDatabase {
 public:
@@ -66,4 +67,14 @@ public:
     MOCK_METHOD(bool, Publish,
         (const std::string &exchange, const std::string &routing_key, const std::string &body),
         (override));
+};
+
+class MockMongo : public IMongoClient {
+public:
+    MOCK_METHOD(bool, UpsertSheetCells,
+        (int64_t sheet_id, int64_t user_id, const std::string &headers_json,
+         const std::string &data_json), (override));
+    MOCK_METHOD(bool, GetSheetCells,
+        (int64_t sheet_id, std::string &headers_json, std::string &data_json), (override));
+    MOCK_METHOD(bool, DeleteSheetCells, (int64_t sheet_id), (override));
 };
