@@ -21,7 +21,7 @@ struct CreateSpec {
 
 // ======== FinishCreate ========
 
-// Tail-end of Create handlers: event 鈫?cache invalidation 鈫?Redis 鈫?response 鈫?log.
+// Tail-end of Create handlers: event -> cache invalidation -> Redis -> response -> log.
 // Caller handles auth guard, MinIO upload, DB create and rollback.
 template <typename Resp>
 void FinishCreate(Resp *resp, int64_t id, int64_t user_id,
@@ -29,7 +29,7 @@ void FinishCreate(Resp *resp, int64_t id, int64_t user_id,
                   IRabbitPublisher *rabbit, IRedisClient *redis,
                   CallLogger *logger, SystemLogger *slog,
                   const CreateSpec &spec, nlohmann::json extra_event,
-                  int64_t elapsed_us) {
+                  int64_t elapsed_us, L1Cache *l1 = nullptr) {
     // Event: RabbitMQ + outbox
     {
         nlohmann::json ev;
@@ -40,8 +40,8 @@ void FinishCreate(Resp *resp, int64_t id, int64_t user_id,
         PublishEvent(rabbit, db, user_id, spec.event_type, std::move(ev));
     }
 
-    // Cache invalidation via outbox
-    InvalidateCaches(db, user_id, {spec.version_key});
+    // Cache invalidation: sync L1 + Pub/Sub + outbox fallback
+    InvalidateCaches(db, user_id, {spec.version_key}, l1, redis);
 
     // Redis version bump
     if (redis && redis->IsConnected())
@@ -64,7 +64,7 @@ void FinishCreate(Resp *resp, int64_t id, int64_t user_id,
 
 // ======== List helpers ========
 
-// TryListCache 鈥?attempt to serve list from Redis cache. Returns true on hit.
+// TryListCache — attempt to serve list from Redis cache. Returns true on hit.
 template <typename Resp>
 bool TryListCache(Resp *resp, int64_t uid, int page, int page_size,
                   IRedisClient *redis, const char *resource, SystemLogger *slog) {
@@ -82,7 +82,7 @@ bool TryListCache(Resp *resp, int64_t uid, int page, int page_size,
     return false;
 }
 
-// PopulateListCache 鈥?write MySQL result back to Redis for future requests.
+// PopulateListCache — write MySQL result back to Redis for future requests.
 template <typename Resp>
 void PopulateListCache(Resp *resp, int64_t uid, int page, int page_size,
                        IRedisClient *redis, const char *resource, SystemLogger *slog) {
@@ -100,7 +100,7 @@ void PopulateListCache(Resp *resp, int64_t uid, int page, int page_size,
 
 // ======== Owner check ========
 
-// CheckOwnerWithRetry 鈥?verify resource ownership with 3x retry + backoff.
+// CheckOwnerWithRetry — verify resource ownership with 3x retry + backoff.
 // Usage:
 //   int64_t owner_uid = 0;
 //   if (!CheckOwnerWithRetry(id, caller_uid, db_,
@@ -135,7 +135,7 @@ struct DeleteSpec {
 
 // ======== HandleDelete ========
 
-// Unified delete handler: ownership 鈫?DB delete 鈫?event 鈫?cache invalidation.
+// Unified delete handler: ownership -> DB delete -> event -> cache invalidation.
 // Auth guard must be called before (requireAuth / requireAuthWith).
 template <typename Resp, typename Fn_Owner, typename Fn_Delete>
 grpc::Status HandleDelete(Resp *resp, int64_t id, int64_t user_id,
@@ -143,7 +143,7 @@ grpc::Status HandleDelete(Resp *resp, int64_t id, int64_t user_id,
                           IRabbitPublisher *rabbit, IRedisClient *redis,
                           CallLogger *logger, SystemLogger *slog,
                           Fn_Owner &&get_owner, Fn_Delete &&do_delete,
-                          const DeleteSpec &spec) {
+                          const DeleteSpec &spec, L1Cache *l1 = nullptr) {
     ScopeTimer timer;
 
     if (!db) {
@@ -173,10 +173,10 @@ grpc::Status HandleDelete(Resp *resp, int64_t id, int64_t user_id,
         PublishEvent(rabbit, db, user_id, spec.event_type, std::move(ev));
     }
 
-    // Cache invalidation via outbox
-    InvalidateCaches(db, user_id, {spec.cache_key, spec.version_key});
+    // Cache invalidation: sync L1 + Pub/Sub + outbox fallback
+    InvalidateCaches(db, user_id, {spec.cache_key, spec.version_key}, l1, redis);
 
-    // Redis direct invalidation
+    // Redis direct invalidation (L2)
     if (redis && redis->IsConnected()) {
         redis->DeleteKey(spec.cache_key);
         redis->DeleteKey(spec.cache_key + ":ts");

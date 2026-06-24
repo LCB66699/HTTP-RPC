@@ -41,13 +41,24 @@ inline std::string SheetLockKey(int64_t user_id, int64_t sheet_id)     { return 
 
 // ======== Cache invalidation ========
 
-// InvalidateCaches — 通用的 cache invalidation outbox 写入
-// 每个 key 作为 payload 插入一条 "cache:invalidate" outbox 条目
-// notify-service 轮询后推 Redis Pub/Sub → 所有进程 L1CacheInvalidator 处理
+// InvalidateCaches — 通用的 cache invalidation
+// 1. L1 同步删除 (writer 自身)
+// 2. Redis Pub/Sub 广播 (其他实例, ms 级)
+// 3. outbox 兜底 (订阅者离线时的补偿)
+// notify-service 轮询后补推 Redis Pub/Sub
+class L1Cache;
+class IRedisClient;
+
 template <typename DB>
-inline void InvalidateCaches(DB *db, int64_t user_id, std::initializer_list<std::string> keys) {
+inline void InvalidateCaches(DB *db, int64_t user_id, std::initializer_list<std::string> keys,
+                             L1Cache *l1 = nullptr, IRedisClient *redis = nullptr) {
     if (!db)
         return;
-    for (auto &key : keys)
-        db->InsertOutbox(user_id, "cache:invalidate", key);
+    for (auto &key : keys) {
+        if (l1)
+            l1->Delete(key);                                       // 1. sync L1
+        if (redis && redis->IsConnected())
+            redis->Publish("cache:invalidate", key);               // 2. sync Pub/Sub
+        db->InsertOutbox(user_id, "cache:invalidate", key);        // 3. outbox fallback
+    }
 }

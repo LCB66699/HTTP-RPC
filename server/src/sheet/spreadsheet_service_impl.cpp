@@ -113,7 +113,7 @@ grpc::Status SpreadsheetServiceImpl::CreateSpreadsheet(grpc::ServerContext *cont
     extra["cells"] = nlohmann::json::parse(req->data_json().empty() ? "[]" : req->data_json());
     FinishCreate(resp, id, g_rpc_auth_ctx.user_id, username, db_, rabbit_, redis_, logger_, slog_,
         {"sheet.created", "id", "SpreadsheetService", SheetVersionKey(g_rpc_auth_ctx.user_id)},
-        std::move(extra), timer.elapsedUs());
+        std::move(extra), timer.elapsedUs(), l1_);
     return grpc::Status::OK;
 }
 
@@ -498,11 +498,11 @@ grpc::Status SpreadsheetServiceImpl::UpdateSpreadsheet(grpc::ServerContext *cont
                     db_->InsertOutbox(g_rpc_auth_ctx.user_id, "sheet.updated", ev.dump());
             }
 
-            // Invalidate caches via outbox
+            // Invalidate caches: sync L1 + Pub/Sub + outbox fallback
             InvalidateCaches(db_, g_rpc_auth_ctx.user_id, {
                 SheetCacheKey(g_rpc_auth_ctx.user_id, req->id()),
                 SheetVersionKey(g_rpc_auth_ctx.user_id)
-            });
+            }, l1_, redis_);
 
             resp->set_success(true);
 
@@ -554,5 +554,5 @@ grpc::Status SpreadsheetServiceImpl::DeleteSpreadsheet(grpc::ServerContext *cont
         },
         {"sheet.deleted", "id", "SpreadsheetService",
          SheetCacheKey(g_rpc_auth_ctx.user_id, req->id()),
-         SheetVersionKey(g_rpc_auth_ctx.user_id)});
+         SheetVersionKey(g_rpc_auth_ctx.user_id)}, l1_);
 }

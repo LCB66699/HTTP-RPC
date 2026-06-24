@@ -33,7 +33,7 @@ bool FileServiceImpl::ValidateCaller(grpc::ServerContext *ctx, int64_t user_id, 
     }
     if (token.empty())
         return false;
-    // 閫氳繃鐔旀柇鍣ㄨ皟锟?Auth 鏈嶅姟
+    // 通过熔断器调用 Auth 服务
     bool ok = auth_cb_.Call("auth.validate", [&]() -> bool {
         rpc::ValidateUserRequest vu_req;
         rpc::ValidateUserResponse vu_resp;
@@ -67,7 +67,7 @@ grpc::Status FileServiceImpl::CreateFile(grpc::ServerContext *context, const rpc
         return grpc::Status::OK;
     }
 
-    // MinIO 浼樺厛锛氫笂浼犲唴锟?锟?鍏冩暟鎹啓 MySQL锛坰torage_path锛夛紱鍥為€€ LONGBLOB
+    // MinIO 优先：上传内容 -> 元数据写 MySQL（storage_path）；回退 LONGBLOB
     int64_t id = 0;
     std::string storage_key;
     if (minio_ && minio_->IsConfigured() && !req->file_content().empty()) {
@@ -93,8 +93,8 @@ grpc::Status FileServiceImpl::CreateFile(grpc::ServerContext *context, const rpc
         return grpc::Status::OK;
     }
 
-    // 鍥為€€锛歁inIO 涓嶅彲鐢ㄦ椂鏂囦欢鍐呭锟?MySQL LONGBLOB
-    // version=0: 鏂板垱寤烘枃浠讹紝鏃犲苟鍙戝啿绐侊紝璺宠繃涔愯閿佹锟?
+    // 回退：MinIO 不可用时文件内容存 MySQL LONGBLOB
+    // version=0: 新创建文件，无并发冲突，跳过乐观锁检查
     if (!req->file_content().empty() && storage_key.empty()) {
         db_->UpdateFileContent(id, req->file_content());
     }
@@ -107,7 +107,7 @@ grpc::Status FileServiceImpl::CreateFile(grpc::ServerContext *context, const rpc
         extra["object_key"] = storage_key;
     FinishCreate(resp, id, g_rpc_auth_ctx.user_id, username, db_, rabbit_, redis_, logger_, slog_,
         {"file.uploaded", "file_id", "FileService", FileVersionKey(g_rpc_auth_ctx.user_id)},
-        std::move(extra), timer.elapsedUs());
+        std::move(extra), timer.elapsedUs(), l1_);
     return grpc::Status::OK;
 }
 
@@ -135,7 +135,7 @@ grpc::Status FileServiceImpl::GetFile(grpc::ServerContext *context, const rpc::G
     const int NULL_TTL = 60;
     const int LOCK_TTL = 10;
 
-    // 寮傛鍒锋柊鍑芥暟
+    // 异步刷新函数
     auto async_refresh = [this, kNullMarker](int64_t id, int64_t uid, std::string ck, std::string tk, std::string lk) {
         FileRow row;
         if (db_ && db_->GetFile(id, uid, row)) {
@@ -275,7 +275,7 @@ grpc::Status FileServiceImpl::GetFile(grpc::ServerContext *context, const rpc::G
     resp->set_success(true);
     resp->set_cache_source("mysql");
 
-    // MinIO 浼樺厛锛氱敓鎴愰绛惧悕 URL 302 閲嶅畾鍚戯紱鍥為€€ LONGBLOB
+    // MinIO 优先：生成预签名 URL 302 重定向；回退 LONGBLOB
     if (minio_ && minio_->IsConfigured() && !row.storage_path.empty()) {
         std::string url = minio_->PresignedGetUrl(row.storage_path, 3600);
         if (!url.empty()) {
@@ -392,7 +392,7 @@ grpc::Status FileServiceImpl::DeleteFile(grpc::ServerContext *context, const rpc
         [&](auto id, auto uid) { return db_->DeleteFile(id, uid); },
         {"file.deleted", "file_id", "FileService",
          FileCacheKey(g_rpc_auth_ctx.user_id, req->id()),
-         FileVersionKey(g_rpc_auth_ctx.user_id)});
+         FileVersionKey(g_rpc_auth_ctx.user_id)}, l1_);
 }
 
 grpc::Status FileServiceImpl::CreateFolder(grpc::ServerContext *ctx, const rpc::CreateFolderRequest *req,
