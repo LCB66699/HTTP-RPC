@@ -46,6 +46,11 @@ type SharedClientI interface {
 	GetByToken(ctx context.Context, req *pb.ShareTokenRequest, opts ...grpc.CallOption) (*pb.SharedResourceResponse, error)
 }
 
+// SearchClientI is the gRPC client interface for search operations.
+type SearchClientI interface {
+	Search(ctx context.Context, req *pb.SearchRequest, opts ...grpc.CallOption) (*pb.SearchResponse, error)
+}
+
 // Injectable gRPC client instances (set by main, overridden by tests).
 var (
 	AuthClient   AuthClientI
