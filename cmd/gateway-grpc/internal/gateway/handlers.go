@@ -8,14 +8,12 @@ import (
 	"log"
 	"net/http"
 	"strconv"
-	"strings"
 	"sync/atomic"
 	"time"
 
 	"github.com/redis/go-redis/v9"
 	"github.com/sony/gobreaker/v2"
 	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/connectivity"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 
