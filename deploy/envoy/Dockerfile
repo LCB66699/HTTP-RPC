@@ -19,5 +19,5 @@ RUN protoc \
 # Stage 2: Envoy 运行镜像
 FROM envoyproxy/envoy:v1.31-latest
 COPY --from=proto-builder /build/proto_descriptor.pb /etc/envoy/proto_descriptor.pb
-COPY envoy/envoy.yaml /etc/envoy/envoy.yaml
+COPY deploy/envoy/envoy.yaml /etc/envoy/envoy.yaml
 CMD ["-c", "/etc/envoy/envoy.yaml", "--log-level", "info"]

@@ -90,7 +90,7 @@ jobs:
           docker compose down -v --remove-orphans 2>/dev/null || true
           rm -rf data/ 2>/dev/null || true
           docker compose up -d --no-build \
-            nginx grpc-gateway \
+            envoy nginx grpc-gateway \
             auth-1 sheet-1 file-1 search \
             mysql-auth mysql-spreadsheet-0 mysql-spreadsheet-0-slave mysql-spreadsheet-1 mysql-file-0 mysql-file-0-slave mysql-file-1 \
             minio minio-init redis-cluster-1 redis-cluster-2 redis-cluster-3 \
