@@ -1373,3 +1373,130 @@ bool ShardedDatabase::MoveFile(int64_t id, int64_t target_folder_id, int version
 int ShardedDatabase::BatchDeleteFiles(int64_t user_id, const std::vector<int64_t> &ids) {
     return ShardFor(user_id)->BatchDeleteFiles(user_id, ids);
 }
+
+// ---- Resource Sharing ----
+
+bool Database::EnsureSharingTables() {
+    const char *sql_shares =
+        "CREATE TABLE IF NOT EXISTS resource_shares ("
+        "  id BIGINT AUTO_INCREMENT PRIMARY KEY,"
+        "  owner_id BIGINT NOT NULL,"
+        "  resource_type VARCHAR(32) NOT NULL,"
+        "  resource_id BIGINT NOT NULL,"
+        "  grantee_username VARCHAR(64) NOT NULL,"
+        "  permission VARCHAR(16) NOT NULL DEFAULT 'view',"
+        "  granted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,"
+        "  UNIQUE KEY uk_share (owner_id, resource_type, resource_id, grantee_username)"
+        ")";
+    const char *sql_links =
+        "CREATE TABLE IF NOT EXISTS share_links ("
+        "  token VARCHAR(64) PRIMARY KEY,"
+        "  owner_id BIGINT NOT NULL,"
+        "  resource_type VARCHAR(32) NOT NULL,"
+        "  resource_id BIGINT NOT NULL,"
+        "  permission VARCHAR(16) NOT NULL DEFAULT 'view',"
+        "  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP"
+        ")";
+    return ExecWrite(sql_shares) && ExecWrite(sql_links);
+}
+
+static std::string make_token() {
+    static const char hex[] = "0123456789abcdef";
+    std::string tok(32, '\0');
+    for (size_t i = 0; i < 32; ++i)
+        tok[i] = hex[(rand() >> 4) & 15];
+    return tok;
+}
+
+bool Database::CreateResourceShare(int64_t owner_id, const std::string &resource_type, int64_t resource_id,
+                                    const std::string &grantee_username, const std::string &permission) {
+    MYSQL *ec = EscConn();
+    return ExecWrite(make_sql(
+        "INSERT INTO resource_shares (owner_id,resource_type,resource_id,grantee_username,permission) "
+        "VALUES ({},{},{},{},{}) ON DUPLICATE KEY UPDATE permission={}",
+        owner_id, sql_param(ec, resource_type), resource_id,
+        sql_param(ec, grantee_username), sql_param(ec, permission),
+        sql_param(ec, permission)));
+}
+
+bool Database::RevokeResourceShare(int64_t owner_id, const std::string &resource_type, int64_t resource_id,
+                                    const std::string &grantee_username) {
+    MYSQL *ec = EscConn();
+    return ExecWrite(make_sql(
+        "DELETE FROM resource_shares WHERE owner_id={} AND resource_type={} AND resource_id={} AND grantee_username={}",
+        owner_id, sql_param(ec, resource_type), resource_id, sql_param(ec, grantee_username)));
+}
+
+bool Database::ListResourceShares(int64_t owner_id, const std::string &resource_type, int64_t resource_id,
+                                   std::string &out_entries_json) {
+    MYSQL *ec = EscConn();
+    std::string sql = make_sql(
+        "SELECT grantee_username, permission, granted_at FROM resource_shares "
+        "WHERE owner_id={} AND resource_type={} AND resource_id={} ORDER BY granted_at",
+        owner_id, sql_param(ec, resource_type), resource_id);
+    std::string entries = "[";
+    bool first = true;
+    ExecRead(sql, [&](MYSQL_RES *res) -> bool {
+        MYSQL_ROW row;
+        while ((row = mysql_fetch_row(res))) {
+            if (!first) entries += ",";
+            first = false;
+            entries += "{\"username\":\"" + std::string(row[0] ? row[0] : "") + "\""
+                     + ",\"permission\":\"" + std::string(row[1] ? row[1] : "") + "\""
+                     + ",\"granted_at\":\"" + std::string(row[2] ? row[2] : "") + "\"}";
+        }
+        return true;
+    });
+    entries += "]";
+    out_entries_json = entries;
+    return true;
+}
+
+bool Database::CheckShareAccess(const std::string &username, const std::string &resource_type, int64_t resource_id,
+                                 std::string &out_permission) {
+    MYSQL *ec = EscConn();
+    std::string sql = make_sql(
+        "SELECT permission FROM resource_shares WHERE grantee_username={} AND resource_type={} AND resource_id={}",
+        sql_param(ec, username), sql_param(ec, resource_type), resource_id);
+    bool found = false;
+    ExecRead(sql, [&](MYSQL_RES *res) -> bool {
+        MYSQL_ROW row = mysql_fetch_row(res);
+        if (row && row[0]) {
+            out_permission = row[0];
+            found = true;
+        }
+        return true;
+    });
+    return found;
+}
+
+bool Database::CreateShareLink(int64_t owner_id, const std::string &resource_type, int64_t resource_id,
+                                const std::string &permission, std::string &out_token) {
+    MYSQL *ec = EscConn();
+    out_token = make_token();
+    return ExecWrite(make_sql(
+        "INSERT INTO share_links (token,owner_id,resource_type,resource_id,permission) VALUES ({},{},{},{},{})",
+        sql_param(ec, out_token), owner_id, sql_param(ec, resource_type), resource_id,
+        sql_param(ec, permission)));
+}
+
+bool Database::GetShareLinkByToken(const std::string &token, std::string &resource_type, int64_t &resource_id,
+                                    std::string &permission, int64_t &owner_id) {
+    MYSQL *ec = EscConn();
+    std::string sql = make_sql(
+        "SELECT resource_type, resource_id, permission, owner_id FROM share_links WHERE token={}",
+        sql_param(ec, token));
+    bool found = false;
+    ExecRead(sql, [&](MYSQL_RES *res) -> bool {
+        MYSQL_ROW row = mysql_fetch_row(res);
+        if (row && row[0]) {
+            resource_type = row[0] ? row[0] : "";
+            resource_id = row[1] ? std::stoll(row[1]) : 0;
+            permission = row[2] ? row[2] : "";
+            owner_id = row[3] ? std::stoll(row[3]) : 0;
+            found = true;
+        }
+        return true;
+    });
+    return found;
+}

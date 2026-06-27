@@ -103,7 +103,7 @@ function(add_rpc_service NAME MAIN_SRC EXTRA_SRCS)
     endif()
 endfunction()
 
-add_rpc_service(auth   server/src/auth/main.cpp     "server/src/auth/auth_service_impl.cpp;server/src/shared/health_service_impl.cpp")
+add_rpc_service(auth   server/src/auth/main.cpp     "server/src/auth/auth_service_impl.cpp;server/src/auth/sharing_service_impl.cpp;server/src/shared/health_service_impl.cpp")
 add_rpc_service(sheet  server/src/sheet/main.cpp    "server/src/sheet/spreadsheet_service_impl.cpp;server/src/shared/health_service_impl.cpp;server/src/shared/l1_cache.cpp;server/src/shared/l1_invalidator.cpp;server/src/shared/rabbit_publisher.cpp")
 add_rpc_service(file   server/src/file/main.cpp     "server/src/file/file_service_impl.cpp;server/src/shared/health_service_impl.cpp;server/src/shared/l1_cache.cpp;server/src/shared/rabbit_publisher.cpp")
 add_rpc_service(search server/src/search/main.cpp   "server/src/search/search_service_impl.cpp;server/src/shared/health_service_impl.cpp")
@@ -119,6 +119,7 @@ add_executable(cpp_test
     test/unit/test_sheet_mock.cpp
     server/src/shared/l1_cache.cpp
     server/src/auth/auth_service_impl.cpp
+    server/src/auth/sharing_service_impl.cpp
     server/src/sheet/spreadsheet_service_impl.cpp
     ${SHARED_SRCS}
     ${PROTO_LIB_SRCS})

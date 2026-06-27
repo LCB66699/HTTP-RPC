@@ -54,7 +54,7 @@ proto:
 	done
 	@echo "[OK] Proto generated"
 
-AUTH_PB := $(GEN_DIR)/rpc_auth.pb.o $(GEN_DIR)/rpc_auth.grpc.pb.o $(GEN_DIR)/rpc_health.pb.o $(GEN_DIR)/rpc_health.grpc.pb.o
+AUTH_PB := $(GEN_DIR)/rpc_auth.pb.o $(GEN_DIR)/rpc_auth.grpc.pb.o $(GEN_DIR)/rpc_health.pb.o $(GEN_DIR)/rpc_health.grpc.pb.o $(GEN_DIR)/rpc_sharing.pb.o $(GEN_DIR)/rpc_sharing.grpc.pb.o
 SHEET_PB := $(GEN_DIR)/rpc_spreadsheet.pb.o $(GEN_DIR)/rpc_spreadsheet.grpc.pb.o $(GEN_DIR)/rpc_auth.pb.o $(GEN_DIR)/rpc_auth.grpc.pb.o $(GEN_DIR)/rpc_health.pb.o $(GEN_DIR)/rpc_health.grpc.pb.o
 FILE_PB := $(GEN_DIR)/rpc_file.pb.o $(GEN_DIR)/rpc_file.grpc.pb.o $(GEN_DIR)/rpc_auth.pb.o $(GEN_DIR)/rpc_auth.grpc.pb.o $(GEN_DIR)/rpc_health.pb.o $(GEN_DIR)/rpc_health.grpc.pb.o
 SEARCH_PB := $(GEN_DIR)/rpc_search.pb.o $(GEN_DIR)/rpc_search.grpc.pb.o
@@ -65,8 +65,11 @@ auth: proto
 	$(CXX) $(CXXFLAGS) -c -o $(GEN_DIR)/rpc_auth.grpc.pb.o $(GEN_DIR)/rpc_auth.grpc.pb.cc
 	$(CXX) $(CXXFLAGS) -c -o $(GEN_DIR)/rpc_health.pb.o $(GEN_DIR)/rpc_health.pb.cc
 	$(CXX) $(CXXFLAGS) -c -o $(GEN_DIR)/rpc_health.grpc.pb.o $(GEN_DIR)/rpc_health.grpc.pb.cc
+	$(CXX) $(CXXFLAGS) -c -o $(GEN_DIR)/rpc_sharing.pb.o $(GEN_DIR)/rpc_sharing.pb.cc
+	$(CXX) $(CXXFLAGS) -c -o $(GEN_DIR)/rpc_sharing.grpc.pb.o $(GEN_DIR)/rpc_sharing.grpc.pb.cc
 	$(CXX) $(CXXFLAGS) -o rpc_auth \
 		$(SRC_DIR)/auth/main.cpp $(SRC_DIR)/auth/auth_service_impl.cpp \
+		$(SRC_DIR)/auth/sharing_service_impl.cpp \
 		$(SRC_DIR)/shared/health_service_impl.cpp \
 		$(SHARED_SRCS) $(AUTH_PB) $(LDFLAGS_RPC)
 	@echo "[OK] rpc_auth"

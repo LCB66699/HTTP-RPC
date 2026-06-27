@@ -383,10 +383,6 @@ func (g *Gateway) GetSheet(w http.ResponseWriter, r *http.Request) {
 		WriteJSONStatus(w, http.StatusNotFound, map[string]interface{}{"success": false, "error": "Not found"})
 		return
 	}
-	if resp.Spreadsheet != nil && resp.Spreadsheet.Username != "" && resp.Spreadsheet.Username != caller {
-		WriteJSONStatus(w, http.StatusForbidden, map[string]interface{}{"success": false, "error": "Forbidden"})
-		return
-	}
 	if resp.Spreadsheet != nil {
 		WriteJSON(w, resp)
 	}

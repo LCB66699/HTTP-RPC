@@ -172,6 +172,21 @@ class Database {
     bool MoveFile(int64_t id, int64_t target_folder_id, int version = 0);
     int BatchDeleteFiles(int64_t user_id, const std::vector<int64_t> &ids);
 
+    // Resource sharing
+    bool CreateResourceShare(int64_t owner_id, const std::string &resource_type, int64_t resource_id,
+                             const std::string &grantee_username, const std::string &permission);
+    bool RevokeResourceShare(int64_t owner_id, const std::string &resource_type, int64_t resource_id,
+                             const std::string &grantee_username);
+    bool ListResourceShares(int64_t owner_id, const std::string &resource_type, int64_t resource_id,
+                            std::string &out_entries_json);
+    bool CheckShareAccess(const std::string &username, const std::string &resource_type, int64_t resource_id,
+                          std::string &out_permission);
+    bool CreateShareLink(int64_t owner_id, const std::string &resource_type, int64_t resource_id,
+                         const std::string &permission, std::string &out_token);
+    bool GetShareLinkByToken(const std::string &token, std::string &resource_type, int64_t &resource_id,
+                             std::string &permission, int64_t &owner_id);
+    bool EnsureSharingTables();
+
     // Undo log
     bool WriteUndoLog(const std::string &xid, const std::string &table_name, int64_t row_id,
                       const std::string &before_snapshot);
@@ -301,6 +316,35 @@ class ShardedDatabase : public IDatabase {
     bool CreateFolder(int64_t user_id, const std::string &name, int64_t parent_id, int64_t &out_id);
     bool MoveFile(int64_t id, int64_t target_folder_id, int version = 0);
     int BatchDeleteFiles(int64_t user_id, const std::vector<int64_t> &ids);
+
+    // === Resource Sharing (auth 鈥?single shard) ===
+    bool CreateResourceShare(int64_t owner_id, const std::string &resource_type, int64_t resource_id,
+                             const std::string &grantee_username, const std::string &permission) {
+        return shards_[0]->CreateResourceShare(owner_id, resource_type, resource_id, grantee_username, permission);
+    }
+    bool RevokeResourceShare(int64_t owner_id, const std::string &resource_type, int64_t resource_id,
+                             const std::string &grantee_username) {
+        return shards_[0]->RevokeResourceShare(owner_id, resource_type, resource_id, grantee_username);
+    }
+    bool ListResourceShares(int64_t owner_id, const std::string &resource_type, int64_t resource_id,
+                            std::string &out_entries_json) {
+        return shards_[0]->ListResourceShares(owner_id, resource_type, resource_id, out_entries_json);
+    }
+    bool CheckShareAccess(const std::string &username, const std::string &resource_type, int64_t resource_id,
+                          std::string &out_permission) {
+        return shards_[0]->CheckShareAccess(username, resource_type, resource_id, out_permission);
+    }
+    bool CreateShareLink(int64_t owner_id, const std::string &resource_type, int64_t resource_id,
+                         const std::string &permission, std::string &out_token) {
+        return shards_[0]->CreateShareLink(owner_id, resource_type, resource_id, permission, out_token);
+    }
+    bool GetShareLinkByToken(const std::string &token, std::string &resource_type, int64_t &resource_id,
+                             std::string &permission, int64_t &owner_id) {
+        return shards_[0]->GetShareLinkByToken(token, resource_type, resource_id, permission, owner_id);
+    }
+    bool EnsureSharingTables() {
+        return shards_[0]->EnsureSharingTables();
+    }
 
     // === Undo Log (by user_id or broadcast) ===
     bool WriteUndoLog(const std::string &xid, const std::string &table_name, int64_t row_id,

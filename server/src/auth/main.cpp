@@ -7,6 +7,7 @@
 
 #include "shared/base/auth_interceptor.h"
 #include "auth/auth_service_impl.h"
+#include "auth/sharing_service_impl.h"
 #include "shared/base/call_logger.h"
 #include "shared/client/database.h"
 #include "shared/base/health_service_impl.h"
@@ -107,6 +108,9 @@ int main(int argc, char *argv[]) {
     auth_service.SetRedis(redis.get());
     auth_service.SetSysLog(slog.get());
     builder.RegisterService(&auth_service);
+
+    SharingServiceImpl sharing_service(db.get());
+    builder.RegisterService(&sharing_service);
 
     g_server = builder.BuildAndStart();
     printf("[Auth] Listening on %s\n", addr.c_str());
