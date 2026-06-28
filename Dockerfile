@@ -1,7 +1,8 @@
 # syntax=docker/dockerfile:1
 # ── Stage 1: shared runtime base (built once, reused by auth/sheet/file/search) ──
 FROM debian:bookworm-slim AS base-runtime
-RUN echo "deb http://deb.debian.org/debian bookworm main contrib non-free non-free-firmware" > /etc/apt/sources.list && \
+RUN rm -f /etc/apt/sources.list.d/debian.sources && \
+    echo "deb http://deb.debian.org/debian bookworm main contrib non-free non-free-firmware" > /etc/apt/sources.list && \
     echo "deb http://deb.debian.org/debian bookworm-updates main contrib non-free non-free-firmware" >> /etc/apt/sources.list && \
     echo "deb http://deb.debian.org/debian-security bookworm-security main contrib non-free non-free-firmware" >> /etc/apt/sources.list
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
