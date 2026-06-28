@@ -11,7 +11,9 @@
       - ./certs:/certs
     entrypoint: >
       sh -c "mkdir -p /certs && openssl req -x509 -nodes -days 365 -newkey rsa:2048 -keyout /certs/server.key -out /certs/server.crt -subj '/CN=luochuanbaiRPC' 2>/dev/null; nginx -g 'daemon off;'"
-    depends_on: [envoy]
+    depends_on:
+      envoy:
+        condition: service_healthy
 
   # ===== Envoy replicas (edge proxy: CORS, circuit breaking, retry) =====
   envoy:
@@ -24,6 +26,12 @@
       - "9901:9901"
     depends_on: [grpc-gateway, grpc-gateway-2]
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "bash", "-c", "echo > /dev/tcp/127.0.0.1/10000"]
+      interval: 5s
+      timeout: 3s
+      retries: 6
+      start_period: 10s
 
   envoy-2:
     image: envoyproxy/envoy:v1.31.3
@@ -35,6 +43,12 @@
       - "9902:9901"
     depends_on: [grpc-gateway, grpc-gateway-2]
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "bash", "-c", "echo > /dev/tcp/127.0.0.1/10000"]
+      interval: 5s
+      timeout: 3s
+      retries: 6
+      start_period: 10s
 
   # ===== MySQL Auth =====
   mysql-auth:
