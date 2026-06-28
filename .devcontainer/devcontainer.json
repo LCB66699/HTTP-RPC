@@ -2,6 +2,7 @@
   "name": "HTTP-RPC Dev",
   "build": { "dockerfile": "Dockerfile" },
   "remoteUser": "dev",
+  "runArgs": ["--network", "http-rpc_default"],
 
   "customizations": {
     "vscode": {
