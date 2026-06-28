@@ -29,6 +29,6 @@ RUN go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.36.5 && \
 ENV PATH=/root/go/bin:$PATH
 
 # Non-root user for devcontainer
-RUN useradd -m -s /bin/bash dev && echo "dev ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/dev
+RUN mkdir -p /etc/sudoers.d && useradd -m -s /bin/bash dev && echo "dev ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/dev
 USER dev
 WORKDIR /workspace
