@@ -116,6 +116,21 @@ jobs:
           echo "=== Services status ==="
           docker compose ps
 
+      - name: Debug - Nginx to Envoy connectivity
+        run: |
+          echo "=== DNS: resolving envoy from nginx ==="
+          docker compose exec nginx sh -c "nslookup envoy 2>/dev/null || getent hosts envoy || ping -c1 envoy || true"
+          echo "=== DNS: resolving envoy-2 from nginx ==="
+          docker compose exec nginx sh -c "nslookup envoy-2 2>/dev/null || getent hosts envoy-2 || ping -c1 envoy-2 || true"
+          echo "=== TCP: nginx -> envoy:10000 ==="
+          docker compose exec nginx sh -c "(echo > /dev/tcp/envoy/10000 && echo 'OK envoy:10000') 2>&1 || echo 'FAIL envoy:10000'"
+          echo "=== TCP: nginx -> envoy-2:10000 ==="
+          docker compose exec nginx sh -c "(echo > /dev/tcp/envoy-2/10000 && echo 'OK envoy-2:10000') 2>&1 || echo 'FAIL envoy-2:10000'"
+          echo "=== Curl: nginx -> envoy:10000/health ==="
+          docker compose exec nginx sh -c "wget -qO- --timeout=3 http://envoy:10000/api/v1/health 2>&1 || curl -sS --max-time 3 http://envoy:10000/api/v1/health 2>&1 || echo 'FAIL curl envoy'"
+          echo "=== Curl: envoy -> grpc-gateway:8080/health ==="
+          docker compose exec envoy sh -c "curl -sS --max-time 3 http://grpc-gateway:8080/api/v1/health 2>&1 || wget -qO- --timeout=3 http://grpc-gateway:8080/api/v1/health 2>&1 || echo 'FAIL curl gateway'"
+
       - name: Functional tests
         run: bash test/e2e/functional_test.sh
 
