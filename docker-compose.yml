@@ -15,7 +15,7 @@
 
   # ===== Envoy replicas (edge proxy: CORS, circuit breaking, retry) =====
   envoy:
-    image: envoyproxy/envoy:v1.31-latest
+    image: envoyproxy/envoy:v1.31.3
     volumes:
       - ./deploy/envoy/envoy.yaml:/etc/envoy/envoy.yaml:ro
     command: ["-c", "/etc/envoy/envoy.yaml", "--log-level", "info"]
@@ -26,7 +26,7 @@
     restart: unless-stopped
 
   envoy-2:
-    image: envoyproxy/envoy:v1.31-latest
+    image: envoyproxy/envoy:v1.31.3
     volumes:
       - ./deploy/envoy/envoy.yaml:/etc/envoy/envoy.yaml:ro
     command: ["-c", "/etc/envoy/envoy.yaml", "--log-level", "info"]
