@@ -1,14 +1,12 @@
 FROM ubuntu:24.04
 
 # C++ toolchain + all project dependencies (dev headers)
-RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
-    --mount=type=cache,target=/var/lib/apt,sharing=locked \
-    apt update && apt install -y \
+RUN apt update && apt install -y \
     g++ gdb make cmake git curl wget pkg-config \
     protobuf-compiler-grpc libgrpc++-dev libprotobuf-dev \
     libmysqlclient-dev libhiredis-dev libssl-dev zlib1g-dev \
     libnghttp2-dev librabbitmq-dev libgtest-dev libgmock-dev \
-    libcurl4-openssl-dev nlohmann-json3-dev \
+    libcurl4-openssl-dev \
     clang-format clang-tidy \
     && rm -rf /var/lib/apt/lists/*
 
