@@ -1,7 +1,7 @@
 # Envoy edge proxy for HTTP-RPC
 # Sits between Nginx and Go Gateway. Handles:
-#   CORS, cluster-level circuit breaking, retry, health checking
-# JWT validation stays in Go gateway (HMAC key mgmt TBD)
+#   cluster-level circuit breaking, retry, health checking
+# CORS and JWT validation stay in Go gateway (less config friction).
 
 admin:
   address:
@@ -21,23 +21,7 @@ static_resources:
           codec_type: AUTO
           use_remote_address: true
 
-          # ---- CORS (replaces Go corsMiddleware) ----
-          cors:
-            allow_origin_string_match:
-            - safe_regex:
-                regex: ".*"
-            allow_methods: GET, POST, PUT, DELETE, OPTIONS
-            allow_headers: Content-Type, Authorization, Cookie
-            expose_headers: Set-Cookie
-            allow_credentials: true
-            max_age: "86400"
-
-          # ---- Filter chain ----
           http_filters:
-          - name: envoy.filters.http.cors
-            typed_config:
-              "@type": type.googleapis.com/envoy.extensions.filters.http.cors.v3.Cors
-
           - name: envoy.filters.http.router
             typed_config:
               "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
@@ -53,32 +37,6 @@ static_resources:
                 route:
                   cluster: gateway_cluster
                   timeout: 5s
-
-              # Metrics — pass through to gateway Prometheus handler
-              - match: { prefix: "/api/v1/metrics" }
-                route:
-                  cluster: gateway_cluster
-                  timeout: 5s
-
-              # Login/Register — no JWT required, tighter timeout
-              - match: { prefix: "/api/v1/login" }
-                route:
-                  cluster: gateway_cluster
-                  timeout: 10s
-              - match: { prefix: "/api/v1/register" }
-                route:
-                  cluster: gateway_cluster
-                  timeout: 10s
-              - match: { prefix: "/api/v1/refresh" }
-                route:
-                  cluster: gateway_cluster
-                  timeout: 10s
-
-              # File upload — longer timeout
-              - match: { prefix: "/api/v1/files/upload" }
-                route:
-                  cluster: gateway_cluster
-                  timeout: 120s
 
               # Default API routes — retry for idempotent GET
               - match:

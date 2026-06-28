@@ -128,6 +128,8 @@ jobs:
           echo "=== auth-1 ===" && docker compose logs auth-1 --tail=10
           echo "=== mysql-spreadsheet-0 ===" && docker compose logs mysql-spreadsheet-0 --tail=10
           echo "=== mysql-spreadsheet-1 ===" && docker compose logs mysql-spreadsheet-1 --tail=10
+          echo "=== envoy ===" && docker compose logs envoy --tail=20
+          echo "=== envoy-2 ===" && docker compose logs envoy-2 --tail=20
           echo "=== nginx ===" && docker compose logs nginx --tail=20
 
   # ===== Stage 3: 推送镜像到 ghcr.io (仅 main 分支) =====
