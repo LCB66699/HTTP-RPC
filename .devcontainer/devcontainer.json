@@ -1,11 +1,7 @@
 {
   "name": "HTTP-RPC Dev",
-  "build": { "dockerfile": "Dockerfile", "context": ".." },
+  "build": { "dockerfile": "Dockerfile" },
   "remoteUser": "dev",
-
-  "mounts": [
-    "source=/var/run/docker.sock,target=/var/run/docker.sock,type=bind"
-  ],
 
   "customizations": {
     "vscode": {
@@ -23,7 +19,7 @@
     }
   },
 
-  "forwardPorts": [8080, 50051],
+  "forwardPorts": [8080],
 
-  "postCreateCommand": "git config --global --add safe.directory /workspace && echo 'Dev container ready. Run: docker compose up -d <services> for infra, then cmake -B build && cmake --build build for C++.'"
+  "postCreateCommand": "git config --global --add safe.directory /workspace && echo 'Dev container ready. cmake -B build && cmake --build build --target rpc_auth -j\$(nproc) to build.'"
 }
