@@ -381,6 +381,14 @@
     restart: "no"
 
   # ===== Auth Service (2 instances) =====
+  base-runtime:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: base-runtime
+    image: ${DOCKER_USER:-http-rpc}/base-runtime:latest
+    restart: "no"
+
   auth-1:
     build:
       context: .
