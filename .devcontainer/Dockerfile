@@ -1,5 +1,9 @@
 FROM ubuntu:24.04
 
+# Use Aliyun mirror for faster apt in China
+RUN sed -i 's|http://archive.ubuntu.com|http://mirrors.aliyun.com|g' /etc/apt/sources.list.d/ubuntu.sources && \
+    sed -i 's|http://security.ubuntu.com|http://mirrors.aliyun.com|g' /etc/apt/sources.list.d/ubuntu.sources
+
 # C++ toolchain + all project dependencies (dev headers)
 RUN apt update && apt install -y \
     g++ gdb make cmake git curl wget pkg-config \
@@ -13,8 +17,9 @@ RUN apt update && apt install -y \
 # Build gtest/gmock static libs
 RUN cd /usr/src/googletest && cmake . && make -j$(nproc) && cp lib/*.a /usr/lib
 
-# Go
+# Go (use Aliyun mirror + goproxy.cn)
 ENV GO_VERSION=1.24.2
+ENV GOPROXY=https://goproxy.cn,direct
 RUN curl -fsSL https://go.dev/dl/go${GO_VERSION}.linux-amd64.tar.gz | tar -C /usr/local -xz
 ENV PATH=/usr/local/go/bin:$PATH
 
