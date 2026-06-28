@@ -13,6 +13,7 @@ import (
 
 	"github.com/redis/go-redis/v9"
 	"github.com/sony/gobreaker/v2"
+	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
@@ -58,6 +59,44 @@ func NewCBSlow(name string, metricsCb func(name string, val float64)) *CBSlow {
 		},
 	})
 	return cbs
+}
+
+// Interceptor returns a gRPC UnaryClientInterceptor that applies circuit
+// breaking, retry with exponential backoff, per-attempt 3s timeout, and
+// slow-call tagging. Retried on Unavailable, DeadlineExceeded,
+// ResourceExhausted, Aborted only.
+func (cbs *CBSlow) Interceptor() grpc.UnaryClientInterceptor {
+	return func(ctx context.Context, method string, req, reply any, cc *grpc.ClientConn, invoker grpc.UnaryInvoker, opts ...grpc.CallOption) error {
+		_, err := cbs.Execute(func() (any, error) {
+			var lastErr error
+			for attempt := 0; attempt < 3; attempt++ {
+				if attempt > 0 {
+					time.Sleep(time.Duration(50<<(attempt-1)) * time.Millisecond)
+				}
+				callCtx, cancel := context.WithTimeout(ctx, 3*time.Second)
+				start := time.Now()
+				err := invoker(callCtx, method, req, reply, cc, opts...)
+				cancel()
+				if time.Since(start) > 2*time.Second {
+					cbs.slowCalls.Add(1)
+				}
+				if err == nil {
+					return nil, nil
+				}
+				lastErr = err
+				if st, ok := status.FromError(err); ok {
+					switch st.Code() {
+					case codes.Unavailable, codes.DeadlineExceeded,
+						codes.ResourceExhausted, codes.Aborted:
+						continue
+					}
+				}
+				return nil, err
+			}
+			return nil, lastErr
+		})
+		return err
+	}
 }
 
 // Gateway holds all dependencies for HTTP handlers.
@@ -135,45 +174,6 @@ func (g *Gateway) checkLoginRate(username string) bool {
 		return true
 	}
 	return false
-}
-
-// callWithRetry wraps a circuit breaker with gRPC retry logic.
-func callWithRetry[T any](ctx context.Context, cb *CBSlow, maxAttempts int, label string, fn func(context.Context) (T, error)) (T, error) {
-	result, err := cb.Execute(func() (any, error) {
-		var lastErr error
-		for attempt := 0; attempt < maxAttempts; attempt++ {
-			if attempt > 0 {
-				d := time.Duration(50<<(attempt-1)) * time.Millisecond
-				time.Sleep(d)
-				log.Printf("[retry] %s attempt %d/%d after %v", label, attempt+1, maxAttempts, d)
-			}
-			attemptCtx, cancel := context.WithTimeout(ctx, 3*time.Second)
-			start := time.Now()
-			r, e := fn(attemptCtx)
-			cancel()
-			if time.Since(start) > 2*time.Second {
-				cb.slowCalls.Add(1)
-			}
-			if e == nil {
-				return r, nil
-			}
-			lastErr = e
-			if st, ok := status.FromError(e); ok {
-				switch st.Code() {
-				case codes.Unavailable, codes.DeadlineExceeded,
-					codes.ResourceExhausted, codes.Aborted:
-					continue
-				}
-			}
-			return nil, e
-		}
-		return nil, lastErr
-	})
-	if err != nil {
-		var zero T
-		return zero, err
-	}
-	return result.(T), nil
 }
 
 // ---- Auth Handlers ----
@@ -340,10 +340,8 @@ func (g *Gateway) Search(w http.ResponseWriter, r *http.Request) {
 		WriteJSONStatus(w, code, map[string]interface{}{"success": false, "error": msg})
 		return
 	}
-	resp, err := callWithRetry(r.Context(), g.CBSearch, 3, "search", func(ctx context.Context) (*pb.SearchResponse, error) {
-		return g.SearchClient.Search(g.withAuth(ctx, r), &pb.SearchRequest{
-			Query: body.Q, UserId: 0, Sort: body.Sort,
-		})
+	resp, err := g.SearchClient.Search(g.withAuth(r.Context(), r), &pb.SearchRequest{
+		Query: body.Q, UserId: 0, Sort: body.Sort,
 	})
 	WriteGRPCResponse(w, resp, err)
 }
@@ -359,9 +357,7 @@ func (g *Gateway) CreateSheet(w http.ResponseWriter, r *http.Request) {
 }
 
 func (g *Gateway) ListSheets(w http.ResponseWriter, r *http.Request) {
-	resp, err := callWithRetry(r.Context(), g.CBSheet, 3, "sheet.list", func(ctx context.Context) (*pb.ListSpreadsheetsResponse, error) {
-		return g.SheetClient.ListSpreadsheets(g.withAuth(ctx, r), &pb.ListSpreadsheetsRequest{UserId: 0})
-	})
+	resp, err := g.SheetClient.ListSpreadsheets(g.withAuth(r.Context(), r), &pb.ListSpreadsheetsRequest{UserId: 0})
 	WriteGRPCResponse(w, resp, err)
 }
 
@@ -372,9 +368,7 @@ func (g *Gateway) GetSheet(w http.ResponseWriter, r *http.Request) {
 		WriteJSONStatus(w, http.StatusUnauthorized, map[string]interface{}{"success": false, "error": "Unauthorized"})
 		return
 	}
-	resp, err := callWithRetry(r.Context(), g.CBSheet, 3, "sheet.get", func(ctx context.Context) (*pb.GetSpreadsheetResponse, error) {
-		return g.SheetClient.GetSpreadsheet(g.withAuth(ctx, r), &pb.GetSpreadsheetRequest{Id: id, UserId: 0})
-	})
+	resp, err := g.SheetClient.GetSpreadsheet(g.withAuth(r.Context(), r), &pb.GetSpreadsheetRequest{Id: id, UserId: 0})
 	if err != nil {
 		WriteGRPCError(w, err, "Not found")
 		return
@@ -399,9 +393,7 @@ func (g *Gateway) UpdateSheet(w http.ResponseWriter, r *http.Request) {
 
 func (g *Gateway) DeleteSheet(w http.ResponseWriter, r *http.Request) {
 	id := parseInt64(r.PathValue("id"))
-	resp, err := callWithRetry(r.Context(), g.CBSheet, 2, "sheet.delete", func(ctx context.Context) (*pb.DeleteSpreadsheetResponse, error) {
-		return g.SheetClient.DeleteSpreadsheet(g.withAuth(ctx, r), &pb.DeleteSpreadsheetRequest{Id: id, UserId: 0})
-	})
+	resp, err := g.SheetClient.DeleteSpreadsheet(g.withAuth(r.Context(), r), &pb.DeleteSpreadsheetRequest{Id: id, UserId: 0})
 	WriteGRPCResponse(w, resp, err)
 }
 
@@ -497,9 +489,7 @@ func (g *Gateway) CreateFolder(w http.ResponseWriter, r *http.Request) {
 }
 
 func (g *Gateway) ListFiles(w http.ResponseWriter, r *http.Request) {
-	resp, err := callWithRetry(r.Context(), g.CBFile, 3, "file.list", func(ctx context.Context) (*pb.ListFilesResponse, error) {
-		return g.FileClient.ListFiles(g.withAuth(ctx, r), &pb.ListFilesRequest{UserId: 0})
-	})
+	resp, err := g.FileClient.ListFiles(g.withAuth(r.Context(), r), &pb.ListFilesRequest{UserId: 0})
 	WriteGRPCResponse(w, resp, err)
 }
 
@@ -521,9 +511,7 @@ func (g *Gateway) UploadFile(w http.ResponseWriter, r *http.Request) {
 
 func (g *Gateway) GetFile(w http.ResponseWriter, r *http.Request) {
 	id := parseInt64(r.PathValue("id"))
-	resp, err := callWithRetry(r.Context(), g.CBFile, 3, "file.get", func(ctx context.Context) (*pb.GetFileResponse, error) {
-		return g.FileClient.GetFile(g.withAuth(ctx, r), &pb.GetFileRequest{Id: id, UserId: 0})
-	})
+	resp, err := g.FileClient.GetFile(g.withAuth(r.Context(), r), &pb.GetFileRequest{Id: id})
 	if err != nil {
 		WriteGRPCError(w, err, "Not found")
 		return
@@ -546,8 +534,6 @@ func (g *Gateway) GetFile(w http.ResponseWriter, r *http.Request) {
 
 func (g *Gateway) DeleteFile(w http.ResponseWriter, r *http.Request) {
 	id := parseInt64(r.PathValue("id"))
-	resp, err := callWithRetry(r.Context(), g.CBFile, 2, "file.delete", func(ctx context.Context) (*pb.DeleteFileResponse, error) {
-		return g.FileClient.DeleteFile(g.withAuth(ctx, r), &pb.DeleteFileRequest{Id: id, UserId: 0})
-	})
+	resp, err := g.FileClient.DeleteFile(g.withAuth(r.Context(), r), &pb.DeleteFileRequest{Id: id, UserId: 0})
 	WriteGRPCResponse(w, resp, err)
 }

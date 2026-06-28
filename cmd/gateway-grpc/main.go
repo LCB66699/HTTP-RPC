@@ -83,7 +83,16 @@ func main() {
 	creds := grpc.WithTransportCredentials(insecure.NewCredentials())
 	lb := grpc.WithDefaultServiceConfig(`{"loadBalancingConfig":[{"round_robin":{}}]}`)
 	otelStats := grpc.WithStatsHandler(otelgrpc.NewClientHandler())
-	grpcMetrics := grpc.WithUnaryInterceptor(grpcMetricsInterceptor())
+
+	// Circuit breakers — created before gRPC connections so interceptors can
+	// be registered. Each service gets its own breaker; the interceptor
+	// applies circuit-breaking, retry, 3s timeout, and slow-call tagging
+	// to every gRPC call on the connection.
+	cbMetrics := func(name string, val float64) { circuitBreakerState.WithLabelValues(name).Set(val) }
+	cbAuth := gw.NewCBSlow("auth", cbMetrics)
+	cbSheet := gw.NewCBSlow("sheet", cbMetrics)
+	cbFile := gw.NewCBSlow("file", cbMetrics)
+	cbSearch := gw.NewCBSlow("search", cbMetrics)
 
 	authAddr := getenv("AUTH_ADDR", "rpc-auth:50051")
 	sheetAddr := getenv("SHEET_ADDR", "rpc-sheet:50051")
@@ -91,10 +100,15 @@ func main() {
 	searchAddr := getenv("SEARCH_ADDR", "rpc-search:50051")
 	log.Printf("Auth=%s Sheet=%s File=%s Search=%s", authAddr, sheetAddr, fileAddr, searchAddr)
 
-	authConn, _ = grpc.NewClient("dns:///"+authAddr, creds, kp, lb, otelStats, grpcMetrics)
-	sheetConn, _ = grpc.NewClient("dns:///"+sheetAddr, creds, kp, lb, otelStats, grpcMetrics)
-	fileConn, _ = grpc.NewClient("dns:///"+fileAddr, creds, kp, lb, otelStats, grpcMetrics)
-	searchConn, _ := grpc.NewClient("dns:///"+searchAddr, creds, kp, lb, otelStats, grpcMetrics)
+	baseOpts := []grpc.DialOption{creds, kp, lb, otelStats}
+	authConn, _ = grpc.NewClient("dns:///"+authAddr, append(baseOpts,
+		grpc.WithChainUnaryInterceptor(grpcMetricsInterceptor(), cbAuth.Interceptor()))...)
+	sheetConn, _ = grpc.NewClient("dns:///"+sheetAddr, append(baseOpts,
+		grpc.WithChainUnaryInterceptor(grpcMetricsInterceptor(), cbSheet.Interceptor()))...)
+	fileConn, _ = grpc.NewClient("dns:///"+fileAddr, append(baseOpts,
+		grpc.WithChainUnaryInterceptor(grpcMetricsInterceptor(), cbFile.Interceptor()))...)
+	searchConn, _ := grpc.NewClient("dns:///"+searchAddr, append(baseOpts,
+		grpc.WithChainUnaryInterceptor(grpcMetricsInterceptor(), cbSearch.Interceptor()))...)
 
 	redisAddr := getenv("REDIS_ADDR", "redis-cluster-7000:7000")
 	redisPass := getenv("REDIS_PASSWORD", "rpc-redis-123456")
@@ -108,9 +122,9 @@ func main() {
 		SharedClient: pb.NewSharingServiceClient(authConn),
 		RDB:          rdb,
 		JWTSecret:    jwtSecret,
-		CBSearch:     gw.NewCBSlow("search", func(name string, val float64) { circuitBreakerState.WithLabelValues(name).Set(val) }),
-		CBSheet:      gw.NewCBSlow("sheet", func(name string, val float64) { circuitBreakerState.WithLabelValues(name).Set(val) }),
-		CBFile:       gw.NewCBSlow("file", func(name string, val float64) { circuitBreakerState.WithLabelValues(name).Set(val) }),
+		CBSearch:     cbSearch,
+		CBSheet:      cbSheet,
+		CBFile:       cbFile,
 	}
 
 	// Routes
