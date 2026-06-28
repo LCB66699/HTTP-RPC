@@ -1,0 +1,50 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Debug auth service",
+      "type": "cppdbg",
+      "request": "launch",
+      "program": "${workspaceFolder}/build/rpc_auth",
+      "args": ["--service", "auth", "--port", "50051", "--mysql-write-host", "mysql-auth", "--mysql-db", "rpc_auth", "--mysql-shards", "1"],
+      "cwd": "${workspaceFolder}",
+      "environment": [
+        { "name": "JWT_SECRET", "value": "default-secret-32bytes-here!!!!!" },
+        { "name": "MYSQL_ROOT_PASSWORD", "value": "123456" }
+      ],
+      "stopAtEntry": false,
+      "preLaunchTask": "cmake: build auth"
+    },
+    {
+      "name": "Debug sheet service",
+      "type": "cppdbg",
+      "request": "launch",
+      "program": "${workspaceFolder}/build/rpc_sheet",
+      "args": ["--service", "spreadsheet", "--port", "50051", "--mysql-write-host", "mysql-spreadsheet", "--mysql-db", "rpc_spreadsheet", "--mysql-shards", "2"],
+      "cwd": "${workspaceFolder}",
+      "environment": [
+        { "name": "JWT_SECRET", "value": "default-secret-32bytes-here!!!!!" },
+        { "name": "RABBITMQ_HOST", "value": "rabbitmq" },
+        { "name": "MYSQL_ROOT_PASSWORD", "value": "123456" }
+      ],
+      "stopAtEntry": false,
+      "preLaunchTask": "cmake: build sheet"
+    },
+    {
+      "name": "Debug Go gateway",
+      "type": "go",
+      "request": "launch",
+      "mode": "debug",
+      "program": "${workspaceFolder}/cmd/gateway-grpc",
+      "cwd": "${workspaceFolder}/cmd/gateway-grpc",
+      "env": {
+        "JWT_SECRET": "default-secret-32bytes-here!!!!!",
+        "AUTH_ADDR": "rpc-auth:50051",
+        "SHEET_ADDR": "rpc-sheet:50051",
+        "FILE_ADDR": "rpc-file:50051",
+        "SEARCH_ADDR": "rpc-search:50051",
+        "PORT": "8080"
+      }
+    }
+  ]
+}

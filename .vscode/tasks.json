@@ -1,0 +1,81 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "cmake: configure",
+      "type": "shell",
+      "command": "cmake -B build -DCMAKE_BUILD_TYPE=Debug",
+      "group": "build",
+      "problemMatcher": []
+    },
+    {
+      "label": "cmake: build all",
+      "type": "shell",
+      "command": "cmake --build build -j$(nproc)",
+      "group": "build",
+      "dependsOn": ["cmake: configure"],
+      "problemMatcher": ["$gcc"]
+    },
+    {
+      "label": "cmake: build auth",
+      "type": "shell",
+      "command": "cmake --build build --target rpc_auth -j$(nproc)",
+      "dependsOn": ["cmake: configure"],
+      "problemMatcher": ["$gcc"]
+    },
+    {
+      "label": "cmake: build sheet",
+      "type": "shell",
+      "command": "cmake --build build --target rpc_sheet -j$(nproc)",
+      "dependsOn": ["cmake: configure"],
+      "problemMatcher": ["$gcc"]
+    },
+    {
+      "label": "cmake: build file",
+      "type": "shell",
+      "command": "cmake --build build --target rpc_file -j$(nproc)",
+      "dependsOn": ["cmake: configure"],
+      "problemMatcher": ["$gcc"]
+    },
+    {
+      "label": "cmake: build search",
+      "type": "shell",
+      "command": "cmake --build build --target rpc_search -j$(nproc)",
+      "dependsOn": ["cmake: configure"],
+      "problemMatcher": ["$gcc"]
+    },
+    {
+      "label": "go: build gateway",
+      "type": "shell",
+      "command": "cd cmd/gateway-grpc && go build .",
+      "group": "build",
+      "problemMatcher": ["$go"]
+    },
+    {
+      "label": "go: test gateway",
+      "type": "shell",
+      "command": "cd cmd/gateway-grpc && go test ./...",
+      "group": "test",
+      "problemMatcher": ["$go"]
+    },
+    {
+      "label": "ctest: all",
+      "type": "shell",
+      "command": "cd build && ctest --output-on-failure",
+      "group": "test",
+      "dependsOn": ["cmake: build all"]
+    },
+    {
+      "label": "docker: start infra",
+      "type": "shell",
+      "command": "docker compose up -d --no-build mysql-auth mysql-spreadsheet-0 mysql-spreadsheet-1 mysql-file-0 mysql-file-1 redis-cluster-1 redis-cluster-2 redis-cluster-3 redis-cluster-4 redis-cluster-5 redis-cluster-6 redis-cluster-init minio minio-init elasticsearch rabbitmq jaeger",
+      "problemMatcher": []
+    },
+    {
+      "label": "docker: stop all",
+      "type": "shell",
+      "command": "docker compose down",
+      "problemMatcher": []
+    }
+  ]
+}

@@ -1,0 +1,29 @@
+{
+  "name": "HTTP-RPC Dev",
+  "build": { "dockerfile": "Dockerfile", "context": ".." },
+  "remoteUser": "dev",
+
+  "mounts": [
+    "source=/var/run/docker.sock,target=/var/run/docker.sock,type=bind"
+  ],
+
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-vscode.cpptools",
+        "ms-vscode.cmake-tools",
+        "golang.go",
+        "ms-azuretools.vscode-docker"
+      ],
+      "settings": {
+        "go.toolsManagement.autoUpdate": true,
+        "cmake.buildDirectory": "${workspaceFolder}/build",
+        "cmake.configureArgs": ["-DCMAKE_BUILD_TYPE=Debug"]
+      }
+    }
+  },
+
+  "forwardPorts": [8080, 50051],
+
+  "postCreateCommand": "git config --global --add safe.directory /workspace && echo 'Dev container ready. Run: docker compose up -d <services> for infra, then cmake -B build && cmake --build build for C++.'"
+}
