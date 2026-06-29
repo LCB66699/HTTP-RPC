@@ -48,9 +48,51 @@ func WriteGRPCResponse(w http.ResponseWriter, resp GRPCResponse, err error) {
 	WriteJSON(w, resp)
 }
 
+// grpcStatusHTTP maps gRPC status codes to HTTP status codes.
+func grpcStatusHTTP(code codes.Code) int {
+	switch code {
+	case codes.OK:
+		return http.StatusOK
+	case codes.Canceled:
+		return 499
+	case codes.Unknown:
+		return http.StatusInternalServerError
+	case codes.InvalidArgument:
+		return http.StatusBadRequest
+	case codes.DeadlineExceeded:
+		return http.StatusGatewayTimeout
+	case codes.NotFound:
+		return http.StatusNotFound
+	case codes.AlreadyExists:
+		return http.StatusConflict
+	case codes.PermissionDenied:
+		return http.StatusForbidden
+	case codes.Unauthenticated:
+		return http.StatusUnauthorized
+	case codes.ResourceExhausted:
+		return http.StatusTooManyRequests
+	case codes.FailedPrecondition:
+		return http.StatusBadRequest
+	case codes.Aborted:
+		return http.StatusConflict
+	case codes.OutOfRange:
+		return http.StatusBadRequest
+	case codes.Unimplemented:
+		return http.StatusNotImplemented
+	case codes.Internal:
+		return http.StatusInternalServerError
+	case codes.Unavailable:
+		return http.StatusServiceUnavailable
+	case codes.DataLoss:
+		return http.StatusInternalServerError
+	default:
+		return http.StatusInternalServerError
+	}
+}
+
 // WriteGRPCError writes a gRPC error as a JSON response.
 func WriteGRPCError(w http.ResponseWriter, err error, fallback string) {
-	code := http.StatusNotFound
+	code := http.StatusInternalServerError
 	msg := fallback
 	if err == gobreaker.ErrOpenState {
 		code = http.StatusServiceUnavailable
@@ -61,11 +103,8 @@ func WriteGRPCError(w http.ResponseWriter, err error, fallback string) {
 		})
 		return
 	} else if st, ok := status.FromError(err); ok {
-		switch st.Code() {
-		case codes.PermissionDenied, codes.Unauthenticated:
-			code = http.StatusForbidden
-			msg = st.Message()
-		}
+		code = grpcStatusHTTP(st.Code())
+		msg = st.Message()
 	}
 	WriteJSONStatus(w, code, map[string]interface{}{"success": false, "error": msg})
 }
