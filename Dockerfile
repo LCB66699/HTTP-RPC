@@ -4,7 +4,7 @@ FROM ubuntu:24.04 AS base-runtime
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,target=/var/lib/apt,sharing=locked \
     apt update && apt install -y \
-    libgrpc++1.51 libmysqlclient21 libhiredis0.14 libssl3 zlib1g \
+    libgrpc++1.51t64 libmysqlclient21 libhiredis1.1.0 libssl3 zlib1g \
     libnghttp2-14 librabbitmq4 libcurl4 \
     ca-certificates curl \
     && rm -rf /var/lib/apt/lists/*
