@@ -182,23 +182,77 @@ jobs:
           docker compose build base-runtime auth-1 sheet-1 file-1 search grpc-gateway notify-service
           docker compose push base-runtime auth-1 sheet-1 file-1 search grpc-gateway notify-service
 
-  # ===== Stage 4: 自动部署到 Ubuntu (仅 main 分支) =====
+  # ===== Stage 4: 推送镜像到 ghcr.io + 生成本地部署脚本 =====
   deploy:
     needs: push
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
-    timeout-minutes: 40
+    timeout-minutes: 10
     steps:
-      - name: Deploy to Ubuntu server
-        uses: appleboy/ssh-action@v1
+      - uses: actions/checkout@v4
+
+      - name: Verify images pushed to ghcr.io
+        env:
+          DOCKER_USER: ghcr.io/lcb66699/http-rpc
+        run: |
+          for img in base-runtime auth sheet file search gateway notify; do
+            echo "=== verifying $DOCKER_USER/$img ==="
+            docker manifest inspect "$DOCKER_USER/$img:latest" > /dev/null 2>&1 || \
+              echo "WARNING: $img not found"
+          done
+          echo "All images verified"
+
+      - name: Generate deploy-local.sh
+        run: |
+          cat > deploy-local.sh << 'SCRIPT'
+          #!/usr/bin/env bash
+          # ── 本地部署脚本 — 从 ghcr.io 拉取并启动服务 ──
+          set -euo pipefail
+
+          DOCKER_USER="${DOCKER_USER:-ghcr.io/lcb66699/http-rpc}"
+
+          echo "=== 登录 ghcr.io ==="
+          echo "请先创建 Personal Access Token: https://github.com/settings/tokens"
+          echo "需勾选 read:packages 权限"
+          if ! docker login ghcr.io -u lcb66699 --password-stdin < /dev/null 2>/dev/null; then
+            echo "运行: echo <你的TOKEN> | docker login ghcr.io -u lcb66699 --password-stdin"
+            exit 1
+          fi
+
+          echo "=== 拉取镜像 ==="
+          export DOCKER_USER
+          docker compose pull auth-1 sheet-1 file-1 search grpc-gateway notify-service
+
+          echo "=== 启动服务 ==="
+          docker compose up -d \
+            envoy envoy-2 nginx grpc-gateway \
+            auth-1 sheet-1 file-1 search \
+            mysql-auth mysql-spreadsheet-0 mysql-spreadsheet-0-slave mysql-spreadsheet-1 \
+            mysql-file-0 mysql-file-0-slave mysql-file-1 \
+            minio minio-init redis-cluster-1 redis-cluster-2 redis-cluster-3 \
+            redis-cluster-4 redis-cluster-5 redis-cluster-6 redis-cluster-init \
+            elasticsearch es-init jaeger rabbitmq mongodb
+
+          echo "=== 等待服务就绪 ==="
+          for i in $(seq 1 60); do
+            TOTAL=$(docker compose ps -a --format json 2>/dev/null | wc -l)
+            HEALTHY=$(docker compose ps -a --format json 2>/dev/null | grep -c '"Health":"healthy"' || true)
+            EXITED_OK=$(docker compose ps -a --format json 2>/dev/null | grep -c '"ExitCode":0' || true)
+            OK=$((HEALTHY + EXITED_OK))
+            [ "$OK" -ge "$TOTAL" ] && [ "$TOTAL" -gt 0 ] && break
+            sleep 5
+          done
+
+          echo "=== 服务状态 ==="
+          docker compose ps
+
+          echo ""
+          echo "部署完成！访问 https://localhost 查看"
+          SCRIPT
+          chmod +x deploy-local.sh
+
+      - name: Upload deploy-local.sh as artifact
+        uses: actions/upload-artifact@v4
         with:
-          host: ${{ secrets.SSH_HOST }}
-          username: ${{ secrets.SSH_USERNAME }}
-          key: ${{ secrets.SSH_KEY }}
-          script: |
-            cd /home/ubuntu/HTTP-RPC
-            echo "${{ secrets.GHCR_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
-            export DOCKER_USER=ghcr.io/lcb66699/http-rpc
-            docker compose pull auth-1 auth-2 sheet-1 sheet-2 file-1 file-2 search grpc-gateway grpc-gateway-2 notify-service
-            docker compose up -d
-            docker image prune -f
+          name: deploy-local-script
+          path: deploy-local.sh
