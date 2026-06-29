@@ -11,6 +11,8 @@ import (
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/redis/go-redis/v9"
+	"golang.org/x/net/http2"
+	"golang.org/x/net/http2/h2c"
 
 	gw "github.com/lcb66699/http-rpc/gateway-grpc/internal/gateway"
 	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
@@ -193,7 +195,7 @@ func main() {
 	))
 
 	port := getenv("PORT", "8080")
-	srv := &http.Server{Addr: ":" + port, Handler: handler}
+	srv := &http.Server{Addr: ":" + port, Handler: h2c.NewHandler(handler, &http2.Server{})}
 	go func() {
 		log.Printf("[Gateway-gRPC] Listening on :%s", port)
 		if err := srv.ListenAndServe(); err != http.ErrServerClosed {
