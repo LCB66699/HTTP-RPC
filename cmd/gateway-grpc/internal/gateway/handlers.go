@@ -1,7 +1,9 @@
-package gateway
+﻿package gateway
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/binary"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -108,7 +110,6 @@ type Gateway struct {
 	SharedClient SharedClientI
 	RDB          *redis.Client
 
-	JWTSecret []byte
 	CBSearch  *CBSlow
 	CBSheet   *CBSlow
 	CBFile    *CBSlow
@@ -158,6 +159,15 @@ func parseInt64(s string) int64 {
 	return n
 }
 
+func randomOTP() string {
+	b := make([]byte, 4)
+	if _, err := rand.Read(b); err != nil {
+		return fmt.Sprintf("%06d", time.Now().UnixNano()%1000000)
+	}
+	n := binary.BigEndian.Uint32(b) % 1000000
+	return fmt.Sprintf("%06d", n)
+}
+
 func (g *Gateway) checkLoginRate(username string) bool {
 	if username == "" || g.RDB == nil {
 		return false
@@ -185,16 +195,16 @@ func (g *Gateway) Register(w http.ResponseWriter, r *http.Request) {
 		WriteJSONStatus(w, code, map[string]interface{}{"success": false, "error": msg})
 		return
 	}
-	resp, _ := g.AuthClient.Register(r.Context(), &req)
-	if resp != nil && !resp.Success {
-		code := int32(0)
-		if ec, ok := any(resp).(interface{ GetErrorCode() int32 }); ok {
-			code = ec.GetErrorCode()
-		}
-		WriteError(w, nil, resp.GetError(), code)
+	resp, err := g.AuthClient.Register(r.Context(), &req)
+	if err != nil {
+		WriteGRPCError(w, err, "register failed")
 		return
 	}
-	g.setCookies(w, resp.AccessToken, resp.RefreshToken)
+	if !resp.GetSuccess() {
+		WriteError(w, nil, resp.GetError(), 0)
+		return
+	}
+	g.setCookies(w, resp.GetAccessToken(), resp.GetRefreshToken())
 	WriteJSON(w, resp)
 }
 
@@ -210,16 +220,16 @@ func (g *Gateway) Login(w http.ResponseWriter, r *http.Request) {
 		WriteJSONStatus(w, code, map[string]interface{}{"success": false, "error": msg})
 		return
 	}
-	resp, _ := g.AuthClient.Login(r.Context(), &req)
-	if resp != nil && !resp.Success {
-		code := int32(0)
-		if ec, ok := any(resp).(interface{ GetErrorCode() int32 }); ok {
-			code = ec.GetErrorCode()
-		}
-		WriteError(w, nil, resp.GetError(), code)
+	resp, err := g.AuthClient.Login(r.Context(), &req)
+	if err != nil {
+		WriteGRPCError(w, err, "login failed")
 		return
 	}
-	g.setCookies(w, resp.AccessToken, resp.RefreshToken)
+	if !resp.GetSuccess() {
+		WriteError(w, nil, resp.GetError(), 0)
+		return
+	}
+	g.setCookies(w, resp.GetAccessToken(), resp.GetRefreshToken())
 	WriteJSON(w, resp)
 }
 
@@ -273,7 +283,7 @@ func (g *Gateway) OTPSend(w http.ResponseWriter, r *http.Request) {
 		WriteJSONStatus(w, http.StatusBadRequest, map[string]interface{}{"success": false, "error": "phone required"})
 		return
 	}
-	code := fmt.Sprintf("%06d", time.Now().UnixNano()%1000000)
+	code := randomOTP()
 	g.RDB.Set(r.Context(), "otp:"+body.Phone, code, 5*time.Minute)
 	log.Printf("[OTP] phone=%s code=%s", body.Phone, code)
 	WriteJSON(w, map[string]interface{}{"success": true})
@@ -291,8 +301,12 @@ func (g *Gateway) PhoneLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	g.RDB.Del(r.Context(), "otp:"+body.Phone)
-	resp, _ := g.AuthClient.LoginByPhone(r.Context(), &pb.PhoneLoginRequest{Phone: body.Phone, Otp: body.OTP})
-	g.setCookies(w, resp.AccessToken, resp.RefreshToken)
+	resp, err := g.AuthClient.LoginByPhone(r.Context(), &pb.PhoneLoginRequest{Phone: body.Phone, Otp: body.OTP})
+	if err != nil {
+		WriteGRPCError(w, err, "phone login failed")
+		return
+	}
+	g.setCookies(w, resp.GetAccessToken(), resp.GetRefreshToken())
 	WriteJSON(w, resp)
 }
 
@@ -304,7 +318,8 @@ func (g *Gateway) Health(w http.ResponseWriter, r *http.Request) {
 
 func (g *Gateway) Me(w http.ResponseWriter, r *http.Request) {
 	user := GetUserFromCookie(r)
-	WriteJSON(w, map[string]interface{}{"username": user, "user_id": 0})
+	uid := ExtractUID(r)
+	WriteJSON(w, map[string]interface{}{"username": user, "user_id": uid})
 }
 
 func (g *Gateway) Services(w http.ResponseWriter, r *http.Request) {
@@ -407,10 +422,14 @@ func (g *Gateway) ShareSheet(w http.ResponseWriter, r *http.Request) {
 	}
 	json.NewDecoder(r.Body).Decode(&body)
 	id := parseInt64(r.PathValue("id"))
-	resp, _ := g.SharedClient.Share(g.injectToken(r), &pb.ShareRequest{
+	resp, err := g.SharedClient.Share(g.injectToken(r), &pb.ShareRequest{
 		OwnerId: uid, ResourceType: "sheet", ResourceId: id,
 		GranteeUsername: body.Username, Permission: body.Permission,
 	})
+	if err != nil {
+		WriteGRPCError(w, err, "share failed")
+		return
+	}
 	WriteJSON(w, resp)
 }
 
@@ -418,44 +437,66 @@ func (g *Gateway) RevokeShare(w http.ResponseWriter, r *http.Request) {
 	uid := ExtractUID(r)
 	username := r.URL.Query().Get("username")
 	id := parseInt64(r.PathValue("id"))
-	resp, _ := g.SharedClient.Revoke(g.injectToken(r), &pb.RevokeRequest{
+	resp, err := g.SharedClient.Revoke(g.injectToken(r), &pb.RevokeRequest{
 		OwnerId: uid, ResourceType: "sheet", ResourceId: id,
 		GranteeUsername: username,
 	})
+	if err != nil {
+		WriteGRPCError(w, err, "revoke failed")
+		return
+	}
 	WriteJSON(w, resp)
 }
 
 func (g *Gateway) ListShares(w http.ResponseWriter, r *http.Request) {
 	uid := ExtractUID(r)
 	id := parseInt64(r.PathValue("id"))
-	resp, _ := g.SharedClient.ListShares(g.injectToken(r), &pb.ResourceRequest{
+	resp, err := g.SharedClient.ListShares(g.injectToken(r), &pb.ResourceRequest{
 		OwnerId: uid, ResourceType: "sheet", ResourceId: id,
 	})
+	if err != nil {
+		WriteGRPCError(w, err, "list shares failed")
+		return
+	}
 	WriteJSON(w, resp)
 }
 
 func (g *Gateway) CreateShareLink(w http.ResponseWriter, r *http.Request) {
 	uid := ExtractUID(r)
 	id := parseInt64(r.PathValue("id"))
-	resp, _ := g.SharedClient.CreateShareLink(g.injectToken(r), &pb.ShareLinkRequest{
+	resp, err := g.SharedClient.CreateShareLink(g.injectToken(r), &pb.ShareLinkRequest{
 		OwnerId: uid, ResourceType: "sheet", ResourceId: id, Permission: "view",
 	})
+	if err != nil {
+		WriteGRPCError(w, err, "create share link failed")
+		return
+	}
 	WriteJSON(w, resp)
 }
 
 func (g *Gateway) ShareByToken(w http.ResponseWriter, r *http.Request) {
 	token := r.PathValue("token")
-	resp, _ := g.SharedClient.GetByToken(g.injectToken(r), &pb.ShareTokenRequest{Token: token})
-	if resp == nil || !resp.Success {
+	resp, err := g.SharedClient.GetByToken(g.injectToken(r), &pb.ShareTokenRequest{Token: token})
+	if err != nil {
+		WriteGRPCError(w, err, "share link failed")
+		return
+	}
+	if !resp.GetSuccess() {
 		WriteJSONStatus(w, http.StatusNotFound, map[string]interface{}{"success": false, "error": "Not found"})
 		return
 	}
 	info := resp.GetInfo()
+	if info == nil {
+		WriteJSONStatus(w, http.StatusInternalServerError, map[string]interface{}{"success": false, "error": "invalid response"})
+		return
+	}
 	switch info.GetResourceType() {
 	case "sheet":
 		http.Redirect(w, r, fmt.Sprintf("/api/v1/sheets/%d", info.GetResourceId()), http.StatusFound)
 	case "file":
 		http.Redirect(w, r, fmt.Sprintf("/api/v1/files/%d", info.GetResourceId()), http.StatusFound)
+	default:
+		WriteJSONStatus(w, http.StatusNotFound, map[string]interface{}{"success": false, "error": "unknown resource type"})
 	}
 }
 

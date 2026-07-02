@@ -20,4 +20,7 @@ RUN protoc \
 FROM envoyproxy/envoy:v1.31-latest
 COPY --from=proto-builder /build/proto_descriptor.pb /etc/envoy/proto_descriptor.pb
 COPY deploy/envoy/envoy.yaml /etc/envoy/envoy.yaml
+COPY deploy/envoy/entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+ENTRYPOINT ["/entrypoint.sh"]
 CMD ["-c", "/etc/envoy/envoy.yaml", "--log-level", "info"]

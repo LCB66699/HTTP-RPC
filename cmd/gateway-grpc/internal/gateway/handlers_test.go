@@ -51,13 +51,13 @@ func (m *mockAuthClient) LoginByPhone(ctx context.Context, req *pb.PhoneLoginReq
 }
 
 type mockSheetClient struct {
-	listResp         *pb.ListSpreadsheetsResponse
-	getResp          *pb.GetSpreadsheetResponse
-	createResp       *pb.CreateSpreadsheetResponse
-	updateResp       *pb.UpdateSpreadsheetResponse
-	deleteResp       *pb.DeleteSpreadsheetResponse
-	listErr          error
-	getErr           error
+	listResp   *pb.ListSpreadsheetsResponse
+	getResp    *pb.GetSpreadsheetResponse
+	createResp *pb.CreateSpreadsheetResponse
+	updateResp *pb.UpdateSpreadsheetResponse
+	deleteResp *pb.DeleteSpreadsheetResponse
+	listErr    error
+	getErr     error
 }
 
 func (m *mockSheetClient) ListSpreadsheets(ctx context.Context, req *pb.ListSpreadsheetsRequest, opts ...grpc.CallOption) (*pb.ListSpreadsheetsResponse, error) {
@@ -206,11 +206,10 @@ func TestChangePassword_Unauthorized(t *testing.T) {
 func TestChangePassword_GrpcError(t *testing.T) {
 	g := &gw.Gateway{
 		AuthClient: &mockAuthClient{changePwdErr: status.Error(codes.Internal, "DB error")},
-		JWTSecret:  []byte("test-secret"),
 	}
 	req := httptest.NewRequest("PUT", "/api/v1/me/password",
 		strings.NewReader(`{"old_password":"old","new_password":"new1234"}`))
-	req.AddCookie(&http.Cookie{Name: "rpc_at", Value: validTestJWT()})
+	req.Header.Set("X-Rpc-Uid", "12345")
 	w := httptest.NewRecorder()
 	g.ChangePassword(w, req)
 	if w.Code != http.StatusInternalServerError {
@@ -287,7 +286,7 @@ func TestShareLink_Create(t *testing.T) {
 	}
 	req := httptest.NewRequest("POST", "/api/v1/sheets/123/share-link",
 		strings.NewReader(`{"permission":"view"}`))
-	req.AddCookie(&http.Cookie{Name: "rpc_at", Value: validTestJWT()})
+	req.Header.Set("X-Rpc-Uid", "12345")
 	w := httptest.NewRecorder()
 	g.CreateShareLink(w, req)
 	if !strings.Contains(w.Body.String(), "abc123") {

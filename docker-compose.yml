@@ -15,9 +15,14 @@
       envoy:
         condition: service_healthy
 
-  # ===== Envoy replicas (edge proxy: CORS, circuit breaking, retry) =====
+  # ===== Envoy replicas (edge proxy: JWT authn, CORS, circuit breaking, retry) =====
   envoy:
-    image: envoyproxy/envoy:v1.31.3
+    build:
+      context: .
+      dockerfile: deploy/envoy/Dockerfile
+    image: ${DOCKER_USER:-http-rpc}/envoy:latest
+    environment:
+      JWT_SECRET: "${JWT_SECRET:-}"
     volumes:
       - ./deploy/envoy/envoy.yaml:/etc/envoy/envoy.yaml:ro
     command: ["-c", "/etc/envoy/envoy.yaml", "--log-level", "info"]
@@ -34,7 +39,12 @@
       start_period: 10s
 
   envoy-2:
-    image: envoyproxy/envoy:v1.31.3
+    build:
+      context: .
+      dockerfile: deploy/envoy/Dockerfile
+    image: ${DOCKER_USER:-http-rpc}/envoy:latest
+    environment:
+      JWT_SECRET: "${JWT_SECRET:-}"
     volumes:
       - ./deploy/envoy/envoy.yaml:/etc/envoy/envoy.yaml:ro
     command: ["-c", "/etc/envoy/envoy.yaml", "--log-level", "info"]
@@ -594,6 +604,7 @@
     image: ${DOCKER_USER:-http-rpc}/search:latest
     environment:
       ES_HOST: "http://elasticsearch:9200"
+      JWT_SECRET: "${JWT_SECRET:-}"
     command: >
       /app/rpc_server --service search --port 50051
     networks:

@@ -38,7 +38,8 @@ int main(int argc, char *argv[]) {
     std::string redis_password;
     int redis_pool_size = 4;
     const char *env_secret = std::getenv("JWT_SECRET");
-    std::string jwt_secret = env_secret ? env_secret : "default-secret";
+    if (!env_secret) { fprintf(stderr, "FATAL: JWT_SECRET environment variable is required\n"); return 1; }
+    std::string jwt_secret = env_secret;
 
     #if HAS_OTEL
     InitTracer("spreadsheet-service");

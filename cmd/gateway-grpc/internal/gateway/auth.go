@@ -1,54 +1,26 @@
 package gateway
 
 import (
-	"encoding/base64"
-	"log"
 	"net/http"
-	"regexp"
 	"strconv"
-	"strings"
-
-	"github.com/golang-jwt/jwt/v5"
 )
 
-// ExtractUID 从 JWT cookie (rpc_at) 中提取 user_id
+// ExtractUID 从 Envoy 注入的 X-Rpc-Uid 请求头中提取 user_id。
+// Envoy 的 jwt_authn filter 已验证 JWT 签名并将 claims 写入此 header。
 func ExtractUID(r *http.Request) int64 {
-	for _, c := range r.Cookies() {
-		if c.Name != "rpc_at" {
-			continue
-		}
-		parts := strings.SplitN(c.Value, ".", 3)
-		if len(parts) != 3 {
-			log.Printf("[ExtractUID] cookie value has %d parts (expected 3)", len(parts))
-			break
-		}
-		raw, err := base64.RawURLEncoding.DecodeString(parts[1])
-		if err != nil {
-			log.Printf("[ExtractUID] base64 decode error: %v", err)
-			break
-		}
-		re := regexp.MustCompile(`"uid":("?)(-?\d+)("?)`)
-		m := re.FindStringSubmatch(string(raw))
-		if m != nil {
-			n, _ := strconv.ParseInt(m[2], 10, 64)
-			return n
-		}
-		log.Printf("[ExtractUID] uid not found in payload: %s", string(raw))
+	uidStr := r.Header.Get("X-Rpc-Uid")
+	if uidStr == "" {
 		return 0
 	}
-	return 0
+	uid, err := strconv.ParseInt(uidStr, 10, 64)
+	if err != nil {
+		return 0
+	}
+	return uid
 }
 
-// GetUserFromCookie 从 JWT cookie 中提取 username
+// GetUserFromCookie 从 Envoy 注入的 X-Rpc-Username 请求头中提取 username。
+// 注意：函数名保留向后兼容，实际不再解析 cookie。
 func GetUserFromCookie(r *http.Request) string {
-	for _, c := range r.Cookies() {
-		if c.Name == "rpc_at" {
-			claims := jwt.MapClaims{}
-			jwt.ParseWithClaims(c.Value, &claims, func(t *jwt.Token) (interface{}, error) { return []byte(""), nil })
-			if u, ok := claims["username"].(string); ok {
-				return u
-			}
-		}
-	}
-	return ""
+	return r.Header.Get("X-Rpc-Username")
 }

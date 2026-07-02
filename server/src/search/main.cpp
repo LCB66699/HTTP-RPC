@@ -21,7 +21,8 @@ int main(int argc, char *argv[]) {
     int port = 50051;
     const char *es_host = std::getenv("ES_HOST");
     const char *env_secret = std::getenv("JWT_SECRET");
-    std::string jwt_secret = env_secret ? env_secret : "default-secret";
+    if (!env_secret) { fprintf(stderr, "FATAL: JWT_SECRET environment variable is required\n"); return 1; }
+    std::string jwt_secret = env_secret;
 
     #if HAS_OTEL
     InitTracer("search-service");

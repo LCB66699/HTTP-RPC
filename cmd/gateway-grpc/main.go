@@ -9,7 +9,6 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/golang-jwt/jwt/v5"
 	"github.com/redis/go-redis/v9"
 	"golang.org/x/net/http2"
 	"golang.org/x/net/http2/h2c"
@@ -27,7 +26,6 @@ import (
 	"google.golang.org/grpc/connectivity"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/keepalive"
-	"strings"
 
 	pb "gateway-grpc/gen/rpc"
 )
@@ -63,8 +61,6 @@ func initTracer() (*sdktrace.TracerProvider, error) {
 }
 
 func main() {
-	jwtSecret := []byte(getenv("JWT_SECRET", "default-secret-32bytes-here!!!!!"))
-
 	tp, err := initTracer()
 	if err != nil {
 		log.Printf("[tracing] WARNING: tracer not available: %v", err)
@@ -123,7 +119,6 @@ func main() {
 		SearchClient: pb.NewSearchServiceClient(searchConn),
 		SharedClient: pb.NewSharingServiceClient(authConn),
 		RDB:          rdb,
-		JWTSecret:    jwtSecret,
 		CBSearch:     cbSearch,
 		CBSheet:      cbSheet,
 		CBFile:       cbFile,
@@ -189,7 +184,10 @@ func main() {
 	mux.HandleFunc("GET /api/v1/files/{id}", gwInst.GetFile)
 	mux.HandleFunc("DELETE /api/v1/files/{id}", gwInst.DeleteFile)
 
-	handler := metricsMiddleware(otelhttp.NewHandler(jwtMiddleware(jwtSecret)(corsMiddleware(mux)), "gateway-grpc",
+	// JWT authn and CORS are handled by Envoy at the edge.
+	// The gateway trusts x-rpc-uid / x-rpc-username headers injected
+	// by Envoy's jwt_authn filter. No additional middleware needed.
+	handler := metricsMiddleware(otelhttp.NewHandler(mux, "gateway-grpc",
 		otelhttp.WithTracerProvider(otel.GetTracerProvider()),
 		otelhttp.WithPropagators(otel.GetTextMapPropagator()),
 	))
@@ -213,54 +211,6 @@ func main() {
 		log.Fatalf("shutdown: %v", err)
 	}
 	log.Println("Server stopped")
-}
-
-func jwtMiddleware(jwtSecret []byte) func(http.Handler) http.Handler {
-	return func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			path := r.URL.Path
-			if strings.HasPrefix(path, "/api/v1/login") || strings.HasPrefix(path, "/api/v1/register") ||
-				strings.HasPrefix(path, "/api/v1/refresh") || strings.HasPrefix(path, "/api/v1/health") ||
-				strings.HasPrefix(path, "/api/v1/me") || strings.HasPrefix(path, "/api/v1/metrics") {
-				next.ServeHTTP(w, r)
-				return
-			}
-			tokenStr := ""
-			for _, c := range r.Cookies() {
-				if c.Name == "rpc_at" {
-					tokenStr = c.Value
-				}
-			}
-			if tokenStr == "" {
-				http.Error(w, `{"error":"Jwt is missing"}`, http.StatusUnauthorized)
-				return
-			}
-			claims := jwt.MapClaims{}
-			_, err := jwt.ParseWithClaims(tokenStr, &claims, func(t *jwt.Token) (interface{}, error) {
-				return jwtSecret, nil
-			})
-			if err != nil {
-				http.Error(w, `{"error":"Invalid token"}`, http.StatusUnauthorized)
-				return
-			}
-			next.ServeHTTP(w, r)
-		})
-	}
-}
-
-func corsMiddleware(next http.Handler) http.Handler {
-	allowedOrigin := getenv("CORS_ORIGIN", "*")
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Access-Control-Allow-Origin", allowedOrigin)
-		w.Header().Set("Access-Control-Allow-Credentials", "true")
-		w.Header().Set("Access-Control-Allow-Methods", "GET,POST,PUT,DELETE,OPTIONS")
-		w.Header().Set("Access-Control-Allow-Headers", "Content-Type,Authorization")
-		if r.Method == "OPTIONS" {
-			w.WriteHeader(http.StatusOK)
-			return
-		}
-		next.ServeHTTP(w, r)
-	})
 }
 
 func getenv(key, fallback string) string {

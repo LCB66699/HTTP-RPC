@@ -21,13 +21,15 @@ func WriteJSON(w http.ResponseWriter, v interface{}) {
 	WriteJSONStatus(w, http.StatusOK, v)
 }
 
+var largeIntRe = regexp.MustCompile(`:(\d{16,})`)
+
 // WriteJSONStatus writes a JSON response with the given HTTP status code.
+// Large integers (>= 10^16) are quoted to preserve precision in JavaScript.
 func WriteJSONStatus(w http.ResponseWriter, code int, v interface{}) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(code)
 	data, _ := json.Marshal(v)
-	re := regexp.MustCompile(`:(\d{16,})`)
-	data = re.ReplaceAll(data, []byte(`:"$1"`))
+	data = largeIntRe.ReplaceAll(data, []byte(`:"$1"`))
 	w.Write(data)
 }
 

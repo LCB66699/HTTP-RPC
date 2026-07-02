@@ -1,7 +1,14 @@
 # Envoy edge proxy for HTTP-RPC
 # Sits between Nginx and Go Gateway. Handles:
-#   cluster-level circuit breaking, retry, health checking
-# CORS and JWT validation stay in Go gateway (less config friction).
+#   JWT authn, CORS, cluster-level circuit breaking, retry, health checking
+#
+# JWT validation: reads "rpc_at" cookie, validates HMAC-SHA256 signature,
+# injects x-rpc-uid and x-rpc-username headers from JWT claims.
+# Public endpoints (login, register, refresh, health, metrics) bypass JWT.
+# CORS preflight OPTIONS is also bypassed (handled by CORS filter + allow_missing).
+#
+# The JWT secret is provided via JWT_SECRET env var at container start;
+# the entrypoint script generates /etc/envoy/jwt/jwks.json from it.
 
 admin:
   address:
@@ -22,6 +29,58 @@ static_resources:
           use_remote_address: true
 
           http_filters:
+          # CORS — must come before jwt_authn so preflight OPTIONS are
+          # handled (returns 200 directly) without reaching the JWT filter.
+          - name: envoy.filters.http.cors
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.http.cors.v3.Cors
+              cors_policy:
+                allow_origin_string_match:
+                - safe_regex:
+                    google_re2: {}
+                    regex: ".*"
+                allow_credentials: true
+                allow_methods: GET,POST,PUT,DELETE,OPTIONS
+                allow_headers: Content-Type,Authorization
+                expose_headers: Content-Disposition
+                max_age: 86400s
+
+          # JWT authentication — validates rpc_at cookie, injects headers
+          - name: envoy.filters.http.jwt_authn
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.http.jwt_authn.v3.JwtAuthentication
+              providers:
+                rpc_jwt_provider:
+                  issuer: http-rpc
+                  forward: true
+                  forward_payload_header: x-jwt-payload
+                  from_cookies:
+                  - rpc_at
+                  claim_to_headers:
+                  - header_name: x-rpc-uid
+                    claim_name: uid
+                  - header_name: x-rpc-username
+                    claim_name: username
+                  local_jwks:
+                    filename: /etc/envoy/jwt/jwks.json
+              rules:
+              # Public endpoints — JWT optional
+              - match: { prefix: "/api/v1/login" }
+                requires: { allow_missing: {} }
+              - match: { prefix: "/api/v1/register" }
+                requires: { allow_missing: {} }
+              - match: { prefix: "/api/v1/refresh" }
+                requires: { allow_missing: {} }
+              - match: { prefix: "/api/v1/health" }
+                requires: { allow_missing: {} }
+              - match: { prefix: "/api/v1/metrics" }
+                requires: { allow_missing: {} }
+              # Default — JWT required for all other API paths.
+              # OPTIONS preflight requests are handled by the CORS filter
+              # (responded directly, not forwarded through the filter chain).
+              - match: { prefix: "/" }
+                requires: { provider_name: rpc_jwt_provider }
+
           - name: envoy.filters.http.router
             typed_config:
               "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
