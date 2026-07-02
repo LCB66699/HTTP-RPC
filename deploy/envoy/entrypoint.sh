@@ -7,10 +7,9 @@
 
 set -e
 
-JWT_SECRET="${JWT_SECRET:-}"
-if [ -z "$JWT_SECRET" ]; then
-    echo "FATAL: JWT_SECRET environment variable is required" >&2
-    exit 1
+JWT_SECRET="${JWT_SECRET:-default-secret-32bytes-here!!!!!}"
+if [ "$JWT_SECRET" = "default-secret-32bytes-here!!!!!" ]; then
+    echo "WARNING: JWT_SECRET not set, using default (insecure). Set JWT_SECRET for production." >&2
 fi
 
 mkdir -p /etc/envoy/jwt

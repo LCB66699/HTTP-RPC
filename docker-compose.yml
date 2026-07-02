@@ -22,7 +22,7 @@
       dockerfile: deploy/envoy/Dockerfile
     image: ${DOCKER_USER:-http-rpc}/envoy:latest
     environment:
-      JWT_SECRET: "${JWT_SECRET:-}"
+      JWT_SECRET: "${JWT_SECRET:-default-secret-32bytes-here!!!!!}"
     volumes:
       - ./deploy/envoy/envoy.yaml:/etc/envoy/envoy.yaml:ro
     command: ["-c", "/etc/envoy/envoy.yaml", "--log-level", "info"]
@@ -44,7 +44,7 @@
       dockerfile: deploy/envoy/Dockerfile
     image: ${DOCKER_USER:-http-rpc}/envoy:latest
     environment:
-      JWT_SECRET: "${JWT_SECRET:-}"
+      JWT_SECRET: "${JWT_SECRET:-default-secret-32bytes-here!!!!!}"
     volumes:
       - ./deploy/envoy/envoy.yaml:/etc/envoy/envoy.yaml:ro
     command: ["-c", "/etc/envoy/envoy.yaml", "--log-level", "info"]
@@ -604,7 +604,7 @@
     image: ${DOCKER_USER:-http-rpc}/search:latest
     environment:
       ES_HOST: "http://elasticsearch:9200"
-      JWT_SECRET: "${JWT_SECRET:-}"
+      JWT_SECRET: "${JWT_SECRET:-default-secret-32bytes-here!!!!!}"
     command: >
       /app/rpc_server --service search --port 50051
     networks:
