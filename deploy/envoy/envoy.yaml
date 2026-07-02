@@ -35,7 +35,6 @@ static_resources:
               "@type": type.googleapis.com/envoy.extensions.filters.http.jwt_authn.v3.JwtAuthentication
               providers:
                 rpc_jwt_provider:
-                  issuer: http-rpc
                   forward: true
                   forward_payload_header: x-jwt-payload
                   from_cookies:
