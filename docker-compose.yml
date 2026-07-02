@@ -25,6 +25,7 @@
       JWT_SECRET: "${JWT_SECRET:-default-secret-32bytes-here!!!!!}"
     volumes:
       - ./deploy/envoy/envoy.yaml:/etc/envoy/envoy.yaml:ro
+      - ./deploy/envoy/jwt/jwks.json:/etc/envoy/jwt/jwks.json:ro
     command: ["-c", "/etc/envoy/envoy.yaml", "--log-level", "info"]
     ports:
       - "10000:10000"
@@ -47,6 +48,7 @@
       JWT_SECRET: "${JWT_SECRET:-default-secret-32bytes-here!!!!!}"
     volumes:
       - ./deploy/envoy/envoy.yaml:/etc/envoy/envoy.yaml:ro
+      - ./deploy/envoy/jwt/jwks.json:/etc/envoy/jwt/jwks.json:ro
     command: ["-c", "/etc/envoy/envoy.yaml", "--log-level", "info"]
     ports:
       - "10001:10000"
