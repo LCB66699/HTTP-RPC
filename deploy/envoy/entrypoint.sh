@@ -7,17 +7,21 @@
 
 set -e
 
-JWT_SECRET="${JWT_SECRET:-default-secret-32bytes-here!!!!!}"
-if [ "$JWT_SECRET" = "default-secret-32bytes-here!!!!!" ]; then
-    echo "WARNING: JWT_SECRET not set, using default (insecure). Set JWT_SECRET for production." >&2
-fi
+# If JWKS already exists (e.g. mounted as a volume), skip generation.
+if [ -f /etc/envoy/jwt/jwks.json ]; then
+    echo "[entrypoint] JWKS already exists at /etc/envoy/jwt/jwks.json, skipping generation"
+else
+    JWT_SECRET="${JWT_SECRET:-default-secret-32bytes-here!!!!!}"
+    if [ "$JWT_SECRET" = "default-secret-32bytes-here!!!!!" ]; then
+        echo "WARNING: JWT_SECRET not set, using default (insecure). Set JWT_SECRET for production." >&2
+    fi
 
-mkdir -p /etc/envoy/jwt
+    mkdir -p /etc/envoy/jwt
 
-# Base64-URL encode the secret (no padding) for JWK format
-JWK_K=$(echo -n "$JWT_SECRET" | base64 -w0 | tr '+/' '-_' | tr -d '=')
+    # Base64-URL encode the secret (no padding) for JWK format
+    JWK_K=$(echo -n "$JWT_SECRET" | base64 -w0 | tr '+/' '-_' | tr -d '=')
 
-cat > /etc/envoy/jwt/jwks.json <<JWKSEOF
+    cat > /etc/envoy/jwt/jwks.json <<JWKSEOF
 {
   "keys": [
     {
@@ -29,7 +33,8 @@ cat > /etc/envoy/jwt/jwks.json <<JWKSEOF
 }
 JWKSEOF
 
-echo "[entrypoint] JWKS generated at /etc/envoy/jwt/jwks.json"
+    echo "[entrypoint] JWKS generated at /etc/envoy/jwt/jwks.json"
+fi
 
 # Hand off to the upstream envoy entrypoint
 exec /usr/local/bin/envoy "$@"
