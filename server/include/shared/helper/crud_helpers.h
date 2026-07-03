@@ -157,7 +157,7 @@ grpc::Status HandleDelete(Resp *resp, int64_t id, int64_t user_id,
             (long)id, (long)user_id, (long)owner_uid, found);
     if (!found || owner_uid != user_id) {
         WriteResult(resp, HandlerResult<>::Fail("Not found or permission denied", rpc_error::NOT_FOUND));
-        return grpc::Status::OK;
+        return grpc::Status(grpc::StatusCode::NOT_FOUND, "Not found or permission denied");
     }
 
     if (!do_delete(id, user_id)) {

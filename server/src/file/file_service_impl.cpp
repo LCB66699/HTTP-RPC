@@ -120,7 +120,8 @@ grpc::Status FileServiceImpl::GetFile(grpc::ServerContext *context, const rpc::G
 
     if (!CheckOwnerWithRetry(req->id(), g_rpc_auth_ctx.user_id, db_,
             [&](auto id, auto &uid) { return db_->GetFileOwner(id, uid); }, slog_))
-        return WriteResult(resp, HandlerResult<>::Fail("Not found", rpc_error::NOT_FOUND)), grpc::Status::OK;
+        return WriteResult(resp, HandlerResult<>::Fail("Not found", rpc_error::NOT_FOUND)),
+               grpc::Status(grpc::StatusCode::NOT_FOUND, "Not found");
 
     auto start = std::chrono::high_resolution_clock::now();
     std::string username = UsernameFromMeta(context);

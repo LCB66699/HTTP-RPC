@@ -125,7 +125,8 @@ grpc::Status SpreadsheetServiceImpl::GetSpreadsheet(grpc::ServerContext *context
         return *fail;
     if (!CheckOwnerWithRetry(req->id(), g_rpc_auth_ctx.user_id, db_,
             [&](auto id, auto &uid) { return db_->GetSpreadsheetOwner(id, uid); }, slog_))
-        return WriteResult(resp, HandlerResult<>::Fail("Not found", rpc_error::NOT_FOUND)), grpc::Status::OK;
+        return WriteResult(resp, HandlerResult<>::Fail("Not found", rpc_error::NOT_FOUND)),
+               grpc::Status(grpc::StatusCode::NOT_FOUND, "Not found");
     auto start = std::chrono::high_resolution_clock::now();
     std::string username = UsernameFromMeta(context);
 
@@ -460,7 +461,7 @@ grpc::Status SpreadsheetServiceImpl::UpdateSpreadsheet(grpc::ServerContext *cont
         if (!db_->GetSpreadsheetOwner(req->id(), owner_uid, &version) || owner_uid != g_rpc_auth_ctx.user_id) {
             resp->set_success(false);
             SET_ERROR(resp, "Not found or permission denied", rpc_error::NOT_FOUND);
-            return grpc::Status::OK;
+            return grpc::Status(grpc::StatusCode::NOT_FOUND, "Not found or permission denied");
         }
 
         bool ok = db_->UpdateSpreadsheet(req->id(), g_rpc_auth_ctx.user_id, req->name(), req->description(),
