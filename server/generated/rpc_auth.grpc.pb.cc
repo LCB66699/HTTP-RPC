@@ -26,6 +26,8 @@ static const char* AuthService_method_names[] = {
   "/rpc.AuthService/Register",
   "/rpc.AuthService/RefreshToken",
   "/rpc.AuthService/ValidateUser",
+  "/rpc.AuthService/ChangePassword",
+  "/rpc.AuthService/LoginByPhone",
 };
 
 std::unique_ptr< AuthService::Stub> AuthService::NewStub(const std::shared_ptr< ::grpc::ChannelInterface>& channel, const ::grpc::StubOptions& options) {
@@ -39,6 +41,8 @@ AuthService::Stub::Stub(const std::shared_ptr< ::grpc::ChannelInterface>& channe
   , rpcmethod_Register_(AuthService_method_names[1], options.suffix_for_stats(),::grpc::internal::RpcMethod::NORMAL_RPC, channel)
   , rpcmethod_RefreshToken_(AuthService_method_names[2], options.suffix_for_stats(),::grpc::internal::RpcMethod::NORMAL_RPC, channel)
   , rpcmethod_ValidateUser_(AuthService_method_names[3], options.suffix_for_stats(),::grpc::internal::RpcMethod::NORMAL_RPC, channel)
+  , rpcmethod_ChangePassword_(AuthService_method_names[4], options.suffix_for_stats(),::grpc::internal::RpcMethod::NORMAL_RPC, channel)
+  , rpcmethod_LoginByPhone_(AuthService_method_names[5], options.suffix_for_stats(),::grpc::internal::RpcMethod::NORMAL_RPC, channel)
   {}
 
 ::grpc::Status AuthService::Stub::Login(::grpc::ClientContext* context, const ::rpc::LoginRequest& request, ::rpc::LoginResponse* response) {
@@ -133,6 +137,52 @@ void AuthService::Stub::async::ValidateUser(::grpc::ClientContext* context, cons
   return result;
 }
 
+::grpc::Status AuthService::Stub::ChangePassword(::grpc::ClientContext* context, const ::rpc::ChangePasswordRequest& request, ::rpc::ChangePasswordResponse* response) {
+  return ::grpc::internal::BlockingUnaryCall< ::rpc::ChangePasswordRequest, ::rpc::ChangePasswordResponse, ::grpc::protobuf::MessageLite, ::grpc::protobuf::MessageLite>(channel_.get(), rpcmethod_ChangePassword_, context, request, response);
+}
+
+void AuthService::Stub::async::ChangePassword(::grpc::ClientContext* context, const ::rpc::ChangePasswordRequest* request, ::rpc::ChangePasswordResponse* response, std::function<void(::grpc::Status)> f) {
+  ::grpc::internal::CallbackUnaryCall< ::rpc::ChangePasswordRequest, ::rpc::ChangePasswordResponse, ::grpc::protobuf::MessageLite, ::grpc::protobuf::MessageLite>(stub_->channel_.get(), stub_->rpcmethod_ChangePassword_, context, request, response, std::move(f));
+}
+
+void AuthService::Stub::async::ChangePassword(::grpc::ClientContext* context, const ::rpc::ChangePasswordRequest* request, ::rpc::ChangePasswordResponse* response, ::grpc::ClientUnaryReactor* reactor) {
+  ::grpc::internal::ClientCallbackUnaryFactory::Create< ::grpc::protobuf::MessageLite, ::grpc::protobuf::MessageLite>(stub_->channel_.get(), stub_->rpcmethod_ChangePassword_, context, request, response, reactor);
+}
+
+::grpc::ClientAsyncResponseReader< ::rpc::ChangePasswordResponse>* AuthService::Stub::PrepareAsyncChangePasswordRaw(::grpc::ClientContext* context, const ::rpc::ChangePasswordRequest& request, ::grpc::CompletionQueue* cq) {
+  return ::grpc::internal::ClientAsyncResponseReaderHelper::Create< ::rpc::ChangePasswordResponse, ::rpc::ChangePasswordRequest, ::grpc::protobuf::MessageLite, ::grpc::protobuf::MessageLite>(channel_.get(), cq, rpcmethod_ChangePassword_, context, request);
+}
+
+::grpc::ClientAsyncResponseReader< ::rpc::ChangePasswordResponse>* AuthService::Stub::AsyncChangePasswordRaw(::grpc::ClientContext* context, const ::rpc::ChangePasswordRequest& request, ::grpc::CompletionQueue* cq) {
+  auto* result =
+    this->PrepareAsyncChangePasswordRaw(context, request, cq);
+  result->StartCall();
+  return result;
+}
+
+::grpc::Status AuthService::Stub::LoginByPhone(::grpc::ClientContext* context, const ::rpc::PhoneLoginRequest& request, ::rpc::LoginResponse* response) {
+  return ::grpc::internal::BlockingUnaryCall< ::rpc::PhoneLoginRequest, ::rpc::LoginResponse, ::grpc::protobuf::MessageLite, ::grpc::protobuf::MessageLite>(channel_.get(), rpcmethod_LoginByPhone_, context, request, response);
+}
+
+void AuthService::Stub::async::LoginByPhone(::grpc::ClientContext* context, const ::rpc::PhoneLoginRequest* request, ::rpc::LoginResponse* response, std::function<void(::grpc::Status)> f) {
+  ::grpc::internal::CallbackUnaryCall< ::rpc::PhoneLoginRequest, ::rpc::LoginResponse, ::grpc::protobuf::MessageLite, ::grpc::protobuf::MessageLite>(stub_->channel_.get(), stub_->rpcmethod_LoginByPhone_, context, request, response, std::move(f));
+}
+
+void AuthService::Stub::async::LoginByPhone(::grpc::ClientContext* context, const ::rpc::PhoneLoginRequest* request, ::rpc::LoginResponse* response, ::grpc::ClientUnaryReactor* reactor) {
+  ::grpc::internal::ClientCallbackUnaryFactory::Create< ::grpc::protobuf::MessageLite, ::grpc::protobuf::MessageLite>(stub_->channel_.get(), stub_->rpcmethod_LoginByPhone_, context, request, response, reactor);
+}
+
+::grpc::ClientAsyncResponseReader< ::rpc::LoginResponse>* AuthService::Stub::PrepareAsyncLoginByPhoneRaw(::grpc::ClientContext* context, const ::rpc::PhoneLoginRequest& request, ::grpc::CompletionQueue* cq) {
+  return ::grpc::internal::ClientAsyncResponseReaderHelper::Create< ::rpc::LoginResponse, ::rpc::PhoneLoginRequest, ::grpc::protobuf::MessageLite, ::grpc::protobuf::MessageLite>(channel_.get(), cq, rpcmethod_LoginByPhone_, context, request);
+}
+
+::grpc::ClientAsyncResponseReader< ::rpc::LoginResponse>* AuthService::Stub::AsyncLoginByPhoneRaw(::grpc::ClientContext* context, const ::rpc::PhoneLoginRequest& request, ::grpc::CompletionQueue* cq) {
+  auto* result =
+    this->PrepareAsyncLoginByPhoneRaw(context, request, cq);
+  result->StartCall();
+  return result;
+}
+
 AuthService::Service::Service() {
   AddMethod(new ::grpc::internal::RpcServiceMethod(
       AuthService_method_names[0],
@@ -174,6 +224,26 @@ AuthService::Service::Service() {
              ::rpc::ValidateUserResponse* resp) {
                return service->ValidateUser(ctx, req, resp);
              }, this)));
+  AddMethod(new ::grpc::internal::RpcServiceMethod(
+      AuthService_method_names[4],
+      ::grpc::internal::RpcMethod::NORMAL_RPC,
+      new ::grpc::internal::RpcMethodHandler< AuthService::Service, ::rpc::ChangePasswordRequest, ::rpc::ChangePasswordResponse, ::grpc::protobuf::MessageLite, ::grpc::protobuf::MessageLite>(
+          [](AuthService::Service* service,
+             ::grpc::ServerContext* ctx,
+             const ::rpc::ChangePasswordRequest* req,
+             ::rpc::ChangePasswordResponse* resp) {
+               return service->ChangePassword(ctx, req, resp);
+             }, this)));
+  AddMethod(new ::grpc::internal::RpcServiceMethod(
+      AuthService_method_names[5],
+      ::grpc::internal::RpcMethod::NORMAL_RPC,
+      new ::grpc::internal::RpcMethodHandler< AuthService::Service, ::rpc::PhoneLoginRequest, ::rpc::LoginResponse, ::grpc::protobuf::MessageLite, ::grpc::protobuf::MessageLite>(
+          [](AuthService::Service* service,
+             ::grpc::ServerContext* ctx,
+             const ::rpc::PhoneLoginRequest* req,
+             ::rpc::LoginResponse* resp) {
+               return service->LoginByPhone(ctx, req, resp);
+             }, this)));
 }
 
 AuthService::Service::~Service() {
@@ -201,6 +271,20 @@ AuthService::Service::~Service() {
 }
 
 ::grpc::Status AuthService::Service::ValidateUser(::grpc::ServerContext* context, const ::rpc::ValidateUserRequest* request, ::rpc::ValidateUserResponse* response) {
+  (void) context;
+  (void) request;
+  (void) response;
+  return ::grpc::Status(::grpc::StatusCode::UNIMPLEMENTED, "");
+}
+
+::grpc::Status AuthService::Service::ChangePassword(::grpc::ServerContext* context, const ::rpc::ChangePasswordRequest* request, ::rpc::ChangePasswordResponse* response) {
+  (void) context;
+  (void) request;
+  (void) response;
+  return ::grpc::Status(::grpc::StatusCode::UNIMPLEMENTED, "");
+}
+
+::grpc::Status AuthService::Service::LoginByPhone(::grpc::ServerContext* context, const ::rpc::PhoneLoginRequest* request, ::rpc::LoginResponse* response) {
   (void) context;
   (void) request;
   (void) response;

@@ -430,6 +430,7 @@ class ShareResponse final :
   enum : int {
     kErrorFieldNumber = 2,
     kSuccessFieldNumber = 1,
+    kErrorCodeFieldNumber = 99,
   };
   // string error = 2;
   void clear_error();
@@ -454,6 +455,15 @@ class ShareResponse final :
   void _internal_set_success(bool value);
   public:
 
+  // int32 error_code = 99;
+  void clear_error_code();
+  int32_t error_code() const;
+  void set_error_code(int32_t value);
+  private:
+  int32_t _internal_error_code() const;
+  void _internal_set_error_code(int32_t value);
+  public:
+
   // @@protoc_insertion_point(class_scope:rpc.ShareResponse)
  private:
   class _Internal;
@@ -464,6 +474,7 @@ class ShareResponse final :
   struct Impl_ {
     ::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr error_;
     bool success_;
+    int32_t error_code_;
     mutable ::PROTOBUF_NAMESPACE_ID::internal::CachedSize _cached_size_;
   };
   union { Impl_ _impl_; };
@@ -785,6 +796,7 @@ class RevokeResponse final :
   enum : int {
     kErrorFieldNumber = 2,
     kSuccessFieldNumber = 1,
+    kErrorCodeFieldNumber = 99,
   };
   // string error = 2;
   void clear_error();
@@ -809,6 +821,15 @@ class RevokeResponse final :
   void _internal_set_success(bool value);
   public:
 
+  // int32 error_code = 99;
+  void clear_error_code();
+  int32_t error_code() const;
+  void set_error_code(int32_t value);
+  private:
+  int32_t _internal_error_code() const;
+  void _internal_set_error_code(int32_t value);
+  public:
+
   // @@protoc_insertion_point(class_scope:rpc.RevokeResponse)
  private:
   class _Internal;
@@ -819,6 +840,7 @@ class RevokeResponse final :
   struct Impl_ {
     ::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr error_;
     bool success_;
+    int32_t error_code_;
     mutable ::PROTOBUF_NAMESPACE_ID::internal::CachedSize _cached_size_;
   };
   union { Impl_ _impl_; };
@@ -1310,6 +1332,7 @@ class ShareListResponse final :
     kEntriesFieldNumber = 2,
     kErrorFieldNumber = 3,
     kSuccessFieldNumber = 1,
+    kErrorCodeFieldNumber = 99,
   };
   // repeated .rpc.AccessEntry entries = 2;
   int entries_size() const;
@@ -1352,6 +1375,15 @@ class ShareListResponse final :
   void _internal_set_success(bool value);
   public:
 
+  // int32 error_code = 99;
+  void clear_error_code();
+  int32_t error_code() const;
+  void set_error_code(int32_t value);
+  private:
+  int32_t _internal_error_code() const;
+  void _internal_set_error_code(int32_t value);
+  public:
+
   // @@protoc_insertion_point(class_scope:rpc.ShareListResponse)
  private:
   class _Internal;
@@ -1363,6 +1395,7 @@ class ShareListResponse final :
     ::PROTOBUF_NAMESPACE_ID::RepeatedPtrField< ::rpc::AccessEntry > entries_;
     ::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr error_;
     bool success_;
+    int32_t error_code_;
     mutable ::PROTOBUF_NAMESPACE_ID::internal::CachedSize _cached_size_;
   };
   union { Impl_ _impl_; };
@@ -1685,6 +1718,7 @@ class ShareLinkResponse final :
     kTokenFieldNumber = 2,
     kErrorFieldNumber = 3,
     kSuccessFieldNumber = 1,
+    kErrorCodeFieldNumber = 99,
   };
   // string token = 2;
   void clear_token();
@@ -1723,6 +1757,15 @@ class ShareLinkResponse final :
   void _internal_set_success(bool value);
   public:
 
+  // int32 error_code = 99;
+  void clear_error_code();
+  int32_t error_code() const;
+  void set_error_code(int32_t value);
+  private:
+  int32_t _internal_error_code() const;
+  void _internal_set_error_code(int32_t value);
+  public:
+
   // @@protoc_insertion_point(class_scope:rpc.ShareLinkResponse)
  private:
   class _Internal;
@@ -1734,6 +1777,7 @@ class ShareLinkResponse final :
     ::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr token_;
     ::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr error_;
     bool success_;
+    int32_t error_code_;
     mutable ::PROTOBUF_NAMESPACE_ID::internal::CachedSize _cached_size_;
   };
   union { Impl_ _impl_; };
@@ -2198,6 +2242,7 @@ class SharedResourceResponse final :
     kErrorFieldNumber = 3,
     kInfoFieldNumber = 2,
     kSuccessFieldNumber = 1,
+    kErrorCodeFieldNumber = 99,
   };
   // string error = 3;
   void clear_error();
@@ -2240,6 +2285,15 @@ class SharedResourceResponse final :
   void _internal_set_success(bool value);
   public:
 
+  // int32 error_code = 99;
+  void clear_error_code();
+  int32_t error_code() const;
+  void set_error_code(int32_t value);
+  private:
+  int32_t _internal_error_code() const;
+  void _internal_set_error_code(int32_t value);
+  public:
+
   // @@protoc_insertion_point(class_scope:rpc.SharedResourceResponse)
  private:
   class _Internal;
@@ -2251,6 +2305,7 @@ class SharedResourceResponse final :
     ::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr error_;
     ::rpc::SharedResourceInfo* info_;
     bool success_;
+    int32_t error_code_;
     mutable ::PROTOBUF_NAMESPACE_ID::internal::CachedSize _cached_size_;
   };
   union { Impl_ _impl_; };
@@ -2531,6 +2586,26 @@ inline void ShareResponse::set_allocated_error(std::string* error) {
   // @@protoc_insertion_point(field_set_allocated:rpc.ShareResponse.error)
 }
 
+// int32 error_code = 99;
+inline void ShareResponse::clear_error_code() {
+  _impl_.error_code_ = 0;
+}
+inline int32_t ShareResponse::_internal_error_code() const {
+  return _impl_.error_code_;
+}
+inline int32_t ShareResponse::error_code() const {
+  // @@protoc_insertion_point(field_get:rpc.ShareResponse.error_code)
+  return _internal_error_code();
+}
+inline void ShareResponse::_internal_set_error_code(int32_t value) {
+  
+  _impl_.error_code_ = value;
+}
+inline void ShareResponse::set_error_code(int32_t value) {
+  _internal_set_error_code(value);
+  // @@protoc_insertion_point(field_set:rpc.ShareResponse.error_code)
+}
+
 // -------------------------------------------------------------------
 
 // RevokeRequest
@@ -2747,6 +2822,26 @@ inline void RevokeResponse::set_allocated_error(std::string* error) {
   }
 #endif // PROTOBUF_FORCE_COPY_DEFAULT_STRING
   // @@protoc_insertion_point(field_set_allocated:rpc.RevokeResponse.error)
+}
+
+// int32 error_code = 99;
+inline void RevokeResponse::clear_error_code() {
+  _impl_.error_code_ = 0;
+}
+inline int32_t RevokeResponse::_internal_error_code() const {
+  return _impl_.error_code_;
+}
+inline int32_t RevokeResponse::error_code() const {
+  // @@protoc_insertion_point(field_get:rpc.RevokeResponse.error_code)
+  return _internal_error_code();
+}
+inline void RevokeResponse::_internal_set_error_code(int32_t value) {
+  
+  _impl_.error_code_ = value;
+}
+inline void RevokeResponse::set_error_code(int32_t value) {
+  _internal_set_error_code(value);
+  // @@protoc_insertion_point(field_set:rpc.RevokeResponse.error_code)
 }
 
 // -------------------------------------------------------------------
@@ -3111,6 +3206,26 @@ inline void ShareListResponse::set_allocated_error(std::string* error) {
   // @@protoc_insertion_point(field_set_allocated:rpc.ShareListResponse.error)
 }
 
+// int32 error_code = 99;
+inline void ShareListResponse::clear_error_code() {
+  _impl_.error_code_ = 0;
+}
+inline int32_t ShareListResponse::_internal_error_code() const {
+  return _impl_.error_code_;
+}
+inline int32_t ShareListResponse::error_code() const {
+  // @@protoc_insertion_point(field_get:rpc.ShareListResponse.error_code)
+  return _internal_error_code();
+}
+inline void ShareListResponse::_internal_set_error_code(int32_t value) {
+  
+  _impl_.error_code_ = value;
+}
+inline void ShareListResponse::set_error_code(int32_t value) {
+  _internal_set_error_code(value);
+  // @@protoc_insertion_point(field_set:rpc.ShareListResponse.error_code)
+}
+
 // -------------------------------------------------------------------
 
 // ShareLinkRequest
@@ -3377,6 +3492,26 @@ inline void ShareLinkResponse::set_allocated_error(std::string* error) {
   }
 #endif // PROTOBUF_FORCE_COPY_DEFAULT_STRING
   // @@protoc_insertion_point(field_set_allocated:rpc.ShareLinkResponse.error)
+}
+
+// int32 error_code = 99;
+inline void ShareLinkResponse::clear_error_code() {
+  _impl_.error_code_ = 0;
+}
+inline int32_t ShareLinkResponse::_internal_error_code() const {
+  return _impl_.error_code_;
+}
+inline int32_t ShareLinkResponse::error_code() const {
+  // @@protoc_insertion_point(field_get:rpc.ShareLinkResponse.error_code)
+  return _internal_error_code();
+}
+inline void ShareLinkResponse::_internal_set_error_code(int32_t value) {
+  
+  _impl_.error_code_ = value;
+}
+inline void ShareLinkResponse::set_error_code(int32_t value) {
+  _internal_set_error_code(value);
+  // @@protoc_insertion_point(field_set:rpc.ShareLinkResponse.error_code)
 }
 
 // -------------------------------------------------------------------
@@ -3719,6 +3854,26 @@ inline void SharedResourceResponse::set_allocated_error(std::string* error) {
   }
 #endif // PROTOBUF_FORCE_COPY_DEFAULT_STRING
   // @@protoc_insertion_point(field_set_allocated:rpc.SharedResourceResponse.error)
+}
+
+// int32 error_code = 99;
+inline void SharedResourceResponse::clear_error_code() {
+  _impl_.error_code_ = 0;
+}
+inline int32_t SharedResourceResponse::_internal_error_code() const {
+  return _impl_.error_code_;
+}
+inline int32_t SharedResourceResponse::error_code() const {
+  // @@protoc_insertion_point(field_get:rpc.SharedResourceResponse.error_code)
+  return _internal_error_code();
+}
+inline void SharedResourceResponse::_internal_set_error_code(int32_t value) {
+  
+  _impl_.error_code_ = value;
+}
+inline void SharedResourceResponse::set_error_code(int32_t value) {
+  _internal_set_error_code(value);
+  // @@protoc_insertion_point(field_set:rpc.SharedResourceResponse.error_code)
 }
 
 #ifdef __GNUC__

@@ -45,12 +45,21 @@ struct TableStruct_rpc_5fauth_2eproto {
 };
 extern const ::PROTOBUF_NAMESPACE_ID::internal::DescriptorTable descriptor_table_rpc_5fauth_2eproto;
 namespace rpc {
+class ChangePasswordRequest;
+struct ChangePasswordRequestDefaultTypeInternal;
+extern ChangePasswordRequestDefaultTypeInternal _ChangePasswordRequest_default_instance_;
+class ChangePasswordResponse;
+struct ChangePasswordResponseDefaultTypeInternal;
+extern ChangePasswordResponseDefaultTypeInternal _ChangePasswordResponse_default_instance_;
 class LoginRequest;
 struct LoginRequestDefaultTypeInternal;
 extern LoginRequestDefaultTypeInternal _LoginRequest_default_instance_;
 class LoginResponse;
 struct LoginResponseDefaultTypeInternal;
 extern LoginResponseDefaultTypeInternal _LoginResponse_default_instance_;
+class PhoneLoginRequest;
+struct PhoneLoginRequestDefaultTypeInternal;
+extern PhoneLoginRequestDefaultTypeInternal _PhoneLoginRequest_default_instance_;
 class RefreshTokenRequest;
 struct RefreshTokenRequestDefaultTypeInternal;
 extern RefreshTokenRequestDefaultTypeInternal _RefreshTokenRequest_default_instance_;
@@ -71,8 +80,11 @@ struct ValidateUserResponseDefaultTypeInternal;
 extern ValidateUserResponseDefaultTypeInternal _ValidateUserResponse_default_instance_;
 }  // namespace rpc
 PROTOBUF_NAMESPACE_OPEN
+template<> ::rpc::ChangePasswordRequest* Arena::CreateMaybeMessage<::rpc::ChangePasswordRequest>(Arena*);
+template<> ::rpc::ChangePasswordResponse* Arena::CreateMaybeMessage<::rpc::ChangePasswordResponse>(Arena*);
 template<> ::rpc::LoginRequest* Arena::CreateMaybeMessage<::rpc::LoginRequest>(Arena*);
 template<> ::rpc::LoginResponse* Arena::CreateMaybeMessage<::rpc::LoginResponse>(Arena*);
+template<> ::rpc::PhoneLoginRequest* Arena::CreateMaybeMessage<::rpc::PhoneLoginRequest>(Arena*);
 template<> ::rpc::RefreshTokenRequest* Arena::CreateMaybeMessage<::rpc::RefreshTokenRequest>(Arena*);
 template<> ::rpc::RefreshTokenResponse* Arena::CreateMaybeMessage<::rpc::RefreshTokenResponse>(Arena*);
 template<> ::rpc::RegisterRequest* Arena::CreateMaybeMessage<::rpc::RegisterRequest>(Arena*);
@@ -380,6 +392,7 @@ class LoginResponse final :
     kRoleFieldNumber = 7,
     kUserIdFieldNumber = 4,
     kSuccessFieldNumber = 1,
+    kErrorCodeFieldNumber = 99,
   };
   // string error = 3;
   void clear_error();
@@ -455,6 +468,15 @@ class LoginResponse final :
   void _internal_set_success(bool value);
   public:
 
+  // int32 error_code = 99;
+  void clear_error_code();
+  int32_t error_code() const;
+  void set_error_code(int32_t value);
+  private:
+  int32_t _internal_error_code() const;
+  void _internal_set_error_code(int32_t value);
+  public:
+
   // @@protoc_insertion_point(class_scope:rpc.LoginResponse)
  private:
   class _Internal;
@@ -469,6 +491,7 @@ class LoginResponse final :
     ::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr role_;
     int64_t user_id_;
     bool success_;
+    int32_t error_code_;
     mutable ::PROTOBUF_NAMESPACE_ID::internal::CachedSize _cached_size_;
   };
   union { Impl_ _impl_; };
@@ -772,6 +795,7 @@ class RegisterResponse final :
     kRoleFieldNumber = 7,
     kUserIdFieldNumber = 4,
     kSuccessFieldNumber = 1,
+    kErrorCodeFieldNumber = 99,
   };
   // string error = 3;
   void clear_error();
@@ -847,6 +871,15 @@ class RegisterResponse final :
   void _internal_set_success(bool value);
   public:
 
+  // int32 error_code = 99;
+  void clear_error_code();
+  int32_t error_code() const;
+  void set_error_code(int32_t value);
+  private:
+  int32_t _internal_error_code() const;
+  void _internal_set_error_code(int32_t value);
+  public:
+
   // @@protoc_insertion_point(class_scope:rpc.RegisterResponse)
  private:
   class _Internal;
@@ -861,6 +894,7 @@ class RegisterResponse final :
     ::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr role_;
     int64_t user_id_;
     bool success_;
+    int32_t error_code_;
     mutable ::PROTOBUF_NAMESPACE_ID::internal::CachedSize _cached_size_;
   };
   union { Impl_ _impl_; };
@@ -1161,6 +1195,7 @@ class RefreshTokenResponse final :
     kErrorFieldNumber = 2,
     kAccessTokenFieldNumber = 3,
     kSuccessFieldNumber = 1,
+    kErrorCodeFieldNumber = 99,
   };
   // string error = 2;
   void clear_error();
@@ -1199,6 +1234,15 @@ class RefreshTokenResponse final :
   void _internal_set_success(bool value);
   public:
 
+  // int32 error_code = 99;
+  void clear_error_code();
+  int32_t error_code() const;
+  void set_error_code(int32_t value);
+  private:
+  int32_t _internal_error_code() const;
+  void _internal_set_error_code(int32_t value);
+  public:
+
   // @@protoc_insertion_point(class_scope:rpc.RefreshTokenResponse)
  private:
   class _Internal;
@@ -1210,6 +1254,7 @@ class RefreshTokenResponse final :
     ::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr error_;
     ::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr access_token_;
     bool success_;
+    int32_t error_code_;
     mutable ::PROTOBUF_NAMESPACE_ID::internal::CachedSize _cached_size_;
   };
   union { Impl_ _impl_; };
@@ -1523,6 +1568,7 @@ class ValidateUserResponse final :
     kErrorFieldNumber = 5,
     kUserIdFieldNumber = 3,
     kValidFieldNumber = 1,
+    kErrorCodeFieldNumber = 99,
   };
   // string username = 2;
   void clear_username();
@@ -1584,6 +1630,15 @@ class ValidateUserResponse final :
   void _internal_set_valid(bool value);
   public:
 
+  // int32 error_code = 99;
+  void clear_error_code();
+  int32_t error_code() const;
+  void set_error_code(int32_t value);
+  private:
+  int32_t _internal_error_code() const;
+  void _internal_set_error_code(int32_t value);
+  public:
+
   // @@protoc_insertion_point(class_scope:rpc.ValidateUserResponse)
  private:
   class _Internal;
@@ -1597,6 +1652,531 @@ class ValidateUserResponse final :
     ::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr error_;
     int64_t user_id_;
     bool valid_;
+    int32_t error_code_;
+    mutable ::PROTOBUF_NAMESPACE_ID::internal::CachedSize _cached_size_;
+  };
+  union { Impl_ _impl_; };
+  friend struct ::TableStruct_rpc_5fauth_2eproto;
+};
+// -------------------------------------------------------------------
+
+class ChangePasswordRequest final :
+    public ::PROTOBUF_NAMESPACE_ID::Message /* @@protoc_insertion_point(class_definition:rpc.ChangePasswordRequest) */ {
+ public:
+  inline ChangePasswordRequest() : ChangePasswordRequest(nullptr) {}
+  ~ChangePasswordRequest() override;
+  explicit PROTOBUF_CONSTEXPR ChangePasswordRequest(::PROTOBUF_NAMESPACE_ID::internal::ConstantInitialized);
+
+  ChangePasswordRequest(const ChangePasswordRequest& from);
+  ChangePasswordRequest(ChangePasswordRequest&& from) noexcept
+    : ChangePasswordRequest() {
+    *this = ::std::move(from);
+  }
+
+  inline ChangePasswordRequest& operator=(const ChangePasswordRequest& from) {
+    CopyFrom(from);
+    return *this;
+  }
+  inline ChangePasswordRequest& operator=(ChangePasswordRequest&& from) noexcept {
+    if (this == &from) return *this;
+    if (GetOwningArena() == from.GetOwningArena()
+  #ifdef PROTOBUF_FORCE_COPY_IN_MOVE
+        && GetOwningArena() != nullptr
+  #endif  // !PROTOBUF_FORCE_COPY_IN_MOVE
+    ) {
+      InternalSwap(&from);
+    } else {
+      CopyFrom(from);
+    }
+    return *this;
+  }
+
+  static const ::PROTOBUF_NAMESPACE_ID::Descriptor* descriptor() {
+    return GetDescriptor();
+  }
+  static const ::PROTOBUF_NAMESPACE_ID::Descriptor* GetDescriptor() {
+    return default_instance().GetMetadata().descriptor;
+  }
+  static const ::PROTOBUF_NAMESPACE_ID::Reflection* GetReflection() {
+    return default_instance().GetMetadata().reflection;
+  }
+  static const ChangePasswordRequest& default_instance() {
+    return *internal_default_instance();
+  }
+  static inline const ChangePasswordRequest* internal_default_instance() {
+    return reinterpret_cast<const ChangePasswordRequest*>(
+               &_ChangePasswordRequest_default_instance_);
+  }
+  static constexpr int kIndexInFileMessages =
+    8;
+
+  friend void swap(ChangePasswordRequest& a, ChangePasswordRequest& b) {
+    a.Swap(&b);
+  }
+  inline void Swap(ChangePasswordRequest* other) {
+    if (other == this) return;
+  #ifdef PROTOBUF_FORCE_COPY_IN_SWAP
+    if (GetOwningArena() != nullptr &&
+        GetOwningArena() == other->GetOwningArena()) {
+   #else  // PROTOBUF_FORCE_COPY_IN_SWAP
+    if (GetOwningArena() == other->GetOwningArena()) {
+  #endif  // !PROTOBUF_FORCE_COPY_IN_SWAP
+      InternalSwap(other);
+    } else {
+      ::PROTOBUF_NAMESPACE_ID::internal::GenericSwap(this, other);
+    }
+  }
+  void UnsafeArenaSwap(ChangePasswordRequest* other) {
+    if (other == this) return;
+    GOOGLE_DCHECK(GetOwningArena() == other->GetOwningArena());
+    InternalSwap(other);
+  }
+
+  // implements Message ----------------------------------------------
+
+  ChangePasswordRequest* New(::PROTOBUF_NAMESPACE_ID::Arena* arena = nullptr) const final {
+    return CreateMaybeMessage<ChangePasswordRequest>(arena);
+  }
+  using ::PROTOBUF_NAMESPACE_ID::Message::CopyFrom;
+  void CopyFrom(const ChangePasswordRequest& from);
+  using ::PROTOBUF_NAMESPACE_ID::Message::MergeFrom;
+  void MergeFrom( const ChangePasswordRequest& from) {
+    ChangePasswordRequest::MergeImpl(*this, from);
+  }
+  private:
+  static void MergeImpl(::PROTOBUF_NAMESPACE_ID::Message& to_msg, const ::PROTOBUF_NAMESPACE_ID::Message& from_msg);
+  public:
+  PROTOBUF_ATTRIBUTE_REINITIALIZES void Clear() final;
+  bool IsInitialized() const final;
+
+  size_t ByteSizeLong() const final;
+  const char* _InternalParse(const char* ptr, ::PROTOBUF_NAMESPACE_ID::internal::ParseContext* ctx) final;
+  uint8_t* _InternalSerialize(
+      uint8_t* target, ::PROTOBUF_NAMESPACE_ID::io::EpsCopyOutputStream* stream) const final;
+  int GetCachedSize() const final { return _impl_._cached_size_.Get(); }
+
+  private:
+  void SharedCtor(::PROTOBUF_NAMESPACE_ID::Arena* arena, bool is_message_owned);
+  void SharedDtor();
+  void SetCachedSize(int size) const final;
+  void InternalSwap(ChangePasswordRequest* other);
+
+  private:
+  friend class ::PROTOBUF_NAMESPACE_ID::internal::AnyMetadata;
+  static ::PROTOBUF_NAMESPACE_ID::StringPiece FullMessageName() {
+    return "rpc.ChangePasswordRequest";
+  }
+  protected:
+  explicit ChangePasswordRequest(::PROTOBUF_NAMESPACE_ID::Arena* arena,
+                       bool is_message_owned = false);
+  public:
+
+  static const ClassData _class_data_;
+  const ::PROTOBUF_NAMESPACE_ID::Message::ClassData*GetClassData() const final;
+
+  ::PROTOBUF_NAMESPACE_ID::Metadata GetMetadata() const final;
+
+  // nested types ----------------------------------------------------
+
+  // accessors -------------------------------------------------------
+
+  enum : int {
+    kOldPasswordFieldNumber = 2,
+    kNewPasswordFieldNumber = 3,
+    kUserIdFieldNumber = 1,
+  };
+  // string old_password = 2;
+  void clear_old_password();
+  const std::string& old_password() const;
+  template <typename ArgT0 = const std::string&, typename... ArgT>
+  void set_old_password(ArgT0&& arg0, ArgT... args);
+  std::string* mutable_old_password();
+  PROTOBUF_NODISCARD std::string* release_old_password();
+  void set_allocated_old_password(std::string* old_password);
+  private:
+  const std::string& _internal_old_password() const;
+  inline PROTOBUF_ALWAYS_INLINE void _internal_set_old_password(const std::string& value);
+  std::string* _internal_mutable_old_password();
+  public:
+
+  // string new_password = 3;
+  void clear_new_password();
+  const std::string& new_password() const;
+  template <typename ArgT0 = const std::string&, typename... ArgT>
+  void set_new_password(ArgT0&& arg0, ArgT... args);
+  std::string* mutable_new_password();
+  PROTOBUF_NODISCARD std::string* release_new_password();
+  void set_allocated_new_password(std::string* new_password);
+  private:
+  const std::string& _internal_new_password() const;
+  inline PROTOBUF_ALWAYS_INLINE void _internal_set_new_password(const std::string& value);
+  std::string* _internal_mutable_new_password();
+  public:
+
+  // int64 user_id = 1;
+  void clear_user_id();
+  int64_t user_id() const;
+  void set_user_id(int64_t value);
+  private:
+  int64_t _internal_user_id() const;
+  void _internal_set_user_id(int64_t value);
+  public:
+
+  // @@protoc_insertion_point(class_scope:rpc.ChangePasswordRequest)
+ private:
+  class _Internal;
+
+  template <typename T> friend class ::PROTOBUF_NAMESPACE_ID::Arena::InternalHelper;
+  typedef void InternalArenaConstructable_;
+  typedef void DestructorSkippable_;
+  struct Impl_ {
+    ::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr old_password_;
+    ::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr new_password_;
+    int64_t user_id_;
+    mutable ::PROTOBUF_NAMESPACE_ID::internal::CachedSize _cached_size_;
+  };
+  union { Impl_ _impl_; };
+  friend struct ::TableStruct_rpc_5fauth_2eproto;
+};
+// -------------------------------------------------------------------
+
+class ChangePasswordResponse final :
+    public ::PROTOBUF_NAMESPACE_ID::Message /* @@protoc_insertion_point(class_definition:rpc.ChangePasswordResponse) */ {
+ public:
+  inline ChangePasswordResponse() : ChangePasswordResponse(nullptr) {}
+  ~ChangePasswordResponse() override;
+  explicit PROTOBUF_CONSTEXPR ChangePasswordResponse(::PROTOBUF_NAMESPACE_ID::internal::ConstantInitialized);
+
+  ChangePasswordResponse(const ChangePasswordResponse& from);
+  ChangePasswordResponse(ChangePasswordResponse&& from) noexcept
+    : ChangePasswordResponse() {
+    *this = ::std::move(from);
+  }
+
+  inline ChangePasswordResponse& operator=(const ChangePasswordResponse& from) {
+    CopyFrom(from);
+    return *this;
+  }
+  inline ChangePasswordResponse& operator=(ChangePasswordResponse&& from) noexcept {
+    if (this == &from) return *this;
+    if (GetOwningArena() == from.GetOwningArena()
+  #ifdef PROTOBUF_FORCE_COPY_IN_MOVE
+        && GetOwningArena() != nullptr
+  #endif  // !PROTOBUF_FORCE_COPY_IN_MOVE
+    ) {
+      InternalSwap(&from);
+    } else {
+      CopyFrom(from);
+    }
+    return *this;
+  }
+
+  static const ::PROTOBUF_NAMESPACE_ID::Descriptor* descriptor() {
+    return GetDescriptor();
+  }
+  static const ::PROTOBUF_NAMESPACE_ID::Descriptor* GetDescriptor() {
+    return default_instance().GetMetadata().descriptor;
+  }
+  static const ::PROTOBUF_NAMESPACE_ID::Reflection* GetReflection() {
+    return default_instance().GetMetadata().reflection;
+  }
+  static const ChangePasswordResponse& default_instance() {
+    return *internal_default_instance();
+  }
+  static inline const ChangePasswordResponse* internal_default_instance() {
+    return reinterpret_cast<const ChangePasswordResponse*>(
+               &_ChangePasswordResponse_default_instance_);
+  }
+  static constexpr int kIndexInFileMessages =
+    9;
+
+  friend void swap(ChangePasswordResponse& a, ChangePasswordResponse& b) {
+    a.Swap(&b);
+  }
+  inline void Swap(ChangePasswordResponse* other) {
+    if (other == this) return;
+  #ifdef PROTOBUF_FORCE_COPY_IN_SWAP
+    if (GetOwningArena() != nullptr &&
+        GetOwningArena() == other->GetOwningArena()) {
+   #else  // PROTOBUF_FORCE_COPY_IN_SWAP
+    if (GetOwningArena() == other->GetOwningArena()) {
+  #endif  // !PROTOBUF_FORCE_COPY_IN_SWAP
+      InternalSwap(other);
+    } else {
+      ::PROTOBUF_NAMESPACE_ID::internal::GenericSwap(this, other);
+    }
+  }
+  void UnsafeArenaSwap(ChangePasswordResponse* other) {
+    if (other == this) return;
+    GOOGLE_DCHECK(GetOwningArena() == other->GetOwningArena());
+    InternalSwap(other);
+  }
+
+  // implements Message ----------------------------------------------
+
+  ChangePasswordResponse* New(::PROTOBUF_NAMESPACE_ID::Arena* arena = nullptr) const final {
+    return CreateMaybeMessage<ChangePasswordResponse>(arena);
+  }
+  using ::PROTOBUF_NAMESPACE_ID::Message::CopyFrom;
+  void CopyFrom(const ChangePasswordResponse& from);
+  using ::PROTOBUF_NAMESPACE_ID::Message::MergeFrom;
+  void MergeFrom( const ChangePasswordResponse& from) {
+    ChangePasswordResponse::MergeImpl(*this, from);
+  }
+  private:
+  static void MergeImpl(::PROTOBUF_NAMESPACE_ID::Message& to_msg, const ::PROTOBUF_NAMESPACE_ID::Message& from_msg);
+  public:
+  PROTOBUF_ATTRIBUTE_REINITIALIZES void Clear() final;
+  bool IsInitialized() const final;
+
+  size_t ByteSizeLong() const final;
+  const char* _InternalParse(const char* ptr, ::PROTOBUF_NAMESPACE_ID::internal::ParseContext* ctx) final;
+  uint8_t* _InternalSerialize(
+      uint8_t* target, ::PROTOBUF_NAMESPACE_ID::io::EpsCopyOutputStream* stream) const final;
+  int GetCachedSize() const final { return _impl_._cached_size_.Get(); }
+
+  private:
+  void SharedCtor(::PROTOBUF_NAMESPACE_ID::Arena* arena, bool is_message_owned);
+  void SharedDtor();
+  void SetCachedSize(int size) const final;
+  void InternalSwap(ChangePasswordResponse* other);
+
+  private:
+  friend class ::PROTOBUF_NAMESPACE_ID::internal::AnyMetadata;
+  static ::PROTOBUF_NAMESPACE_ID::StringPiece FullMessageName() {
+    return "rpc.ChangePasswordResponse";
+  }
+  protected:
+  explicit ChangePasswordResponse(::PROTOBUF_NAMESPACE_ID::Arena* arena,
+                       bool is_message_owned = false);
+  public:
+
+  static const ClassData _class_data_;
+  const ::PROTOBUF_NAMESPACE_ID::Message::ClassData*GetClassData() const final;
+
+  ::PROTOBUF_NAMESPACE_ID::Metadata GetMetadata() const final;
+
+  // nested types ----------------------------------------------------
+
+  // accessors -------------------------------------------------------
+
+  enum : int {
+    kErrorFieldNumber = 2,
+    kSuccessFieldNumber = 1,
+    kErrorCodeFieldNumber = 99,
+  };
+  // string error = 2;
+  void clear_error();
+  const std::string& error() const;
+  template <typename ArgT0 = const std::string&, typename... ArgT>
+  void set_error(ArgT0&& arg0, ArgT... args);
+  std::string* mutable_error();
+  PROTOBUF_NODISCARD std::string* release_error();
+  void set_allocated_error(std::string* error);
+  private:
+  const std::string& _internal_error() const;
+  inline PROTOBUF_ALWAYS_INLINE void _internal_set_error(const std::string& value);
+  std::string* _internal_mutable_error();
+  public:
+
+  // bool success = 1;
+  void clear_success();
+  bool success() const;
+  void set_success(bool value);
+  private:
+  bool _internal_success() const;
+  void _internal_set_success(bool value);
+  public:
+
+  // int32 error_code = 99;
+  void clear_error_code();
+  int32_t error_code() const;
+  void set_error_code(int32_t value);
+  private:
+  int32_t _internal_error_code() const;
+  void _internal_set_error_code(int32_t value);
+  public:
+
+  // @@protoc_insertion_point(class_scope:rpc.ChangePasswordResponse)
+ private:
+  class _Internal;
+
+  template <typename T> friend class ::PROTOBUF_NAMESPACE_ID::Arena::InternalHelper;
+  typedef void InternalArenaConstructable_;
+  typedef void DestructorSkippable_;
+  struct Impl_ {
+    ::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr error_;
+    bool success_;
+    int32_t error_code_;
+    mutable ::PROTOBUF_NAMESPACE_ID::internal::CachedSize _cached_size_;
+  };
+  union { Impl_ _impl_; };
+  friend struct ::TableStruct_rpc_5fauth_2eproto;
+};
+// -------------------------------------------------------------------
+
+class PhoneLoginRequest final :
+    public ::PROTOBUF_NAMESPACE_ID::Message /* @@protoc_insertion_point(class_definition:rpc.PhoneLoginRequest) */ {
+ public:
+  inline PhoneLoginRequest() : PhoneLoginRequest(nullptr) {}
+  ~PhoneLoginRequest() override;
+  explicit PROTOBUF_CONSTEXPR PhoneLoginRequest(::PROTOBUF_NAMESPACE_ID::internal::ConstantInitialized);
+
+  PhoneLoginRequest(const PhoneLoginRequest& from);
+  PhoneLoginRequest(PhoneLoginRequest&& from) noexcept
+    : PhoneLoginRequest() {
+    *this = ::std::move(from);
+  }
+
+  inline PhoneLoginRequest& operator=(const PhoneLoginRequest& from) {
+    CopyFrom(from);
+    return *this;
+  }
+  inline PhoneLoginRequest& operator=(PhoneLoginRequest&& from) noexcept {
+    if (this == &from) return *this;
+    if (GetOwningArena() == from.GetOwningArena()
+  #ifdef PROTOBUF_FORCE_COPY_IN_MOVE
+        && GetOwningArena() != nullptr
+  #endif  // !PROTOBUF_FORCE_COPY_IN_MOVE
+    ) {
+      InternalSwap(&from);
+    } else {
+      CopyFrom(from);
+    }
+    return *this;
+  }
+
+  static const ::PROTOBUF_NAMESPACE_ID::Descriptor* descriptor() {
+    return GetDescriptor();
+  }
+  static const ::PROTOBUF_NAMESPACE_ID::Descriptor* GetDescriptor() {
+    return default_instance().GetMetadata().descriptor;
+  }
+  static const ::PROTOBUF_NAMESPACE_ID::Reflection* GetReflection() {
+    return default_instance().GetMetadata().reflection;
+  }
+  static const PhoneLoginRequest& default_instance() {
+    return *internal_default_instance();
+  }
+  static inline const PhoneLoginRequest* internal_default_instance() {
+    return reinterpret_cast<const PhoneLoginRequest*>(
+               &_PhoneLoginRequest_default_instance_);
+  }
+  static constexpr int kIndexInFileMessages =
+    10;
+
+  friend void swap(PhoneLoginRequest& a, PhoneLoginRequest& b) {
+    a.Swap(&b);
+  }
+  inline void Swap(PhoneLoginRequest* other) {
+    if (other == this) return;
+  #ifdef PROTOBUF_FORCE_COPY_IN_SWAP
+    if (GetOwningArena() != nullptr &&
+        GetOwningArena() == other->GetOwningArena()) {
+   #else  // PROTOBUF_FORCE_COPY_IN_SWAP
+    if (GetOwningArena() == other->GetOwningArena()) {
+  #endif  // !PROTOBUF_FORCE_COPY_IN_SWAP
+      InternalSwap(other);
+    } else {
+      ::PROTOBUF_NAMESPACE_ID::internal::GenericSwap(this, other);
+    }
+  }
+  void UnsafeArenaSwap(PhoneLoginRequest* other) {
+    if (other == this) return;
+    GOOGLE_DCHECK(GetOwningArena() == other->GetOwningArena());
+    InternalSwap(other);
+  }
+
+  // implements Message ----------------------------------------------
+
+  PhoneLoginRequest* New(::PROTOBUF_NAMESPACE_ID::Arena* arena = nullptr) const final {
+    return CreateMaybeMessage<PhoneLoginRequest>(arena);
+  }
+  using ::PROTOBUF_NAMESPACE_ID::Message::CopyFrom;
+  void CopyFrom(const PhoneLoginRequest& from);
+  using ::PROTOBUF_NAMESPACE_ID::Message::MergeFrom;
+  void MergeFrom( const PhoneLoginRequest& from) {
+    PhoneLoginRequest::MergeImpl(*this, from);
+  }
+  private:
+  static void MergeImpl(::PROTOBUF_NAMESPACE_ID::Message& to_msg, const ::PROTOBUF_NAMESPACE_ID::Message& from_msg);
+  public:
+  PROTOBUF_ATTRIBUTE_REINITIALIZES void Clear() final;
+  bool IsInitialized() const final;
+
+  size_t ByteSizeLong() const final;
+  const char* _InternalParse(const char* ptr, ::PROTOBUF_NAMESPACE_ID::internal::ParseContext* ctx) final;
+  uint8_t* _InternalSerialize(
+      uint8_t* target, ::PROTOBUF_NAMESPACE_ID::io::EpsCopyOutputStream* stream) const final;
+  int GetCachedSize() const final { return _impl_._cached_size_.Get(); }
+
+  private:
+  void SharedCtor(::PROTOBUF_NAMESPACE_ID::Arena* arena, bool is_message_owned);
+  void SharedDtor();
+  void SetCachedSize(int size) const final;
+  void InternalSwap(PhoneLoginRequest* other);
+
+  private:
+  friend class ::PROTOBUF_NAMESPACE_ID::internal::AnyMetadata;
+  static ::PROTOBUF_NAMESPACE_ID::StringPiece FullMessageName() {
+    return "rpc.PhoneLoginRequest";
+  }
+  protected:
+  explicit PhoneLoginRequest(::PROTOBUF_NAMESPACE_ID::Arena* arena,
+                       bool is_message_owned = false);
+  public:
+
+  static const ClassData _class_data_;
+  const ::PROTOBUF_NAMESPACE_ID::Message::ClassData*GetClassData() const final;
+
+  ::PROTOBUF_NAMESPACE_ID::Metadata GetMetadata() const final;
+
+  // nested types ----------------------------------------------------
+
+  // accessors -------------------------------------------------------
+
+  enum : int {
+    kPhoneFieldNumber = 1,
+    kOtpFieldNumber = 2,
+  };
+  // string phone = 1;
+  void clear_phone();
+  const std::string& phone() const;
+  template <typename ArgT0 = const std::string&, typename... ArgT>
+  void set_phone(ArgT0&& arg0, ArgT... args);
+  std::string* mutable_phone();
+  PROTOBUF_NODISCARD std::string* release_phone();
+  void set_allocated_phone(std::string* phone);
+  private:
+  const std::string& _internal_phone() const;
+  inline PROTOBUF_ALWAYS_INLINE void _internal_set_phone(const std::string& value);
+  std::string* _internal_mutable_phone();
+  public:
+
+  // string otp = 2;
+  void clear_otp();
+  const std::string& otp() const;
+  template <typename ArgT0 = const std::string&, typename... ArgT>
+  void set_otp(ArgT0&& arg0, ArgT... args);
+  std::string* mutable_otp();
+  PROTOBUF_NODISCARD std::string* release_otp();
+  void set_allocated_otp(std::string* otp);
+  private:
+  const std::string& _internal_otp() const;
+  inline PROTOBUF_ALWAYS_INLINE void _internal_set_otp(const std::string& value);
+  std::string* _internal_mutable_otp();
+  public:
+
+  // @@protoc_insertion_point(class_scope:rpc.PhoneLoginRequest)
+ private:
+  class _Internal;
+
+  template <typename T> friend class ::PROTOBUF_NAMESPACE_ID::Arena::InternalHelper;
+  typedef void InternalArenaConstructable_;
+  typedef void DestructorSkippable_;
+  struct Impl_ {
+    ::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr phone_;
+    ::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr otp_;
     mutable ::PROTOBUF_NAMESPACE_ID::internal::CachedSize _cached_size_;
   };
   union { Impl_ _impl_; };
@@ -1785,6 +2365,26 @@ inline void LoginResponse::set_allocated_error(std::string* error) {
   }
 #endif // PROTOBUF_FORCE_COPY_DEFAULT_STRING
   // @@protoc_insertion_point(field_set_allocated:rpc.LoginResponse.error)
+}
+
+// int32 error_code = 99;
+inline void LoginResponse::clear_error_code() {
+  _impl_.error_code_ = 0;
+}
+inline int32_t LoginResponse::_internal_error_code() const {
+  return _impl_.error_code_;
+}
+inline int32_t LoginResponse::error_code() const {
+  // @@protoc_insertion_point(field_get:rpc.LoginResponse.error_code)
+  return _internal_error_code();
+}
+inline void LoginResponse::_internal_set_error_code(int32_t value) {
+  
+  _impl_.error_code_ = value;
+}
+inline void LoginResponse::set_error_code(int32_t value) {
+  _internal_set_error_code(value);
+  // @@protoc_insertion_point(field_set:rpc.LoginResponse.error_code)
 }
 
 // int64 user_id = 4;
@@ -2135,6 +2735,26 @@ inline void RegisterResponse::set_allocated_error(std::string* error) {
   // @@protoc_insertion_point(field_set_allocated:rpc.RegisterResponse.error)
 }
 
+// int32 error_code = 99;
+inline void RegisterResponse::clear_error_code() {
+  _impl_.error_code_ = 0;
+}
+inline int32_t RegisterResponse::_internal_error_code() const {
+  return _impl_.error_code_;
+}
+inline int32_t RegisterResponse::error_code() const {
+  // @@protoc_insertion_point(field_get:rpc.RegisterResponse.error_code)
+  return _internal_error_code();
+}
+inline void RegisterResponse::_internal_set_error_code(int32_t value) {
+  
+  _impl_.error_code_ = value;
+}
+inline void RegisterResponse::set_error_code(int32_t value) {
+  _internal_set_error_code(value);
+  // @@protoc_insertion_point(field_set:rpc.RegisterResponse.error_code)
+}
+
 // int64 user_id = 4;
 inline void RegisterResponse::clear_user_id() {
   _impl_.user_id_ = int64_t{0};
@@ -2481,6 +3101,26 @@ inline void RefreshTokenResponse::set_allocated_error(std::string* error) {
   }
 #endif // PROTOBUF_FORCE_COPY_DEFAULT_STRING
   // @@protoc_insertion_point(field_set_allocated:rpc.RefreshTokenResponse.error)
+}
+
+// int32 error_code = 99;
+inline void RefreshTokenResponse::clear_error_code() {
+  _impl_.error_code_ = 0;
+}
+inline int32_t RefreshTokenResponse::_internal_error_code() const {
+  return _impl_.error_code_;
+}
+inline int32_t RefreshTokenResponse::error_code() const {
+  // @@protoc_insertion_point(field_get:rpc.RefreshTokenResponse.error_code)
+  return _internal_error_code();
+}
+inline void RefreshTokenResponse::_internal_set_error_code(int32_t value) {
+  
+  _impl_.error_code_ = value;
+}
+inline void RefreshTokenResponse::set_error_code(int32_t value) {
+  _internal_set_error_code(value);
+  // @@protoc_insertion_point(field_set:rpc.RefreshTokenResponse.error_code)
 }
 
 // string access_token = 3;
@@ -2851,9 +3491,357 @@ inline void ValidateUserResponse::set_allocated_error(std::string* error) {
   // @@protoc_insertion_point(field_set_allocated:rpc.ValidateUserResponse.error)
 }
 
+// int32 error_code = 99;
+inline void ValidateUserResponse::clear_error_code() {
+  _impl_.error_code_ = 0;
+}
+inline int32_t ValidateUserResponse::_internal_error_code() const {
+  return _impl_.error_code_;
+}
+inline int32_t ValidateUserResponse::error_code() const {
+  // @@protoc_insertion_point(field_get:rpc.ValidateUserResponse.error_code)
+  return _internal_error_code();
+}
+inline void ValidateUserResponse::_internal_set_error_code(int32_t value) {
+  
+  _impl_.error_code_ = value;
+}
+inline void ValidateUserResponse::set_error_code(int32_t value) {
+  _internal_set_error_code(value);
+  // @@protoc_insertion_point(field_set:rpc.ValidateUserResponse.error_code)
+}
+
+// -------------------------------------------------------------------
+
+// ChangePasswordRequest
+
+// int64 user_id = 1;
+inline void ChangePasswordRequest::clear_user_id() {
+  _impl_.user_id_ = int64_t{0};
+}
+inline int64_t ChangePasswordRequest::_internal_user_id() const {
+  return _impl_.user_id_;
+}
+inline int64_t ChangePasswordRequest::user_id() const {
+  // @@protoc_insertion_point(field_get:rpc.ChangePasswordRequest.user_id)
+  return _internal_user_id();
+}
+inline void ChangePasswordRequest::_internal_set_user_id(int64_t value) {
+  
+  _impl_.user_id_ = value;
+}
+inline void ChangePasswordRequest::set_user_id(int64_t value) {
+  _internal_set_user_id(value);
+  // @@protoc_insertion_point(field_set:rpc.ChangePasswordRequest.user_id)
+}
+
+// string old_password = 2;
+inline void ChangePasswordRequest::clear_old_password() {
+  _impl_.old_password_.ClearToEmpty();
+}
+inline const std::string& ChangePasswordRequest::old_password() const {
+  // @@protoc_insertion_point(field_get:rpc.ChangePasswordRequest.old_password)
+  return _internal_old_password();
+}
+template <typename ArgT0, typename... ArgT>
+inline PROTOBUF_ALWAYS_INLINE
+void ChangePasswordRequest::set_old_password(ArgT0&& arg0, ArgT... args) {
+ 
+ _impl_.old_password_.Set(static_cast<ArgT0 &&>(arg0), args..., GetArenaForAllocation());
+  // @@protoc_insertion_point(field_set:rpc.ChangePasswordRequest.old_password)
+}
+inline std::string* ChangePasswordRequest::mutable_old_password() {
+  std::string* _s = _internal_mutable_old_password();
+  // @@protoc_insertion_point(field_mutable:rpc.ChangePasswordRequest.old_password)
+  return _s;
+}
+inline const std::string& ChangePasswordRequest::_internal_old_password() const {
+  return _impl_.old_password_.Get();
+}
+inline void ChangePasswordRequest::_internal_set_old_password(const std::string& value) {
+  
+  _impl_.old_password_.Set(value, GetArenaForAllocation());
+}
+inline std::string* ChangePasswordRequest::_internal_mutable_old_password() {
+  
+  return _impl_.old_password_.Mutable(GetArenaForAllocation());
+}
+inline std::string* ChangePasswordRequest::release_old_password() {
+  // @@protoc_insertion_point(field_release:rpc.ChangePasswordRequest.old_password)
+  return _impl_.old_password_.Release();
+}
+inline void ChangePasswordRequest::set_allocated_old_password(std::string* old_password) {
+  if (old_password != nullptr) {
+    
+  } else {
+    
+  }
+  _impl_.old_password_.SetAllocated(old_password, GetArenaForAllocation());
+#ifdef PROTOBUF_FORCE_COPY_DEFAULT_STRING
+  if (_impl_.old_password_.IsDefault()) {
+    _impl_.old_password_.Set("", GetArenaForAllocation());
+  }
+#endif // PROTOBUF_FORCE_COPY_DEFAULT_STRING
+  // @@protoc_insertion_point(field_set_allocated:rpc.ChangePasswordRequest.old_password)
+}
+
+// string new_password = 3;
+inline void ChangePasswordRequest::clear_new_password() {
+  _impl_.new_password_.ClearToEmpty();
+}
+inline const std::string& ChangePasswordRequest::new_password() const {
+  // @@protoc_insertion_point(field_get:rpc.ChangePasswordRequest.new_password)
+  return _internal_new_password();
+}
+template <typename ArgT0, typename... ArgT>
+inline PROTOBUF_ALWAYS_INLINE
+void ChangePasswordRequest::set_new_password(ArgT0&& arg0, ArgT... args) {
+ 
+ _impl_.new_password_.Set(static_cast<ArgT0 &&>(arg0), args..., GetArenaForAllocation());
+  // @@protoc_insertion_point(field_set:rpc.ChangePasswordRequest.new_password)
+}
+inline std::string* ChangePasswordRequest::mutable_new_password() {
+  std::string* _s = _internal_mutable_new_password();
+  // @@protoc_insertion_point(field_mutable:rpc.ChangePasswordRequest.new_password)
+  return _s;
+}
+inline const std::string& ChangePasswordRequest::_internal_new_password() const {
+  return _impl_.new_password_.Get();
+}
+inline void ChangePasswordRequest::_internal_set_new_password(const std::string& value) {
+  
+  _impl_.new_password_.Set(value, GetArenaForAllocation());
+}
+inline std::string* ChangePasswordRequest::_internal_mutable_new_password() {
+  
+  return _impl_.new_password_.Mutable(GetArenaForAllocation());
+}
+inline std::string* ChangePasswordRequest::release_new_password() {
+  // @@protoc_insertion_point(field_release:rpc.ChangePasswordRequest.new_password)
+  return _impl_.new_password_.Release();
+}
+inline void ChangePasswordRequest::set_allocated_new_password(std::string* new_password) {
+  if (new_password != nullptr) {
+    
+  } else {
+    
+  }
+  _impl_.new_password_.SetAllocated(new_password, GetArenaForAllocation());
+#ifdef PROTOBUF_FORCE_COPY_DEFAULT_STRING
+  if (_impl_.new_password_.IsDefault()) {
+    _impl_.new_password_.Set("", GetArenaForAllocation());
+  }
+#endif // PROTOBUF_FORCE_COPY_DEFAULT_STRING
+  // @@protoc_insertion_point(field_set_allocated:rpc.ChangePasswordRequest.new_password)
+}
+
+// -------------------------------------------------------------------
+
+// ChangePasswordResponse
+
+// bool success = 1;
+inline void ChangePasswordResponse::clear_success() {
+  _impl_.success_ = false;
+}
+inline bool ChangePasswordResponse::_internal_success() const {
+  return _impl_.success_;
+}
+inline bool ChangePasswordResponse::success() const {
+  // @@protoc_insertion_point(field_get:rpc.ChangePasswordResponse.success)
+  return _internal_success();
+}
+inline void ChangePasswordResponse::_internal_set_success(bool value) {
+  
+  _impl_.success_ = value;
+}
+inline void ChangePasswordResponse::set_success(bool value) {
+  _internal_set_success(value);
+  // @@protoc_insertion_point(field_set:rpc.ChangePasswordResponse.success)
+}
+
+// string error = 2;
+inline void ChangePasswordResponse::clear_error() {
+  _impl_.error_.ClearToEmpty();
+}
+inline const std::string& ChangePasswordResponse::error() const {
+  // @@protoc_insertion_point(field_get:rpc.ChangePasswordResponse.error)
+  return _internal_error();
+}
+template <typename ArgT0, typename... ArgT>
+inline PROTOBUF_ALWAYS_INLINE
+void ChangePasswordResponse::set_error(ArgT0&& arg0, ArgT... args) {
+ 
+ _impl_.error_.Set(static_cast<ArgT0 &&>(arg0), args..., GetArenaForAllocation());
+  // @@protoc_insertion_point(field_set:rpc.ChangePasswordResponse.error)
+}
+inline std::string* ChangePasswordResponse::mutable_error() {
+  std::string* _s = _internal_mutable_error();
+  // @@protoc_insertion_point(field_mutable:rpc.ChangePasswordResponse.error)
+  return _s;
+}
+inline const std::string& ChangePasswordResponse::_internal_error() const {
+  return _impl_.error_.Get();
+}
+inline void ChangePasswordResponse::_internal_set_error(const std::string& value) {
+  
+  _impl_.error_.Set(value, GetArenaForAllocation());
+}
+inline std::string* ChangePasswordResponse::_internal_mutable_error() {
+  
+  return _impl_.error_.Mutable(GetArenaForAllocation());
+}
+inline std::string* ChangePasswordResponse::release_error() {
+  // @@protoc_insertion_point(field_release:rpc.ChangePasswordResponse.error)
+  return _impl_.error_.Release();
+}
+inline void ChangePasswordResponse::set_allocated_error(std::string* error) {
+  if (error != nullptr) {
+    
+  } else {
+    
+  }
+  _impl_.error_.SetAllocated(error, GetArenaForAllocation());
+#ifdef PROTOBUF_FORCE_COPY_DEFAULT_STRING
+  if (_impl_.error_.IsDefault()) {
+    _impl_.error_.Set("", GetArenaForAllocation());
+  }
+#endif // PROTOBUF_FORCE_COPY_DEFAULT_STRING
+  // @@protoc_insertion_point(field_set_allocated:rpc.ChangePasswordResponse.error)
+}
+
+// int32 error_code = 99;
+inline void ChangePasswordResponse::clear_error_code() {
+  _impl_.error_code_ = 0;
+}
+inline int32_t ChangePasswordResponse::_internal_error_code() const {
+  return _impl_.error_code_;
+}
+inline int32_t ChangePasswordResponse::error_code() const {
+  // @@protoc_insertion_point(field_get:rpc.ChangePasswordResponse.error_code)
+  return _internal_error_code();
+}
+inline void ChangePasswordResponse::_internal_set_error_code(int32_t value) {
+  
+  _impl_.error_code_ = value;
+}
+inline void ChangePasswordResponse::set_error_code(int32_t value) {
+  _internal_set_error_code(value);
+  // @@protoc_insertion_point(field_set:rpc.ChangePasswordResponse.error_code)
+}
+
+// -------------------------------------------------------------------
+
+// PhoneLoginRequest
+
+// string phone = 1;
+inline void PhoneLoginRequest::clear_phone() {
+  _impl_.phone_.ClearToEmpty();
+}
+inline const std::string& PhoneLoginRequest::phone() const {
+  // @@protoc_insertion_point(field_get:rpc.PhoneLoginRequest.phone)
+  return _internal_phone();
+}
+template <typename ArgT0, typename... ArgT>
+inline PROTOBUF_ALWAYS_INLINE
+void PhoneLoginRequest::set_phone(ArgT0&& arg0, ArgT... args) {
+ 
+ _impl_.phone_.Set(static_cast<ArgT0 &&>(arg0), args..., GetArenaForAllocation());
+  // @@protoc_insertion_point(field_set:rpc.PhoneLoginRequest.phone)
+}
+inline std::string* PhoneLoginRequest::mutable_phone() {
+  std::string* _s = _internal_mutable_phone();
+  // @@protoc_insertion_point(field_mutable:rpc.PhoneLoginRequest.phone)
+  return _s;
+}
+inline const std::string& PhoneLoginRequest::_internal_phone() const {
+  return _impl_.phone_.Get();
+}
+inline void PhoneLoginRequest::_internal_set_phone(const std::string& value) {
+  
+  _impl_.phone_.Set(value, GetArenaForAllocation());
+}
+inline std::string* PhoneLoginRequest::_internal_mutable_phone() {
+  
+  return _impl_.phone_.Mutable(GetArenaForAllocation());
+}
+inline std::string* PhoneLoginRequest::release_phone() {
+  // @@protoc_insertion_point(field_release:rpc.PhoneLoginRequest.phone)
+  return _impl_.phone_.Release();
+}
+inline void PhoneLoginRequest::set_allocated_phone(std::string* phone) {
+  if (phone != nullptr) {
+    
+  } else {
+    
+  }
+  _impl_.phone_.SetAllocated(phone, GetArenaForAllocation());
+#ifdef PROTOBUF_FORCE_COPY_DEFAULT_STRING
+  if (_impl_.phone_.IsDefault()) {
+    _impl_.phone_.Set("", GetArenaForAllocation());
+  }
+#endif // PROTOBUF_FORCE_COPY_DEFAULT_STRING
+  // @@protoc_insertion_point(field_set_allocated:rpc.PhoneLoginRequest.phone)
+}
+
+// string otp = 2;
+inline void PhoneLoginRequest::clear_otp() {
+  _impl_.otp_.ClearToEmpty();
+}
+inline const std::string& PhoneLoginRequest::otp() const {
+  // @@protoc_insertion_point(field_get:rpc.PhoneLoginRequest.otp)
+  return _internal_otp();
+}
+template <typename ArgT0, typename... ArgT>
+inline PROTOBUF_ALWAYS_INLINE
+void PhoneLoginRequest::set_otp(ArgT0&& arg0, ArgT... args) {
+ 
+ _impl_.otp_.Set(static_cast<ArgT0 &&>(arg0), args..., GetArenaForAllocation());
+  // @@protoc_insertion_point(field_set:rpc.PhoneLoginRequest.otp)
+}
+inline std::string* PhoneLoginRequest::mutable_otp() {
+  std::string* _s = _internal_mutable_otp();
+  // @@protoc_insertion_point(field_mutable:rpc.PhoneLoginRequest.otp)
+  return _s;
+}
+inline const std::string& PhoneLoginRequest::_internal_otp() const {
+  return _impl_.otp_.Get();
+}
+inline void PhoneLoginRequest::_internal_set_otp(const std::string& value) {
+  
+  _impl_.otp_.Set(value, GetArenaForAllocation());
+}
+inline std::string* PhoneLoginRequest::_internal_mutable_otp() {
+  
+  return _impl_.otp_.Mutable(GetArenaForAllocation());
+}
+inline std::string* PhoneLoginRequest::release_otp() {
+  // @@protoc_insertion_point(field_release:rpc.PhoneLoginRequest.otp)
+  return _impl_.otp_.Release();
+}
+inline void PhoneLoginRequest::set_allocated_otp(std::string* otp) {
+  if (otp != nullptr) {
+    
+  } else {
+    
+  }
+  _impl_.otp_.SetAllocated(otp, GetArenaForAllocation());
+#ifdef PROTOBUF_FORCE_COPY_DEFAULT_STRING
+  if (_impl_.otp_.IsDefault()) {
+    _impl_.otp_.Set("", GetArenaForAllocation());
+  }
+#endif // PROTOBUF_FORCE_COPY_DEFAULT_STRING
+  // @@protoc_insertion_point(field_set_allocated:rpc.PhoneLoginRequest.otp)
+}
+
 #ifdef __GNUC__
   #pragma GCC diagnostic pop
 #endif  // __GNUC__
+// -------------------------------------------------------------------
+
+// -------------------------------------------------------------------
+
+// -------------------------------------------------------------------
+
 // -------------------------------------------------------------------
 
 // -------------------------------------------------------------------

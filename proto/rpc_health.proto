@@ -4,9 +4,20 @@ package rpc;
 
 option go_package = "rpc-server/proto/rpc";
 
+import "google/api/annotations.proto";
+
 service HealthMonitor {
-  rpc Report(ReportRequest) returns (ReportResponse);
-  rpc Query(QueryRequest) returns (QueryResponse);
+  rpc Report(ReportRequest) returns (ReportResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/health/report"
+      body: "*"
+    };
+  }
+  rpc Query(QueryRequest) returns (QueryResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/health/nodes"
+    };
+  }
 }
 
 message ReportRequest {

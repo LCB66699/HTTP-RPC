@@ -26,6 +26,9 @@ static const char* FileService_method_names[] = {
   "/rpc.FileService/GetFile",
   "/rpc.FileService/ListFiles",
   "/rpc.FileService/DeleteFile",
+  "/rpc.FileService/CreateFolder",
+  "/rpc.FileService/MoveFile",
+  "/rpc.FileService/BatchDelete",
 };
 
 std::unique_ptr< FileService::Stub> FileService::NewStub(const std::shared_ptr< ::grpc::ChannelInterface>& channel, const ::grpc::StubOptions& options) {
@@ -39,6 +42,9 @@ FileService::Stub::Stub(const std::shared_ptr< ::grpc::ChannelInterface>& channe
   , rpcmethod_GetFile_(FileService_method_names[1], options.suffix_for_stats(),::grpc::internal::RpcMethod::NORMAL_RPC, channel)
   , rpcmethod_ListFiles_(FileService_method_names[2], options.suffix_for_stats(),::grpc::internal::RpcMethod::NORMAL_RPC, channel)
   , rpcmethod_DeleteFile_(FileService_method_names[3], options.suffix_for_stats(),::grpc::internal::RpcMethod::NORMAL_RPC, channel)
+  , rpcmethod_CreateFolder_(FileService_method_names[4], options.suffix_for_stats(),::grpc::internal::RpcMethod::NORMAL_RPC, channel)
+  , rpcmethod_MoveFile_(FileService_method_names[5], options.suffix_for_stats(),::grpc::internal::RpcMethod::NORMAL_RPC, channel)
+  , rpcmethod_BatchDelete_(FileService_method_names[6], options.suffix_for_stats(),::grpc::internal::RpcMethod::NORMAL_RPC, channel)
   {}
 
 ::grpc::Status FileService::Stub::CreateFile(::grpc::ClientContext* context, const ::rpc::CreateFileRequest& request, ::rpc::CreateFileResponse* response) {
@@ -133,6 +139,75 @@ void FileService::Stub::async::DeleteFile(::grpc::ClientContext* context, const 
   return result;
 }
 
+::grpc::Status FileService::Stub::CreateFolder(::grpc::ClientContext* context, const ::rpc::CreateFolderRequest& request, ::rpc::CreateFolderResponse* response) {
+  return ::grpc::internal::BlockingUnaryCall< ::rpc::CreateFolderRequest, ::rpc::CreateFolderResponse, ::grpc::protobuf::MessageLite, ::grpc::protobuf::MessageLite>(channel_.get(), rpcmethod_CreateFolder_, context, request, response);
+}
+
+void FileService::Stub::async::CreateFolder(::grpc::ClientContext* context, const ::rpc::CreateFolderRequest* request, ::rpc::CreateFolderResponse* response, std::function<void(::grpc::Status)> f) {
+  ::grpc::internal::CallbackUnaryCall< ::rpc::CreateFolderRequest, ::rpc::CreateFolderResponse, ::grpc::protobuf::MessageLite, ::grpc::protobuf::MessageLite>(stub_->channel_.get(), stub_->rpcmethod_CreateFolder_, context, request, response, std::move(f));
+}
+
+void FileService::Stub::async::CreateFolder(::grpc::ClientContext* context, const ::rpc::CreateFolderRequest* request, ::rpc::CreateFolderResponse* response, ::grpc::ClientUnaryReactor* reactor) {
+  ::grpc::internal::ClientCallbackUnaryFactory::Create< ::grpc::protobuf::MessageLite, ::grpc::protobuf::MessageLite>(stub_->channel_.get(), stub_->rpcmethod_CreateFolder_, context, request, response, reactor);
+}
+
+::grpc::ClientAsyncResponseReader< ::rpc::CreateFolderResponse>* FileService::Stub::PrepareAsyncCreateFolderRaw(::grpc::ClientContext* context, const ::rpc::CreateFolderRequest& request, ::grpc::CompletionQueue* cq) {
+  return ::grpc::internal::ClientAsyncResponseReaderHelper::Create< ::rpc::CreateFolderResponse, ::rpc::CreateFolderRequest, ::grpc::protobuf::MessageLite, ::grpc::protobuf::MessageLite>(channel_.get(), cq, rpcmethod_CreateFolder_, context, request);
+}
+
+::grpc::ClientAsyncResponseReader< ::rpc::CreateFolderResponse>* FileService::Stub::AsyncCreateFolderRaw(::grpc::ClientContext* context, const ::rpc::CreateFolderRequest& request, ::grpc::CompletionQueue* cq) {
+  auto* result =
+    this->PrepareAsyncCreateFolderRaw(context, request, cq);
+  result->StartCall();
+  return result;
+}
+
+::grpc::Status FileService::Stub::MoveFile(::grpc::ClientContext* context, const ::rpc::MoveFileRequest& request, ::rpc::MoveFileResponse* response) {
+  return ::grpc::internal::BlockingUnaryCall< ::rpc::MoveFileRequest, ::rpc::MoveFileResponse, ::grpc::protobuf::MessageLite, ::grpc::protobuf::MessageLite>(channel_.get(), rpcmethod_MoveFile_, context, request, response);
+}
+
+void FileService::Stub::async::MoveFile(::grpc::ClientContext* context, const ::rpc::MoveFileRequest* request, ::rpc::MoveFileResponse* response, std::function<void(::grpc::Status)> f) {
+  ::grpc::internal::CallbackUnaryCall< ::rpc::MoveFileRequest, ::rpc::MoveFileResponse, ::grpc::protobuf::MessageLite, ::grpc::protobuf::MessageLite>(stub_->channel_.get(), stub_->rpcmethod_MoveFile_, context, request, response, std::move(f));
+}
+
+void FileService::Stub::async::MoveFile(::grpc::ClientContext* context, const ::rpc::MoveFileRequest* request, ::rpc::MoveFileResponse* response, ::grpc::ClientUnaryReactor* reactor) {
+  ::grpc::internal::ClientCallbackUnaryFactory::Create< ::grpc::protobuf::MessageLite, ::grpc::protobuf::MessageLite>(stub_->channel_.get(), stub_->rpcmethod_MoveFile_, context, request, response, reactor);
+}
+
+::grpc::ClientAsyncResponseReader< ::rpc::MoveFileResponse>* FileService::Stub::PrepareAsyncMoveFileRaw(::grpc::ClientContext* context, const ::rpc::MoveFileRequest& request, ::grpc::CompletionQueue* cq) {
+  return ::grpc::internal::ClientAsyncResponseReaderHelper::Create< ::rpc::MoveFileResponse, ::rpc::MoveFileRequest, ::grpc::protobuf::MessageLite, ::grpc::protobuf::MessageLite>(channel_.get(), cq, rpcmethod_MoveFile_, context, request);
+}
+
+::grpc::ClientAsyncResponseReader< ::rpc::MoveFileResponse>* FileService::Stub::AsyncMoveFileRaw(::grpc::ClientContext* context, const ::rpc::MoveFileRequest& request, ::grpc::CompletionQueue* cq) {
+  auto* result =
+    this->PrepareAsyncMoveFileRaw(context, request, cq);
+  result->StartCall();
+  return result;
+}
+
+::grpc::Status FileService::Stub::BatchDelete(::grpc::ClientContext* context, const ::rpc::BatchDeleteRequest& request, ::rpc::BatchDeleteResponse* response) {
+  return ::grpc::internal::BlockingUnaryCall< ::rpc::BatchDeleteRequest, ::rpc::BatchDeleteResponse, ::grpc::protobuf::MessageLite, ::grpc::protobuf::MessageLite>(channel_.get(), rpcmethod_BatchDelete_, context, request, response);
+}
+
+void FileService::Stub::async::BatchDelete(::grpc::ClientContext* context, const ::rpc::BatchDeleteRequest* request, ::rpc::BatchDeleteResponse* response, std::function<void(::grpc::Status)> f) {
+  ::grpc::internal::CallbackUnaryCall< ::rpc::BatchDeleteRequest, ::rpc::BatchDeleteResponse, ::grpc::protobuf::MessageLite, ::grpc::protobuf::MessageLite>(stub_->channel_.get(), stub_->rpcmethod_BatchDelete_, context, request, response, std::move(f));
+}
+
+void FileService::Stub::async::BatchDelete(::grpc::ClientContext* context, const ::rpc::BatchDeleteRequest* request, ::rpc::BatchDeleteResponse* response, ::grpc::ClientUnaryReactor* reactor) {
+  ::grpc::internal::ClientCallbackUnaryFactory::Create< ::grpc::protobuf::MessageLite, ::grpc::protobuf::MessageLite>(stub_->channel_.get(), stub_->rpcmethod_BatchDelete_, context, request, response, reactor);
+}
+
+::grpc::ClientAsyncResponseReader< ::rpc::BatchDeleteResponse>* FileService::Stub::PrepareAsyncBatchDeleteRaw(::grpc::ClientContext* context, const ::rpc::BatchDeleteRequest& request, ::grpc::CompletionQueue* cq) {
+  return ::grpc::internal::ClientAsyncResponseReaderHelper::Create< ::rpc::BatchDeleteResponse, ::rpc::BatchDeleteRequest, ::grpc::protobuf::MessageLite, ::grpc::protobuf::MessageLite>(channel_.get(), cq, rpcmethod_BatchDelete_, context, request);
+}
+
+::grpc::ClientAsyncResponseReader< ::rpc::BatchDeleteResponse>* FileService::Stub::AsyncBatchDeleteRaw(::grpc::ClientContext* context, const ::rpc::BatchDeleteRequest& request, ::grpc::CompletionQueue* cq) {
+  auto* result =
+    this->PrepareAsyncBatchDeleteRaw(context, request, cq);
+  result->StartCall();
+  return result;
+}
+
 FileService::Service::Service() {
   AddMethod(new ::grpc::internal::RpcServiceMethod(
       FileService_method_names[0],
@@ -174,6 +249,36 @@ FileService::Service::Service() {
              ::rpc::DeleteFileResponse* resp) {
                return service->DeleteFile(ctx, req, resp);
              }, this)));
+  AddMethod(new ::grpc::internal::RpcServiceMethod(
+      FileService_method_names[4],
+      ::grpc::internal::RpcMethod::NORMAL_RPC,
+      new ::grpc::internal::RpcMethodHandler< FileService::Service, ::rpc::CreateFolderRequest, ::rpc::CreateFolderResponse, ::grpc::protobuf::MessageLite, ::grpc::protobuf::MessageLite>(
+          [](FileService::Service* service,
+             ::grpc::ServerContext* ctx,
+             const ::rpc::CreateFolderRequest* req,
+             ::rpc::CreateFolderResponse* resp) {
+               return service->CreateFolder(ctx, req, resp);
+             }, this)));
+  AddMethod(new ::grpc::internal::RpcServiceMethod(
+      FileService_method_names[5],
+      ::grpc::internal::RpcMethod::NORMAL_RPC,
+      new ::grpc::internal::RpcMethodHandler< FileService::Service, ::rpc::MoveFileRequest, ::rpc::MoveFileResponse, ::grpc::protobuf::MessageLite, ::grpc::protobuf::MessageLite>(
+          [](FileService::Service* service,
+             ::grpc::ServerContext* ctx,
+             const ::rpc::MoveFileRequest* req,
+             ::rpc::MoveFileResponse* resp) {
+               return service->MoveFile(ctx, req, resp);
+             }, this)));
+  AddMethod(new ::grpc::internal::RpcServiceMethod(
+      FileService_method_names[6],
+      ::grpc::internal::RpcMethod::NORMAL_RPC,
+      new ::grpc::internal::RpcMethodHandler< FileService::Service, ::rpc::BatchDeleteRequest, ::rpc::BatchDeleteResponse, ::grpc::protobuf::MessageLite, ::grpc::protobuf::MessageLite>(
+          [](FileService::Service* service,
+             ::grpc::ServerContext* ctx,
+             const ::rpc::BatchDeleteRequest* req,
+             ::rpc::BatchDeleteResponse* resp) {
+               return service->BatchDelete(ctx, req, resp);
+             }, this)));
 }
 
 FileService::Service::~Service() {
@@ -201,6 +306,27 @@ FileService::Service::~Service() {
 }
 
 ::grpc::Status FileService::Service::DeleteFile(::grpc::ServerContext* context, const ::rpc::DeleteFileRequest* request, ::rpc::DeleteFileResponse* response) {
+  (void) context;
+  (void) request;
+  (void) response;
+  return ::grpc::Status(::grpc::StatusCode::UNIMPLEMENTED, "");
+}
+
+::grpc::Status FileService::Service::CreateFolder(::grpc::ServerContext* context, const ::rpc::CreateFolderRequest* request, ::rpc::CreateFolderResponse* response) {
+  (void) context;
+  (void) request;
+  (void) response;
+  return ::grpc::Status(::grpc::StatusCode::UNIMPLEMENTED, "");
+}
+
+::grpc::Status FileService::Service::MoveFile(::grpc::ServerContext* context, const ::rpc::MoveFileRequest* request, ::rpc::MoveFileResponse* response) {
+  (void) context;
+  (void) request;
+  (void) response;
+  return ::grpc::Status(::grpc::StatusCode::UNIMPLEMENTED, "");
+}
+
+::grpc::Status FileService::Service::BatchDelete(::grpc::ServerContext* context, const ::rpc::BatchDeleteRequest* request, ::rpc::BatchDeleteResponse* response) {
   (void) context;
   (void) request;
   (void) response;

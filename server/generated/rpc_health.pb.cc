@@ -41,6 +41,7 @@ PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT PROTOBUF_ATTRIBUTE_INIT_PRIORIT
 PROTOBUF_CONSTEXPR ReportResponse::ReportResponse(
     ::_pbi::ConstantInitialized): _impl_{
     /*decltype(_impl_.success_)*/false
+  , /*decltype(_impl_.error_code_)*/0
   , /*decltype(_impl_._cached_size_)*/{}} {}
 struct ReportResponseDefaultTypeInternal {
   PROTOBUF_CONSTEXPR ReportResponseDefaultTypeInternal()
@@ -87,6 +88,7 @@ PROTOBUF_CONSTEXPR QueryResponse::QueryResponse(
     /*decltype(_impl_.nodes_)*/{}
   , /*decltype(_impl_.total_online_)*/0
   , /*decltype(_impl_.total_offline_)*/0
+  , /*decltype(_impl_.error_code_)*/0
   , /*decltype(_impl_._cached_size_)*/{}} {}
 struct QueryResponseDefaultTypeInternal {
   PROTOBUF_CONSTEXPR QueryResponseDefaultTypeInternal()
@@ -121,6 +123,7 @@ const uint32_t TableStruct_rpc_5fhealth_2eproto::offsets[] PROTOBUF_SECTION_VARI
   ~0u,  // no _weak_field_map_
   ~0u,  // no _inlined_string_donated_
   PROTOBUF_FIELD_OFFSET(::rpc::ReportResponse, _impl_.success_),
+  PROTOBUF_FIELD_OFFSET(::rpc::ReportResponse, _impl_.error_code_),
   ~0u,  // no _has_bits_
   PROTOBUF_FIELD_OFFSET(::rpc::NodeInfo, _internal_metadata_),
   ~0u,  // no _extensions_
@@ -150,13 +153,14 @@ const uint32_t TableStruct_rpc_5fhealth_2eproto::offsets[] PROTOBUF_SECTION_VARI
   PROTOBUF_FIELD_OFFSET(::rpc::QueryResponse, _impl_.nodes_),
   PROTOBUF_FIELD_OFFSET(::rpc::QueryResponse, _impl_.total_online_),
   PROTOBUF_FIELD_OFFSET(::rpc::QueryResponse, _impl_.total_offline_),
+  PROTOBUF_FIELD_OFFSET(::rpc::QueryResponse, _impl_.error_code_),
 };
 static const ::_pbi::MigrationSchema schemas[] PROTOBUF_SECTION_VARIABLE(protodesc_cold) = {
   { 0, -1, -1, sizeof(::rpc::ReportRequest)},
   { 11, -1, -1, sizeof(::rpc::ReportResponse)},
-  { 18, -1, -1, sizeof(::rpc::NodeInfo)},
-  { 32, -1, -1, sizeof(::rpc::QueryRequest)},
-  { 38, -1, -1, sizeof(::rpc::QueryResponse)},
+  { 19, -1, -1, sizeof(::rpc::NodeInfo)},
+  { 33, -1, -1, sizeof(::rpc::QueryRequest)},
+  { 39, -1, -1, sizeof(::rpc::QueryResponse)},
 };
 
 static const ::_pb::Message* const file_default_instances[] = {
@@ -171,14 +175,15 @@ const char descriptor_table_protodef_rpc_5fhealth_2eproto[] PROTOBUF_SECTION_VAR
   "\n\020rpc_health.proto\022\003rpc\"^\n\rReportRequest"
   "\022\017\n\007node_id\030\001 \001(\t\022\017\n\007service\030\002 \001(\t\022\014\n\004ho"
   "st\030\003 \001(\t\022\014\n\004port\030\004 \001(\005\022\017\n\007version\030\005 \001(\t\""
-  "!\n\016ReportResponse\022\017\n\007success\030\001 \001(\010\"\231\001\n\010N"
-  "odeInfo\022\017\n\007node_id\030\001 \001(\t\022\017\n\007service\030\002 \001("
-  "\t\022\014\n\004host\030\003 \001(\t\022\014\n\004port\030\004 \001(\005\022\016\n\006status\030"
-  "\005 \001(\t\022\017\n\007version\030\006 \001(\t\022\026\n\016last_heartbeat"
-  "\030\007 \001(\t\022\026\n\016uptime_seconds\030\010 \001(\005\"\016\n\014QueryR"
-  "equest\"Z\n\rQueryResponse\022\034\n\005nodes\030\001 \003(\0132\r"
-  ".rpc.NodeInfo\022\024\n\014total_online\030\002 \001(\005\022\025\n\rt"
-  "otal_offline\030\003 \001(\0052r\n\rHealthMonitor\0221\n\006R"
+  "5\n\016ReportResponse\022\017\n\007success\030\001 \001(\010\022\022\n\ner"
+  "ror_code\030c \001(\005\"\231\001\n\010NodeInfo\022\017\n\007node_id\030\001"
+  " \001(\t\022\017\n\007service\030\002 \001(\t\022\014\n\004host\030\003 \001(\t\022\014\n\004p"
+  "ort\030\004 \001(\005\022\016\n\006status\030\005 \001(\t\022\017\n\007version\030\006 \001"
+  "(\t\022\026\n\016last_heartbeat\030\007 \001(\t\022\026\n\016uptime_sec"
+  "onds\030\010 \001(\005\"\016\n\014QueryRequest\"n\n\rQueryRespo"
+  "nse\022\034\n\005nodes\030\001 \003(\0132\r.rpc.NodeInfo\022\024\n\014tot"
+  "al_online\030\002 \001(\005\022\025\n\rtotal_offline\030\003 \001(\005\022\022"
+  "\n\nerror_code\030c \001(\0052r\n\rHealthMonitor\0221\n\006R"
   "eport\022\022.rpc.ReportRequest\032\023.rpc.ReportRe"
   "sponse\022.\n\005Query\022\021.rpc.QueryRequest\032\022.rpc"
   ".QueryResponseB\026Z\024rpc-server/proto/rpcb\006"
@@ -186,7 +191,7 @@ const char descriptor_table_protodef_rpc_5fhealth_2eproto[] PROTOBUF_SECTION_VAR
   ;
 static ::_pbi::once_flag descriptor_table_rpc_5fhealth_2eproto_once;
 const ::_pbi::DescriptorTable descriptor_table_rpc_5fhealth_2eproto = {
-    false, false, 566, descriptor_table_protodef_rpc_5fhealth_2eproto,
+    false, false, 606, descriptor_table_protodef_rpc_5fhealth_2eproto,
     "rpc_health.proto",
     &descriptor_table_rpc_5fhealth_2eproto_once, nullptr, 0, 5,
     schemas, file_default_instances, TableStruct_rpc_5fhealth_2eproto::offsets,
@@ -598,10 +603,13 @@ ReportResponse::ReportResponse(const ReportResponse& from)
   ReportResponse* const _this = this; (void)_this;
   new (&_impl_) Impl_{
       decltype(_impl_.success_){}
+    , decltype(_impl_.error_code_){}
     , /*decltype(_impl_._cached_size_)*/{}};
 
   _internal_metadata_.MergeFrom<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(from._internal_metadata_);
-  _this->_impl_.success_ = from._impl_.success_;
+  ::memcpy(&_impl_.success_, &from._impl_.success_,
+    static_cast<size_t>(reinterpret_cast<char*>(&_impl_.error_code_) -
+    reinterpret_cast<char*>(&_impl_.success_)) + sizeof(_impl_.error_code_));
   // @@protoc_insertion_point(copy_constructor:rpc.ReportResponse)
 }
 
@@ -611,6 +619,7 @@ inline void ReportResponse::SharedCtor(
   (void)is_message_owned;
   new (&_impl_) Impl_{
       decltype(_impl_.success_){false}
+    , decltype(_impl_.error_code_){0}
     , /*decltype(_impl_._cached_size_)*/{}
   };
 }
@@ -638,7 +647,9 @@ void ReportResponse::Clear() {
   // Prevent compiler warnings about cached_has_bits being unused
   (void) cached_has_bits;
 
-  _impl_.success_ = false;
+  ::memset(&_impl_.success_, 0, static_cast<size_t>(
+      reinterpret_cast<char*>(&_impl_.error_code_) -
+      reinterpret_cast<char*>(&_impl_.success_)) + sizeof(_impl_.error_code_));
   _internal_metadata_.Clear<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>();
 }
 
@@ -652,6 +663,14 @@ const char* ReportResponse::_InternalParse(const char* ptr, ::_pbi::ParseContext
       case 1:
         if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 8)) {
           _impl_.success_ = ::PROTOBUF_NAMESPACE_ID::internal::ReadVarint64(&ptr);
+          CHK_(ptr);
+        } else
+          goto handle_unusual;
+        continue;
+      // int32 error_code = 99;
+      case 99:
+        if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 24)) {
+          _impl_.error_code_ = ::PROTOBUF_NAMESPACE_ID::internal::ReadVarint32(&ptr);
           CHK_(ptr);
         } else
           goto handle_unusual;
@@ -691,6 +710,12 @@ uint8_t* ReportResponse::_InternalSerialize(
     target = ::_pbi::WireFormatLite::WriteBoolToArray(1, this->_internal_success(), target);
   }
 
+  // int32 error_code = 99;
+  if (this->_internal_error_code() != 0) {
+    target = stream->EnsureSpace(target);
+    target = ::_pbi::WireFormatLite::WriteInt32ToArray(99, this->_internal_error_code(), target);
+  }
+
   if (PROTOBUF_PREDICT_FALSE(_internal_metadata_.have_unknown_fields())) {
     target = ::_pbi::WireFormat::InternalSerializeUnknownFieldsToArray(
         _internal_metadata_.unknown_fields<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(::PROTOBUF_NAMESPACE_ID::UnknownFieldSet::default_instance), target, stream);
@@ -710,6 +735,13 @@ size_t ReportResponse::ByteSizeLong() const {
   // bool success = 1;
   if (this->_internal_success() != 0) {
     total_size += 1 + 1;
+  }
+
+  // int32 error_code = 99;
+  if (this->_internal_error_code() != 0) {
+    total_size += 2 +
+      ::_pbi::WireFormatLite::Int32Size(
+        this->_internal_error_code());
   }
 
   return MaybeComputeUnknownFieldsSize(total_size, &_impl_._cached_size_);
@@ -733,6 +765,9 @@ void ReportResponse::MergeImpl(::PROTOBUF_NAMESPACE_ID::Message& to_msg, const :
   if (from._internal_success() != 0) {
     _this->_internal_set_success(from._internal_success());
   }
+  if (from._internal_error_code() != 0) {
+    _this->_internal_set_error_code(from._internal_error_code());
+  }
   _this->_internal_metadata_.MergeFrom<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(from._internal_metadata_);
 }
 
@@ -750,7 +785,12 @@ bool ReportResponse::IsInitialized() const {
 void ReportResponse::InternalSwap(ReportResponse* other) {
   using std::swap;
   _internal_metadata_.InternalSwap(&other->_internal_metadata_);
-  swap(_impl_.success_, other->_impl_.success_);
+  ::PROTOBUF_NAMESPACE_ID::internal::memswap<
+      PROTOBUF_FIELD_OFFSET(ReportResponse, _impl_.error_code_)
+      + sizeof(ReportResponse::_impl_.error_code_)
+      - PROTOBUF_FIELD_OFFSET(ReportResponse, _impl_.success_)>(
+          reinterpret_cast<char*>(&_impl_.success_),
+          reinterpret_cast<char*>(&other->_impl_.success_));
 }
 
 ::PROTOBUF_NAMESPACE_ID::Metadata ReportResponse::GetMetadata() const {
@@ -1331,12 +1371,13 @@ QueryResponse::QueryResponse(const QueryResponse& from)
       decltype(_impl_.nodes_){from._impl_.nodes_}
     , decltype(_impl_.total_online_){}
     , decltype(_impl_.total_offline_){}
+    , decltype(_impl_.error_code_){}
     , /*decltype(_impl_._cached_size_)*/{}};
 
   _internal_metadata_.MergeFrom<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(from._internal_metadata_);
   ::memcpy(&_impl_.total_online_, &from._impl_.total_online_,
-    static_cast<size_t>(reinterpret_cast<char*>(&_impl_.total_offline_) -
-    reinterpret_cast<char*>(&_impl_.total_online_)) + sizeof(_impl_.total_offline_));
+    static_cast<size_t>(reinterpret_cast<char*>(&_impl_.error_code_) -
+    reinterpret_cast<char*>(&_impl_.total_online_)) + sizeof(_impl_.error_code_));
   // @@protoc_insertion_point(copy_constructor:rpc.QueryResponse)
 }
 
@@ -1348,6 +1389,7 @@ inline void QueryResponse::SharedCtor(
       decltype(_impl_.nodes_){arena}
     , decltype(_impl_.total_online_){0}
     , decltype(_impl_.total_offline_){0}
+    , decltype(_impl_.error_code_){0}
     , /*decltype(_impl_._cached_size_)*/{}
   };
 }
@@ -1378,8 +1420,8 @@ void QueryResponse::Clear() {
 
   _impl_.nodes_.Clear();
   ::memset(&_impl_.total_online_, 0, static_cast<size_t>(
-      reinterpret_cast<char*>(&_impl_.total_offline_) -
-      reinterpret_cast<char*>(&_impl_.total_online_)) + sizeof(_impl_.total_offline_));
+      reinterpret_cast<char*>(&_impl_.error_code_) -
+      reinterpret_cast<char*>(&_impl_.total_online_)) + sizeof(_impl_.error_code_));
   _internal_metadata_.Clear<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>();
 }
 
@@ -1414,6 +1456,14 @@ const char* QueryResponse::_InternalParse(const char* ptr, ::_pbi::ParseContext*
       case 3:
         if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 24)) {
           _impl_.total_offline_ = ::PROTOBUF_NAMESPACE_ID::internal::ReadVarint32(&ptr);
+          CHK_(ptr);
+        } else
+          goto handle_unusual;
+        continue;
+      // int32 error_code = 99;
+      case 99:
+        if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 24)) {
+          _impl_.error_code_ = ::PROTOBUF_NAMESPACE_ID::internal::ReadVarint32(&ptr);
           CHK_(ptr);
         } else
           goto handle_unusual;
@@ -1467,6 +1517,12 @@ uint8_t* QueryResponse::_InternalSerialize(
     target = ::_pbi::WireFormatLite::WriteInt32ToArray(3, this->_internal_total_offline(), target);
   }
 
+  // int32 error_code = 99;
+  if (this->_internal_error_code() != 0) {
+    target = stream->EnsureSpace(target);
+    target = ::_pbi::WireFormatLite::WriteInt32ToArray(99, this->_internal_error_code(), target);
+  }
+
   if (PROTOBUF_PREDICT_FALSE(_internal_metadata_.have_unknown_fields())) {
     target = ::_pbi::WireFormat::InternalSerializeUnknownFieldsToArray(
         _internal_metadata_.unknown_fields<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(::PROTOBUF_NAMESPACE_ID::UnknownFieldSet::default_instance), target, stream);
@@ -1500,6 +1556,13 @@ size_t QueryResponse::ByteSizeLong() const {
     total_size += ::_pbi::WireFormatLite::Int32SizePlusOne(this->_internal_total_offline());
   }
 
+  // int32 error_code = 99;
+  if (this->_internal_error_code() != 0) {
+    total_size += 2 +
+      ::_pbi::WireFormatLite::Int32Size(
+        this->_internal_error_code());
+  }
+
   return MaybeComputeUnknownFieldsSize(total_size, &_impl_._cached_size_);
 }
 
@@ -1525,6 +1588,9 @@ void QueryResponse::MergeImpl(::PROTOBUF_NAMESPACE_ID::Message& to_msg, const ::
   if (from._internal_total_offline() != 0) {
     _this->_internal_set_total_offline(from._internal_total_offline());
   }
+  if (from._internal_error_code() != 0) {
+    _this->_internal_set_error_code(from._internal_error_code());
+  }
   _this->_internal_metadata_.MergeFrom<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(from._internal_metadata_);
 }
 
@@ -1544,8 +1610,8 @@ void QueryResponse::InternalSwap(QueryResponse* other) {
   _internal_metadata_.InternalSwap(&other->_internal_metadata_);
   _impl_.nodes_.InternalSwap(&other->_impl_.nodes_);
   ::PROTOBUF_NAMESPACE_ID::internal::memswap<
-      PROTOBUF_FIELD_OFFSET(QueryResponse, _impl_.total_offline_)
-      + sizeof(QueryResponse::_impl_.total_offline_)
+      PROTOBUF_FIELD_OFFSET(QueryResponse, _impl_.error_code_)
+      + sizeof(QueryResponse::_impl_.error_code_)
       - PROTOBUF_FIELD_OFFSET(QueryResponse, _impl_.total_online_)>(
           reinterpret_cast<char*>(&_impl_.total_online_),
           reinterpret_cast<char*>(&other->_impl_.total_online_));

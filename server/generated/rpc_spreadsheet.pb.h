@@ -952,6 +952,7 @@ class CreateSpreadsheetResponse final :
     kErrorFieldNumber = 3,
     kIdFieldNumber = 2,
     kSuccessFieldNumber = 1,
+    kErrorCodeFieldNumber = 99,
   };
   // string error = 3;
   void clear_error();
@@ -985,6 +986,15 @@ class CreateSpreadsheetResponse final :
   void _internal_set_success(bool value);
   public:
 
+  // int32 error_code = 99;
+  void clear_error_code();
+  int32_t error_code() const;
+  void set_error_code(int32_t value);
+  private:
+  int32_t _internal_error_code() const;
+  void _internal_set_error_code(int32_t value);
+  public:
+
   // @@protoc_insertion_point(class_scope:rpc.CreateSpreadsheetResponse)
  private:
   class _Internal;
@@ -996,6 +1006,7 @@ class CreateSpreadsheetResponse final :
     ::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr error_;
     int64_t id_;
     bool success_;
+    int32_t error_code_;
     mutable ::PROTOBUF_NAMESPACE_ID::internal::CachedSize _cached_size_;
   };
   union { Impl_ _impl_; };
@@ -1287,6 +1298,7 @@ class GetSpreadsheetResponse final :
     kErrorFieldNumber = 4,
     kSpreadsheetFieldNumber = 2,
     kSuccessFieldNumber = 1,
+    kErrorCodeFieldNumber = 99,
   };
   // string cache_source = 3;
   void clear_cache_source();
@@ -1343,6 +1355,15 @@ class GetSpreadsheetResponse final :
   void _internal_set_success(bool value);
   public:
 
+  // int32 error_code = 99;
+  void clear_error_code();
+  int32_t error_code() const;
+  void set_error_code(int32_t value);
+  private:
+  int32_t _internal_error_code() const;
+  void _internal_set_error_code(int32_t value);
+  public:
+
   // @@protoc_insertion_point(class_scope:rpc.GetSpreadsheetResponse)
  private:
   class _Internal;
@@ -1355,6 +1376,7 @@ class GetSpreadsheetResponse final :
     ::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr error_;
     ::rpc::Spreadsheet* spreadsheet_;
     bool success_;
+    int32_t error_code_;
     mutable ::PROTOBUF_NAMESPACE_ID::internal::CachedSize _cached_size_;
   };
   union { Impl_ _impl_; };
@@ -1486,6 +1508,8 @@ class ListSpreadsheetsRequest final :
     kUserIdFieldNumber = 1,
     kPageFieldNumber = 2,
     kPageSizeFieldNumber = 3,
+    kAfterIdFieldNumber = 4,
+    kLimitFieldNumber = 5,
   };
   // int64 user_id = 1;
   void clear_user_id();
@@ -1514,6 +1538,24 @@ class ListSpreadsheetsRequest final :
   void _internal_set_page_size(int32_t value);
   public:
 
+  // int64 after_id = 4;
+  void clear_after_id();
+  int64_t after_id() const;
+  void set_after_id(int64_t value);
+  private:
+  int64_t _internal_after_id() const;
+  void _internal_set_after_id(int64_t value);
+  public:
+
+  // int32 limit = 5;
+  void clear_limit();
+  int32_t limit() const;
+  void set_limit(int32_t value);
+  private:
+  int32_t _internal_limit() const;
+  void _internal_set_limit(int32_t value);
+  public:
+
   // @@protoc_insertion_point(class_scope:rpc.ListSpreadsheetsRequest)
  private:
   class _Internal;
@@ -1525,6 +1567,8 @@ class ListSpreadsheetsRequest final :
     int64_t user_id_;
     int32_t page_;
     int32_t page_size_;
+    int64_t after_id_;
+    int32_t limit_;
     mutable ::PROTOBUF_NAMESPACE_ID::internal::CachedSize _cached_size_;
   };
   union { Impl_ _impl_; };
@@ -1656,8 +1700,11 @@ class ListSpreadsheetsResponse final :
     kSheetsFieldNumber = 2,
     kCacheSourceFieldNumber = 4,
     kErrorFieldNumber = 5,
-    kSuccessFieldNumber = 1,
+    kNextCursorFieldNumber = 6,
     kTotalFieldNumber = 3,
+    kSuccessFieldNumber = 1,
+    kHasMoreFieldNumber = 7,
+    kErrorCodeFieldNumber = 99,
   };
   // repeated .rpc.SpreadsheetSummary sheets = 2;
   int sheets_size() const;
@@ -1705,13 +1752,18 @@ class ListSpreadsheetsResponse final :
   std::string* _internal_mutable_error();
   public:
 
-  // bool success = 1;
-  void clear_success();
-  bool success() const;
-  void set_success(bool value);
+  // string next_cursor = 6;
+  void clear_next_cursor();
+  const std::string& next_cursor() const;
+  template <typename ArgT0 = const std::string&, typename... ArgT>
+  void set_next_cursor(ArgT0&& arg0, ArgT... args);
+  std::string* mutable_next_cursor();
+  PROTOBUF_NODISCARD std::string* release_next_cursor();
+  void set_allocated_next_cursor(std::string* next_cursor);
   private:
-  bool _internal_success() const;
-  void _internal_set_success(bool value);
+  const std::string& _internal_next_cursor() const;
+  inline PROTOBUF_ALWAYS_INLINE void _internal_set_next_cursor(const std::string& value);
+  std::string* _internal_mutable_next_cursor();
   public:
 
   // int32 total = 3;
@@ -1721,6 +1773,33 @@ class ListSpreadsheetsResponse final :
   private:
   int32_t _internal_total() const;
   void _internal_set_total(int32_t value);
+  public:
+
+  // bool success = 1;
+  void clear_success();
+  bool success() const;
+  void set_success(bool value);
+  private:
+  bool _internal_success() const;
+  void _internal_set_success(bool value);
+  public:
+
+  // bool has_more = 7;
+  void clear_has_more();
+  bool has_more() const;
+  void set_has_more(bool value);
+  private:
+  bool _internal_has_more() const;
+  void _internal_set_has_more(bool value);
+  public:
+
+  // int32 error_code = 99;
+  void clear_error_code();
+  int32_t error_code() const;
+  void set_error_code(int32_t value);
+  private:
+  int32_t _internal_error_code() const;
+  void _internal_set_error_code(int32_t value);
   public:
 
   // @@protoc_insertion_point(class_scope:rpc.ListSpreadsheetsResponse)
@@ -1734,8 +1813,11 @@ class ListSpreadsheetsResponse final :
     ::PROTOBUF_NAMESPACE_ID::RepeatedPtrField< ::rpc::SpreadsheetSummary > sheets_;
     ::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr cache_source_;
     ::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr error_;
-    bool success_;
+    ::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr next_cursor_;
     int32_t total_;
+    bool success_;
+    bool has_more_;
+    int32_t error_code_;
     mutable ::PROTOBUF_NAMESPACE_ID::internal::CachedSize _cached_size_;
   };
   union { Impl_ _impl_; };
@@ -2089,6 +2171,7 @@ class UpdateSpreadsheetResponse final :
   enum : int {
     kErrorFieldNumber = 2,
     kSuccessFieldNumber = 1,
+    kErrorCodeFieldNumber = 99,
   };
   // string error = 2;
   void clear_error();
@@ -2113,6 +2196,15 @@ class UpdateSpreadsheetResponse final :
   void _internal_set_success(bool value);
   public:
 
+  // int32 error_code = 99;
+  void clear_error_code();
+  int32_t error_code() const;
+  void set_error_code(int32_t value);
+  private:
+  int32_t _internal_error_code() const;
+  void _internal_set_error_code(int32_t value);
+  public:
+
   // @@protoc_insertion_point(class_scope:rpc.UpdateSpreadsheetResponse)
  private:
   class _Internal;
@@ -2123,6 +2215,7 @@ class UpdateSpreadsheetResponse final :
   struct Impl_ {
     ::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr error_;
     bool success_;
+    int32_t error_code_;
     mutable ::PROTOBUF_NAMESPACE_ID::internal::CachedSize _cached_size_;
   };
   union { Impl_ _impl_; };
@@ -2412,6 +2505,7 @@ class DeleteSpreadsheetResponse final :
   enum : int {
     kErrorFieldNumber = 2,
     kSuccessFieldNumber = 1,
+    kErrorCodeFieldNumber = 99,
   };
   // string error = 2;
   void clear_error();
@@ -2436,6 +2530,15 @@ class DeleteSpreadsheetResponse final :
   void _internal_set_success(bool value);
   public:
 
+  // int32 error_code = 99;
+  void clear_error_code();
+  int32_t error_code() const;
+  void set_error_code(int32_t value);
+  private:
+  int32_t _internal_error_code() const;
+  void _internal_set_error_code(int32_t value);
+  public:
+
   // @@protoc_insertion_point(class_scope:rpc.DeleteSpreadsheetResponse)
  private:
   class _Internal;
@@ -2446,6 +2549,7 @@ class DeleteSpreadsheetResponse final :
   struct Impl_ {
     ::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr error_;
     bool success_;
+    int32_t error_code_;
     mutable ::PROTOBUF_NAMESPACE_ID::internal::CachedSize _cached_size_;
   };
   union { Impl_ _impl_; };
@@ -3454,6 +3558,26 @@ inline void CreateSpreadsheetResponse::set_allocated_error(std::string* error) {
   // @@protoc_insertion_point(field_set_allocated:rpc.CreateSpreadsheetResponse.error)
 }
 
+// int32 error_code = 99;
+inline void CreateSpreadsheetResponse::clear_error_code() {
+  _impl_.error_code_ = 0;
+}
+inline int32_t CreateSpreadsheetResponse::_internal_error_code() const {
+  return _impl_.error_code_;
+}
+inline int32_t CreateSpreadsheetResponse::error_code() const {
+  // @@protoc_insertion_point(field_get:rpc.CreateSpreadsheetResponse.error_code)
+  return _internal_error_code();
+}
+inline void CreateSpreadsheetResponse::_internal_set_error_code(int32_t value) {
+  
+  _impl_.error_code_ = value;
+}
+inline void CreateSpreadsheetResponse::set_error_code(int32_t value) {
+  _internal_set_error_code(value);
+  // @@protoc_insertion_point(field_set:rpc.CreateSpreadsheetResponse.error_code)
+}
+
 // -------------------------------------------------------------------
 
 // GetSpreadsheetRequest
@@ -3712,6 +3836,26 @@ inline void GetSpreadsheetResponse::set_allocated_error(std::string* error) {
   // @@protoc_insertion_point(field_set_allocated:rpc.GetSpreadsheetResponse.error)
 }
 
+// int32 error_code = 99;
+inline void GetSpreadsheetResponse::clear_error_code() {
+  _impl_.error_code_ = 0;
+}
+inline int32_t GetSpreadsheetResponse::_internal_error_code() const {
+  return _impl_.error_code_;
+}
+inline int32_t GetSpreadsheetResponse::error_code() const {
+  // @@protoc_insertion_point(field_get:rpc.GetSpreadsheetResponse.error_code)
+  return _internal_error_code();
+}
+inline void GetSpreadsheetResponse::_internal_set_error_code(int32_t value) {
+  
+  _impl_.error_code_ = value;
+}
+inline void GetSpreadsheetResponse::set_error_code(int32_t value) {
+  _internal_set_error_code(value);
+  // @@protoc_insertion_point(field_set:rpc.GetSpreadsheetResponse.error_code)
+}
+
 // -------------------------------------------------------------------
 
 // ListSpreadsheetsRequest
@@ -3774,6 +3918,46 @@ inline void ListSpreadsheetsRequest::_internal_set_page_size(int32_t value) {
 inline void ListSpreadsheetsRequest::set_page_size(int32_t value) {
   _internal_set_page_size(value);
   // @@protoc_insertion_point(field_set:rpc.ListSpreadsheetsRequest.page_size)
+}
+
+// int64 after_id = 4;
+inline void ListSpreadsheetsRequest::clear_after_id() {
+  _impl_.after_id_ = int64_t{0};
+}
+inline int64_t ListSpreadsheetsRequest::_internal_after_id() const {
+  return _impl_.after_id_;
+}
+inline int64_t ListSpreadsheetsRequest::after_id() const {
+  // @@protoc_insertion_point(field_get:rpc.ListSpreadsheetsRequest.after_id)
+  return _internal_after_id();
+}
+inline void ListSpreadsheetsRequest::_internal_set_after_id(int64_t value) {
+  
+  _impl_.after_id_ = value;
+}
+inline void ListSpreadsheetsRequest::set_after_id(int64_t value) {
+  _internal_set_after_id(value);
+  // @@protoc_insertion_point(field_set:rpc.ListSpreadsheetsRequest.after_id)
+}
+
+// int32 limit = 5;
+inline void ListSpreadsheetsRequest::clear_limit() {
+  _impl_.limit_ = 0;
+}
+inline int32_t ListSpreadsheetsRequest::_internal_limit() const {
+  return _impl_.limit_;
+}
+inline int32_t ListSpreadsheetsRequest::limit() const {
+  // @@protoc_insertion_point(field_get:rpc.ListSpreadsheetsRequest.limit)
+  return _internal_limit();
+}
+inline void ListSpreadsheetsRequest::_internal_set_limit(int32_t value) {
+  
+  _impl_.limit_ = value;
+}
+inline void ListSpreadsheetsRequest::set_limit(int32_t value) {
+  _internal_set_limit(value);
+  // @@protoc_insertion_point(field_set:rpc.ListSpreadsheetsRequest.limit)
 }
 
 // -------------------------------------------------------------------
@@ -3958,6 +4142,96 @@ inline void ListSpreadsheetsResponse::set_allocated_error(std::string* error) {
   }
 #endif // PROTOBUF_FORCE_COPY_DEFAULT_STRING
   // @@protoc_insertion_point(field_set_allocated:rpc.ListSpreadsheetsResponse.error)
+}
+
+// string next_cursor = 6;
+inline void ListSpreadsheetsResponse::clear_next_cursor() {
+  _impl_.next_cursor_.ClearToEmpty();
+}
+inline const std::string& ListSpreadsheetsResponse::next_cursor() const {
+  // @@protoc_insertion_point(field_get:rpc.ListSpreadsheetsResponse.next_cursor)
+  return _internal_next_cursor();
+}
+template <typename ArgT0, typename... ArgT>
+inline PROTOBUF_ALWAYS_INLINE
+void ListSpreadsheetsResponse::set_next_cursor(ArgT0&& arg0, ArgT... args) {
+ 
+ _impl_.next_cursor_.Set(static_cast<ArgT0 &&>(arg0), args..., GetArenaForAllocation());
+  // @@protoc_insertion_point(field_set:rpc.ListSpreadsheetsResponse.next_cursor)
+}
+inline std::string* ListSpreadsheetsResponse::mutable_next_cursor() {
+  std::string* _s = _internal_mutable_next_cursor();
+  // @@protoc_insertion_point(field_mutable:rpc.ListSpreadsheetsResponse.next_cursor)
+  return _s;
+}
+inline const std::string& ListSpreadsheetsResponse::_internal_next_cursor() const {
+  return _impl_.next_cursor_.Get();
+}
+inline void ListSpreadsheetsResponse::_internal_set_next_cursor(const std::string& value) {
+  
+  _impl_.next_cursor_.Set(value, GetArenaForAllocation());
+}
+inline std::string* ListSpreadsheetsResponse::_internal_mutable_next_cursor() {
+  
+  return _impl_.next_cursor_.Mutable(GetArenaForAllocation());
+}
+inline std::string* ListSpreadsheetsResponse::release_next_cursor() {
+  // @@protoc_insertion_point(field_release:rpc.ListSpreadsheetsResponse.next_cursor)
+  return _impl_.next_cursor_.Release();
+}
+inline void ListSpreadsheetsResponse::set_allocated_next_cursor(std::string* next_cursor) {
+  if (next_cursor != nullptr) {
+    
+  } else {
+    
+  }
+  _impl_.next_cursor_.SetAllocated(next_cursor, GetArenaForAllocation());
+#ifdef PROTOBUF_FORCE_COPY_DEFAULT_STRING
+  if (_impl_.next_cursor_.IsDefault()) {
+    _impl_.next_cursor_.Set("", GetArenaForAllocation());
+  }
+#endif // PROTOBUF_FORCE_COPY_DEFAULT_STRING
+  // @@protoc_insertion_point(field_set_allocated:rpc.ListSpreadsheetsResponse.next_cursor)
+}
+
+// bool has_more = 7;
+inline void ListSpreadsheetsResponse::clear_has_more() {
+  _impl_.has_more_ = false;
+}
+inline bool ListSpreadsheetsResponse::_internal_has_more() const {
+  return _impl_.has_more_;
+}
+inline bool ListSpreadsheetsResponse::has_more() const {
+  // @@protoc_insertion_point(field_get:rpc.ListSpreadsheetsResponse.has_more)
+  return _internal_has_more();
+}
+inline void ListSpreadsheetsResponse::_internal_set_has_more(bool value) {
+  
+  _impl_.has_more_ = value;
+}
+inline void ListSpreadsheetsResponse::set_has_more(bool value) {
+  _internal_set_has_more(value);
+  // @@protoc_insertion_point(field_set:rpc.ListSpreadsheetsResponse.has_more)
+}
+
+// int32 error_code = 99;
+inline void ListSpreadsheetsResponse::clear_error_code() {
+  _impl_.error_code_ = 0;
+}
+inline int32_t ListSpreadsheetsResponse::_internal_error_code() const {
+  return _impl_.error_code_;
+}
+inline int32_t ListSpreadsheetsResponse::error_code() const {
+  // @@protoc_insertion_point(field_get:rpc.ListSpreadsheetsResponse.error_code)
+  return _internal_error_code();
+}
+inline void ListSpreadsheetsResponse::_internal_set_error_code(int32_t value) {
+  
+  _impl_.error_code_ = value;
+}
+inline void ListSpreadsheetsResponse::set_error_code(int32_t value) {
+  _internal_set_error_code(value);
+  // @@protoc_insertion_point(field_set:rpc.ListSpreadsheetsResponse.error_code)
 }
 
 // -------------------------------------------------------------------
@@ -4278,6 +4552,26 @@ inline void UpdateSpreadsheetResponse::set_allocated_error(std::string* error) {
   // @@protoc_insertion_point(field_set_allocated:rpc.UpdateSpreadsheetResponse.error)
 }
 
+// int32 error_code = 99;
+inline void UpdateSpreadsheetResponse::clear_error_code() {
+  _impl_.error_code_ = 0;
+}
+inline int32_t UpdateSpreadsheetResponse::_internal_error_code() const {
+  return _impl_.error_code_;
+}
+inline int32_t UpdateSpreadsheetResponse::error_code() const {
+  // @@protoc_insertion_point(field_get:rpc.UpdateSpreadsheetResponse.error_code)
+  return _internal_error_code();
+}
+inline void UpdateSpreadsheetResponse::_internal_set_error_code(int32_t value) {
+  
+  _impl_.error_code_ = value;
+}
+inline void UpdateSpreadsheetResponse::set_error_code(int32_t value) {
+  _internal_set_error_code(value);
+  // @@protoc_insertion_point(field_set:rpc.UpdateSpreadsheetResponse.error_code)
+}
+
 // -------------------------------------------------------------------
 
 // DeleteSpreadsheetRequest
@@ -4394,6 +4688,26 @@ inline void DeleteSpreadsheetResponse::set_allocated_error(std::string* error) {
   }
 #endif // PROTOBUF_FORCE_COPY_DEFAULT_STRING
   // @@protoc_insertion_point(field_set_allocated:rpc.DeleteSpreadsheetResponse.error)
+}
+
+// int32 error_code = 99;
+inline void DeleteSpreadsheetResponse::clear_error_code() {
+  _impl_.error_code_ = 0;
+}
+inline int32_t DeleteSpreadsheetResponse::_internal_error_code() const {
+  return _impl_.error_code_;
+}
+inline int32_t DeleteSpreadsheetResponse::error_code() const {
+  // @@protoc_insertion_point(field_get:rpc.DeleteSpreadsheetResponse.error_code)
+  return _internal_error_code();
+}
+inline void DeleteSpreadsheetResponse::_internal_set_error_code(int32_t value) {
+  
+  _impl_.error_code_ = value;
+}
+inline void DeleteSpreadsheetResponse::set_error_code(int32_t value) {
+  _internal_set_error_code(value);
+  // @@protoc_insertion_point(field_set:rpc.DeleteSpreadsheetResponse.error_code)
 }
 
 #ifdef __GNUC__

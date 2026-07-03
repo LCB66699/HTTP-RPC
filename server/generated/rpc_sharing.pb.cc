@@ -42,6 +42,7 @@ PROTOBUF_CONSTEXPR ShareResponse::ShareResponse(
     ::_pbi::ConstantInitialized): _impl_{
     /*decltype(_impl_.error_)*/{&::_pbi::fixed_address_empty_string, ::_pbi::ConstantInitialized{}}
   , /*decltype(_impl_.success_)*/false
+  , /*decltype(_impl_.error_code_)*/0
   , /*decltype(_impl_._cached_size_)*/{}} {}
 struct ShareResponseDefaultTypeInternal {
   PROTOBUF_CONSTEXPR ShareResponseDefaultTypeInternal()
@@ -72,6 +73,7 @@ PROTOBUF_CONSTEXPR RevokeResponse::RevokeResponse(
     ::_pbi::ConstantInitialized): _impl_{
     /*decltype(_impl_.error_)*/{&::_pbi::fixed_address_empty_string, ::_pbi::ConstantInitialized{}}
   , /*decltype(_impl_.success_)*/false
+  , /*decltype(_impl_.error_code_)*/0
   , /*decltype(_impl_._cached_size_)*/{}} {}
 struct RevokeResponseDefaultTypeInternal {
   PROTOBUF_CONSTEXPR RevokeResponseDefaultTypeInternal()
@@ -117,6 +119,7 @@ PROTOBUF_CONSTEXPR ShareListResponse::ShareListResponse(
     /*decltype(_impl_.entries_)*/{}
   , /*decltype(_impl_.error_)*/{&::_pbi::fixed_address_empty_string, ::_pbi::ConstantInitialized{}}
   , /*decltype(_impl_.success_)*/false
+  , /*decltype(_impl_.error_code_)*/0
   , /*decltype(_impl_._cached_size_)*/{}} {}
 struct ShareListResponseDefaultTypeInternal {
   PROTOBUF_CONSTEXPR ShareListResponseDefaultTypeInternal()
@@ -148,6 +151,7 @@ PROTOBUF_CONSTEXPR ShareLinkResponse::ShareLinkResponse(
     /*decltype(_impl_.token_)*/{&::_pbi::fixed_address_empty_string, ::_pbi::ConstantInitialized{}}
   , /*decltype(_impl_.error_)*/{&::_pbi::fixed_address_empty_string, ::_pbi::ConstantInitialized{}}
   , /*decltype(_impl_.success_)*/false
+  , /*decltype(_impl_.error_code_)*/0
   , /*decltype(_impl_._cached_size_)*/{}} {}
 struct ShareLinkResponseDefaultTypeInternal {
   PROTOBUF_CONSTEXPR ShareLinkResponseDefaultTypeInternal()
@@ -191,6 +195,7 @@ PROTOBUF_CONSTEXPR SharedResourceResponse::SharedResourceResponse(
     /*decltype(_impl_.error_)*/{&::_pbi::fixed_address_empty_string, ::_pbi::ConstantInitialized{}}
   , /*decltype(_impl_.info_)*/nullptr
   , /*decltype(_impl_.success_)*/false
+  , /*decltype(_impl_.error_code_)*/0
   , /*decltype(_impl_._cached_size_)*/{}} {}
 struct SharedResourceResponseDefaultTypeInternal {
   PROTOBUF_CONSTEXPR SharedResourceResponseDefaultTypeInternal()
@@ -226,6 +231,7 @@ const uint32_t TableStruct_rpc_5fsharing_2eproto::offsets[] PROTOBUF_SECTION_VAR
   ~0u,  // no _inlined_string_donated_
   PROTOBUF_FIELD_OFFSET(::rpc::ShareResponse, _impl_.success_),
   PROTOBUF_FIELD_OFFSET(::rpc::ShareResponse, _impl_.error_),
+  PROTOBUF_FIELD_OFFSET(::rpc::ShareResponse, _impl_.error_code_),
   ~0u,  // no _has_bits_
   PROTOBUF_FIELD_OFFSET(::rpc::RevokeRequest, _internal_metadata_),
   ~0u,  // no _extensions_
@@ -244,6 +250,7 @@ const uint32_t TableStruct_rpc_5fsharing_2eproto::offsets[] PROTOBUF_SECTION_VAR
   ~0u,  // no _inlined_string_donated_
   PROTOBUF_FIELD_OFFSET(::rpc::RevokeResponse, _impl_.success_),
   PROTOBUF_FIELD_OFFSET(::rpc::RevokeResponse, _impl_.error_),
+  PROTOBUF_FIELD_OFFSET(::rpc::RevokeResponse, _impl_.error_code_),
   ~0u,  // no _has_bits_
   PROTOBUF_FIELD_OFFSET(::rpc::ResourceRequest, _internal_metadata_),
   ~0u,  // no _extensions_
@@ -271,6 +278,7 @@ const uint32_t TableStruct_rpc_5fsharing_2eproto::offsets[] PROTOBUF_SECTION_VAR
   PROTOBUF_FIELD_OFFSET(::rpc::ShareListResponse, _impl_.success_),
   PROTOBUF_FIELD_OFFSET(::rpc::ShareListResponse, _impl_.entries_),
   PROTOBUF_FIELD_OFFSET(::rpc::ShareListResponse, _impl_.error_),
+  PROTOBUF_FIELD_OFFSET(::rpc::ShareListResponse, _impl_.error_code_),
   ~0u,  // no _has_bits_
   PROTOBUF_FIELD_OFFSET(::rpc::ShareLinkRequest, _internal_metadata_),
   ~0u,  // no _extensions_
@@ -290,6 +298,7 @@ const uint32_t TableStruct_rpc_5fsharing_2eproto::offsets[] PROTOBUF_SECTION_VAR
   PROTOBUF_FIELD_OFFSET(::rpc::ShareLinkResponse, _impl_.success_),
   PROTOBUF_FIELD_OFFSET(::rpc::ShareLinkResponse, _impl_.token_),
   PROTOBUF_FIELD_OFFSET(::rpc::ShareLinkResponse, _impl_.error_),
+  PROTOBUF_FIELD_OFFSET(::rpc::ShareLinkResponse, _impl_.error_code_),
   ~0u,  // no _has_bits_
   PROTOBUF_FIELD_OFFSET(::rpc::ShareTokenRequest, _internal_metadata_),
   ~0u,  // no _extensions_
@@ -315,20 +324,21 @@ const uint32_t TableStruct_rpc_5fsharing_2eproto::offsets[] PROTOBUF_SECTION_VAR
   PROTOBUF_FIELD_OFFSET(::rpc::SharedResourceResponse, _impl_.success_),
   PROTOBUF_FIELD_OFFSET(::rpc::SharedResourceResponse, _impl_.info_),
   PROTOBUF_FIELD_OFFSET(::rpc::SharedResourceResponse, _impl_.error_),
+  PROTOBUF_FIELD_OFFSET(::rpc::SharedResourceResponse, _impl_.error_code_),
 };
 static const ::_pbi::MigrationSchema schemas[] PROTOBUF_SECTION_VARIABLE(protodesc_cold) = {
   { 0, -1, -1, sizeof(::rpc::ShareRequest)},
   { 11, -1, -1, sizeof(::rpc::ShareResponse)},
-  { 19, -1, -1, sizeof(::rpc::RevokeRequest)},
-  { 29, -1, -1, sizeof(::rpc::RevokeResponse)},
-  { 37, -1, -1, sizeof(::rpc::ResourceRequest)},
-  { 46, -1, -1, sizeof(::rpc::AccessEntry)},
-  { 55, -1, -1, sizeof(::rpc::ShareListResponse)},
-  { 64, -1, -1, sizeof(::rpc::ShareLinkRequest)},
-  { 74, -1, -1, sizeof(::rpc::ShareLinkResponse)},
-  { 83, -1, -1, sizeof(::rpc::ShareTokenRequest)},
-  { 90, -1, -1, sizeof(::rpc::SharedResourceInfo)},
-  { 99, -1, -1, sizeof(::rpc::SharedResourceResponse)},
+  { 20, -1, -1, sizeof(::rpc::RevokeRequest)},
+  { 30, -1, -1, sizeof(::rpc::RevokeResponse)},
+  { 39, -1, -1, sizeof(::rpc::ResourceRequest)},
+  { 48, -1, -1, sizeof(::rpc::AccessEntry)},
+  { 57, -1, -1, sizeof(::rpc::ShareListResponse)},
+  { 67, -1, -1, sizeof(::rpc::ShareLinkRequest)},
+  { 77, -1, -1, sizeof(::rpc::ShareLinkResponse)},
+  { 87, -1, -1, sizeof(::rpc::ShareTokenRequest)},
+  { 94, -1, -1, sizeof(::rpc::SharedResourceInfo)},
+  { 103, -1, -1, sizeof(::rpc::SharedResourceResponse)},
 };
 
 static const ::_pb::Message* const file_default_instances[] = {
@@ -350,41 +360,43 @@ const char descriptor_table_protodef_rpc_5fsharing_2eproto[] PROTOBUF_SECTION_VA
   "\n\021rpc_sharing.proto\022\003rpc\"z\n\014ShareRequest"
   "\022\020\n\010owner_id\030\001 \001(\003\022\025\n\rresource_type\030\002 \001("
   "\t\022\023\n\013resource_id\030\003 \001(\003\022\030\n\020grantee_userna"
-  "me\030\004 \001(\t\022\022\n\npermission\030\005 \001(\t\"/\n\rShareRes"
-  "ponse\022\017\n\007success\030\001 \001(\010\022\r\n\005error\030\002 \001(\t\"g\n"
-  "\rRevokeRequest\022\020\n\010owner_id\030\001 \001(\003\022\025\n\rreso"
-  "urce_type\030\002 \001(\t\022\023\n\013resource_id\030\003 \001(\003\022\030\n\020"
-  "grantee_username\030\004 \001(\t\"0\n\016RevokeResponse"
-  "\022\017\n\007success\030\001 \001(\010\022\r\n\005error\030\002 \001(\t\"O\n\017Reso"
+  "me\030\004 \001(\t\022\022\n\npermission\030\005 \001(\t\"C\n\rShareRes"
+  "ponse\022\017\n\007success\030\001 \001(\010\022\r\n\005error\030\002 \001(\t\022\022\n"
+  "\nerror_code\030c \001(\005\"g\n\rRevokeRequest\022\020\n\010ow"
+  "ner_id\030\001 \001(\003\022\025\n\rresource_type\030\002 \001(\t\022\023\n\013r"
+  "esource_id\030\003 \001(\003\022\030\n\020grantee_username\030\004 \001"
+  "(\t\"D\n\016RevokeResponse\022\017\n\007success\030\001 \001(\010\022\r\n"
+  "\005error\030\002 \001(\t\022\022\n\nerror_code\030c \001(\005\"O\n\017Reso"
   "urceRequest\022\020\n\010owner_id\030\001 \001(\003\022\025\n\rresourc"
   "e_type\030\002 \001(\t\022\023\n\013resource_id\030\003 \001(\003\"G\n\013Acc"
   "essEntry\022\020\n\010username\030\001 \001(\t\022\022\n\npermission"
-  "\030\002 \001(\t\022\022\n\ngranted_at\030\003 \001(\t\"V\n\021ShareListR"
+  "\030\002 \001(\t\022\022\n\ngranted_at\030\003 \001(\t\"j\n\021ShareListR"
   "esponse\022\017\n\007success\030\001 \001(\010\022!\n\007entries\030\002 \003("
-  "\0132\020.rpc.AccessEntry\022\r\n\005error\030\003 \001(\t\"d\n\020Sh"
-  "areLinkRequest\022\020\n\010owner_id\030\001 \001(\003\022\025\n\rreso"
-  "urce_type\030\002 \001(\t\022\023\n\013resource_id\030\003 \001(\003\022\022\n\n"
-  "permission\030\004 \001(\t\"B\n\021ShareLinkResponse\022\017\n"
-  "\007success\030\001 \001(\010\022\r\n\005token\030\002 \001(\t\022\r\n\005error\030\003"
-  " \001(\t\"\"\n\021ShareTokenRequest\022\r\n\005token\030\001 \001(\t"
+  "\0132\020.rpc.AccessEntry\022\r\n\005error\030\003 \001(\t\022\022\n\ner"
+  "ror_code\030c \001(\005\"d\n\020ShareLinkRequest\022\020\n\010ow"
+  "ner_id\030\001 \001(\003\022\025\n\rresource_type\030\002 \001(\t\022\023\n\013r"
+  "esource_id\030\003 \001(\003\022\022\n\npermission\030\004 \001(\t\"V\n\021"
+  "ShareLinkResponse\022\017\n\007success\030\001 \001(\010\022\r\n\005to"
+  "ken\030\002 \001(\t\022\r\n\005error\030\003 \001(\t\022\022\n\nerror_code\030c"
+  " \001(\005\"\"\n\021ShareTokenRequest\022\r\n\005token\030\001 \001(\t"
   "\"T\n\022SharedResourceInfo\022\025\n\rresource_type\030"
   "\001 \001(\t\022\023\n\013resource_id\030\002 \001(\003\022\022\n\npermission"
-  "\030\003 \001(\t\"_\n\026SharedResourceResponse\022\017\n\007succ"
+  "\030\003 \001(\t\"s\n\026SharedResourceResponse\022\017\n\007succ"
   "ess\030\001 \001(\010\022%\n\004info\030\002 \001(\0132\027.rpc.SharedReso"
-  "urceInfo\022\r\n\005error\030\003 \001(\t2\264\002\n\016SharingServi"
-  "ce\022.\n\005Share\022\021.rpc.ShareRequest\032\022.rpc.Sha"
-  "reResponse\0221\n\006Revoke\022\022.rpc.RevokeRequest"
-  "\032\023.rpc.RevokeResponse\022:\n\nListShares\022\024.rp"
-  "c.ResourceRequest\032\026.rpc.ShareListRespons"
-  "e\022@\n\017CreateShareLink\022\025.rpc.ShareLinkRequ"
-  "est\032\026.rpc.ShareLinkResponse\022A\n\nGetByToke"
-  "n\022\026.rpc.ShareTokenRequest\032\033.rpc.SharedRe"
-  "sourceResponseB\026Z\024rpc-server/proto/rpcb\006"
-  "proto3"
+  "urceInfo\022\r\n\005error\030\003 \001(\t\022\022\n\nerror_code\030c "
+  "\001(\0052\264\002\n\016SharingService\022.\n\005Share\022\021.rpc.Sh"
+  "areRequest\032\022.rpc.ShareResponse\0221\n\006Revoke"
+  "\022\022.rpc.RevokeRequest\032\023.rpc.RevokeRespons"
+  "e\022:\n\nListShares\022\024.rpc.ResourceRequest\032\026."
+  "rpc.ShareListResponse\022@\n\017CreateShareLink"
+  "\022\025.rpc.ShareLinkRequest\032\026.rpc.ShareLinkR"
+  "esponse\022A\n\nGetByToken\022\026.rpc.ShareTokenRe"
+  "quest\032\033.rpc.SharedResourceResponseB\026Z\024rp"
+  "c-server/proto/rpcb\006proto3"
   ;
 static ::_pbi::once_flag descriptor_table_rpc_5fsharing_2eproto_once;
 const ::_pbi::DescriptorTable descriptor_table_rpc_5fsharing_2eproto = {
-    false, false, 1326, descriptor_table_protodef_rpc_5fsharing_2eproto,
+    false, false, 1426, descriptor_table_protodef_rpc_5fsharing_2eproto,
     "rpc_sharing.proto",
     &descriptor_table_rpc_5fsharing_2eproto_once, nullptr, 0, 12,
     schemas, file_default_instances, TableStruct_rpc_5fsharing_2eproto::offsets,
@@ -780,6 +792,7 @@ ShareResponse::ShareResponse(const ShareResponse& from)
   new (&_impl_) Impl_{
       decltype(_impl_.error_){}
     , decltype(_impl_.success_){}
+    , decltype(_impl_.error_code_){}
     , /*decltype(_impl_._cached_size_)*/{}};
 
   _internal_metadata_.MergeFrom<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(from._internal_metadata_);
@@ -791,7 +804,9 @@ ShareResponse::ShareResponse(const ShareResponse& from)
     _this->_impl_.error_.Set(from._internal_error(), 
       _this->GetArenaForAllocation());
   }
-  _this->_impl_.success_ = from._impl_.success_;
+  ::memcpy(&_impl_.success_, &from._impl_.success_,
+    static_cast<size_t>(reinterpret_cast<char*>(&_impl_.error_code_) -
+    reinterpret_cast<char*>(&_impl_.success_)) + sizeof(_impl_.error_code_));
   // @@protoc_insertion_point(copy_constructor:rpc.ShareResponse)
 }
 
@@ -802,6 +817,7 @@ inline void ShareResponse::SharedCtor(
   new (&_impl_) Impl_{
       decltype(_impl_.error_){}
     , decltype(_impl_.success_){false}
+    , decltype(_impl_.error_code_){0}
     , /*decltype(_impl_._cached_size_)*/{}
   };
   _impl_.error_.InitDefault();
@@ -835,7 +851,9 @@ void ShareResponse::Clear() {
   (void) cached_has_bits;
 
   _impl_.error_.ClearToEmpty();
-  _impl_.success_ = false;
+  ::memset(&_impl_.success_, 0, static_cast<size_t>(
+      reinterpret_cast<char*>(&_impl_.error_code_) -
+      reinterpret_cast<char*>(&_impl_.success_)) + sizeof(_impl_.error_code_));
   _internal_metadata_.Clear<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>();
 }
 
@@ -860,6 +878,14 @@ const char* ShareResponse::_InternalParse(const char* ptr, ::_pbi::ParseContext*
           ptr = ::_pbi::InlineGreedyStringParser(str, ptr, ctx);
           CHK_(ptr);
           CHK_(::_pbi::VerifyUTF8(str, "rpc.ShareResponse.error"));
+        } else
+          goto handle_unusual;
+        continue;
+      // int32 error_code = 99;
+      case 99:
+        if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 24)) {
+          _impl_.error_code_ = ::PROTOBUF_NAMESPACE_ID::internal::ReadVarint32(&ptr);
+          CHK_(ptr);
         } else
           goto handle_unusual;
         continue;
@@ -908,6 +934,12 @@ uint8_t* ShareResponse::_InternalSerialize(
         2, this->_internal_error(), target);
   }
 
+  // int32 error_code = 99;
+  if (this->_internal_error_code() != 0) {
+    target = stream->EnsureSpace(target);
+    target = ::_pbi::WireFormatLite::WriteInt32ToArray(99, this->_internal_error_code(), target);
+  }
+
   if (PROTOBUF_PREDICT_FALSE(_internal_metadata_.have_unknown_fields())) {
     target = ::_pbi::WireFormat::InternalSerializeUnknownFieldsToArray(
         _internal_metadata_.unknown_fields<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(::PROTOBUF_NAMESPACE_ID::UnknownFieldSet::default_instance), target, stream);
@@ -936,6 +968,13 @@ size_t ShareResponse::ByteSizeLong() const {
     total_size += 1 + 1;
   }
 
+  // int32 error_code = 99;
+  if (this->_internal_error_code() != 0) {
+    total_size += 2 +
+      ::_pbi::WireFormatLite::Int32Size(
+        this->_internal_error_code());
+  }
+
   return MaybeComputeUnknownFieldsSize(total_size, &_impl_._cached_size_);
 }
 
@@ -960,6 +999,9 @@ void ShareResponse::MergeImpl(::PROTOBUF_NAMESPACE_ID::Message& to_msg, const ::
   if (from._internal_success() != 0) {
     _this->_internal_set_success(from._internal_success());
   }
+  if (from._internal_error_code() != 0) {
+    _this->_internal_set_error_code(from._internal_error_code());
+  }
   _this->_internal_metadata_.MergeFrom<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(from._internal_metadata_);
 }
 
@@ -983,7 +1025,12 @@ void ShareResponse::InternalSwap(ShareResponse* other) {
       &_impl_.error_, lhs_arena,
       &other->_impl_.error_, rhs_arena
   );
-  swap(_impl_.success_, other->_impl_.success_);
+  ::PROTOBUF_NAMESPACE_ID::internal::memswap<
+      PROTOBUF_FIELD_OFFSET(ShareResponse, _impl_.error_code_)
+      + sizeof(ShareResponse::_impl_.error_code_)
+      - PROTOBUF_FIELD_OFFSET(ShareResponse, _impl_.success_)>(
+          reinterpret_cast<char*>(&_impl_.success_),
+          reinterpret_cast<char*>(&other->_impl_.success_));
 }
 
 ::PROTOBUF_NAMESPACE_ID::Metadata ShareResponse::GetMetadata() const {
@@ -1323,6 +1370,7 @@ RevokeResponse::RevokeResponse(const RevokeResponse& from)
   new (&_impl_) Impl_{
       decltype(_impl_.error_){}
     , decltype(_impl_.success_){}
+    , decltype(_impl_.error_code_){}
     , /*decltype(_impl_._cached_size_)*/{}};
 
   _internal_metadata_.MergeFrom<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(from._internal_metadata_);
@@ -1334,7 +1382,9 @@ RevokeResponse::RevokeResponse(const RevokeResponse& from)
     _this->_impl_.error_.Set(from._internal_error(), 
       _this->GetArenaForAllocation());
   }
-  _this->_impl_.success_ = from._impl_.success_;
+  ::memcpy(&_impl_.success_, &from._impl_.success_,
+    static_cast<size_t>(reinterpret_cast<char*>(&_impl_.error_code_) -
+    reinterpret_cast<char*>(&_impl_.success_)) + sizeof(_impl_.error_code_));
   // @@protoc_insertion_point(copy_constructor:rpc.RevokeResponse)
 }
 
@@ -1345,6 +1395,7 @@ inline void RevokeResponse::SharedCtor(
   new (&_impl_) Impl_{
       decltype(_impl_.error_){}
     , decltype(_impl_.success_){false}
+    , decltype(_impl_.error_code_){0}
     , /*decltype(_impl_._cached_size_)*/{}
   };
   _impl_.error_.InitDefault();
@@ -1378,7 +1429,9 @@ void RevokeResponse::Clear() {
   (void) cached_has_bits;
 
   _impl_.error_.ClearToEmpty();
-  _impl_.success_ = false;
+  ::memset(&_impl_.success_, 0, static_cast<size_t>(
+      reinterpret_cast<char*>(&_impl_.error_code_) -
+      reinterpret_cast<char*>(&_impl_.success_)) + sizeof(_impl_.error_code_));
   _internal_metadata_.Clear<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>();
 }
 
@@ -1403,6 +1456,14 @@ const char* RevokeResponse::_InternalParse(const char* ptr, ::_pbi::ParseContext
           ptr = ::_pbi::InlineGreedyStringParser(str, ptr, ctx);
           CHK_(ptr);
           CHK_(::_pbi::VerifyUTF8(str, "rpc.RevokeResponse.error"));
+        } else
+          goto handle_unusual;
+        continue;
+      // int32 error_code = 99;
+      case 99:
+        if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 24)) {
+          _impl_.error_code_ = ::PROTOBUF_NAMESPACE_ID::internal::ReadVarint32(&ptr);
+          CHK_(ptr);
         } else
           goto handle_unusual;
         continue;
@@ -1451,6 +1512,12 @@ uint8_t* RevokeResponse::_InternalSerialize(
         2, this->_internal_error(), target);
   }
 
+  // int32 error_code = 99;
+  if (this->_internal_error_code() != 0) {
+    target = stream->EnsureSpace(target);
+    target = ::_pbi::WireFormatLite::WriteInt32ToArray(99, this->_internal_error_code(), target);
+  }
+
   if (PROTOBUF_PREDICT_FALSE(_internal_metadata_.have_unknown_fields())) {
     target = ::_pbi::WireFormat::InternalSerializeUnknownFieldsToArray(
         _internal_metadata_.unknown_fields<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(::PROTOBUF_NAMESPACE_ID::UnknownFieldSet::default_instance), target, stream);
@@ -1479,6 +1546,13 @@ size_t RevokeResponse::ByteSizeLong() const {
     total_size += 1 + 1;
   }
 
+  // int32 error_code = 99;
+  if (this->_internal_error_code() != 0) {
+    total_size += 2 +
+      ::_pbi::WireFormatLite::Int32Size(
+        this->_internal_error_code());
+  }
+
   return MaybeComputeUnknownFieldsSize(total_size, &_impl_._cached_size_);
 }
 
@@ -1503,6 +1577,9 @@ void RevokeResponse::MergeImpl(::PROTOBUF_NAMESPACE_ID::Message& to_msg, const :
   if (from._internal_success() != 0) {
     _this->_internal_set_success(from._internal_success());
   }
+  if (from._internal_error_code() != 0) {
+    _this->_internal_set_error_code(from._internal_error_code());
+  }
   _this->_internal_metadata_.MergeFrom<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(from._internal_metadata_);
 }
 
@@ -1526,7 +1603,12 @@ void RevokeResponse::InternalSwap(RevokeResponse* other) {
       &_impl_.error_, lhs_arena,
       &other->_impl_.error_, rhs_arena
   );
-  swap(_impl_.success_, other->_impl_.success_);
+  ::PROTOBUF_NAMESPACE_ID::internal::memswap<
+      PROTOBUF_FIELD_OFFSET(RevokeResponse, _impl_.error_code_)
+      + sizeof(RevokeResponse::_impl_.error_code_)
+      - PROTOBUF_FIELD_OFFSET(RevokeResponse, _impl_.success_)>(
+          reinterpret_cast<char*>(&_impl_.success_),
+          reinterpret_cast<char*>(&other->_impl_.success_));
 }
 
 ::PROTOBUF_NAMESPACE_ID::Metadata RevokeResponse::GetMetadata() const {
@@ -2120,6 +2202,7 @@ ShareListResponse::ShareListResponse(const ShareListResponse& from)
       decltype(_impl_.entries_){from._impl_.entries_}
     , decltype(_impl_.error_){}
     , decltype(_impl_.success_){}
+    , decltype(_impl_.error_code_){}
     , /*decltype(_impl_._cached_size_)*/{}};
 
   _internal_metadata_.MergeFrom<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(from._internal_metadata_);
@@ -2131,7 +2214,9 @@ ShareListResponse::ShareListResponse(const ShareListResponse& from)
     _this->_impl_.error_.Set(from._internal_error(), 
       _this->GetArenaForAllocation());
   }
-  _this->_impl_.success_ = from._impl_.success_;
+  ::memcpy(&_impl_.success_, &from._impl_.success_,
+    static_cast<size_t>(reinterpret_cast<char*>(&_impl_.error_code_) -
+    reinterpret_cast<char*>(&_impl_.success_)) + sizeof(_impl_.error_code_));
   // @@protoc_insertion_point(copy_constructor:rpc.ShareListResponse)
 }
 
@@ -2143,6 +2228,7 @@ inline void ShareListResponse::SharedCtor(
       decltype(_impl_.entries_){arena}
     , decltype(_impl_.error_){}
     , decltype(_impl_.success_){false}
+    , decltype(_impl_.error_code_){0}
     , /*decltype(_impl_._cached_size_)*/{}
   };
   _impl_.error_.InitDefault();
@@ -2178,7 +2264,9 @@ void ShareListResponse::Clear() {
 
   _impl_.entries_.Clear();
   _impl_.error_.ClearToEmpty();
-  _impl_.success_ = false;
+  ::memset(&_impl_.success_, 0, static_cast<size_t>(
+      reinterpret_cast<char*>(&_impl_.error_code_) -
+      reinterpret_cast<char*>(&_impl_.success_)) + sizeof(_impl_.error_code_));
   _internal_metadata_.Clear<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>();
 }
 
@@ -2216,6 +2304,14 @@ const char* ShareListResponse::_InternalParse(const char* ptr, ::_pbi::ParseCont
           ptr = ::_pbi::InlineGreedyStringParser(str, ptr, ctx);
           CHK_(ptr);
           CHK_(::_pbi::VerifyUTF8(str, "rpc.ShareListResponse.error"));
+        } else
+          goto handle_unusual;
+        continue;
+      // int32 error_code = 99;
+      case 99:
+        if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 24)) {
+          _impl_.error_code_ = ::PROTOBUF_NAMESPACE_ID::internal::ReadVarint32(&ptr);
+          CHK_(ptr);
         } else
           goto handle_unusual;
         continue;
@@ -2272,6 +2368,12 @@ uint8_t* ShareListResponse::_InternalSerialize(
         3, this->_internal_error(), target);
   }
 
+  // int32 error_code = 99;
+  if (this->_internal_error_code() != 0) {
+    target = stream->EnsureSpace(target);
+    target = ::_pbi::WireFormatLite::WriteInt32ToArray(99, this->_internal_error_code(), target);
+  }
+
   if (PROTOBUF_PREDICT_FALSE(_internal_metadata_.have_unknown_fields())) {
     target = ::_pbi::WireFormat::InternalSerializeUnknownFieldsToArray(
         _internal_metadata_.unknown_fields<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(::PROTOBUF_NAMESPACE_ID::UnknownFieldSet::default_instance), target, stream);
@@ -2307,6 +2409,13 @@ size_t ShareListResponse::ByteSizeLong() const {
     total_size += 1 + 1;
   }
 
+  // int32 error_code = 99;
+  if (this->_internal_error_code() != 0) {
+    total_size += 2 +
+      ::_pbi::WireFormatLite::Int32Size(
+        this->_internal_error_code());
+  }
+
   return MaybeComputeUnknownFieldsSize(total_size, &_impl_._cached_size_);
 }
 
@@ -2332,6 +2441,9 @@ void ShareListResponse::MergeImpl(::PROTOBUF_NAMESPACE_ID::Message& to_msg, cons
   if (from._internal_success() != 0) {
     _this->_internal_set_success(from._internal_success());
   }
+  if (from._internal_error_code() != 0) {
+    _this->_internal_set_error_code(from._internal_error_code());
+  }
   _this->_internal_metadata_.MergeFrom<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(from._internal_metadata_);
 }
 
@@ -2356,7 +2468,12 @@ void ShareListResponse::InternalSwap(ShareListResponse* other) {
       &_impl_.error_, lhs_arena,
       &other->_impl_.error_, rhs_arena
   );
-  swap(_impl_.success_, other->_impl_.success_);
+  ::PROTOBUF_NAMESPACE_ID::internal::memswap<
+      PROTOBUF_FIELD_OFFSET(ShareListResponse, _impl_.error_code_)
+      + sizeof(ShareListResponse::_impl_.error_code_)
+      - PROTOBUF_FIELD_OFFSET(ShareListResponse, _impl_.success_)>(
+          reinterpret_cast<char*>(&_impl_.success_),
+          reinterpret_cast<char*>(&other->_impl_.success_));
 }
 
 ::PROTOBUF_NAMESPACE_ID::Metadata ShareListResponse::GetMetadata() const {
@@ -2697,6 +2814,7 @@ ShareLinkResponse::ShareLinkResponse(const ShareLinkResponse& from)
       decltype(_impl_.token_){}
     , decltype(_impl_.error_){}
     , decltype(_impl_.success_){}
+    , decltype(_impl_.error_code_){}
     , /*decltype(_impl_._cached_size_)*/{}};
 
   _internal_metadata_.MergeFrom<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(from._internal_metadata_);
@@ -2716,7 +2834,9 @@ ShareLinkResponse::ShareLinkResponse(const ShareLinkResponse& from)
     _this->_impl_.error_.Set(from._internal_error(), 
       _this->GetArenaForAllocation());
   }
-  _this->_impl_.success_ = from._impl_.success_;
+  ::memcpy(&_impl_.success_, &from._impl_.success_,
+    static_cast<size_t>(reinterpret_cast<char*>(&_impl_.error_code_) -
+    reinterpret_cast<char*>(&_impl_.success_)) + sizeof(_impl_.error_code_));
   // @@protoc_insertion_point(copy_constructor:rpc.ShareLinkResponse)
 }
 
@@ -2728,6 +2848,7 @@ inline void ShareLinkResponse::SharedCtor(
       decltype(_impl_.token_){}
     , decltype(_impl_.error_){}
     , decltype(_impl_.success_){false}
+    , decltype(_impl_.error_code_){0}
     , /*decltype(_impl_._cached_size_)*/{}
   };
   _impl_.token_.InitDefault();
@@ -2767,7 +2888,9 @@ void ShareLinkResponse::Clear() {
 
   _impl_.token_.ClearToEmpty();
   _impl_.error_.ClearToEmpty();
-  _impl_.success_ = false;
+  ::memset(&_impl_.success_, 0, static_cast<size_t>(
+      reinterpret_cast<char*>(&_impl_.error_code_) -
+      reinterpret_cast<char*>(&_impl_.success_)) + sizeof(_impl_.error_code_));
   _internal_metadata_.Clear<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>();
 }
 
@@ -2802,6 +2925,14 @@ const char* ShareLinkResponse::_InternalParse(const char* ptr, ::_pbi::ParseCont
           ptr = ::_pbi::InlineGreedyStringParser(str, ptr, ctx);
           CHK_(ptr);
           CHK_(::_pbi::VerifyUTF8(str, "rpc.ShareLinkResponse.error"));
+        } else
+          goto handle_unusual;
+        continue;
+      // int32 error_code = 99;
+      case 99:
+        if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 24)) {
+          _impl_.error_code_ = ::PROTOBUF_NAMESPACE_ID::internal::ReadVarint32(&ptr);
+          CHK_(ptr);
         } else
           goto handle_unusual;
         continue;
@@ -2860,6 +2991,12 @@ uint8_t* ShareLinkResponse::_InternalSerialize(
         3, this->_internal_error(), target);
   }
 
+  // int32 error_code = 99;
+  if (this->_internal_error_code() != 0) {
+    target = stream->EnsureSpace(target);
+    target = ::_pbi::WireFormatLite::WriteInt32ToArray(99, this->_internal_error_code(), target);
+  }
+
   if (PROTOBUF_PREDICT_FALSE(_internal_metadata_.have_unknown_fields())) {
     target = ::_pbi::WireFormat::InternalSerializeUnknownFieldsToArray(
         _internal_metadata_.unknown_fields<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(::PROTOBUF_NAMESPACE_ID::UnknownFieldSet::default_instance), target, stream);
@@ -2895,6 +3032,13 @@ size_t ShareLinkResponse::ByteSizeLong() const {
     total_size += 1 + 1;
   }
 
+  // int32 error_code = 99;
+  if (this->_internal_error_code() != 0) {
+    total_size += 2 +
+      ::_pbi::WireFormatLite::Int32Size(
+        this->_internal_error_code());
+  }
+
   return MaybeComputeUnknownFieldsSize(total_size, &_impl_._cached_size_);
 }
 
@@ -2921,6 +3065,9 @@ void ShareLinkResponse::MergeImpl(::PROTOBUF_NAMESPACE_ID::Message& to_msg, cons
   }
   if (from._internal_success() != 0) {
     _this->_internal_set_success(from._internal_success());
+  }
+  if (from._internal_error_code() != 0) {
+    _this->_internal_set_error_code(from._internal_error_code());
   }
   _this->_internal_metadata_.MergeFrom<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(from._internal_metadata_);
 }
@@ -2949,7 +3096,12 @@ void ShareLinkResponse::InternalSwap(ShareLinkResponse* other) {
       &_impl_.error_, lhs_arena,
       &other->_impl_.error_, rhs_arena
   );
-  swap(_impl_.success_, other->_impl_.success_);
+  ::PROTOBUF_NAMESPACE_ID::internal::memswap<
+      PROTOBUF_FIELD_OFFSET(ShareLinkResponse, _impl_.error_code_)
+      + sizeof(ShareLinkResponse::_impl_.error_code_)
+      - PROTOBUF_FIELD_OFFSET(ShareLinkResponse, _impl_.success_)>(
+          reinterpret_cast<char*>(&_impl_.success_),
+          reinterpret_cast<char*>(&other->_impl_.success_));
 }
 
 ::PROTOBUF_NAMESPACE_ID::Metadata ShareLinkResponse::GetMetadata() const {
@@ -3465,6 +3617,7 @@ SharedResourceResponse::SharedResourceResponse(const SharedResourceResponse& fro
       decltype(_impl_.error_){}
     , decltype(_impl_.info_){nullptr}
     , decltype(_impl_.success_){}
+    , decltype(_impl_.error_code_){}
     , /*decltype(_impl_._cached_size_)*/{}};
 
   _internal_metadata_.MergeFrom<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(from._internal_metadata_);
@@ -3479,7 +3632,9 @@ SharedResourceResponse::SharedResourceResponse(const SharedResourceResponse& fro
   if (from._internal_has_info()) {
     _this->_impl_.info_ = new ::rpc::SharedResourceInfo(*from._impl_.info_);
   }
-  _this->_impl_.success_ = from._impl_.success_;
+  ::memcpy(&_impl_.success_, &from._impl_.success_,
+    static_cast<size_t>(reinterpret_cast<char*>(&_impl_.error_code_) -
+    reinterpret_cast<char*>(&_impl_.success_)) + sizeof(_impl_.error_code_));
   // @@protoc_insertion_point(copy_constructor:rpc.SharedResourceResponse)
 }
 
@@ -3491,6 +3646,7 @@ inline void SharedResourceResponse::SharedCtor(
       decltype(_impl_.error_){}
     , decltype(_impl_.info_){nullptr}
     , decltype(_impl_.success_){false}
+    , decltype(_impl_.error_code_){0}
     , /*decltype(_impl_._cached_size_)*/{}
   };
   _impl_.error_.InitDefault();
@@ -3529,7 +3685,9 @@ void SharedResourceResponse::Clear() {
     delete _impl_.info_;
   }
   _impl_.info_ = nullptr;
-  _impl_.success_ = false;
+  ::memset(&_impl_.success_, 0, static_cast<size_t>(
+      reinterpret_cast<char*>(&_impl_.error_code_) -
+      reinterpret_cast<char*>(&_impl_.success_)) + sizeof(_impl_.error_code_));
   _internal_metadata_.Clear<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>();
 }
 
@@ -3562,6 +3720,14 @@ const char* SharedResourceResponse::_InternalParse(const char* ptr, ::_pbi::Pars
           ptr = ::_pbi::InlineGreedyStringParser(str, ptr, ctx);
           CHK_(ptr);
           CHK_(::_pbi::VerifyUTF8(str, "rpc.SharedResourceResponse.error"));
+        } else
+          goto handle_unusual;
+        continue;
+      // int32 error_code = 99;
+      case 99:
+        if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 24)) {
+          _impl_.error_code_ = ::PROTOBUF_NAMESPACE_ID::internal::ReadVarint32(&ptr);
+          CHK_(ptr);
         } else
           goto handle_unusual;
         continue;
@@ -3617,6 +3783,12 @@ uint8_t* SharedResourceResponse::_InternalSerialize(
         3, this->_internal_error(), target);
   }
 
+  // int32 error_code = 99;
+  if (this->_internal_error_code() != 0) {
+    target = stream->EnsureSpace(target);
+    target = ::_pbi::WireFormatLite::WriteInt32ToArray(99, this->_internal_error_code(), target);
+  }
+
   if (PROTOBUF_PREDICT_FALSE(_internal_metadata_.have_unknown_fields())) {
     target = ::_pbi::WireFormat::InternalSerializeUnknownFieldsToArray(
         _internal_metadata_.unknown_fields<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(::PROTOBUF_NAMESPACE_ID::UnknownFieldSet::default_instance), target, stream);
@@ -3652,6 +3824,13 @@ size_t SharedResourceResponse::ByteSizeLong() const {
     total_size += 1 + 1;
   }
 
+  // int32 error_code = 99;
+  if (this->_internal_error_code() != 0) {
+    total_size += 2 +
+      ::_pbi::WireFormatLite::Int32Size(
+        this->_internal_error_code());
+  }
+
   return MaybeComputeUnknownFieldsSize(total_size, &_impl_._cached_size_);
 }
 
@@ -3680,6 +3859,9 @@ void SharedResourceResponse::MergeImpl(::PROTOBUF_NAMESPACE_ID::Message& to_msg,
   if (from._internal_success() != 0) {
     _this->_internal_set_success(from._internal_success());
   }
+  if (from._internal_error_code() != 0) {
+    _this->_internal_set_error_code(from._internal_error_code());
+  }
   _this->_internal_metadata_.MergeFrom<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(from._internal_metadata_);
 }
 
@@ -3704,8 +3886,8 @@ void SharedResourceResponse::InternalSwap(SharedResourceResponse* other) {
       &other->_impl_.error_, rhs_arena
   );
   ::PROTOBUF_NAMESPACE_ID::internal::memswap<
-      PROTOBUF_FIELD_OFFSET(SharedResourceResponse, _impl_.success_)
-      + sizeof(SharedResourceResponse::_impl_.success_)
+      PROTOBUF_FIELD_OFFSET(SharedResourceResponse, _impl_.error_code_)
+      + sizeof(SharedResourceResponse::_impl_.error_code_)
       - PROTOBUF_FIELD_OFFSET(SharedResourceResponse, _impl_.info_)>(
           reinterpret_cast<char*>(&_impl_.info_),
           reinterpret_cast<char*>(&other->_impl_.info_));

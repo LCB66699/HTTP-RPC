@@ -63,6 +63,20 @@ class AuthService final {
     std::unique_ptr< ::grpc::ClientAsyncResponseReaderInterface< ::rpc::ValidateUserResponse>> PrepareAsyncValidateUser(::grpc::ClientContext* context, const ::rpc::ValidateUserRequest& request, ::grpc::CompletionQueue* cq) {
       return std::unique_ptr< ::grpc::ClientAsyncResponseReaderInterface< ::rpc::ValidateUserResponse>>(PrepareAsyncValidateUserRaw(context, request, cq));
     }
+    virtual ::grpc::Status ChangePassword(::grpc::ClientContext* context, const ::rpc::ChangePasswordRequest& request, ::rpc::ChangePasswordResponse* response) = 0;
+    std::unique_ptr< ::grpc::ClientAsyncResponseReaderInterface< ::rpc::ChangePasswordResponse>> AsyncChangePassword(::grpc::ClientContext* context, const ::rpc::ChangePasswordRequest& request, ::grpc::CompletionQueue* cq) {
+      return std::unique_ptr< ::grpc::ClientAsyncResponseReaderInterface< ::rpc::ChangePasswordResponse>>(AsyncChangePasswordRaw(context, request, cq));
+    }
+    std::unique_ptr< ::grpc::ClientAsyncResponseReaderInterface< ::rpc::ChangePasswordResponse>> PrepareAsyncChangePassword(::grpc::ClientContext* context, const ::rpc::ChangePasswordRequest& request, ::grpc::CompletionQueue* cq) {
+      return std::unique_ptr< ::grpc::ClientAsyncResponseReaderInterface< ::rpc::ChangePasswordResponse>>(PrepareAsyncChangePasswordRaw(context, request, cq));
+    }
+    virtual ::grpc::Status LoginByPhone(::grpc::ClientContext* context, const ::rpc::PhoneLoginRequest& request, ::rpc::LoginResponse* response) = 0;
+    std::unique_ptr< ::grpc::ClientAsyncResponseReaderInterface< ::rpc::LoginResponse>> AsyncLoginByPhone(::grpc::ClientContext* context, const ::rpc::PhoneLoginRequest& request, ::grpc::CompletionQueue* cq) {
+      return std::unique_ptr< ::grpc::ClientAsyncResponseReaderInterface< ::rpc::LoginResponse>>(AsyncLoginByPhoneRaw(context, request, cq));
+    }
+    std::unique_ptr< ::grpc::ClientAsyncResponseReaderInterface< ::rpc::LoginResponse>> PrepareAsyncLoginByPhone(::grpc::ClientContext* context, const ::rpc::PhoneLoginRequest& request, ::grpc::CompletionQueue* cq) {
+      return std::unique_ptr< ::grpc::ClientAsyncResponseReaderInterface< ::rpc::LoginResponse>>(PrepareAsyncLoginByPhoneRaw(context, request, cq));
+    }
     class async_interface {
      public:
       virtual ~async_interface() {}
@@ -74,6 +88,10 @@ class AuthService final {
       virtual void RefreshToken(::grpc::ClientContext* context, const ::rpc::RefreshTokenRequest* request, ::rpc::RefreshTokenResponse* response, ::grpc::ClientUnaryReactor* reactor) = 0;
       virtual void ValidateUser(::grpc::ClientContext* context, const ::rpc::ValidateUserRequest* request, ::rpc::ValidateUserResponse* response, std::function<void(::grpc::Status)>) = 0;
       virtual void ValidateUser(::grpc::ClientContext* context, const ::rpc::ValidateUserRequest* request, ::rpc::ValidateUserResponse* response, ::grpc::ClientUnaryReactor* reactor) = 0;
+      virtual void ChangePassword(::grpc::ClientContext* context, const ::rpc::ChangePasswordRequest* request, ::rpc::ChangePasswordResponse* response, std::function<void(::grpc::Status)>) = 0;
+      virtual void ChangePassword(::grpc::ClientContext* context, const ::rpc::ChangePasswordRequest* request, ::rpc::ChangePasswordResponse* response, ::grpc::ClientUnaryReactor* reactor) = 0;
+      virtual void LoginByPhone(::grpc::ClientContext* context, const ::rpc::PhoneLoginRequest* request, ::rpc::LoginResponse* response, std::function<void(::grpc::Status)>) = 0;
+      virtual void LoginByPhone(::grpc::ClientContext* context, const ::rpc::PhoneLoginRequest* request, ::rpc::LoginResponse* response, ::grpc::ClientUnaryReactor* reactor) = 0;
     };
     typedef class async_interface experimental_async_interface;
     virtual class async_interface* async() { return nullptr; }
@@ -87,6 +105,10 @@ class AuthService final {
     virtual ::grpc::ClientAsyncResponseReaderInterface< ::rpc::RefreshTokenResponse>* PrepareAsyncRefreshTokenRaw(::grpc::ClientContext* context, const ::rpc::RefreshTokenRequest& request, ::grpc::CompletionQueue* cq) = 0;
     virtual ::grpc::ClientAsyncResponseReaderInterface< ::rpc::ValidateUserResponse>* AsyncValidateUserRaw(::grpc::ClientContext* context, const ::rpc::ValidateUserRequest& request, ::grpc::CompletionQueue* cq) = 0;
     virtual ::grpc::ClientAsyncResponseReaderInterface< ::rpc::ValidateUserResponse>* PrepareAsyncValidateUserRaw(::grpc::ClientContext* context, const ::rpc::ValidateUserRequest& request, ::grpc::CompletionQueue* cq) = 0;
+    virtual ::grpc::ClientAsyncResponseReaderInterface< ::rpc::ChangePasswordResponse>* AsyncChangePasswordRaw(::grpc::ClientContext* context, const ::rpc::ChangePasswordRequest& request, ::grpc::CompletionQueue* cq) = 0;
+    virtual ::grpc::ClientAsyncResponseReaderInterface< ::rpc::ChangePasswordResponse>* PrepareAsyncChangePasswordRaw(::grpc::ClientContext* context, const ::rpc::ChangePasswordRequest& request, ::grpc::CompletionQueue* cq) = 0;
+    virtual ::grpc::ClientAsyncResponseReaderInterface< ::rpc::LoginResponse>* AsyncLoginByPhoneRaw(::grpc::ClientContext* context, const ::rpc::PhoneLoginRequest& request, ::grpc::CompletionQueue* cq) = 0;
+    virtual ::grpc::ClientAsyncResponseReaderInterface< ::rpc::LoginResponse>* PrepareAsyncLoginByPhoneRaw(::grpc::ClientContext* context, const ::rpc::PhoneLoginRequest& request, ::grpc::CompletionQueue* cq) = 0;
   };
   class Stub final : public StubInterface {
    public:
@@ -119,6 +141,20 @@ class AuthService final {
     std::unique_ptr< ::grpc::ClientAsyncResponseReader< ::rpc::ValidateUserResponse>> PrepareAsyncValidateUser(::grpc::ClientContext* context, const ::rpc::ValidateUserRequest& request, ::grpc::CompletionQueue* cq) {
       return std::unique_ptr< ::grpc::ClientAsyncResponseReader< ::rpc::ValidateUserResponse>>(PrepareAsyncValidateUserRaw(context, request, cq));
     }
+    ::grpc::Status ChangePassword(::grpc::ClientContext* context, const ::rpc::ChangePasswordRequest& request, ::rpc::ChangePasswordResponse* response) override;
+    std::unique_ptr< ::grpc::ClientAsyncResponseReader< ::rpc::ChangePasswordResponse>> AsyncChangePassword(::grpc::ClientContext* context, const ::rpc::ChangePasswordRequest& request, ::grpc::CompletionQueue* cq) {
+      return std::unique_ptr< ::grpc::ClientAsyncResponseReader< ::rpc::ChangePasswordResponse>>(AsyncChangePasswordRaw(context, request, cq));
+    }
+    std::unique_ptr< ::grpc::ClientAsyncResponseReader< ::rpc::ChangePasswordResponse>> PrepareAsyncChangePassword(::grpc::ClientContext* context, const ::rpc::ChangePasswordRequest& request, ::grpc::CompletionQueue* cq) {
+      return std::unique_ptr< ::grpc::ClientAsyncResponseReader< ::rpc::ChangePasswordResponse>>(PrepareAsyncChangePasswordRaw(context, request, cq));
+    }
+    ::grpc::Status LoginByPhone(::grpc::ClientContext* context, const ::rpc::PhoneLoginRequest& request, ::rpc::LoginResponse* response) override;
+    std::unique_ptr< ::grpc::ClientAsyncResponseReader< ::rpc::LoginResponse>> AsyncLoginByPhone(::grpc::ClientContext* context, const ::rpc::PhoneLoginRequest& request, ::grpc::CompletionQueue* cq) {
+      return std::unique_ptr< ::grpc::ClientAsyncResponseReader< ::rpc::LoginResponse>>(AsyncLoginByPhoneRaw(context, request, cq));
+    }
+    std::unique_ptr< ::grpc::ClientAsyncResponseReader< ::rpc::LoginResponse>> PrepareAsyncLoginByPhone(::grpc::ClientContext* context, const ::rpc::PhoneLoginRequest& request, ::grpc::CompletionQueue* cq) {
+      return std::unique_ptr< ::grpc::ClientAsyncResponseReader< ::rpc::LoginResponse>>(PrepareAsyncLoginByPhoneRaw(context, request, cq));
+    }
     class async final :
       public StubInterface::async_interface {
      public:
@@ -130,6 +166,10 @@ class AuthService final {
       void RefreshToken(::grpc::ClientContext* context, const ::rpc::RefreshTokenRequest* request, ::rpc::RefreshTokenResponse* response, ::grpc::ClientUnaryReactor* reactor) override;
       void ValidateUser(::grpc::ClientContext* context, const ::rpc::ValidateUserRequest* request, ::rpc::ValidateUserResponse* response, std::function<void(::grpc::Status)>) override;
       void ValidateUser(::grpc::ClientContext* context, const ::rpc::ValidateUserRequest* request, ::rpc::ValidateUserResponse* response, ::grpc::ClientUnaryReactor* reactor) override;
+      void ChangePassword(::grpc::ClientContext* context, const ::rpc::ChangePasswordRequest* request, ::rpc::ChangePasswordResponse* response, std::function<void(::grpc::Status)>) override;
+      void ChangePassword(::grpc::ClientContext* context, const ::rpc::ChangePasswordRequest* request, ::rpc::ChangePasswordResponse* response, ::grpc::ClientUnaryReactor* reactor) override;
+      void LoginByPhone(::grpc::ClientContext* context, const ::rpc::PhoneLoginRequest* request, ::rpc::LoginResponse* response, std::function<void(::grpc::Status)>) override;
+      void LoginByPhone(::grpc::ClientContext* context, const ::rpc::PhoneLoginRequest* request, ::rpc::LoginResponse* response, ::grpc::ClientUnaryReactor* reactor) override;
      private:
       friend class Stub;
       explicit async(Stub* stub): stub_(stub) { }
@@ -149,10 +189,16 @@ class AuthService final {
     ::grpc::ClientAsyncResponseReader< ::rpc::RefreshTokenResponse>* PrepareAsyncRefreshTokenRaw(::grpc::ClientContext* context, const ::rpc::RefreshTokenRequest& request, ::grpc::CompletionQueue* cq) override;
     ::grpc::ClientAsyncResponseReader< ::rpc::ValidateUserResponse>* AsyncValidateUserRaw(::grpc::ClientContext* context, const ::rpc::ValidateUserRequest& request, ::grpc::CompletionQueue* cq) override;
     ::grpc::ClientAsyncResponseReader< ::rpc::ValidateUserResponse>* PrepareAsyncValidateUserRaw(::grpc::ClientContext* context, const ::rpc::ValidateUserRequest& request, ::grpc::CompletionQueue* cq) override;
+    ::grpc::ClientAsyncResponseReader< ::rpc::ChangePasswordResponse>* AsyncChangePasswordRaw(::grpc::ClientContext* context, const ::rpc::ChangePasswordRequest& request, ::grpc::CompletionQueue* cq) override;
+    ::grpc::ClientAsyncResponseReader< ::rpc::ChangePasswordResponse>* PrepareAsyncChangePasswordRaw(::grpc::ClientContext* context, const ::rpc::ChangePasswordRequest& request, ::grpc::CompletionQueue* cq) override;
+    ::grpc::ClientAsyncResponseReader< ::rpc::LoginResponse>* AsyncLoginByPhoneRaw(::grpc::ClientContext* context, const ::rpc::PhoneLoginRequest& request, ::grpc::CompletionQueue* cq) override;
+    ::grpc::ClientAsyncResponseReader< ::rpc::LoginResponse>* PrepareAsyncLoginByPhoneRaw(::grpc::ClientContext* context, const ::rpc::PhoneLoginRequest& request, ::grpc::CompletionQueue* cq) override;
     const ::grpc::internal::RpcMethod rpcmethod_Login_;
     const ::grpc::internal::RpcMethod rpcmethod_Register_;
     const ::grpc::internal::RpcMethod rpcmethod_RefreshToken_;
     const ::grpc::internal::RpcMethod rpcmethod_ValidateUser_;
+    const ::grpc::internal::RpcMethod rpcmethod_ChangePassword_;
+    const ::grpc::internal::RpcMethod rpcmethod_LoginByPhone_;
   };
   static std::unique_ptr<Stub> NewStub(const std::shared_ptr< ::grpc::ChannelInterface>& channel, const ::grpc::StubOptions& options = ::grpc::StubOptions());
 
@@ -164,6 +210,8 @@ class AuthService final {
     virtual ::grpc::Status Register(::grpc::ServerContext* context, const ::rpc::RegisterRequest* request, ::rpc::RegisterResponse* response);
     virtual ::grpc::Status RefreshToken(::grpc::ServerContext* context, const ::rpc::RefreshTokenRequest* request, ::rpc::RefreshTokenResponse* response);
     virtual ::grpc::Status ValidateUser(::grpc::ServerContext* context, const ::rpc::ValidateUserRequest* request, ::rpc::ValidateUserResponse* response);
+    virtual ::grpc::Status ChangePassword(::grpc::ServerContext* context, const ::rpc::ChangePasswordRequest* request, ::rpc::ChangePasswordResponse* response);
+    virtual ::grpc::Status LoginByPhone(::grpc::ServerContext* context, const ::rpc::PhoneLoginRequest* request, ::rpc::LoginResponse* response);
   };
   template <class BaseClass>
   class WithAsyncMethod_Login : public BaseClass {
@@ -245,7 +293,47 @@ class AuthService final {
       ::grpc::Service::RequestAsyncUnary(3, context, request, response, new_call_cq, notification_cq, tag);
     }
   };
-  typedef WithAsyncMethod_Login<WithAsyncMethod_Register<WithAsyncMethod_RefreshToken<WithAsyncMethod_ValidateUser<Service > > > > AsyncService;
+  template <class BaseClass>
+  class WithAsyncMethod_ChangePassword : public BaseClass {
+   private:
+    void BaseClassMustBeDerivedFromService(const Service* /*service*/) {}
+   public:
+    WithAsyncMethod_ChangePassword() {
+      ::grpc::Service::MarkMethodAsync(4);
+    }
+    ~WithAsyncMethod_ChangePassword() override {
+      BaseClassMustBeDerivedFromService(this);
+    }
+    // disable synchronous version of this method
+    ::grpc::Status ChangePassword(::grpc::ServerContext* /*context*/, const ::rpc::ChangePasswordRequest* /*request*/, ::rpc::ChangePasswordResponse* /*response*/) override {
+      abort();
+      return ::grpc::Status(::grpc::StatusCode::UNIMPLEMENTED, "");
+    }
+    void RequestChangePassword(::grpc::ServerContext* context, ::rpc::ChangePasswordRequest* request, ::grpc::ServerAsyncResponseWriter< ::rpc::ChangePasswordResponse>* response, ::grpc::CompletionQueue* new_call_cq, ::grpc::ServerCompletionQueue* notification_cq, void *tag) {
+      ::grpc::Service::RequestAsyncUnary(4, context, request, response, new_call_cq, notification_cq, tag);
+    }
+  };
+  template <class BaseClass>
+  class WithAsyncMethod_LoginByPhone : public BaseClass {
+   private:
+    void BaseClassMustBeDerivedFromService(const Service* /*service*/) {}
+   public:
+    WithAsyncMethod_LoginByPhone() {
+      ::grpc::Service::MarkMethodAsync(5);
+    }
+    ~WithAsyncMethod_LoginByPhone() override {
+      BaseClassMustBeDerivedFromService(this);
+    }
+    // disable synchronous version of this method
+    ::grpc::Status LoginByPhone(::grpc::ServerContext* /*context*/, const ::rpc::PhoneLoginRequest* /*request*/, ::rpc::LoginResponse* /*response*/) override {
+      abort();
+      return ::grpc::Status(::grpc::StatusCode::UNIMPLEMENTED, "");
+    }
+    void RequestLoginByPhone(::grpc::ServerContext* context, ::rpc::PhoneLoginRequest* request, ::grpc::ServerAsyncResponseWriter< ::rpc::LoginResponse>* response, ::grpc::CompletionQueue* new_call_cq, ::grpc::ServerCompletionQueue* notification_cq, void *tag) {
+      ::grpc::Service::RequestAsyncUnary(5, context, request, response, new_call_cq, notification_cq, tag);
+    }
+  };
+  typedef WithAsyncMethod_Login<WithAsyncMethod_Register<WithAsyncMethod_RefreshToken<WithAsyncMethod_ValidateUser<WithAsyncMethod_ChangePassword<WithAsyncMethod_LoginByPhone<Service > > > > > > AsyncService;
   template <class BaseClass>
   class WithCallbackMethod_Login : public BaseClass {
    private:
@@ -354,7 +442,61 @@ class AuthService final {
     virtual ::grpc::ServerUnaryReactor* ValidateUser(
       ::grpc::CallbackServerContext* /*context*/, const ::rpc::ValidateUserRequest* /*request*/, ::rpc::ValidateUserResponse* /*response*/)  { return nullptr; }
   };
-  typedef WithCallbackMethod_Login<WithCallbackMethod_Register<WithCallbackMethod_RefreshToken<WithCallbackMethod_ValidateUser<Service > > > > CallbackService;
+  template <class BaseClass>
+  class WithCallbackMethod_ChangePassword : public BaseClass {
+   private:
+    void BaseClassMustBeDerivedFromService(const Service* /*service*/) {}
+   public:
+    WithCallbackMethod_ChangePassword() {
+      ::grpc::Service::MarkMethodCallback(4,
+          new ::grpc::internal::CallbackUnaryHandler< ::rpc::ChangePasswordRequest, ::rpc::ChangePasswordResponse>(
+            [this](
+                   ::grpc::CallbackServerContext* context, const ::rpc::ChangePasswordRequest* request, ::rpc::ChangePasswordResponse* response) { return this->ChangePassword(context, request, response); }));}
+    void SetMessageAllocatorFor_ChangePassword(
+        ::grpc::MessageAllocator< ::rpc::ChangePasswordRequest, ::rpc::ChangePasswordResponse>* allocator) {
+      ::grpc::internal::MethodHandler* const handler = ::grpc::Service::GetHandler(4);
+      static_cast<::grpc::internal::CallbackUnaryHandler< ::rpc::ChangePasswordRequest, ::rpc::ChangePasswordResponse>*>(handler)
+              ->SetMessageAllocator(allocator);
+    }
+    ~WithCallbackMethod_ChangePassword() override {
+      BaseClassMustBeDerivedFromService(this);
+    }
+    // disable synchronous version of this method
+    ::grpc::Status ChangePassword(::grpc::ServerContext* /*context*/, const ::rpc::ChangePasswordRequest* /*request*/, ::rpc::ChangePasswordResponse* /*response*/) override {
+      abort();
+      return ::grpc::Status(::grpc::StatusCode::UNIMPLEMENTED, "");
+    }
+    virtual ::grpc::ServerUnaryReactor* ChangePassword(
+      ::grpc::CallbackServerContext* /*context*/, const ::rpc::ChangePasswordRequest* /*request*/, ::rpc::ChangePasswordResponse* /*response*/)  { return nullptr; }
+  };
+  template <class BaseClass>
+  class WithCallbackMethod_LoginByPhone : public BaseClass {
+   private:
+    void BaseClassMustBeDerivedFromService(const Service* /*service*/) {}
+   public:
+    WithCallbackMethod_LoginByPhone() {
+      ::grpc::Service::MarkMethodCallback(5,
+          new ::grpc::internal::CallbackUnaryHandler< ::rpc::PhoneLoginRequest, ::rpc::LoginResponse>(
+            [this](
+                   ::grpc::CallbackServerContext* context, const ::rpc::PhoneLoginRequest* request, ::rpc::LoginResponse* response) { return this->LoginByPhone(context, request, response); }));}
+    void SetMessageAllocatorFor_LoginByPhone(
+        ::grpc::MessageAllocator< ::rpc::PhoneLoginRequest, ::rpc::LoginResponse>* allocator) {
+      ::grpc::internal::MethodHandler* const handler = ::grpc::Service::GetHandler(5);
+      static_cast<::grpc::internal::CallbackUnaryHandler< ::rpc::PhoneLoginRequest, ::rpc::LoginResponse>*>(handler)
+              ->SetMessageAllocator(allocator);
+    }
+    ~WithCallbackMethod_LoginByPhone() override {
+      BaseClassMustBeDerivedFromService(this);
+    }
+    // disable synchronous version of this method
+    ::grpc::Status LoginByPhone(::grpc::ServerContext* /*context*/, const ::rpc::PhoneLoginRequest* /*request*/, ::rpc::LoginResponse* /*response*/) override {
+      abort();
+      return ::grpc::Status(::grpc::StatusCode::UNIMPLEMENTED, "");
+    }
+    virtual ::grpc::ServerUnaryReactor* LoginByPhone(
+      ::grpc::CallbackServerContext* /*context*/, const ::rpc::PhoneLoginRequest* /*request*/, ::rpc::LoginResponse* /*response*/)  { return nullptr; }
+  };
+  typedef WithCallbackMethod_Login<WithCallbackMethod_Register<WithCallbackMethod_RefreshToken<WithCallbackMethod_ValidateUser<WithCallbackMethod_ChangePassword<WithCallbackMethod_LoginByPhone<Service > > > > > > CallbackService;
   typedef CallbackService ExperimentalCallbackService;
   template <class BaseClass>
   class WithGenericMethod_Login : public BaseClass {
@@ -420,6 +562,40 @@ class AuthService final {
     }
     // disable synchronous version of this method
     ::grpc::Status ValidateUser(::grpc::ServerContext* /*context*/, const ::rpc::ValidateUserRequest* /*request*/, ::rpc::ValidateUserResponse* /*response*/) override {
+      abort();
+      return ::grpc::Status(::grpc::StatusCode::UNIMPLEMENTED, "");
+    }
+  };
+  template <class BaseClass>
+  class WithGenericMethod_ChangePassword : public BaseClass {
+   private:
+    void BaseClassMustBeDerivedFromService(const Service* /*service*/) {}
+   public:
+    WithGenericMethod_ChangePassword() {
+      ::grpc::Service::MarkMethodGeneric(4);
+    }
+    ~WithGenericMethod_ChangePassword() override {
+      BaseClassMustBeDerivedFromService(this);
+    }
+    // disable synchronous version of this method
+    ::grpc::Status ChangePassword(::grpc::ServerContext* /*context*/, const ::rpc::ChangePasswordRequest* /*request*/, ::rpc::ChangePasswordResponse* /*response*/) override {
+      abort();
+      return ::grpc::Status(::grpc::StatusCode::UNIMPLEMENTED, "");
+    }
+  };
+  template <class BaseClass>
+  class WithGenericMethod_LoginByPhone : public BaseClass {
+   private:
+    void BaseClassMustBeDerivedFromService(const Service* /*service*/) {}
+   public:
+    WithGenericMethod_LoginByPhone() {
+      ::grpc::Service::MarkMethodGeneric(5);
+    }
+    ~WithGenericMethod_LoginByPhone() override {
+      BaseClassMustBeDerivedFromService(this);
+    }
+    // disable synchronous version of this method
+    ::grpc::Status LoginByPhone(::grpc::ServerContext* /*context*/, const ::rpc::PhoneLoginRequest* /*request*/, ::rpc::LoginResponse* /*response*/) override {
       abort();
       return ::grpc::Status(::grpc::StatusCode::UNIMPLEMENTED, "");
     }
@@ -502,6 +678,46 @@ class AuthService final {
     }
     void RequestValidateUser(::grpc::ServerContext* context, ::grpc::ByteBuffer* request, ::grpc::ServerAsyncResponseWriter< ::grpc::ByteBuffer>* response, ::grpc::CompletionQueue* new_call_cq, ::grpc::ServerCompletionQueue* notification_cq, void *tag) {
       ::grpc::Service::RequestAsyncUnary(3, context, request, response, new_call_cq, notification_cq, tag);
+    }
+  };
+  template <class BaseClass>
+  class WithRawMethod_ChangePassword : public BaseClass {
+   private:
+    void BaseClassMustBeDerivedFromService(const Service* /*service*/) {}
+   public:
+    WithRawMethod_ChangePassword() {
+      ::grpc::Service::MarkMethodRaw(4);
+    }
+    ~WithRawMethod_ChangePassword() override {
+      BaseClassMustBeDerivedFromService(this);
+    }
+    // disable synchronous version of this method
+    ::grpc::Status ChangePassword(::grpc::ServerContext* /*context*/, const ::rpc::ChangePasswordRequest* /*request*/, ::rpc::ChangePasswordResponse* /*response*/) override {
+      abort();
+      return ::grpc::Status(::grpc::StatusCode::UNIMPLEMENTED, "");
+    }
+    void RequestChangePassword(::grpc::ServerContext* context, ::grpc::ByteBuffer* request, ::grpc::ServerAsyncResponseWriter< ::grpc::ByteBuffer>* response, ::grpc::CompletionQueue* new_call_cq, ::grpc::ServerCompletionQueue* notification_cq, void *tag) {
+      ::grpc::Service::RequestAsyncUnary(4, context, request, response, new_call_cq, notification_cq, tag);
+    }
+  };
+  template <class BaseClass>
+  class WithRawMethod_LoginByPhone : public BaseClass {
+   private:
+    void BaseClassMustBeDerivedFromService(const Service* /*service*/) {}
+   public:
+    WithRawMethod_LoginByPhone() {
+      ::grpc::Service::MarkMethodRaw(5);
+    }
+    ~WithRawMethod_LoginByPhone() override {
+      BaseClassMustBeDerivedFromService(this);
+    }
+    // disable synchronous version of this method
+    ::grpc::Status LoginByPhone(::grpc::ServerContext* /*context*/, const ::rpc::PhoneLoginRequest* /*request*/, ::rpc::LoginResponse* /*response*/) override {
+      abort();
+      return ::grpc::Status(::grpc::StatusCode::UNIMPLEMENTED, "");
+    }
+    void RequestLoginByPhone(::grpc::ServerContext* context, ::grpc::ByteBuffer* request, ::grpc::ServerAsyncResponseWriter< ::grpc::ByteBuffer>* response, ::grpc::CompletionQueue* new_call_cq, ::grpc::ServerCompletionQueue* notification_cq, void *tag) {
+      ::grpc::Service::RequestAsyncUnary(5, context, request, response, new_call_cq, notification_cq, tag);
     }
   };
   template <class BaseClass>
@@ -590,6 +806,50 @@ class AuthService final {
       return ::grpc::Status(::grpc::StatusCode::UNIMPLEMENTED, "");
     }
     virtual ::grpc::ServerUnaryReactor* ValidateUser(
+      ::grpc::CallbackServerContext* /*context*/, const ::grpc::ByteBuffer* /*request*/, ::grpc::ByteBuffer* /*response*/)  { return nullptr; }
+  };
+  template <class BaseClass>
+  class WithRawCallbackMethod_ChangePassword : public BaseClass {
+   private:
+    void BaseClassMustBeDerivedFromService(const Service* /*service*/) {}
+   public:
+    WithRawCallbackMethod_ChangePassword() {
+      ::grpc::Service::MarkMethodRawCallback(4,
+          new ::grpc::internal::CallbackUnaryHandler< ::grpc::ByteBuffer, ::grpc::ByteBuffer>(
+            [this](
+                   ::grpc::CallbackServerContext* context, const ::grpc::ByteBuffer* request, ::grpc::ByteBuffer* response) { return this->ChangePassword(context, request, response); }));
+    }
+    ~WithRawCallbackMethod_ChangePassword() override {
+      BaseClassMustBeDerivedFromService(this);
+    }
+    // disable synchronous version of this method
+    ::grpc::Status ChangePassword(::grpc::ServerContext* /*context*/, const ::rpc::ChangePasswordRequest* /*request*/, ::rpc::ChangePasswordResponse* /*response*/) override {
+      abort();
+      return ::grpc::Status(::grpc::StatusCode::UNIMPLEMENTED, "");
+    }
+    virtual ::grpc::ServerUnaryReactor* ChangePassword(
+      ::grpc::CallbackServerContext* /*context*/, const ::grpc::ByteBuffer* /*request*/, ::grpc::ByteBuffer* /*response*/)  { return nullptr; }
+  };
+  template <class BaseClass>
+  class WithRawCallbackMethod_LoginByPhone : public BaseClass {
+   private:
+    void BaseClassMustBeDerivedFromService(const Service* /*service*/) {}
+   public:
+    WithRawCallbackMethod_LoginByPhone() {
+      ::grpc::Service::MarkMethodRawCallback(5,
+          new ::grpc::internal::CallbackUnaryHandler< ::grpc::ByteBuffer, ::grpc::ByteBuffer>(
+            [this](
+                   ::grpc::CallbackServerContext* context, const ::grpc::ByteBuffer* request, ::grpc::ByteBuffer* response) { return this->LoginByPhone(context, request, response); }));
+    }
+    ~WithRawCallbackMethod_LoginByPhone() override {
+      BaseClassMustBeDerivedFromService(this);
+    }
+    // disable synchronous version of this method
+    ::grpc::Status LoginByPhone(::grpc::ServerContext* /*context*/, const ::rpc::PhoneLoginRequest* /*request*/, ::rpc::LoginResponse* /*response*/) override {
+      abort();
+      return ::grpc::Status(::grpc::StatusCode::UNIMPLEMENTED, "");
+    }
+    virtual ::grpc::ServerUnaryReactor* LoginByPhone(
       ::grpc::CallbackServerContext* /*context*/, const ::grpc::ByteBuffer* /*request*/, ::grpc::ByteBuffer* /*response*/)  { return nullptr; }
   };
   template <class BaseClass>
@@ -700,9 +960,63 @@ class AuthService final {
     // replace default version of method with streamed unary
     virtual ::grpc::Status StreamedValidateUser(::grpc::ServerContext* context, ::grpc::ServerUnaryStreamer< ::rpc::ValidateUserRequest,::rpc::ValidateUserResponse>* server_unary_streamer) = 0;
   };
-  typedef WithStreamedUnaryMethod_Login<WithStreamedUnaryMethod_Register<WithStreamedUnaryMethod_RefreshToken<WithStreamedUnaryMethod_ValidateUser<Service > > > > StreamedUnaryService;
+  template <class BaseClass>
+  class WithStreamedUnaryMethod_ChangePassword : public BaseClass {
+   private:
+    void BaseClassMustBeDerivedFromService(const Service* /*service*/) {}
+   public:
+    WithStreamedUnaryMethod_ChangePassword() {
+      ::grpc::Service::MarkMethodStreamed(4,
+        new ::grpc::internal::StreamedUnaryHandler<
+          ::rpc::ChangePasswordRequest, ::rpc::ChangePasswordResponse>(
+            [this](::grpc::ServerContext* context,
+                   ::grpc::ServerUnaryStreamer<
+                     ::rpc::ChangePasswordRequest, ::rpc::ChangePasswordResponse>* streamer) {
+                       return this->StreamedChangePassword(context,
+                         streamer);
+                  }));
+    }
+    ~WithStreamedUnaryMethod_ChangePassword() override {
+      BaseClassMustBeDerivedFromService(this);
+    }
+    // disable regular version of this method
+    ::grpc::Status ChangePassword(::grpc::ServerContext* /*context*/, const ::rpc::ChangePasswordRequest* /*request*/, ::rpc::ChangePasswordResponse* /*response*/) override {
+      abort();
+      return ::grpc::Status(::grpc::StatusCode::UNIMPLEMENTED, "");
+    }
+    // replace default version of method with streamed unary
+    virtual ::grpc::Status StreamedChangePassword(::grpc::ServerContext* context, ::grpc::ServerUnaryStreamer< ::rpc::ChangePasswordRequest,::rpc::ChangePasswordResponse>* server_unary_streamer) = 0;
+  };
+  template <class BaseClass>
+  class WithStreamedUnaryMethod_LoginByPhone : public BaseClass {
+   private:
+    void BaseClassMustBeDerivedFromService(const Service* /*service*/) {}
+   public:
+    WithStreamedUnaryMethod_LoginByPhone() {
+      ::grpc::Service::MarkMethodStreamed(5,
+        new ::grpc::internal::StreamedUnaryHandler<
+          ::rpc::PhoneLoginRequest, ::rpc::LoginResponse>(
+            [this](::grpc::ServerContext* context,
+                   ::grpc::ServerUnaryStreamer<
+                     ::rpc::PhoneLoginRequest, ::rpc::LoginResponse>* streamer) {
+                       return this->StreamedLoginByPhone(context,
+                         streamer);
+                  }));
+    }
+    ~WithStreamedUnaryMethod_LoginByPhone() override {
+      BaseClassMustBeDerivedFromService(this);
+    }
+    // disable regular version of this method
+    ::grpc::Status LoginByPhone(::grpc::ServerContext* /*context*/, const ::rpc::PhoneLoginRequest* /*request*/, ::rpc::LoginResponse* /*response*/) override {
+      abort();
+      return ::grpc::Status(::grpc::StatusCode::UNIMPLEMENTED, "");
+    }
+    // replace default version of method with streamed unary
+    virtual ::grpc::Status StreamedLoginByPhone(::grpc::ServerContext* context, ::grpc::ServerUnaryStreamer< ::rpc::PhoneLoginRequest,::rpc::LoginResponse>* server_unary_streamer) = 0;
+  };
+  typedef WithStreamedUnaryMethod_Login<WithStreamedUnaryMethod_Register<WithStreamedUnaryMethod_RefreshToken<WithStreamedUnaryMethod_ValidateUser<WithStreamedUnaryMethod_ChangePassword<WithStreamedUnaryMethod_LoginByPhone<Service > > > > > > StreamedUnaryService;
   typedef Service SplitStreamedService;
-  typedef WithStreamedUnaryMethod_Login<WithStreamedUnaryMethod_Register<WithStreamedUnaryMethod_RefreshToken<WithStreamedUnaryMethod_ValidateUser<Service > > > > StreamedService;
+  typedef WithStreamedUnaryMethod_Login<WithStreamedUnaryMethod_Register<WithStreamedUnaryMethod_RefreshToken<WithStreamedUnaryMethod_ValidateUser<WithStreamedUnaryMethod_ChangePassword<WithStreamedUnaryMethod_LoginByPhone<Service > > > > > > StreamedService;
 };
 
 }  // namespace rpc

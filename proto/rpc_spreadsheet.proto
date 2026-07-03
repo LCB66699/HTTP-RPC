@@ -4,12 +4,36 @@ package rpc;
 
 option go_package = "rpc-server/proto/rpc";
 
+import "google/api/annotations.proto";
+
 service SpreadsheetService {
-  rpc CreateSpreadsheet(CreateSpreadsheetRequest) returns (CreateSpreadsheetResponse);
-  rpc GetSpreadsheet(GetSpreadsheetRequest) returns (GetSpreadsheetResponse);
-  rpc ListSpreadsheets(ListSpreadsheetsRequest) returns (ListSpreadsheetsResponse);
-  rpc UpdateSpreadsheet(UpdateSpreadsheetRequest) returns (UpdateSpreadsheetResponse);
-  rpc DeleteSpreadsheet(DeleteSpreadsheetRequest) returns (DeleteSpreadsheetResponse);
+  rpc CreateSpreadsheet(CreateSpreadsheetRequest) returns (CreateSpreadsheetResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/sheets"
+      body: "*"
+    };
+  }
+  rpc GetSpreadsheet(GetSpreadsheetRequest) returns (GetSpreadsheetResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/sheets/{id}"
+    };
+  }
+  rpc ListSpreadsheets(ListSpreadsheetsRequest) returns (ListSpreadsheetsResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/sheets"
+    };
+  }
+  rpc UpdateSpreadsheet(UpdateSpreadsheetRequest) returns (UpdateSpreadsheetResponse) {
+    option (google.api.http) = {
+      put: "/api/v1/sheets/{id}"
+      body: "*"
+    };
+  }
+  rpc DeleteSpreadsheet(DeleteSpreadsheetRequest) returns (DeleteSpreadsheetResponse) {
+    option (google.api.http) = {
+      delete: "/api/v1/sheets/{id}"
+    };
+  }
 }
 
 message Spreadsheet {

@@ -6,12 +6,16 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
 	"github.com/redis/go-redis/v9"
+	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
 	"golang.org/x/net/http2"
 	"golang.org/x/net/http2/h2c"
+	"google.golang.org/grpc/metadata"
+	"google.golang.org/protobuf/encoding/protojson"
 
 	gw "github.com/lcb66699/http-rpc/gateway-grpc/internal/gateway"
 	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
@@ -124,7 +128,33 @@ func main() {
 		CBFile:       cbFile,
 	}
 
-	// Routes
+	// ---- gRPC-gateway mux (replaces SpreadsheetService CRUD handlers) ----
+	gwmux := runtime.NewServeMux(
+		runtime.WithMetadata(func(ctx context.Context, r *http.Request) metadata.MD {
+			for _, c := range r.Cookies() {
+				if c.Name == "rpc_at" {
+					return metadata.Pairs("authorization", "Bearer "+c.Value)
+				}
+			}
+			return nil
+		}),
+		runtime.WithMarshalerOption(runtime.MIMEWildcard, &runtime.JSONPb{
+			MarshalOptions: protojson.MarshalOptions{
+				UseProtoNames:   true,
+				EmitUnpopulated: true,
+			},
+			UnmarshalOptions: protojson.UnmarshalOptions{
+				DiscardUnknown: true,
+			},
+		}),
+	)
+	{
+		ctx := context.Background()
+		if err := pb.RegisterSpreadsheetServiceHandler(ctx, gwmux, sheetConn); err != nil {
+			log.Fatalf("register spreadsheet gRPC-gateway: %v", err)
+		}
+	}
+
 	mux.HandleFunc("POST /api/v1/register", gwInst.Register)
 	mux.HandleFunc("POST /api/v1/login", gwInst.Login)
 	mux.HandleFunc("POST /api/v1/refresh", gwInst.Refresh)
@@ -165,17 +195,6 @@ func main() {
 	mux.HandleFunc("GET /api/v1/sheets/{id}/share", gwInst.ListShares)
 	mux.HandleFunc("POST /api/v1/sheets/{id}/share-link", gwInst.CreateShareLink)
 	mux.HandleFunc("GET /api/v1/s/{token}", gwInst.ShareByToken)
-
-	// Sheet CRUD
-	mux.HandleFunc("POST /api/v1/sheets", gwInst.CreateSheet)
-	mux.HandleFunc("GET /api/v1/sheets", gwInst.ListSheets)
-	mux.HandleFunc("GET /api/v1/sheets/{id}", gwInst.GetSheet)
-	mux.HandleFunc("PUT /api/v1/sheets/{id}", gwInst.UpdateSheet)
-	mux.HandleFunc("DELETE /api/v1/sheets/{id}", gwInst.DeleteSheet)
-
-	// Photos
-	mux.HandleFunc("GET /api/v1/photos", gwInst.Photos)
-
 	// File CRUD
 	mux.HandleFunc("PUT /api/v1/files/{id}/move", gwInst.MoveFile)
 	mux.HandleFunc("POST /api/v1/files/folder", gwInst.CreateFolder)
@@ -187,7 +206,22 @@ func main() {
 	// JWT authn and CORS are handled by Envoy at the edge.
 	// The gateway trusts x-rpc-uid / x-rpc-username headers injected
 	// by Envoy's jwt_authn filter. No additional middleware needed.
-	handler := metricsMiddleware(otelhttp.NewHandler(mux, "gateway-grpc",
+
+	// ---- Dispatcher: sheet CRUD -> gwmux, everything else -> custom mux ----
+	top := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.HasPrefix(r.URL.Path, "/api/v1/sheets") {
+			rest := strings.TrimPrefix(r.URL.Path, "/api/v1/sheets")
+			segments := strings.Split(strings.Trim(rest, "/"), "/")
+			// CRUD: 0-1 segments after /api/v1/sheets (e.g. /sheets, /sheets/123)
+			// Sharing: 2+ segments (e.g. /sheets/123/share)
+			if len(segments) <= 2 {
+				gwmux.ServeHTTP(w, r)
+				return
+			}
+		}
+		mux.ServeHTTP(w, r)
+	})
+	handler := metricsMiddleware(otelhttp.NewHandler(top, "gateway-grpc",
 		otelhttp.WithTracerProvider(otel.GetTracerProvider()),
 		otelhttp.WithPropagators(otel.GetTextMapPropagator()),
 	))

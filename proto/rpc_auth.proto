@@ -4,13 +4,44 @@ package rpc;
 
 option go_package = "rpc-server/proto/rpc";
 
+import "google/api/annotations.proto";
+
 service AuthService {
-  rpc Login(LoginRequest) returns (LoginResponse);
-  rpc Register(RegisterRequest) returns (RegisterResponse);
-  rpc RefreshToken(RefreshTokenRequest) returns (RefreshTokenResponse);
-  rpc ValidateUser(ValidateUserRequest) returns (ValidateUserResponse);
-  rpc ChangePassword(ChangePasswordRequest) returns (ChangePasswordResponse);
-  rpc LoginByPhone(PhoneLoginRequest) returns (LoginResponse);
+  rpc Login(LoginRequest) returns (LoginResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/login"
+      body: "*"
+    };
+  }
+  rpc Register(RegisterRequest) returns (RegisterResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/register"
+      body: "*"
+    };
+  }
+  rpc RefreshToken(RefreshTokenRequest) returns (RefreshTokenResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/refresh"
+      body: "*"
+    };
+  }
+  rpc ValidateUser(ValidateUserRequest) returns (ValidateUserResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/auth/validate"
+    };
+  }
+  rpc ChangePassword(ChangePasswordRequest) returns (ChangePasswordResponse) {
+    option (google.api.http) = {
+      put: "/api/v1/me/password"
+      body: "*"
+    };
+  }
+  rpc LoginByPhone(PhoneLoginRequest) returns (LoginResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/auth/phone/login"
+      body: "*"
+    };
+  }
 }
 
 message LoginRequest {

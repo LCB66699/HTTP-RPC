@@ -217,41 +217,6 @@ func TestChangePassword_GrpcError(t *testing.T) {
 	}
 }
 
-func TestListSheets_Success(t *testing.T) {
-	g := &gw.Gateway{
-		SheetClient: &mockSheetClient{
-			listResp: &pb.ListSpreadsheetsResponse{Success: true, Total: 50, HasMore: true, NextCursor: "999"},
-		},
-		CBSheet: gw.NewCBSlow("sheet-test", nil),
-	}
-	req := httptest.NewRequest("GET", "/api/v1/sheets?limit=10", nil)
-	req.AddCookie(&http.Cookie{Name: "rpc_at", Value: validTestJWT()})
-	w := httptest.NewRecorder()
-	g.ListSheets(w, req)
-	if w.Code != http.StatusOK {
-		t.Errorf("expected 200, got %d", w.Code)
-	}
-	if !strings.Contains(w.Body.String(), `"has_more":true`) {
-		t.Errorf("expected has_more, got: %s", w.Body.String())
-	}
-}
-
-func TestListSheets_EmptyResult(t *testing.T) {
-	g := &gw.Gateway{
-		SheetClient: &mockSheetClient{
-			listResp: &pb.ListSpreadsheetsResponse{Success: true, Total: 0, HasMore: false},
-		},
-		CBSheet: gw.NewCBSlow("sheet-test", nil),
-	}
-	req := httptest.NewRequest("GET", "/api/v1/sheets?limit=10", nil)
-	req.AddCookie(&http.Cookie{Name: "rpc_at", Value: validTestJWT()})
-	w := httptest.NewRecorder()
-	g.ListSheets(w, req)
-	if w.Code != http.StatusOK {
-		t.Errorf("expected 200, got %d", w.Code)
-	}
-}
-
 func TestCreateFolder_Success(t *testing.T) {
 	g := &gw.Gateway{
 		FileClient: &mockFileClient{createFolderResp: &pb.CreateFolderResponse{Success: true, Id: 999}},
@@ -301,19 +266,6 @@ func TestShareToken_NotFound(t *testing.T) {
 	g.ShareByToken(w, req)
 	if w.Code != http.StatusNotFound {
 		t.Errorf("expected 404, got %d", w.Code)
-	}
-}
-
-func TestPhotoList_Success(t *testing.T) {
-	g := &gw.Gateway{
-		FileClient: &mockFileClient{listResp: &pb.ListFilesResponse{Success: true, Total: 5}},
-	}
-	req := httptest.NewRequest("GET", "/api/v1/photos", nil)
-	req.AddCookie(&http.Cookie{Name: "rpc_at", Value: validTestJWT()})
-	w := httptest.NewRecorder()
-	g.Photos(w, req)
-	if w.Code != http.StatusOK {
-		t.Errorf("expected 200, got %d", w.Code)
 	}
 }
 

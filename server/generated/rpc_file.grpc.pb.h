@@ -63,6 +63,27 @@ class FileService final {
     std::unique_ptr< ::grpc::ClientAsyncResponseReaderInterface< ::rpc::DeleteFileResponse>> PrepareAsyncDeleteFile(::grpc::ClientContext* context, const ::rpc::DeleteFileRequest& request, ::grpc::CompletionQueue* cq) {
       return std::unique_ptr< ::grpc::ClientAsyncResponseReaderInterface< ::rpc::DeleteFileResponse>>(PrepareAsyncDeleteFileRaw(context, request, cq));
     }
+    virtual ::grpc::Status CreateFolder(::grpc::ClientContext* context, const ::rpc::CreateFolderRequest& request, ::rpc::CreateFolderResponse* response) = 0;
+    std::unique_ptr< ::grpc::ClientAsyncResponseReaderInterface< ::rpc::CreateFolderResponse>> AsyncCreateFolder(::grpc::ClientContext* context, const ::rpc::CreateFolderRequest& request, ::grpc::CompletionQueue* cq) {
+      return std::unique_ptr< ::grpc::ClientAsyncResponseReaderInterface< ::rpc::CreateFolderResponse>>(AsyncCreateFolderRaw(context, request, cq));
+    }
+    std::unique_ptr< ::grpc::ClientAsyncResponseReaderInterface< ::rpc::CreateFolderResponse>> PrepareAsyncCreateFolder(::grpc::ClientContext* context, const ::rpc::CreateFolderRequest& request, ::grpc::CompletionQueue* cq) {
+      return std::unique_ptr< ::grpc::ClientAsyncResponseReaderInterface< ::rpc::CreateFolderResponse>>(PrepareAsyncCreateFolderRaw(context, request, cq));
+    }
+    virtual ::grpc::Status MoveFile(::grpc::ClientContext* context, const ::rpc::MoveFileRequest& request, ::rpc::MoveFileResponse* response) = 0;
+    std::unique_ptr< ::grpc::ClientAsyncResponseReaderInterface< ::rpc::MoveFileResponse>> AsyncMoveFile(::grpc::ClientContext* context, const ::rpc::MoveFileRequest& request, ::grpc::CompletionQueue* cq) {
+      return std::unique_ptr< ::grpc::ClientAsyncResponseReaderInterface< ::rpc::MoveFileResponse>>(AsyncMoveFileRaw(context, request, cq));
+    }
+    std::unique_ptr< ::grpc::ClientAsyncResponseReaderInterface< ::rpc::MoveFileResponse>> PrepareAsyncMoveFile(::grpc::ClientContext* context, const ::rpc::MoveFileRequest& request, ::grpc::CompletionQueue* cq) {
+      return std::unique_ptr< ::grpc::ClientAsyncResponseReaderInterface< ::rpc::MoveFileResponse>>(PrepareAsyncMoveFileRaw(context, request, cq));
+    }
+    virtual ::grpc::Status BatchDelete(::grpc::ClientContext* context, const ::rpc::BatchDeleteRequest& request, ::rpc::BatchDeleteResponse* response) = 0;
+    std::unique_ptr< ::grpc::ClientAsyncResponseReaderInterface< ::rpc::BatchDeleteResponse>> AsyncBatchDelete(::grpc::ClientContext* context, const ::rpc::BatchDeleteRequest& request, ::grpc::CompletionQueue* cq) {
+      return std::unique_ptr< ::grpc::ClientAsyncResponseReaderInterface< ::rpc::BatchDeleteResponse>>(AsyncBatchDeleteRaw(context, request, cq));
+    }
+    std::unique_ptr< ::grpc::ClientAsyncResponseReaderInterface< ::rpc::BatchDeleteResponse>> PrepareAsyncBatchDelete(::grpc::ClientContext* context, const ::rpc::BatchDeleteRequest& request, ::grpc::CompletionQueue* cq) {
+      return std::unique_ptr< ::grpc::ClientAsyncResponseReaderInterface< ::rpc::BatchDeleteResponse>>(PrepareAsyncBatchDeleteRaw(context, request, cq));
+    }
     class async_interface {
      public:
       virtual ~async_interface() {}
@@ -74,6 +95,12 @@ class FileService final {
       virtual void ListFiles(::grpc::ClientContext* context, const ::rpc::ListFilesRequest* request, ::rpc::ListFilesResponse* response, ::grpc::ClientUnaryReactor* reactor) = 0;
       virtual void DeleteFile(::grpc::ClientContext* context, const ::rpc::DeleteFileRequest* request, ::rpc::DeleteFileResponse* response, std::function<void(::grpc::Status)>) = 0;
       virtual void DeleteFile(::grpc::ClientContext* context, const ::rpc::DeleteFileRequest* request, ::rpc::DeleteFileResponse* response, ::grpc::ClientUnaryReactor* reactor) = 0;
+      virtual void CreateFolder(::grpc::ClientContext* context, const ::rpc::CreateFolderRequest* request, ::rpc::CreateFolderResponse* response, std::function<void(::grpc::Status)>) = 0;
+      virtual void CreateFolder(::grpc::ClientContext* context, const ::rpc::CreateFolderRequest* request, ::rpc::CreateFolderResponse* response, ::grpc::ClientUnaryReactor* reactor) = 0;
+      virtual void MoveFile(::grpc::ClientContext* context, const ::rpc::MoveFileRequest* request, ::rpc::MoveFileResponse* response, std::function<void(::grpc::Status)>) = 0;
+      virtual void MoveFile(::grpc::ClientContext* context, const ::rpc::MoveFileRequest* request, ::rpc::MoveFileResponse* response, ::grpc::ClientUnaryReactor* reactor) = 0;
+      virtual void BatchDelete(::grpc::ClientContext* context, const ::rpc::BatchDeleteRequest* request, ::rpc::BatchDeleteResponse* response, std::function<void(::grpc::Status)>) = 0;
+      virtual void BatchDelete(::grpc::ClientContext* context, const ::rpc::BatchDeleteRequest* request, ::rpc::BatchDeleteResponse* response, ::grpc::ClientUnaryReactor* reactor) = 0;
     };
     typedef class async_interface experimental_async_interface;
     virtual class async_interface* async() { return nullptr; }
@@ -87,6 +114,12 @@ class FileService final {
     virtual ::grpc::ClientAsyncResponseReaderInterface< ::rpc::ListFilesResponse>* PrepareAsyncListFilesRaw(::grpc::ClientContext* context, const ::rpc::ListFilesRequest& request, ::grpc::CompletionQueue* cq) = 0;
     virtual ::grpc::ClientAsyncResponseReaderInterface< ::rpc::DeleteFileResponse>* AsyncDeleteFileRaw(::grpc::ClientContext* context, const ::rpc::DeleteFileRequest& request, ::grpc::CompletionQueue* cq) = 0;
     virtual ::grpc::ClientAsyncResponseReaderInterface< ::rpc::DeleteFileResponse>* PrepareAsyncDeleteFileRaw(::grpc::ClientContext* context, const ::rpc::DeleteFileRequest& request, ::grpc::CompletionQueue* cq) = 0;
+    virtual ::grpc::ClientAsyncResponseReaderInterface< ::rpc::CreateFolderResponse>* AsyncCreateFolderRaw(::grpc::ClientContext* context, const ::rpc::CreateFolderRequest& request, ::grpc::CompletionQueue* cq) = 0;
+    virtual ::grpc::ClientAsyncResponseReaderInterface< ::rpc::CreateFolderResponse>* PrepareAsyncCreateFolderRaw(::grpc::ClientContext* context, const ::rpc::CreateFolderRequest& request, ::grpc::CompletionQueue* cq) = 0;
+    virtual ::grpc::ClientAsyncResponseReaderInterface< ::rpc::MoveFileResponse>* AsyncMoveFileRaw(::grpc::ClientContext* context, const ::rpc::MoveFileRequest& request, ::grpc::CompletionQueue* cq) = 0;
+    virtual ::grpc::ClientAsyncResponseReaderInterface< ::rpc::MoveFileResponse>* PrepareAsyncMoveFileRaw(::grpc::ClientContext* context, const ::rpc::MoveFileRequest& request, ::grpc::CompletionQueue* cq) = 0;
+    virtual ::grpc::ClientAsyncResponseReaderInterface< ::rpc::BatchDeleteResponse>* AsyncBatchDeleteRaw(::grpc::ClientContext* context, const ::rpc::BatchDeleteRequest& request, ::grpc::CompletionQueue* cq) = 0;
+    virtual ::grpc::ClientAsyncResponseReaderInterface< ::rpc::BatchDeleteResponse>* PrepareAsyncBatchDeleteRaw(::grpc::ClientContext* context, const ::rpc::BatchDeleteRequest& request, ::grpc::CompletionQueue* cq) = 0;
   };
   class Stub final : public StubInterface {
    public:
@@ -119,6 +152,27 @@ class FileService final {
     std::unique_ptr< ::grpc::ClientAsyncResponseReader< ::rpc::DeleteFileResponse>> PrepareAsyncDeleteFile(::grpc::ClientContext* context, const ::rpc::DeleteFileRequest& request, ::grpc::CompletionQueue* cq) {
       return std::unique_ptr< ::grpc::ClientAsyncResponseReader< ::rpc::DeleteFileResponse>>(PrepareAsyncDeleteFileRaw(context, request, cq));
     }
+    ::grpc::Status CreateFolder(::grpc::ClientContext* context, const ::rpc::CreateFolderRequest& request, ::rpc::CreateFolderResponse* response) override;
+    std::unique_ptr< ::grpc::ClientAsyncResponseReader< ::rpc::CreateFolderResponse>> AsyncCreateFolder(::grpc::ClientContext* context, const ::rpc::CreateFolderRequest& request, ::grpc::CompletionQueue* cq) {
+      return std::unique_ptr< ::grpc::ClientAsyncResponseReader< ::rpc::CreateFolderResponse>>(AsyncCreateFolderRaw(context, request, cq));
+    }
+    std::unique_ptr< ::grpc::ClientAsyncResponseReader< ::rpc::CreateFolderResponse>> PrepareAsyncCreateFolder(::grpc::ClientContext* context, const ::rpc::CreateFolderRequest& request, ::grpc::CompletionQueue* cq) {
+      return std::unique_ptr< ::grpc::ClientAsyncResponseReader< ::rpc::CreateFolderResponse>>(PrepareAsyncCreateFolderRaw(context, request, cq));
+    }
+    ::grpc::Status MoveFile(::grpc::ClientContext* context, const ::rpc::MoveFileRequest& request, ::rpc::MoveFileResponse* response) override;
+    std::unique_ptr< ::grpc::ClientAsyncResponseReader< ::rpc::MoveFileResponse>> AsyncMoveFile(::grpc::ClientContext* context, const ::rpc::MoveFileRequest& request, ::grpc::CompletionQueue* cq) {
+      return std::unique_ptr< ::grpc::ClientAsyncResponseReader< ::rpc::MoveFileResponse>>(AsyncMoveFileRaw(context, request, cq));
+    }
+    std::unique_ptr< ::grpc::ClientAsyncResponseReader< ::rpc::MoveFileResponse>> PrepareAsyncMoveFile(::grpc::ClientContext* context, const ::rpc::MoveFileRequest& request, ::grpc::CompletionQueue* cq) {
+      return std::unique_ptr< ::grpc::ClientAsyncResponseReader< ::rpc::MoveFileResponse>>(PrepareAsyncMoveFileRaw(context, request, cq));
+    }
+    ::grpc::Status BatchDelete(::grpc::ClientContext* context, const ::rpc::BatchDeleteRequest& request, ::rpc::BatchDeleteResponse* response) override;
+    std::unique_ptr< ::grpc::ClientAsyncResponseReader< ::rpc::BatchDeleteResponse>> AsyncBatchDelete(::grpc::ClientContext* context, const ::rpc::BatchDeleteRequest& request, ::grpc::CompletionQueue* cq) {
+      return std::unique_ptr< ::grpc::ClientAsyncResponseReader< ::rpc::BatchDeleteResponse>>(AsyncBatchDeleteRaw(context, request, cq));
+    }
+    std::unique_ptr< ::grpc::ClientAsyncResponseReader< ::rpc::BatchDeleteResponse>> PrepareAsyncBatchDelete(::grpc::ClientContext* context, const ::rpc::BatchDeleteRequest& request, ::grpc::CompletionQueue* cq) {
+      return std::unique_ptr< ::grpc::ClientAsyncResponseReader< ::rpc::BatchDeleteResponse>>(PrepareAsyncBatchDeleteRaw(context, request, cq));
+    }
     class async final :
       public StubInterface::async_interface {
      public:
@@ -130,6 +184,12 @@ class FileService final {
       void ListFiles(::grpc::ClientContext* context, const ::rpc::ListFilesRequest* request, ::rpc::ListFilesResponse* response, ::grpc::ClientUnaryReactor* reactor) override;
       void DeleteFile(::grpc::ClientContext* context, const ::rpc::DeleteFileRequest* request, ::rpc::DeleteFileResponse* response, std::function<void(::grpc::Status)>) override;
       void DeleteFile(::grpc::ClientContext* context, const ::rpc::DeleteFileRequest* request, ::rpc::DeleteFileResponse* response, ::grpc::ClientUnaryReactor* reactor) override;
+      void CreateFolder(::grpc::ClientContext* context, const ::rpc::CreateFolderRequest* request, ::rpc::CreateFolderResponse* response, std::function<void(::grpc::Status)>) override;
+      void CreateFolder(::grpc::ClientContext* context, const ::rpc::CreateFolderRequest* request, ::rpc::CreateFolderResponse* response, ::grpc::ClientUnaryReactor* reactor) override;
+      void MoveFile(::grpc::ClientContext* context, const ::rpc::MoveFileRequest* request, ::rpc::MoveFileResponse* response, std::function<void(::grpc::Status)>) override;
+      void MoveFile(::grpc::ClientContext* context, const ::rpc::MoveFileRequest* request, ::rpc::MoveFileResponse* response, ::grpc::ClientUnaryReactor* reactor) override;
+      void BatchDelete(::grpc::ClientContext* context, const ::rpc::BatchDeleteRequest* request, ::rpc::BatchDeleteResponse* response, std::function<void(::grpc::Status)>) override;
+      void BatchDelete(::grpc::ClientContext* context, const ::rpc::BatchDeleteRequest* request, ::rpc::BatchDeleteResponse* response, ::grpc::ClientUnaryReactor* reactor) override;
      private:
       friend class Stub;
       explicit async(Stub* stub): stub_(stub) { }
@@ -149,10 +209,19 @@ class FileService final {
     ::grpc::ClientAsyncResponseReader< ::rpc::ListFilesResponse>* PrepareAsyncListFilesRaw(::grpc::ClientContext* context, const ::rpc::ListFilesRequest& request, ::grpc::CompletionQueue* cq) override;
     ::grpc::ClientAsyncResponseReader< ::rpc::DeleteFileResponse>* AsyncDeleteFileRaw(::grpc::ClientContext* context, const ::rpc::DeleteFileRequest& request, ::grpc::CompletionQueue* cq) override;
     ::grpc::ClientAsyncResponseReader< ::rpc::DeleteFileResponse>* PrepareAsyncDeleteFileRaw(::grpc::ClientContext* context, const ::rpc::DeleteFileRequest& request, ::grpc::CompletionQueue* cq) override;
+    ::grpc::ClientAsyncResponseReader< ::rpc::CreateFolderResponse>* AsyncCreateFolderRaw(::grpc::ClientContext* context, const ::rpc::CreateFolderRequest& request, ::grpc::CompletionQueue* cq) override;
+    ::grpc::ClientAsyncResponseReader< ::rpc::CreateFolderResponse>* PrepareAsyncCreateFolderRaw(::grpc::ClientContext* context, const ::rpc::CreateFolderRequest& request, ::grpc::CompletionQueue* cq) override;
+    ::grpc::ClientAsyncResponseReader< ::rpc::MoveFileResponse>* AsyncMoveFileRaw(::grpc::ClientContext* context, const ::rpc::MoveFileRequest& request, ::grpc::CompletionQueue* cq) override;
+    ::grpc::ClientAsyncResponseReader< ::rpc::MoveFileResponse>* PrepareAsyncMoveFileRaw(::grpc::ClientContext* context, const ::rpc::MoveFileRequest& request, ::grpc::CompletionQueue* cq) override;
+    ::grpc::ClientAsyncResponseReader< ::rpc::BatchDeleteResponse>* AsyncBatchDeleteRaw(::grpc::ClientContext* context, const ::rpc::BatchDeleteRequest& request, ::grpc::CompletionQueue* cq) override;
+    ::grpc::ClientAsyncResponseReader< ::rpc::BatchDeleteResponse>* PrepareAsyncBatchDeleteRaw(::grpc::ClientContext* context, const ::rpc::BatchDeleteRequest& request, ::grpc::CompletionQueue* cq) override;
     const ::grpc::internal::RpcMethod rpcmethod_CreateFile_;
     const ::grpc::internal::RpcMethod rpcmethod_GetFile_;
     const ::grpc::internal::RpcMethod rpcmethod_ListFiles_;
     const ::grpc::internal::RpcMethod rpcmethod_DeleteFile_;
+    const ::grpc::internal::RpcMethod rpcmethod_CreateFolder_;
+    const ::grpc::internal::RpcMethod rpcmethod_MoveFile_;
+    const ::grpc::internal::RpcMethod rpcmethod_BatchDelete_;
   };
   static std::unique_ptr<Stub> NewStub(const std::shared_ptr< ::grpc::ChannelInterface>& channel, const ::grpc::StubOptions& options = ::grpc::StubOptions());
 
@@ -164,6 +233,9 @@ class FileService final {
     virtual ::grpc::Status GetFile(::grpc::ServerContext* context, const ::rpc::GetFileRequest* request, ::rpc::GetFileResponse* response);
     virtual ::grpc::Status ListFiles(::grpc::ServerContext* context, const ::rpc::ListFilesRequest* request, ::rpc::ListFilesResponse* response);
     virtual ::grpc::Status DeleteFile(::grpc::ServerContext* context, const ::rpc::DeleteFileRequest* request, ::rpc::DeleteFileResponse* response);
+    virtual ::grpc::Status CreateFolder(::grpc::ServerContext* context, const ::rpc::CreateFolderRequest* request, ::rpc::CreateFolderResponse* response);
+    virtual ::grpc::Status MoveFile(::grpc::ServerContext* context, const ::rpc::MoveFileRequest* request, ::rpc::MoveFileResponse* response);
+    virtual ::grpc::Status BatchDelete(::grpc::ServerContext* context, const ::rpc::BatchDeleteRequest* request, ::rpc::BatchDeleteResponse* response);
   };
   template <class BaseClass>
   class WithAsyncMethod_CreateFile : public BaseClass {
@@ -245,7 +317,67 @@ class FileService final {
       ::grpc::Service::RequestAsyncUnary(3, context, request, response, new_call_cq, notification_cq, tag);
     }
   };
-  typedef WithAsyncMethod_CreateFile<WithAsyncMethod_GetFile<WithAsyncMethod_ListFiles<WithAsyncMethod_DeleteFile<Service > > > > AsyncService;
+  template <class BaseClass>
+  class WithAsyncMethod_CreateFolder : public BaseClass {
+   private:
+    void BaseClassMustBeDerivedFromService(const Service* /*service*/) {}
+   public:
+    WithAsyncMethod_CreateFolder() {
+      ::grpc::Service::MarkMethodAsync(4);
+    }
+    ~WithAsyncMethod_CreateFolder() override {
+      BaseClassMustBeDerivedFromService(this);
+    }
+    // disable synchronous version of this method
+    ::grpc::Status CreateFolder(::grpc::ServerContext* /*context*/, const ::rpc::CreateFolderRequest* /*request*/, ::rpc::CreateFolderResponse* /*response*/) override {
+      abort();
+      return ::grpc::Status(::grpc::StatusCode::UNIMPLEMENTED, "");
+    }
+    void RequestCreateFolder(::grpc::ServerContext* context, ::rpc::CreateFolderRequest* request, ::grpc::ServerAsyncResponseWriter< ::rpc::CreateFolderResponse>* response, ::grpc::CompletionQueue* new_call_cq, ::grpc::ServerCompletionQueue* notification_cq, void *tag) {
+      ::grpc::Service::RequestAsyncUnary(4, context, request, response, new_call_cq, notification_cq, tag);
+    }
+  };
+  template <class BaseClass>
+  class WithAsyncMethod_MoveFile : public BaseClass {
+   private:
+    void BaseClassMustBeDerivedFromService(const Service* /*service*/) {}
+   public:
+    WithAsyncMethod_MoveFile() {
+      ::grpc::Service::MarkMethodAsync(5);
+    }
+    ~WithAsyncMethod_MoveFile() override {
+      BaseClassMustBeDerivedFromService(this);
+    }
+    // disable synchronous version of this method
+    ::grpc::Status MoveFile(::grpc::ServerContext* /*context*/, const ::rpc::MoveFileRequest* /*request*/, ::rpc::MoveFileResponse* /*response*/) override {
+      abort();
+      return ::grpc::Status(::grpc::StatusCode::UNIMPLEMENTED, "");
+    }
+    void RequestMoveFile(::grpc::ServerContext* context, ::rpc::MoveFileRequest* request, ::grpc::ServerAsyncResponseWriter< ::rpc::MoveFileResponse>* response, ::grpc::CompletionQueue* new_call_cq, ::grpc::ServerCompletionQueue* notification_cq, void *tag) {
+      ::grpc::Service::RequestAsyncUnary(5, context, request, response, new_call_cq, notification_cq, tag);
+    }
+  };
+  template <class BaseClass>
+  class WithAsyncMethod_BatchDelete : public BaseClass {
+   private:
+    void BaseClassMustBeDerivedFromService(const Service* /*service*/) {}
+   public:
+    WithAsyncMethod_BatchDelete() {
+      ::grpc::Service::MarkMethodAsync(6);
+    }
+    ~WithAsyncMethod_BatchDelete() override {
+      BaseClassMustBeDerivedFromService(this);
+    }
+    // disable synchronous version of this method
+    ::grpc::Status BatchDelete(::grpc::ServerContext* /*context*/, const ::rpc::BatchDeleteRequest* /*request*/, ::rpc::BatchDeleteResponse* /*response*/) override {
+      abort();
+      return ::grpc::Status(::grpc::StatusCode::UNIMPLEMENTED, "");
+    }
+    void RequestBatchDelete(::grpc::ServerContext* context, ::rpc::BatchDeleteRequest* request, ::grpc::ServerAsyncResponseWriter< ::rpc::BatchDeleteResponse>* response, ::grpc::CompletionQueue* new_call_cq, ::grpc::ServerCompletionQueue* notification_cq, void *tag) {
+      ::grpc::Service::RequestAsyncUnary(6, context, request, response, new_call_cq, notification_cq, tag);
+    }
+  };
+  typedef WithAsyncMethod_CreateFile<WithAsyncMethod_GetFile<WithAsyncMethod_ListFiles<WithAsyncMethod_DeleteFile<WithAsyncMethod_CreateFolder<WithAsyncMethod_MoveFile<WithAsyncMethod_BatchDelete<Service > > > > > > > AsyncService;
   template <class BaseClass>
   class WithCallbackMethod_CreateFile : public BaseClass {
    private:
@@ -354,7 +486,88 @@ class FileService final {
     virtual ::grpc::ServerUnaryReactor* DeleteFile(
       ::grpc::CallbackServerContext* /*context*/, const ::rpc::DeleteFileRequest* /*request*/, ::rpc::DeleteFileResponse* /*response*/)  { return nullptr; }
   };
-  typedef WithCallbackMethod_CreateFile<WithCallbackMethod_GetFile<WithCallbackMethod_ListFiles<WithCallbackMethod_DeleteFile<Service > > > > CallbackService;
+  template <class BaseClass>
+  class WithCallbackMethod_CreateFolder : public BaseClass {
+   private:
+    void BaseClassMustBeDerivedFromService(const Service* /*service*/) {}
+   public:
+    WithCallbackMethod_CreateFolder() {
+      ::grpc::Service::MarkMethodCallback(4,
+          new ::grpc::internal::CallbackUnaryHandler< ::rpc::CreateFolderRequest, ::rpc::CreateFolderResponse>(
+            [this](
+                   ::grpc::CallbackServerContext* context, const ::rpc::CreateFolderRequest* request, ::rpc::CreateFolderResponse* response) { return this->CreateFolder(context, request, response); }));}
+    void SetMessageAllocatorFor_CreateFolder(
+        ::grpc::MessageAllocator< ::rpc::CreateFolderRequest, ::rpc::CreateFolderResponse>* allocator) {
+      ::grpc::internal::MethodHandler* const handler = ::grpc::Service::GetHandler(4);
+      static_cast<::grpc::internal::CallbackUnaryHandler< ::rpc::CreateFolderRequest, ::rpc::CreateFolderResponse>*>(handler)
+              ->SetMessageAllocator(allocator);
+    }
+    ~WithCallbackMethod_CreateFolder() override {
+      BaseClassMustBeDerivedFromService(this);
+    }
+    // disable synchronous version of this method
+    ::grpc::Status CreateFolder(::grpc::ServerContext* /*context*/, const ::rpc::CreateFolderRequest* /*request*/, ::rpc::CreateFolderResponse* /*response*/) override {
+      abort();
+      return ::grpc::Status(::grpc::StatusCode::UNIMPLEMENTED, "");
+    }
+    virtual ::grpc::ServerUnaryReactor* CreateFolder(
+      ::grpc::CallbackServerContext* /*context*/, const ::rpc::CreateFolderRequest* /*request*/, ::rpc::CreateFolderResponse* /*response*/)  { return nullptr; }
+  };
+  template <class BaseClass>
+  class WithCallbackMethod_MoveFile : public BaseClass {
+   private:
+    void BaseClassMustBeDerivedFromService(const Service* /*service*/) {}
+   public:
+    WithCallbackMethod_MoveFile() {
+      ::grpc::Service::MarkMethodCallback(5,
+          new ::grpc::internal::CallbackUnaryHandler< ::rpc::MoveFileRequest, ::rpc::MoveFileResponse>(
+            [this](
+                   ::grpc::CallbackServerContext* context, const ::rpc::MoveFileRequest* request, ::rpc::MoveFileResponse* response) { return this->MoveFile(context, request, response); }));}
+    void SetMessageAllocatorFor_MoveFile(
+        ::grpc::MessageAllocator< ::rpc::MoveFileRequest, ::rpc::MoveFileResponse>* allocator) {
+      ::grpc::internal::MethodHandler* const handler = ::grpc::Service::GetHandler(5);
+      static_cast<::grpc::internal::CallbackUnaryHandler< ::rpc::MoveFileRequest, ::rpc::MoveFileResponse>*>(handler)
+              ->SetMessageAllocator(allocator);
+    }
+    ~WithCallbackMethod_MoveFile() override {
+      BaseClassMustBeDerivedFromService(this);
+    }
+    // disable synchronous version of this method
+    ::grpc::Status MoveFile(::grpc::ServerContext* /*context*/, const ::rpc::MoveFileRequest* /*request*/, ::rpc::MoveFileResponse* /*response*/) override {
+      abort();
+      return ::grpc::Status(::grpc::StatusCode::UNIMPLEMENTED, "");
+    }
+    virtual ::grpc::ServerUnaryReactor* MoveFile(
+      ::grpc::CallbackServerContext* /*context*/, const ::rpc::MoveFileRequest* /*request*/, ::rpc::MoveFileResponse* /*response*/)  { return nullptr; }
+  };
+  template <class BaseClass>
+  class WithCallbackMethod_BatchDelete : public BaseClass {
+   private:
+    void BaseClassMustBeDerivedFromService(const Service* /*service*/) {}
+   public:
+    WithCallbackMethod_BatchDelete() {
+      ::grpc::Service::MarkMethodCallback(6,
+          new ::grpc::internal::CallbackUnaryHandler< ::rpc::BatchDeleteRequest, ::rpc::BatchDeleteResponse>(
+            [this](
+                   ::grpc::CallbackServerContext* context, const ::rpc::BatchDeleteRequest* request, ::rpc::BatchDeleteResponse* response) { return this->BatchDelete(context, request, response); }));}
+    void SetMessageAllocatorFor_BatchDelete(
+        ::grpc::MessageAllocator< ::rpc::BatchDeleteRequest, ::rpc::BatchDeleteResponse>* allocator) {
+      ::grpc::internal::MethodHandler* const handler = ::grpc::Service::GetHandler(6);
+      static_cast<::grpc::internal::CallbackUnaryHandler< ::rpc::BatchDeleteRequest, ::rpc::BatchDeleteResponse>*>(handler)
+              ->SetMessageAllocator(allocator);
+    }
+    ~WithCallbackMethod_BatchDelete() override {
+      BaseClassMustBeDerivedFromService(this);
+    }
+    // disable synchronous version of this method
+    ::grpc::Status BatchDelete(::grpc::ServerContext* /*context*/, const ::rpc::BatchDeleteRequest* /*request*/, ::rpc::BatchDeleteResponse* /*response*/) override {
+      abort();
+      return ::grpc::Status(::grpc::StatusCode::UNIMPLEMENTED, "");
+    }
+    virtual ::grpc::ServerUnaryReactor* BatchDelete(
+      ::grpc::CallbackServerContext* /*context*/, const ::rpc::BatchDeleteRequest* /*request*/, ::rpc::BatchDeleteResponse* /*response*/)  { return nullptr; }
+  };
+  typedef WithCallbackMethod_CreateFile<WithCallbackMethod_GetFile<WithCallbackMethod_ListFiles<WithCallbackMethod_DeleteFile<WithCallbackMethod_CreateFolder<WithCallbackMethod_MoveFile<WithCallbackMethod_BatchDelete<Service > > > > > > > CallbackService;
   typedef CallbackService ExperimentalCallbackService;
   template <class BaseClass>
   class WithGenericMethod_CreateFile : public BaseClass {
@@ -420,6 +633,57 @@ class FileService final {
     }
     // disable synchronous version of this method
     ::grpc::Status DeleteFile(::grpc::ServerContext* /*context*/, const ::rpc::DeleteFileRequest* /*request*/, ::rpc::DeleteFileResponse* /*response*/) override {
+      abort();
+      return ::grpc::Status(::grpc::StatusCode::UNIMPLEMENTED, "");
+    }
+  };
+  template <class BaseClass>
+  class WithGenericMethod_CreateFolder : public BaseClass {
+   private:
+    void BaseClassMustBeDerivedFromService(const Service* /*service*/) {}
+   public:
+    WithGenericMethod_CreateFolder() {
+      ::grpc::Service::MarkMethodGeneric(4);
+    }
+    ~WithGenericMethod_CreateFolder() override {
+      BaseClassMustBeDerivedFromService(this);
+    }
+    // disable synchronous version of this method
+    ::grpc::Status CreateFolder(::grpc::ServerContext* /*context*/, const ::rpc::CreateFolderRequest* /*request*/, ::rpc::CreateFolderResponse* /*response*/) override {
+      abort();
+      return ::grpc::Status(::grpc::StatusCode::UNIMPLEMENTED, "");
+    }
+  };
+  template <class BaseClass>
+  class WithGenericMethod_MoveFile : public BaseClass {
+   private:
+    void BaseClassMustBeDerivedFromService(const Service* /*service*/) {}
+   public:
+    WithGenericMethod_MoveFile() {
+      ::grpc::Service::MarkMethodGeneric(5);
+    }
+    ~WithGenericMethod_MoveFile() override {
+      BaseClassMustBeDerivedFromService(this);
+    }
+    // disable synchronous version of this method
+    ::grpc::Status MoveFile(::grpc::ServerContext* /*context*/, const ::rpc::MoveFileRequest* /*request*/, ::rpc::MoveFileResponse* /*response*/) override {
+      abort();
+      return ::grpc::Status(::grpc::StatusCode::UNIMPLEMENTED, "");
+    }
+  };
+  template <class BaseClass>
+  class WithGenericMethod_BatchDelete : public BaseClass {
+   private:
+    void BaseClassMustBeDerivedFromService(const Service* /*service*/) {}
+   public:
+    WithGenericMethod_BatchDelete() {
+      ::grpc::Service::MarkMethodGeneric(6);
+    }
+    ~WithGenericMethod_BatchDelete() override {
+      BaseClassMustBeDerivedFromService(this);
+    }
+    // disable synchronous version of this method
+    ::grpc::Status BatchDelete(::grpc::ServerContext* /*context*/, const ::rpc::BatchDeleteRequest* /*request*/, ::rpc::BatchDeleteResponse* /*response*/) override {
       abort();
       return ::grpc::Status(::grpc::StatusCode::UNIMPLEMENTED, "");
     }
@@ -502,6 +766,66 @@ class FileService final {
     }
     void RequestDeleteFile(::grpc::ServerContext* context, ::grpc::ByteBuffer* request, ::grpc::ServerAsyncResponseWriter< ::grpc::ByteBuffer>* response, ::grpc::CompletionQueue* new_call_cq, ::grpc::ServerCompletionQueue* notification_cq, void *tag) {
       ::grpc::Service::RequestAsyncUnary(3, context, request, response, new_call_cq, notification_cq, tag);
+    }
+  };
+  template <class BaseClass>
+  class WithRawMethod_CreateFolder : public BaseClass {
+   private:
+    void BaseClassMustBeDerivedFromService(const Service* /*service*/) {}
+   public:
+    WithRawMethod_CreateFolder() {
+      ::grpc::Service::MarkMethodRaw(4);
+    }
+    ~WithRawMethod_CreateFolder() override {
+      BaseClassMustBeDerivedFromService(this);
+    }
+    // disable synchronous version of this method
+    ::grpc::Status CreateFolder(::grpc::ServerContext* /*context*/, const ::rpc::CreateFolderRequest* /*request*/, ::rpc::CreateFolderResponse* /*response*/) override {
+      abort();
+      return ::grpc::Status(::grpc::StatusCode::UNIMPLEMENTED, "");
+    }
+    void RequestCreateFolder(::grpc::ServerContext* context, ::grpc::ByteBuffer* request, ::grpc::ServerAsyncResponseWriter< ::grpc::ByteBuffer>* response, ::grpc::CompletionQueue* new_call_cq, ::grpc::ServerCompletionQueue* notification_cq, void *tag) {
+      ::grpc::Service::RequestAsyncUnary(4, context, request, response, new_call_cq, notification_cq, tag);
+    }
+  };
+  template <class BaseClass>
+  class WithRawMethod_MoveFile : public BaseClass {
+   private:
+    void BaseClassMustBeDerivedFromService(const Service* /*service*/) {}
+   public:
+    WithRawMethod_MoveFile() {
+      ::grpc::Service::MarkMethodRaw(5);
+    }
+    ~WithRawMethod_MoveFile() override {
+      BaseClassMustBeDerivedFromService(this);
+    }
+    // disable synchronous version of this method
+    ::grpc::Status MoveFile(::grpc::ServerContext* /*context*/, const ::rpc::MoveFileRequest* /*request*/, ::rpc::MoveFileResponse* /*response*/) override {
+      abort();
+      return ::grpc::Status(::grpc::StatusCode::UNIMPLEMENTED, "");
+    }
+    void RequestMoveFile(::grpc::ServerContext* context, ::grpc::ByteBuffer* request, ::grpc::ServerAsyncResponseWriter< ::grpc::ByteBuffer>* response, ::grpc::CompletionQueue* new_call_cq, ::grpc::ServerCompletionQueue* notification_cq, void *tag) {
+      ::grpc::Service::RequestAsyncUnary(5, context, request, response, new_call_cq, notification_cq, tag);
+    }
+  };
+  template <class BaseClass>
+  class WithRawMethod_BatchDelete : public BaseClass {
+   private:
+    void BaseClassMustBeDerivedFromService(const Service* /*service*/) {}
+   public:
+    WithRawMethod_BatchDelete() {
+      ::grpc::Service::MarkMethodRaw(6);
+    }
+    ~WithRawMethod_BatchDelete() override {
+      BaseClassMustBeDerivedFromService(this);
+    }
+    // disable synchronous version of this method
+    ::grpc::Status BatchDelete(::grpc::ServerContext* /*context*/, const ::rpc::BatchDeleteRequest* /*request*/, ::rpc::BatchDeleteResponse* /*response*/) override {
+      abort();
+      return ::grpc::Status(::grpc::StatusCode::UNIMPLEMENTED, "");
+    }
+    void RequestBatchDelete(::grpc::ServerContext* context, ::grpc::ByteBuffer* request, ::grpc::ServerAsyncResponseWriter< ::grpc::ByteBuffer>* response, ::grpc::CompletionQueue* new_call_cq, ::grpc::ServerCompletionQueue* notification_cq, void *tag) {
+      ::grpc::Service::RequestAsyncUnary(6, context, request, response, new_call_cq, notification_cq, tag);
     }
   };
   template <class BaseClass>
@@ -590,6 +914,72 @@ class FileService final {
       return ::grpc::Status(::grpc::StatusCode::UNIMPLEMENTED, "");
     }
     virtual ::grpc::ServerUnaryReactor* DeleteFile(
+      ::grpc::CallbackServerContext* /*context*/, const ::grpc::ByteBuffer* /*request*/, ::grpc::ByteBuffer* /*response*/)  { return nullptr; }
+  };
+  template <class BaseClass>
+  class WithRawCallbackMethod_CreateFolder : public BaseClass {
+   private:
+    void BaseClassMustBeDerivedFromService(const Service* /*service*/) {}
+   public:
+    WithRawCallbackMethod_CreateFolder() {
+      ::grpc::Service::MarkMethodRawCallback(4,
+          new ::grpc::internal::CallbackUnaryHandler< ::grpc::ByteBuffer, ::grpc::ByteBuffer>(
+            [this](
+                   ::grpc::CallbackServerContext* context, const ::grpc::ByteBuffer* request, ::grpc::ByteBuffer* response) { return this->CreateFolder(context, request, response); }));
+    }
+    ~WithRawCallbackMethod_CreateFolder() override {
+      BaseClassMustBeDerivedFromService(this);
+    }
+    // disable synchronous version of this method
+    ::grpc::Status CreateFolder(::grpc::ServerContext* /*context*/, const ::rpc::CreateFolderRequest* /*request*/, ::rpc::CreateFolderResponse* /*response*/) override {
+      abort();
+      return ::grpc::Status(::grpc::StatusCode::UNIMPLEMENTED, "");
+    }
+    virtual ::grpc::ServerUnaryReactor* CreateFolder(
+      ::grpc::CallbackServerContext* /*context*/, const ::grpc::ByteBuffer* /*request*/, ::grpc::ByteBuffer* /*response*/)  { return nullptr; }
+  };
+  template <class BaseClass>
+  class WithRawCallbackMethod_MoveFile : public BaseClass {
+   private:
+    void BaseClassMustBeDerivedFromService(const Service* /*service*/) {}
+   public:
+    WithRawCallbackMethod_MoveFile() {
+      ::grpc::Service::MarkMethodRawCallback(5,
+          new ::grpc::internal::CallbackUnaryHandler< ::grpc::ByteBuffer, ::grpc::ByteBuffer>(
+            [this](
+                   ::grpc::CallbackServerContext* context, const ::grpc::ByteBuffer* request, ::grpc::ByteBuffer* response) { return this->MoveFile(context, request, response); }));
+    }
+    ~WithRawCallbackMethod_MoveFile() override {
+      BaseClassMustBeDerivedFromService(this);
+    }
+    // disable synchronous version of this method
+    ::grpc::Status MoveFile(::grpc::ServerContext* /*context*/, const ::rpc::MoveFileRequest* /*request*/, ::rpc::MoveFileResponse* /*response*/) override {
+      abort();
+      return ::grpc::Status(::grpc::StatusCode::UNIMPLEMENTED, "");
+    }
+    virtual ::grpc::ServerUnaryReactor* MoveFile(
+      ::grpc::CallbackServerContext* /*context*/, const ::grpc::ByteBuffer* /*request*/, ::grpc::ByteBuffer* /*response*/)  { return nullptr; }
+  };
+  template <class BaseClass>
+  class WithRawCallbackMethod_BatchDelete : public BaseClass {
+   private:
+    void BaseClassMustBeDerivedFromService(const Service* /*service*/) {}
+   public:
+    WithRawCallbackMethod_BatchDelete() {
+      ::grpc::Service::MarkMethodRawCallback(6,
+          new ::grpc::internal::CallbackUnaryHandler< ::grpc::ByteBuffer, ::grpc::ByteBuffer>(
+            [this](
+                   ::grpc::CallbackServerContext* context, const ::grpc::ByteBuffer* request, ::grpc::ByteBuffer* response) { return this->BatchDelete(context, request, response); }));
+    }
+    ~WithRawCallbackMethod_BatchDelete() override {
+      BaseClassMustBeDerivedFromService(this);
+    }
+    // disable synchronous version of this method
+    ::grpc::Status BatchDelete(::grpc::ServerContext* /*context*/, const ::rpc::BatchDeleteRequest* /*request*/, ::rpc::BatchDeleteResponse* /*response*/) override {
+      abort();
+      return ::grpc::Status(::grpc::StatusCode::UNIMPLEMENTED, "");
+    }
+    virtual ::grpc::ServerUnaryReactor* BatchDelete(
       ::grpc::CallbackServerContext* /*context*/, const ::grpc::ByteBuffer* /*request*/, ::grpc::ByteBuffer* /*response*/)  { return nullptr; }
   };
   template <class BaseClass>
@@ -700,9 +1090,90 @@ class FileService final {
     // replace default version of method with streamed unary
     virtual ::grpc::Status StreamedDeleteFile(::grpc::ServerContext* context, ::grpc::ServerUnaryStreamer< ::rpc::DeleteFileRequest,::rpc::DeleteFileResponse>* server_unary_streamer) = 0;
   };
-  typedef WithStreamedUnaryMethod_CreateFile<WithStreamedUnaryMethod_GetFile<WithStreamedUnaryMethod_ListFiles<WithStreamedUnaryMethod_DeleteFile<Service > > > > StreamedUnaryService;
+  template <class BaseClass>
+  class WithStreamedUnaryMethod_CreateFolder : public BaseClass {
+   private:
+    void BaseClassMustBeDerivedFromService(const Service* /*service*/) {}
+   public:
+    WithStreamedUnaryMethod_CreateFolder() {
+      ::grpc::Service::MarkMethodStreamed(4,
+        new ::grpc::internal::StreamedUnaryHandler<
+          ::rpc::CreateFolderRequest, ::rpc::CreateFolderResponse>(
+            [this](::grpc::ServerContext* context,
+                   ::grpc::ServerUnaryStreamer<
+                     ::rpc::CreateFolderRequest, ::rpc::CreateFolderResponse>* streamer) {
+                       return this->StreamedCreateFolder(context,
+                         streamer);
+                  }));
+    }
+    ~WithStreamedUnaryMethod_CreateFolder() override {
+      BaseClassMustBeDerivedFromService(this);
+    }
+    // disable regular version of this method
+    ::grpc::Status CreateFolder(::grpc::ServerContext* /*context*/, const ::rpc::CreateFolderRequest* /*request*/, ::rpc::CreateFolderResponse* /*response*/) override {
+      abort();
+      return ::grpc::Status(::grpc::StatusCode::UNIMPLEMENTED, "");
+    }
+    // replace default version of method with streamed unary
+    virtual ::grpc::Status StreamedCreateFolder(::grpc::ServerContext* context, ::grpc::ServerUnaryStreamer< ::rpc::CreateFolderRequest,::rpc::CreateFolderResponse>* server_unary_streamer) = 0;
+  };
+  template <class BaseClass>
+  class WithStreamedUnaryMethod_MoveFile : public BaseClass {
+   private:
+    void BaseClassMustBeDerivedFromService(const Service* /*service*/) {}
+   public:
+    WithStreamedUnaryMethod_MoveFile() {
+      ::grpc::Service::MarkMethodStreamed(5,
+        new ::grpc::internal::StreamedUnaryHandler<
+          ::rpc::MoveFileRequest, ::rpc::MoveFileResponse>(
+            [this](::grpc::ServerContext* context,
+                   ::grpc::ServerUnaryStreamer<
+                     ::rpc::MoveFileRequest, ::rpc::MoveFileResponse>* streamer) {
+                       return this->StreamedMoveFile(context,
+                         streamer);
+                  }));
+    }
+    ~WithStreamedUnaryMethod_MoveFile() override {
+      BaseClassMustBeDerivedFromService(this);
+    }
+    // disable regular version of this method
+    ::grpc::Status MoveFile(::grpc::ServerContext* /*context*/, const ::rpc::MoveFileRequest* /*request*/, ::rpc::MoveFileResponse* /*response*/) override {
+      abort();
+      return ::grpc::Status(::grpc::StatusCode::UNIMPLEMENTED, "");
+    }
+    // replace default version of method with streamed unary
+    virtual ::grpc::Status StreamedMoveFile(::grpc::ServerContext* context, ::grpc::ServerUnaryStreamer< ::rpc::MoveFileRequest,::rpc::MoveFileResponse>* server_unary_streamer) = 0;
+  };
+  template <class BaseClass>
+  class WithStreamedUnaryMethod_BatchDelete : public BaseClass {
+   private:
+    void BaseClassMustBeDerivedFromService(const Service* /*service*/) {}
+   public:
+    WithStreamedUnaryMethod_BatchDelete() {
+      ::grpc::Service::MarkMethodStreamed(6,
+        new ::grpc::internal::StreamedUnaryHandler<
+          ::rpc::BatchDeleteRequest, ::rpc::BatchDeleteResponse>(
+            [this](::grpc::ServerContext* context,
+                   ::grpc::ServerUnaryStreamer<
+                     ::rpc::BatchDeleteRequest, ::rpc::BatchDeleteResponse>* streamer) {
+                       return this->StreamedBatchDelete(context,
+                         streamer);
+                  }));
+    }
+    ~WithStreamedUnaryMethod_BatchDelete() override {
+      BaseClassMustBeDerivedFromService(this);
+    }
+    // disable regular version of this method
+    ::grpc::Status BatchDelete(::grpc::ServerContext* /*context*/, const ::rpc::BatchDeleteRequest* /*request*/, ::rpc::BatchDeleteResponse* /*response*/) override {
+      abort();
+      return ::grpc::Status(::grpc::StatusCode::UNIMPLEMENTED, "");
+    }
+    // replace default version of method with streamed unary
+    virtual ::grpc::Status StreamedBatchDelete(::grpc::ServerContext* context, ::grpc::ServerUnaryStreamer< ::rpc::BatchDeleteRequest,::rpc::BatchDeleteResponse>* server_unary_streamer) = 0;
+  };
+  typedef WithStreamedUnaryMethod_CreateFile<WithStreamedUnaryMethod_GetFile<WithStreamedUnaryMethod_ListFiles<WithStreamedUnaryMethod_DeleteFile<WithStreamedUnaryMethod_CreateFolder<WithStreamedUnaryMethod_MoveFile<WithStreamedUnaryMethod_BatchDelete<Service > > > > > > > StreamedUnaryService;
   typedef Service SplitStreamedService;
-  typedef WithStreamedUnaryMethod_CreateFile<WithStreamedUnaryMethod_GetFile<WithStreamedUnaryMethod_ListFiles<WithStreamedUnaryMethod_DeleteFile<Service > > > > StreamedService;
+  typedef WithStreamedUnaryMethod_CreateFile<WithStreamedUnaryMethod_GetFile<WithStreamedUnaryMethod_ListFiles<WithStreamedUnaryMethod_DeleteFile<WithStreamedUnaryMethod_CreateFolder<WithStreamedUnaryMethod_MoveFile<WithStreamedUnaryMethod_BatchDelete<Service > > > > > > > StreamedService;
 };
 
 }  // namespace rpc

@@ -3,8 +3,15 @@ package rpc;
 
 option go_package = "rpc-server/proto/rpc";
 
+import "google/api/annotations.proto";
+
 service SearchService {
-  rpc Search(SearchRequest) returns (SearchResponse);
+  rpc Search(SearchRequest) returns (SearchResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/search"
+      body: "*"
+    };
+  }
 }
 
 message SearchRequest {

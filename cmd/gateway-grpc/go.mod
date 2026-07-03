@@ -7,6 +7,7 @@ toolchain go1.24.2
 require (
 	gateway-grpc/gen/rpc v0.0.0-00010101000000-000000000000
 	github.com/golang-jwt/jwt/v5 v5.2.1
+	github.com/grpc-ecosystem/grpc-gateway/v2 v2.23.0
 	github.com/prometheus/client_golang v1.19.1
 	github.com/redis/go-redis/v9 v9.7.0
 	github.com/sony/gobreaker/v2 v2.1.0
@@ -16,6 +17,7 @@ require (
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc v1.28.0
 	go.opentelemetry.io/otel/sdk v1.28.0
 	golang.org/x/net v0.28.0
+	google.golang.org/genproto/googleapis/api v0.0.0-20241021214115-324edc3d5d38
 	google.golang.org/grpc v1.67.1
 )
 

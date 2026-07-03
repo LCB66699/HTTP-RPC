@@ -48,6 +48,7 @@ PROTOBUF_CONSTEXPR SearchResponse::SearchResponse(
   , /*decltype(_impl_.page_)*/0
   , /*decltype(_impl_.total_)*/int64_t{0}
   , /*decltype(_impl_.page_size_)*/0
+  , /*decltype(_impl_.error_code_)*/0
   , /*decltype(_impl_._cached_size_)*/{}} {}
 struct SearchResponseDefaultTypeInternal {
   PROTOBUF_CONSTEXPR SearchResponseDefaultTypeInternal()
@@ -115,6 +116,7 @@ const uint32_t TableStruct_rpc_5fsearch_2eproto::offsets[] PROTOBUF_SECTION_VARI
   PROTOBUF_FIELD_OFFSET(::rpc::SearchResponse, _impl_.page_),
   PROTOBUF_FIELD_OFFSET(::rpc::SearchResponse, _impl_.page_size_),
   PROTOBUF_FIELD_OFFSET(::rpc::SearchResponse, _impl_.results_),
+  PROTOBUF_FIELD_OFFSET(::rpc::SearchResponse, _impl_.error_code_),
   ~0u,  // no _has_bits_
   PROTOBUF_FIELD_OFFSET(::rpc::SearchResult, _internal_metadata_),
   ~0u,  // no _extensions_
@@ -139,7 +141,7 @@ const uint32_t TableStruct_rpc_5fsearch_2eproto::offsets[] PROTOBUF_SECTION_VARI
 static const ::_pbi::MigrationSchema schemas[] PROTOBUF_SECTION_VARIABLE(protodesc_cold) = {
   { 0, -1, -1, sizeof(::rpc::SearchRequest)},
   { 13, -1, -1, sizeof(::rpc::SearchResponse)},
-  { 25, -1, -1, sizeof(::rpc::SearchResult)},
+  { 26, -1, -1, sizeof(::rpc::SearchResult)},
 };
 
 static const ::_pb::Message* const file_default_instances[] = {
@@ -152,23 +154,24 @@ const char descriptor_table_protodef_rpc_5fsearch_2eproto[] PROTOBUF_SECTION_VAR
   "\n\020rpc_search.proto\022\003rpc\"\177\n\rSearchRequest"
   "\022\r\n\005query\030\001 \001(\t\022\r\n\005scope\030\002 \001(\t\022\014\n\004sort\030\003"
   " \001(\t\022\014\n\004page\030\004 \001(\005\022\021\n\tpage_size\030\005 \001(\005\022\017\n"
-  "\007user_id\030\006 \001(\003\022\020\n\010is_admin\030\007 \001(\010\"\204\001\n\016Sea"
+  "\007user_id\030\006 \001(\003\022\020\n\010is_admin\030\007 \001(\010\"\230\001\n\016Sea"
   "rchResponse\022\017\n\007success\030\001 \001(\010\022\r\n\005error\030\002 "
   "\001(\t\022\r\n\005total\030\003 \001(\003\022\014\n\004page\030\004 \001(\005\022\021\n\tpage"
   "_size\030\005 \001(\005\022\"\n\007results\030\006 \003(\0132\021.rpc.Searc"
-  "hResult\"\205\002\n\014SearchResult\022\014\n\004type\030\001 \001(\t\022\n"
-  "\n\002id\030\002 \001(\t\022\r\n\005score\030\003 \001(\001\022\014\n\004name\030\004 \001(\t\022"
-  "\023\n\013description\030\005 \001(\t\022\020\n\010username\030\006 \001(\t\022\021"
-  "\n\trow_count\030\007 \001(\005\022\021\n\tcol_count\030\010 \001(\005\022\022\n\n"
-  "updated_at\030\t \001(\t\022\025\n\roriginal_name\030\n \001(\t\022"
-  "\021\n\tmime_type\030\013 \001(\t\022\014\n\004size\030\014 \001(\003\022\022\n\ncrea"
-  "ted_at\030\r \001(\t\022\021\n\thighlight\030\016 \001(\t2B\n\rSearc"
-  "hService\0221\n\006Search\022\022.rpc.SearchRequest\032\023"
-  ".rpc.SearchResponseb\006proto3"
+  "hResult\022\022\n\nerror_code\030c \001(\005\"\205\002\n\014SearchRe"
+  "sult\022\014\n\004type\030\001 \001(\t\022\n\n\002id\030\002 \001(\t\022\r\n\005score\030"
+  "\003 \001(\001\022\014\n\004name\030\004 \001(\t\022\023\n\013description\030\005 \001(\t"
+  "\022\020\n\010username\030\006 \001(\t\022\021\n\trow_count\030\007 \001(\005\022\021\n"
+  "\tcol_count\030\010 \001(\005\022\022\n\nupdated_at\030\t \001(\t\022\025\n\r"
+  "original_name\030\n \001(\t\022\021\n\tmime_type\030\013 \001(\t\022\014"
+  "\n\004size\030\014 \001(\003\022\022\n\ncreated_at\030\r \001(\t\022\021\n\thigh"
+  "light\030\016 \001(\t2B\n\rSearchService\0221\n\006Search\022\022"
+  ".rpc.SearchRequest\032\023.rpc.SearchResponseB"
+  "\026Z\024rpc-server/proto/rpcb\006proto3"
   ;
 static ::_pbi::once_flag descriptor_table_rpc_5fsearch_2eproto_once;
 const ::_pbi::DescriptorTable descriptor_table_rpc_5fsearch_2eproto = {
-    false, false, 627, descriptor_table_protodef_rpc_5fsearch_2eproto,
+    false, false, 671, descriptor_table_protodef_rpc_5fsearch_2eproto,
     "rpc_search.proto",
     &descriptor_table_rpc_5fsearch_2eproto_once, nullptr, 0, 3,
     schemas, file_default_instances, TableStruct_rpc_5fsearch_2eproto::offsets,
@@ -616,6 +619,7 @@ SearchResponse::SearchResponse(const SearchResponse& from)
     , decltype(_impl_.page_){}
     , decltype(_impl_.total_){}
     , decltype(_impl_.page_size_){}
+    , decltype(_impl_.error_code_){}
     , /*decltype(_impl_._cached_size_)*/{}};
 
   _internal_metadata_.MergeFrom<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(from._internal_metadata_);
@@ -628,8 +632,8 @@ SearchResponse::SearchResponse(const SearchResponse& from)
       _this->GetArenaForAllocation());
   }
   ::memcpy(&_impl_.success_, &from._impl_.success_,
-    static_cast<size_t>(reinterpret_cast<char*>(&_impl_.page_size_) -
-    reinterpret_cast<char*>(&_impl_.success_)) + sizeof(_impl_.page_size_));
+    static_cast<size_t>(reinterpret_cast<char*>(&_impl_.error_code_) -
+    reinterpret_cast<char*>(&_impl_.success_)) + sizeof(_impl_.error_code_));
   // @@protoc_insertion_point(copy_constructor:rpc.SearchResponse)
 }
 
@@ -644,6 +648,7 @@ inline void SearchResponse::SharedCtor(
     , decltype(_impl_.page_){0}
     , decltype(_impl_.total_){int64_t{0}}
     , decltype(_impl_.page_size_){0}
+    , decltype(_impl_.error_code_){0}
     , /*decltype(_impl_._cached_size_)*/{}
   };
   _impl_.error_.InitDefault();
@@ -680,8 +685,8 @@ void SearchResponse::Clear() {
   _impl_.results_.Clear();
   _impl_.error_.ClearToEmpty();
   ::memset(&_impl_.success_, 0, static_cast<size_t>(
-      reinterpret_cast<char*>(&_impl_.page_size_) -
-      reinterpret_cast<char*>(&_impl_.success_)) + sizeof(_impl_.page_size_));
+      reinterpret_cast<char*>(&_impl_.error_code_) -
+      reinterpret_cast<char*>(&_impl_.success_)) + sizeof(_impl_.error_code_));
   _internal_metadata_.Clear<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>();
 }
 
@@ -743,6 +748,14 @@ const char* SearchResponse::_InternalParse(const char* ptr, ::_pbi::ParseContext
             CHK_(ptr);
             if (!ctx->DataAvailable(ptr)) break;
           } while (::PROTOBUF_NAMESPACE_ID::internal::ExpectTag<50>(ptr));
+        } else
+          goto handle_unusual;
+        continue;
+      // int32 error_code = 99;
+      case 99:
+        if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 24)) {
+          _impl_.error_code_ = ::PROTOBUF_NAMESPACE_ID::internal::ReadVarint32(&ptr);
+          CHK_(ptr);
         } else
           goto handle_unusual;
         continue;
@@ -817,6 +830,12 @@ uint8_t* SearchResponse::_InternalSerialize(
         InternalWriteMessage(6, repfield, repfield.GetCachedSize(), target, stream);
   }
 
+  // int32 error_code = 99;
+  if (this->_internal_error_code() != 0) {
+    target = stream->EnsureSpace(target);
+    target = ::_pbi::WireFormatLite::WriteInt32ToArray(99, this->_internal_error_code(), target);
+  }
+
   if (PROTOBUF_PREDICT_FALSE(_internal_metadata_.have_unknown_fields())) {
     target = ::_pbi::WireFormat::InternalSerializeUnknownFieldsToArray(
         _internal_metadata_.unknown_fields<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(::PROTOBUF_NAMESPACE_ID::UnknownFieldSet::default_instance), target, stream);
@@ -867,6 +886,13 @@ size_t SearchResponse::ByteSizeLong() const {
     total_size += ::_pbi::WireFormatLite::Int32SizePlusOne(this->_internal_page_size());
   }
 
+  // int32 error_code = 99;
+  if (this->_internal_error_code() != 0) {
+    total_size += 2 +
+      ::_pbi::WireFormatLite::Int32Size(
+        this->_internal_error_code());
+  }
+
   return MaybeComputeUnknownFieldsSize(total_size, &_impl_._cached_size_);
 }
 
@@ -901,6 +927,9 @@ void SearchResponse::MergeImpl(::PROTOBUF_NAMESPACE_ID::Message& to_msg, const :
   if (from._internal_page_size() != 0) {
     _this->_internal_set_page_size(from._internal_page_size());
   }
+  if (from._internal_error_code() != 0) {
+    _this->_internal_set_error_code(from._internal_error_code());
+  }
   _this->_internal_metadata_.MergeFrom<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(from._internal_metadata_);
 }
 
@@ -926,8 +955,8 @@ void SearchResponse::InternalSwap(SearchResponse* other) {
       &other->_impl_.error_, rhs_arena
   );
   ::PROTOBUF_NAMESPACE_ID::internal::memswap<
-      PROTOBUF_FIELD_OFFSET(SearchResponse, _impl_.page_size_)
-      + sizeof(SearchResponse::_impl_.page_size_)
+      PROTOBUF_FIELD_OFFSET(SearchResponse, _impl_.error_code_)
+      + sizeof(SearchResponse::_impl_.error_code_)
       - PROTOBUF_FIELD_OFFSET(SearchResponse, _impl_.success_)>(
           reinterpret_cast<char*>(&_impl_.success_),
           reinterpret_cast<char*>(&other->_impl_.success_));

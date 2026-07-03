@@ -29,6 +29,8 @@ PROTOBUF_CONSTEXPR FileInfo::FileInfo(
   , /*decltype(_impl_.created_at_)*/{&::_pbi::fixed_address_empty_string, ::_pbi::ConstantInitialized{}}
   , /*decltype(_impl_.id_)*/int64_t{0}
   , /*decltype(_impl_.size_)*/int64_t{0}
+  , /*decltype(_impl_.folder_id_)*/int64_t{0}
+  , /*decltype(_impl_.is_folder_)*/false
   , /*decltype(_impl_._cached_size_)*/{}} {}
 struct FileInfoDefaultTypeInternal {
   PROTOBUF_CONSTEXPR FileInfoDefaultTypeInternal()
@@ -62,6 +64,7 @@ PROTOBUF_CONSTEXPR CreateFileResponse::CreateFileResponse(
     /*decltype(_impl_.error_)*/{&::_pbi::fixed_address_empty_string, ::_pbi::ConstantInitialized{}}
   , /*decltype(_impl_.id_)*/int64_t{0}
   , /*decltype(_impl_.success_)*/false
+  , /*decltype(_impl_.error_code_)*/0
   , /*decltype(_impl_._cached_size_)*/{}} {}
 struct CreateFileResponseDefaultTypeInternal {
   PROTOBUF_CONSTEXPR CreateFileResponseDefaultTypeInternal()
@@ -94,6 +97,7 @@ PROTOBUF_CONSTEXPR GetFileResponse::GetFileResponse(
   , /*decltype(_impl_.download_url_)*/{&::_pbi::fixed_address_empty_string, ::_pbi::ConstantInitialized{}}
   , /*decltype(_impl_.file_)*/nullptr
   , /*decltype(_impl_.success_)*/false
+  , /*decltype(_impl_.error_code_)*/0
   , /*decltype(_impl_._cached_size_)*/{}} {}
 struct GetFileResponseDefaultTypeInternal {
   PROTOBUF_CONSTEXPR GetFileResponseDefaultTypeInternal()
@@ -106,9 +110,13 @@ struct GetFileResponseDefaultTypeInternal {
 PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 GetFileResponseDefaultTypeInternal _GetFileResponse_default_instance_;
 PROTOBUF_CONSTEXPR ListFilesRequest::ListFilesRequest(
     ::_pbi::ConstantInitialized): _impl_{
-    /*decltype(_impl_.user_id_)*/int64_t{0}
+    /*decltype(_impl_.mime_filter_)*/{&::_pbi::fixed_address_empty_string, ::_pbi::ConstantInitialized{}}
+  , /*decltype(_impl_.user_id_)*/int64_t{0}
   , /*decltype(_impl_.page_)*/0
   , /*decltype(_impl_.page_size_)*/0
+  , /*decltype(_impl_.after_id_)*/int64_t{0}
+  , /*decltype(_impl_.folder_id_)*/int64_t{0}
+  , /*decltype(_impl_.limit_)*/0
   , /*decltype(_impl_._cached_size_)*/{}} {}
 struct ListFilesRequestDefaultTypeInternal {
   PROTOBUF_CONSTEXPR ListFilesRequestDefaultTypeInternal()
@@ -124,8 +132,11 @@ PROTOBUF_CONSTEXPR ListFilesResponse::ListFilesResponse(
     /*decltype(_impl_.files_)*/{}
   , /*decltype(_impl_.cache_source_)*/{&::_pbi::fixed_address_empty_string, ::_pbi::ConstantInitialized{}}
   , /*decltype(_impl_.error_)*/{&::_pbi::fixed_address_empty_string, ::_pbi::ConstantInitialized{}}
-  , /*decltype(_impl_.success_)*/false
+  , /*decltype(_impl_.next_cursor_)*/{&::_pbi::fixed_address_empty_string, ::_pbi::ConstantInitialized{}}
   , /*decltype(_impl_.total_)*/0
+  , /*decltype(_impl_.success_)*/false
+  , /*decltype(_impl_.has_more_)*/false
+  , /*decltype(_impl_.error_code_)*/0
   , /*decltype(_impl_._cached_size_)*/{}} {}
 struct ListFilesResponseDefaultTypeInternal {
   PROTOBUF_CONSTEXPR ListFilesResponseDefaultTypeInternal()
@@ -150,10 +161,103 @@ struct DeleteFileRequestDefaultTypeInternal {
   };
 };
 PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 DeleteFileRequestDefaultTypeInternal _DeleteFileRequest_default_instance_;
+PROTOBUF_CONSTEXPR CreateFolderRequest::CreateFolderRequest(
+    ::_pbi::ConstantInitialized): _impl_{
+    /*decltype(_impl_.name_)*/{&::_pbi::fixed_address_empty_string, ::_pbi::ConstantInitialized{}}
+  , /*decltype(_impl_.user_id_)*/int64_t{0}
+  , /*decltype(_impl_.parent_folder_id_)*/int64_t{0}
+  , /*decltype(_impl_._cached_size_)*/{}} {}
+struct CreateFolderRequestDefaultTypeInternal {
+  PROTOBUF_CONSTEXPR CreateFolderRequestDefaultTypeInternal()
+      : _instance(::_pbi::ConstantInitialized{}) {}
+  ~CreateFolderRequestDefaultTypeInternal() {}
+  union {
+    CreateFolderRequest _instance;
+  };
+};
+PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 CreateFolderRequestDefaultTypeInternal _CreateFolderRequest_default_instance_;
+PROTOBUF_CONSTEXPR CreateFolderResponse::CreateFolderResponse(
+    ::_pbi::ConstantInitialized): _impl_{
+    /*decltype(_impl_.error_)*/{&::_pbi::fixed_address_empty_string, ::_pbi::ConstantInitialized{}}
+  , /*decltype(_impl_.id_)*/int64_t{0}
+  , /*decltype(_impl_.success_)*/false
+  , /*decltype(_impl_.error_code_)*/0
+  , /*decltype(_impl_._cached_size_)*/{}} {}
+struct CreateFolderResponseDefaultTypeInternal {
+  PROTOBUF_CONSTEXPR CreateFolderResponseDefaultTypeInternal()
+      : _instance(::_pbi::ConstantInitialized{}) {}
+  ~CreateFolderResponseDefaultTypeInternal() {}
+  union {
+    CreateFolderResponse _instance;
+  };
+};
+PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 CreateFolderResponseDefaultTypeInternal _CreateFolderResponse_default_instance_;
+PROTOBUF_CONSTEXPR MoveFileRequest::MoveFileRequest(
+    ::_pbi::ConstantInitialized): _impl_{
+    /*decltype(_impl_.id_)*/int64_t{0}
+  , /*decltype(_impl_.user_id_)*/int64_t{0}
+  , /*decltype(_impl_.target_folder_id_)*/int64_t{0}
+  , /*decltype(_impl_._cached_size_)*/{}} {}
+struct MoveFileRequestDefaultTypeInternal {
+  PROTOBUF_CONSTEXPR MoveFileRequestDefaultTypeInternal()
+      : _instance(::_pbi::ConstantInitialized{}) {}
+  ~MoveFileRequestDefaultTypeInternal() {}
+  union {
+    MoveFileRequest _instance;
+  };
+};
+PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 MoveFileRequestDefaultTypeInternal _MoveFileRequest_default_instance_;
+PROTOBUF_CONSTEXPR MoveFileResponse::MoveFileResponse(
+    ::_pbi::ConstantInitialized): _impl_{
+    /*decltype(_impl_.error_)*/{&::_pbi::fixed_address_empty_string, ::_pbi::ConstantInitialized{}}
+  , /*decltype(_impl_.success_)*/false
+  , /*decltype(_impl_.error_code_)*/0
+  , /*decltype(_impl_._cached_size_)*/{}} {}
+struct MoveFileResponseDefaultTypeInternal {
+  PROTOBUF_CONSTEXPR MoveFileResponseDefaultTypeInternal()
+      : _instance(::_pbi::ConstantInitialized{}) {}
+  ~MoveFileResponseDefaultTypeInternal() {}
+  union {
+    MoveFileResponse _instance;
+  };
+};
+PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 MoveFileResponseDefaultTypeInternal _MoveFileResponse_default_instance_;
+PROTOBUF_CONSTEXPR BatchDeleteRequest::BatchDeleteRequest(
+    ::_pbi::ConstantInitialized): _impl_{
+    /*decltype(_impl_.ids_)*/{}
+  , /*decltype(_impl_._ids_cached_byte_size_)*/{0}
+  , /*decltype(_impl_.user_id_)*/int64_t{0}
+  , /*decltype(_impl_._cached_size_)*/{}} {}
+struct BatchDeleteRequestDefaultTypeInternal {
+  PROTOBUF_CONSTEXPR BatchDeleteRequestDefaultTypeInternal()
+      : _instance(::_pbi::ConstantInitialized{}) {}
+  ~BatchDeleteRequestDefaultTypeInternal() {}
+  union {
+    BatchDeleteRequest _instance;
+  };
+};
+PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 BatchDeleteRequestDefaultTypeInternal _BatchDeleteRequest_default_instance_;
+PROTOBUF_CONSTEXPR BatchDeleteResponse::BatchDeleteResponse(
+    ::_pbi::ConstantInitialized): _impl_{
+    /*decltype(_impl_.error_)*/{&::_pbi::fixed_address_empty_string, ::_pbi::ConstantInitialized{}}
+  , /*decltype(_impl_.success_)*/false
+  , /*decltype(_impl_.deleted_count_)*/0
+  , /*decltype(_impl_.error_code_)*/0
+  , /*decltype(_impl_._cached_size_)*/{}} {}
+struct BatchDeleteResponseDefaultTypeInternal {
+  PROTOBUF_CONSTEXPR BatchDeleteResponseDefaultTypeInternal()
+      : _instance(::_pbi::ConstantInitialized{}) {}
+  ~BatchDeleteResponseDefaultTypeInternal() {}
+  union {
+    BatchDeleteResponse _instance;
+  };
+};
+PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 BatchDeleteResponseDefaultTypeInternal _BatchDeleteResponse_default_instance_;
 PROTOBUF_CONSTEXPR DeleteFileResponse::DeleteFileResponse(
     ::_pbi::ConstantInitialized): _impl_{
     /*decltype(_impl_.error_)*/{&::_pbi::fixed_address_empty_string, ::_pbi::ConstantInitialized{}}
   , /*decltype(_impl_.success_)*/false
+  , /*decltype(_impl_.error_code_)*/0
   , /*decltype(_impl_._cached_size_)*/{}} {}
 struct DeleteFileResponseDefaultTypeInternal {
   PROTOBUF_CONSTEXPR DeleteFileResponseDefaultTypeInternal()
@@ -165,7 +269,7 @@ struct DeleteFileResponseDefaultTypeInternal {
 };
 PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 DeleteFileResponseDefaultTypeInternal _DeleteFileResponse_default_instance_;
 }  // namespace rpc
-static ::_pb::Metadata file_level_metadata_rpc_5ffile_2eproto[9];
+static ::_pb::Metadata file_level_metadata_rpc_5ffile_2eproto[15];
 static constexpr ::_pb::EnumDescriptor const** file_level_enum_descriptors_rpc_5ffile_2eproto = nullptr;
 static constexpr ::_pb::ServiceDescriptor const** file_level_service_descriptors_rpc_5ffile_2eproto = nullptr;
 
@@ -182,6 +286,8 @@ const uint32_t TableStruct_rpc_5ffile_2eproto::offsets[] PROTOBUF_SECTION_VARIAB
   PROTOBUF_FIELD_OFFSET(::rpc::FileInfo, _impl_.size_),
   PROTOBUF_FIELD_OFFSET(::rpc::FileInfo, _impl_.mime_type_),
   PROTOBUF_FIELD_OFFSET(::rpc::FileInfo, _impl_.created_at_),
+  PROTOBUF_FIELD_OFFSET(::rpc::FileInfo, _impl_.folder_id_),
+  PROTOBUF_FIELD_OFFSET(::rpc::FileInfo, _impl_.is_folder_),
   ~0u,  // no _has_bits_
   PROTOBUF_FIELD_OFFSET(::rpc::CreateFileRequest, _internal_metadata_),
   ~0u,  // no _extensions_
@@ -203,6 +309,7 @@ const uint32_t TableStruct_rpc_5ffile_2eproto::offsets[] PROTOBUF_SECTION_VARIAB
   PROTOBUF_FIELD_OFFSET(::rpc::CreateFileResponse, _impl_.success_),
   PROTOBUF_FIELD_OFFSET(::rpc::CreateFileResponse, _impl_.id_),
   PROTOBUF_FIELD_OFFSET(::rpc::CreateFileResponse, _impl_.error_),
+  PROTOBUF_FIELD_OFFSET(::rpc::CreateFileResponse, _impl_.error_code_),
   ~0u,  // no _has_bits_
   PROTOBUF_FIELD_OFFSET(::rpc::GetFileRequest, _internal_metadata_),
   ~0u,  // no _extensions_
@@ -223,6 +330,7 @@ const uint32_t TableStruct_rpc_5ffile_2eproto::offsets[] PROTOBUF_SECTION_VARIAB
   PROTOBUF_FIELD_OFFSET(::rpc::GetFileResponse, _impl_.error_),
   PROTOBUF_FIELD_OFFSET(::rpc::GetFileResponse, _impl_.file_content_),
   PROTOBUF_FIELD_OFFSET(::rpc::GetFileResponse, _impl_.download_url_),
+  PROTOBUF_FIELD_OFFSET(::rpc::GetFileResponse, _impl_.error_code_),
   ~0u,  // no _has_bits_
   PROTOBUF_FIELD_OFFSET(::rpc::ListFilesRequest, _internal_metadata_),
   ~0u,  // no _extensions_
@@ -232,6 +340,10 @@ const uint32_t TableStruct_rpc_5ffile_2eproto::offsets[] PROTOBUF_SECTION_VARIAB
   PROTOBUF_FIELD_OFFSET(::rpc::ListFilesRequest, _impl_.user_id_),
   PROTOBUF_FIELD_OFFSET(::rpc::ListFilesRequest, _impl_.page_),
   PROTOBUF_FIELD_OFFSET(::rpc::ListFilesRequest, _impl_.page_size_),
+  PROTOBUF_FIELD_OFFSET(::rpc::ListFilesRequest, _impl_.after_id_),
+  PROTOBUF_FIELD_OFFSET(::rpc::ListFilesRequest, _impl_.limit_),
+  PROTOBUF_FIELD_OFFSET(::rpc::ListFilesRequest, _impl_.folder_id_),
+  PROTOBUF_FIELD_OFFSET(::rpc::ListFilesRequest, _impl_.mime_filter_),
   ~0u,  // no _has_bits_
   PROTOBUF_FIELD_OFFSET(::rpc::ListFilesResponse, _internal_metadata_),
   ~0u,  // no _extensions_
@@ -242,7 +354,10 @@ const uint32_t TableStruct_rpc_5ffile_2eproto::offsets[] PROTOBUF_SECTION_VARIAB
   PROTOBUF_FIELD_OFFSET(::rpc::ListFilesResponse, _impl_.files_),
   PROTOBUF_FIELD_OFFSET(::rpc::ListFilesResponse, _impl_.total_),
   PROTOBUF_FIELD_OFFSET(::rpc::ListFilesResponse, _impl_.cache_source_),
+  PROTOBUF_FIELD_OFFSET(::rpc::ListFilesResponse, _impl_.next_cursor_),
+  PROTOBUF_FIELD_OFFSET(::rpc::ListFilesResponse, _impl_.has_more_),
   PROTOBUF_FIELD_OFFSET(::rpc::ListFilesResponse, _impl_.error_),
+  PROTOBUF_FIELD_OFFSET(::rpc::ListFilesResponse, _impl_.error_code_),
   ~0u,  // no _has_bits_
   PROTOBUF_FIELD_OFFSET(::rpc::DeleteFileRequest, _internal_metadata_),
   ~0u,  // no _extensions_
@@ -252,6 +367,61 @@ const uint32_t TableStruct_rpc_5ffile_2eproto::offsets[] PROTOBUF_SECTION_VARIAB
   PROTOBUF_FIELD_OFFSET(::rpc::DeleteFileRequest, _impl_.id_),
   PROTOBUF_FIELD_OFFSET(::rpc::DeleteFileRequest, _impl_.user_id_),
   ~0u,  // no _has_bits_
+  PROTOBUF_FIELD_OFFSET(::rpc::CreateFolderRequest, _internal_metadata_),
+  ~0u,  // no _extensions_
+  ~0u,  // no _oneof_case_
+  ~0u,  // no _weak_field_map_
+  ~0u,  // no _inlined_string_donated_
+  PROTOBUF_FIELD_OFFSET(::rpc::CreateFolderRequest, _impl_.user_id_),
+  PROTOBUF_FIELD_OFFSET(::rpc::CreateFolderRequest, _impl_.name_),
+  PROTOBUF_FIELD_OFFSET(::rpc::CreateFolderRequest, _impl_.parent_folder_id_),
+  ~0u,  // no _has_bits_
+  PROTOBUF_FIELD_OFFSET(::rpc::CreateFolderResponse, _internal_metadata_),
+  ~0u,  // no _extensions_
+  ~0u,  // no _oneof_case_
+  ~0u,  // no _weak_field_map_
+  ~0u,  // no _inlined_string_donated_
+  PROTOBUF_FIELD_OFFSET(::rpc::CreateFolderResponse, _impl_.success_),
+  PROTOBUF_FIELD_OFFSET(::rpc::CreateFolderResponse, _impl_.id_),
+  PROTOBUF_FIELD_OFFSET(::rpc::CreateFolderResponse, _impl_.error_),
+  PROTOBUF_FIELD_OFFSET(::rpc::CreateFolderResponse, _impl_.error_code_),
+  ~0u,  // no _has_bits_
+  PROTOBUF_FIELD_OFFSET(::rpc::MoveFileRequest, _internal_metadata_),
+  ~0u,  // no _extensions_
+  ~0u,  // no _oneof_case_
+  ~0u,  // no _weak_field_map_
+  ~0u,  // no _inlined_string_donated_
+  PROTOBUF_FIELD_OFFSET(::rpc::MoveFileRequest, _impl_.id_),
+  PROTOBUF_FIELD_OFFSET(::rpc::MoveFileRequest, _impl_.user_id_),
+  PROTOBUF_FIELD_OFFSET(::rpc::MoveFileRequest, _impl_.target_folder_id_),
+  ~0u,  // no _has_bits_
+  PROTOBUF_FIELD_OFFSET(::rpc::MoveFileResponse, _internal_metadata_),
+  ~0u,  // no _extensions_
+  ~0u,  // no _oneof_case_
+  ~0u,  // no _weak_field_map_
+  ~0u,  // no _inlined_string_donated_
+  PROTOBUF_FIELD_OFFSET(::rpc::MoveFileResponse, _impl_.success_),
+  PROTOBUF_FIELD_OFFSET(::rpc::MoveFileResponse, _impl_.error_),
+  PROTOBUF_FIELD_OFFSET(::rpc::MoveFileResponse, _impl_.error_code_),
+  ~0u,  // no _has_bits_
+  PROTOBUF_FIELD_OFFSET(::rpc::BatchDeleteRequest, _internal_metadata_),
+  ~0u,  // no _extensions_
+  ~0u,  // no _oneof_case_
+  ~0u,  // no _weak_field_map_
+  ~0u,  // no _inlined_string_donated_
+  PROTOBUF_FIELD_OFFSET(::rpc::BatchDeleteRequest, _impl_.user_id_),
+  PROTOBUF_FIELD_OFFSET(::rpc::BatchDeleteRequest, _impl_.ids_),
+  ~0u,  // no _has_bits_
+  PROTOBUF_FIELD_OFFSET(::rpc::BatchDeleteResponse, _internal_metadata_),
+  ~0u,  // no _extensions_
+  ~0u,  // no _oneof_case_
+  ~0u,  // no _weak_field_map_
+  ~0u,  // no _inlined_string_donated_
+  PROTOBUF_FIELD_OFFSET(::rpc::BatchDeleteResponse, _impl_.success_),
+  PROTOBUF_FIELD_OFFSET(::rpc::BatchDeleteResponse, _impl_.deleted_count_),
+  PROTOBUF_FIELD_OFFSET(::rpc::BatchDeleteResponse, _impl_.error_),
+  PROTOBUF_FIELD_OFFSET(::rpc::BatchDeleteResponse, _impl_.error_code_),
+  ~0u,  // no _has_bits_
   PROTOBUF_FIELD_OFFSET(::rpc::DeleteFileResponse, _internal_metadata_),
   ~0u,  // no _extensions_
   ~0u,  // no _oneof_case_
@@ -259,17 +429,24 @@ const uint32_t TableStruct_rpc_5ffile_2eproto::offsets[] PROTOBUF_SECTION_VARIAB
   ~0u,  // no _inlined_string_donated_
   PROTOBUF_FIELD_OFFSET(::rpc::DeleteFileResponse, _impl_.success_),
   PROTOBUF_FIELD_OFFSET(::rpc::DeleteFileResponse, _impl_.error_),
+  PROTOBUF_FIELD_OFFSET(::rpc::DeleteFileResponse, _impl_.error_code_),
 };
 static const ::_pbi::MigrationSchema schemas[] PROTOBUF_SECTION_VARIABLE(protodesc_cold) = {
   { 0, -1, -1, sizeof(::rpc::FileInfo)},
-  { 12, -1, -1, sizeof(::rpc::CreateFileRequest)},
-  { 24, -1, -1, sizeof(::rpc::CreateFileResponse)},
-  { 33, -1, -1, sizeof(::rpc::GetFileRequest)},
-  { 41, -1, -1, sizeof(::rpc::GetFileResponse)},
-  { 53, -1, -1, sizeof(::rpc::ListFilesRequest)},
-  { 62, -1, -1, sizeof(::rpc::ListFilesResponse)},
-  { 73, -1, -1, sizeof(::rpc::DeleteFileRequest)},
-  { 81, -1, -1, sizeof(::rpc::DeleteFileResponse)},
+  { 14, -1, -1, sizeof(::rpc::CreateFileRequest)},
+  { 26, -1, -1, sizeof(::rpc::CreateFileResponse)},
+  { 36, -1, -1, sizeof(::rpc::GetFileRequest)},
+  { 44, -1, -1, sizeof(::rpc::GetFileResponse)},
+  { 57, -1, -1, sizeof(::rpc::ListFilesRequest)},
+  { 70, -1, -1, sizeof(::rpc::ListFilesResponse)},
+  { 84, -1, -1, sizeof(::rpc::DeleteFileRequest)},
+  { 92, -1, -1, sizeof(::rpc::CreateFolderRequest)},
+  { 101, -1, -1, sizeof(::rpc::CreateFolderResponse)},
+  { 111, -1, -1, sizeof(::rpc::MoveFileRequest)},
+  { 120, -1, -1, sizeof(::rpc::MoveFileResponse)},
+  { 129, -1, -1, sizeof(::rpc::BatchDeleteRequest)},
+  { 137, -1, -1, sizeof(::rpc::BatchDeleteResponse)},
+  { 147, -1, -1, sizeof(::rpc::DeleteFileResponse)},
 };
 
 static const ::_pb::Message* const file_default_instances[] = {
@@ -281,45 +458,73 @@ static const ::_pb::Message* const file_default_instances[] = {
   &::rpc::_ListFilesRequest_default_instance_._instance,
   &::rpc::_ListFilesResponse_default_instance_._instance,
   &::rpc::_DeleteFileRequest_default_instance_._instance,
+  &::rpc::_CreateFolderRequest_default_instance_._instance,
+  &::rpc::_CreateFolderResponse_default_instance_._instance,
+  &::rpc::_MoveFileRequest_default_instance_._instance,
+  &::rpc::_MoveFileResponse_default_instance_._instance,
+  &::rpc::_BatchDeleteRequest_default_instance_._instance,
+  &::rpc::_BatchDeleteResponse_default_instance_._instance,
   &::rpc::_DeleteFileResponse_default_instance_._instance,
 };
 
 const char descriptor_table_protodef_rpc_5ffile_2eproto[] PROTOBUF_SECTION_VARIABLE(protodesc_cold) =
-  "\n\016rpc_file.proto\022\003rpc\"t\n\010FileInfo\022\n\n\002id\030"
-  "\001 \001(\003\022\020\n\010username\030\002 \001(\t\022\025\n\roriginal_name"
-  "\030\003 \001(\t\022\014\n\004size\030\004 \001(\003\022\021\n\tmime_type\030\005 \001(\t\022"
-  "\022\n\ncreated_at\030\006 \001(\t\"\213\001\n\021CreateFileReques"
-  "t\022\017\n\007user_id\030\001 \001(\003\022\025\n\roriginal_name\030\002 \001("
-  "\t\022\014\n\004size\030\003 \001(\003\022\021\n\tmime_type\030\004 \001(\t\022\024\n\014fi"
-  "le_content\030\005 \001(\014\022\027\n\017idempotency_key\030\006 \001("
-  "\t\"@\n\022CreateFileResponse\022\017\n\007success\030\001 \001(\010"
-  "\022\n\n\002id\030\002 \001(\003\022\r\n\005error\030\003 \001(\t\"-\n\016GetFileRe"
-  "quest\022\n\n\002id\030\001 \001(\003\022\017\n\007user_id\030\002 \001(\003\"\220\001\n\017G"
-  "etFileResponse\022\017\n\007success\030\001 \001(\010\022\033\n\004file\030"
-  "\002 \001(\0132\r.rpc.FileInfo\022\024\n\014cache_source\030\003 \001"
-  "(\t\022\r\n\005error\030\004 \001(\t\022\024\n\014file_content\030\005 \001(\014\022"
-  "\024\n\014download_url\030\006 \001(\t\"D\n\020ListFilesReques"
+  "\n\016rpc_file.proto\022\003rpc\"\232\001\n\010FileInfo\022\n\n\002id"
+  "\030\001 \001(\003\022\020\n\010username\030\002 \001(\t\022\025\n\roriginal_nam"
+  "e\030\003 \001(\t\022\014\n\004size\030\004 \001(\003\022\021\n\tmime_type\030\005 \001(\t"
+  "\022\022\n\ncreated_at\030\006 \001(\t\022\021\n\tfolder_id\030\007 \001(\003\022"
+  "\021\n\tis_folder\030\010 \001(\010\"\213\001\n\021CreateFileRequest"
+  "\022\017\n\007user_id\030\001 \001(\003\022\025\n\roriginal_name\030\002 \001(\t"
+  "\022\014\n\004size\030\003 \001(\003\022\021\n\tmime_type\030\004 \001(\t\022\024\n\014fil"
+  "e_content\030\005 \001(\014\022\027\n\017idempotency_key\030\006 \001(\t"
+  "\"T\n\022CreateFileResponse\022\017\n\007success\030\001 \001(\010\022"
+  "\n\n\002id\030\002 \001(\003\022\r\n\005error\030\003 \001(\t\022\022\n\nerror_code"
+  "\030c \001(\005\"-\n\016GetFileRequest\022\n\n\002id\030\001 \001(\003\022\017\n\007"
+  "user_id\030\002 \001(\003\"\244\001\n\017GetFileResponse\022\017\n\007suc"
+  "cess\030\001 \001(\010\022\033\n\004file\030\002 \001(\0132\r.rpc.FileInfo\022"
+  "\024\n\014cache_source\030\003 \001(\t\022\r\n\005error\030\004 \001(\t\022\024\n\014"
+  "file_content\030\005 \001(\014\022\024\n\014download_url\030\006 \001(\t"
+  "\022\022\n\nerror_code\030c \001(\005\"\215\001\n\020ListFilesReques"
   "t\022\017\n\007user_id\030\001 \001(\003\022\014\n\004page\030\002 \001(\005\022\021\n\tpage"
-  "_size\030\003 \001(\005\"v\n\021ListFilesResponse\022\017\n\007succ"
-  "ess\030\001 \001(\010\022\034\n\005files\030\002 \003(\0132\r.rpc.FileInfo\022"
-  "\r\n\005total\030\003 \001(\005\022\024\n\014cache_source\030\004 \001(\t\022\r\n\005"
-  "error\030\005 \001(\t\"0\n\021DeleteFileRequest\022\n\n\002id\030\001"
-  " \001(\003\022\017\n\007user_id\030\002 \001(\003\"4\n\022DeleteFileRespo"
-  "nse\022\017\n\007success\030\001 \001(\010\022\r\n\005error\030\002 \001(\t2\375\001\n\013"
-  "FileService\022=\n\nCreateFile\022\026.rpc.CreateFi"
-  "leRequest\032\027.rpc.CreateFileResponse\0224\n\007Ge"
-  "tFile\022\023.rpc.GetFileRequest\032\024.rpc.GetFile"
-  "Response\022:\n\tListFiles\022\025.rpc.ListFilesReq"
-  "uest\032\026.rpc.ListFilesResponse\022=\n\nDeleteFi"
-  "le\022\026.rpc.DeleteFileRequest\032\027.rpc.DeleteF"
-  "ileResponseB\026Z\024rpc-server/proto/rpcb\006pro"
-  "to3"
+  "_size\030\003 \001(\005\022\020\n\010after_id\030\004 \001(\003\022\r\n\005limit\030\005"
+  " \001(\005\022\021\n\tfolder_id\030\006 \001(\003\022\023\n\013mime_filter\030\007"
+  " \001(\t\"\261\001\n\021ListFilesResponse\022\017\n\007success\030\001 "
+  "\001(\010\022\034\n\005files\030\002 \003(\0132\r.rpc.FileInfo\022\r\n\005tot"
+  "al\030\003 \001(\005\022\024\n\014cache_source\030\004 \001(\t\022\023\n\013next_c"
+  "ursor\030\006 \001(\t\022\020\n\010has_more\030\007 \001(\010\022\r\n\005error\030\005"
+  " \001(\t\022\022\n\nerror_code\030c \001(\005\"0\n\021DeleteFileRe"
+  "quest\022\n\n\002id\030\001 \001(\003\022\017\n\007user_id\030\002 \001(\003\"N\n\023Cr"
+  "eateFolderRequest\022\017\n\007user_id\030\001 \001(\003\022\014\n\004na"
+  "me\030\002 \001(\t\022\030\n\020parent_folder_id\030\003 \001(\003\"V\n\024Cr"
+  "eateFolderResponse\022\017\n\007success\030\001 \001(\010\022\n\n\002i"
+  "d\030\002 \001(\003\022\r\n\005error\030\003 \001(\t\022\022\n\nerror_code\030c \001"
+  "(\005\"H\n\017MoveFileRequest\022\n\n\002id\030\001 \001(\003\022\017\n\007use"
+  "r_id\030\002 \001(\003\022\030\n\020target_folder_id\030\003 \001(\003\"F\n\020"
+  "MoveFileResponse\022\017\n\007success\030\001 \001(\010\022\r\n\005err"
+  "or\030\002 \001(\t\022\022\n\nerror_code\030c \001(\005\"2\n\022BatchDel"
+  "eteRequest\022\017\n\007user_id\030\001 \001(\003\022\013\n\003ids\030\002 \003(\003"
+  "\"`\n\023BatchDeleteResponse\022\017\n\007success\030\001 \001(\010"
+  "\022\025\n\rdeleted_count\030\002 \001(\005\022\r\n\005error\030\003 \001(\t\022\022"
+  "\n\nerror_code\030c \001(\005\"H\n\022DeleteFileResponse"
+  "\022\017\n\007success\030\001 \001(\010\022\r\n\005error\030\002 \001(\t\022\022\n\nerro"
+  "r_code\030c \001(\0052\275\003\n\013FileService\022=\n\nCreateFi"
+  "le\022\026.rpc.CreateFileRequest\032\027.rpc.CreateF"
+  "ileResponse\0224\n\007GetFile\022\023.rpc.GetFileRequ"
+  "est\032\024.rpc.GetFileResponse\022:\n\tListFiles\022\025"
+  ".rpc.ListFilesRequest\032\026.rpc.ListFilesRes"
+  "ponse\022=\n\nDeleteFile\022\026.rpc.DeleteFileRequ"
+  "est\032\027.rpc.DeleteFileResponse\022C\n\014CreateFo"
+  "lder\022\030.rpc.CreateFolderRequest\032\031.rpc.Cre"
+  "ateFolderResponse\0227\n\010MoveFile\022\024.rpc.Move"
+  "FileRequest\032\025.rpc.MoveFileResponse\022@\n\013Ba"
+  "tchDelete\022\027.rpc.BatchDeleteRequest\032\030.rpc"
+  ".BatchDeleteResponseB\026Z\024rpc-server/proto"
+  "/rpcb\006proto3"
   ;
 static ::_pbi::once_flag descriptor_table_rpc_5ffile_2eproto_once;
 const ::_pbi::DescriptorTable descriptor_table_rpc_5ffile_2eproto = {
-    false, false, 1123, descriptor_table_protodef_rpc_5ffile_2eproto,
+    false, false, 2012, descriptor_table_protodef_rpc_5ffile_2eproto,
     "rpc_file.proto",
-    &descriptor_table_rpc_5ffile_2eproto_once, nullptr, 0, 9,
+    &descriptor_table_rpc_5ffile_2eproto_once, nullptr, 0, 15,
     schemas, file_default_instances, TableStruct_rpc_5ffile_2eproto::offsets,
     file_level_metadata_rpc_5ffile_2eproto, file_level_enum_descriptors_rpc_5ffile_2eproto,
     file_level_service_descriptors_rpc_5ffile_2eproto,
@@ -354,6 +559,8 @@ FileInfo::FileInfo(const FileInfo& from)
     , decltype(_impl_.created_at_){}
     , decltype(_impl_.id_){}
     , decltype(_impl_.size_){}
+    , decltype(_impl_.folder_id_){}
+    , decltype(_impl_.is_folder_){}
     , /*decltype(_impl_._cached_size_)*/{}};
 
   _internal_metadata_.MergeFrom<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(from._internal_metadata_);
@@ -390,8 +597,8 @@ FileInfo::FileInfo(const FileInfo& from)
       _this->GetArenaForAllocation());
   }
   ::memcpy(&_impl_.id_, &from._impl_.id_,
-    static_cast<size_t>(reinterpret_cast<char*>(&_impl_.size_) -
-    reinterpret_cast<char*>(&_impl_.id_)) + sizeof(_impl_.size_));
+    static_cast<size_t>(reinterpret_cast<char*>(&_impl_.is_folder_) -
+    reinterpret_cast<char*>(&_impl_.id_)) + sizeof(_impl_.is_folder_));
   // @@protoc_insertion_point(copy_constructor:rpc.FileInfo)
 }
 
@@ -406,6 +613,8 @@ inline void FileInfo::SharedCtor(
     , decltype(_impl_.created_at_){}
     , decltype(_impl_.id_){int64_t{0}}
     , decltype(_impl_.size_){int64_t{0}}
+    , decltype(_impl_.folder_id_){int64_t{0}}
+    , decltype(_impl_.is_folder_){false}
     , /*decltype(_impl_._cached_size_)*/{}
   };
   _impl_.username_.InitDefault();
@@ -458,8 +667,8 @@ void FileInfo::Clear() {
   _impl_.mime_type_.ClearToEmpty();
   _impl_.created_at_.ClearToEmpty();
   ::memset(&_impl_.id_, 0, static_cast<size_t>(
-      reinterpret_cast<char*>(&_impl_.size_) -
-      reinterpret_cast<char*>(&_impl_.id_)) + sizeof(_impl_.size_));
+      reinterpret_cast<char*>(&_impl_.is_folder_) -
+      reinterpret_cast<char*>(&_impl_.id_)) + sizeof(_impl_.is_folder_));
   _internal_metadata_.Clear<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>();
 }
 
@@ -522,6 +731,22 @@ const char* FileInfo::_InternalParse(const char* ptr, ::_pbi::ParseContext* ctx)
           ptr = ::_pbi::InlineGreedyStringParser(str, ptr, ctx);
           CHK_(ptr);
           CHK_(::_pbi::VerifyUTF8(str, "rpc.FileInfo.created_at"));
+        } else
+          goto handle_unusual;
+        continue;
+      // int64 folder_id = 7;
+      case 7:
+        if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 56)) {
+          _impl_.folder_id_ = ::PROTOBUF_NAMESPACE_ID::internal::ReadVarint64(&ptr);
+          CHK_(ptr);
+        } else
+          goto handle_unusual;
+        continue;
+      // bool is_folder = 8;
+      case 8:
+        if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 64)) {
+          _impl_.is_folder_ = ::PROTOBUF_NAMESPACE_ID::internal::ReadVarint64(&ptr);
+          CHK_(ptr);
         } else
           goto handle_unusual;
         continue;
@@ -606,6 +831,18 @@ uint8_t* FileInfo::_InternalSerialize(
         6, this->_internal_created_at(), target);
   }
 
+  // int64 folder_id = 7;
+  if (this->_internal_folder_id() != 0) {
+    target = stream->EnsureSpace(target);
+    target = ::_pbi::WireFormatLite::WriteInt64ToArray(7, this->_internal_folder_id(), target);
+  }
+
+  // bool is_folder = 8;
+  if (this->_internal_is_folder() != 0) {
+    target = stream->EnsureSpace(target);
+    target = ::_pbi::WireFormatLite::WriteBoolToArray(8, this->_internal_is_folder(), target);
+  }
+
   if (PROTOBUF_PREDICT_FALSE(_internal_metadata_.have_unknown_fields())) {
     target = ::_pbi::WireFormat::InternalSerializeUnknownFieldsToArray(
         _internal_metadata_.unknown_fields<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(::PROTOBUF_NAMESPACE_ID::UnknownFieldSet::default_instance), target, stream);
@@ -660,6 +897,16 @@ size_t FileInfo::ByteSizeLong() const {
     total_size += ::_pbi::WireFormatLite::Int64SizePlusOne(this->_internal_size());
   }
 
+  // int64 folder_id = 7;
+  if (this->_internal_folder_id() != 0) {
+    total_size += ::_pbi::WireFormatLite::Int64SizePlusOne(this->_internal_folder_id());
+  }
+
+  // bool is_folder = 8;
+  if (this->_internal_is_folder() != 0) {
+    total_size += 1 + 1;
+  }
+
   return MaybeComputeUnknownFieldsSize(total_size, &_impl_._cached_size_);
 }
 
@@ -695,6 +942,12 @@ void FileInfo::MergeImpl(::PROTOBUF_NAMESPACE_ID::Message& to_msg, const ::PROTO
   }
   if (from._internal_size() != 0) {
     _this->_internal_set_size(from._internal_size());
+  }
+  if (from._internal_folder_id() != 0) {
+    _this->_internal_set_folder_id(from._internal_folder_id());
+  }
+  if (from._internal_is_folder() != 0) {
+    _this->_internal_set_is_folder(from._internal_is_folder());
   }
   _this->_internal_metadata_.MergeFrom<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(from._internal_metadata_);
 }
@@ -732,8 +985,8 @@ void FileInfo::InternalSwap(FileInfo* other) {
       &other->_impl_.created_at_, rhs_arena
   );
   ::PROTOBUF_NAMESPACE_ID::internal::memswap<
-      PROTOBUF_FIELD_OFFSET(FileInfo, _impl_.size_)
-      + sizeof(FileInfo::_impl_.size_)
+      PROTOBUF_FIELD_OFFSET(FileInfo, _impl_.is_folder_)
+      + sizeof(FileInfo::_impl_.is_folder_)
       - PROTOBUF_FIELD_OFFSET(FileInfo, _impl_.id_)>(
           reinterpret_cast<char*>(&_impl_.id_),
           reinterpret_cast<char*>(&other->_impl_.id_));
@@ -1172,6 +1425,7 @@ CreateFileResponse::CreateFileResponse(const CreateFileResponse& from)
       decltype(_impl_.error_){}
     , decltype(_impl_.id_){}
     , decltype(_impl_.success_){}
+    , decltype(_impl_.error_code_){}
     , /*decltype(_impl_._cached_size_)*/{}};
 
   _internal_metadata_.MergeFrom<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(from._internal_metadata_);
@@ -1184,8 +1438,8 @@ CreateFileResponse::CreateFileResponse(const CreateFileResponse& from)
       _this->GetArenaForAllocation());
   }
   ::memcpy(&_impl_.id_, &from._impl_.id_,
-    static_cast<size_t>(reinterpret_cast<char*>(&_impl_.success_) -
-    reinterpret_cast<char*>(&_impl_.id_)) + sizeof(_impl_.success_));
+    static_cast<size_t>(reinterpret_cast<char*>(&_impl_.error_code_) -
+    reinterpret_cast<char*>(&_impl_.id_)) + sizeof(_impl_.error_code_));
   // @@protoc_insertion_point(copy_constructor:rpc.CreateFileResponse)
 }
 
@@ -1197,6 +1451,7 @@ inline void CreateFileResponse::SharedCtor(
       decltype(_impl_.error_){}
     , decltype(_impl_.id_){int64_t{0}}
     , decltype(_impl_.success_){false}
+    , decltype(_impl_.error_code_){0}
     , /*decltype(_impl_._cached_size_)*/{}
   };
   _impl_.error_.InitDefault();
@@ -1231,8 +1486,8 @@ void CreateFileResponse::Clear() {
 
   _impl_.error_.ClearToEmpty();
   ::memset(&_impl_.id_, 0, static_cast<size_t>(
-      reinterpret_cast<char*>(&_impl_.success_) -
-      reinterpret_cast<char*>(&_impl_.id_)) + sizeof(_impl_.success_));
+      reinterpret_cast<char*>(&_impl_.error_code_) -
+      reinterpret_cast<char*>(&_impl_.id_)) + sizeof(_impl_.error_code_));
   _internal_metadata_.Clear<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>();
 }
 
@@ -1265,6 +1520,14 @@ const char* CreateFileResponse::_InternalParse(const char* ptr, ::_pbi::ParseCon
           ptr = ::_pbi::InlineGreedyStringParser(str, ptr, ctx);
           CHK_(ptr);
           CHK_(::_pbi::VerifyUTF8(str, "rpc.CreateFileResponse.error"));
+        } else
+          goto handle_unusual;
+        continue;
+      // int32 error_code = 99;
+      case 99:
+        if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 24)) {
+          _impl_.error_code_ = ::PROTOBUF_NAMESPACE_ID::internal::ReadVarint32(&ptr);
+          CHK_(ptr);
         } else
           goto handle_unusual;
         continue;
@@ -1319,6 +1582,12 @@ uint8_t* CreateFileResponse::_InternalSerialize(
         3, this->_internal_error(), target);
   }
 
+  // int32 error_code = 99;
+  if (this->_internal_error_code() != 0) {
+    target = stream->EnsureSpace(target);
+    target = ::_pbi::WireFormatLite::WriteInt32ToArray(99, this->_internal_error_code(), target);
+  }
+
   if (PROTOBUF_PREDICT_FALSE(_internal_metadata_.have_unknown_fields())) {
     target = ::_pbi::WireFormat::InternalSerializeUnknownFieldsToArray(
         _internal_metadata_.unknown_fields<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(::PROTOBUF_NAMESPACE_ID::UnknownFieldSet::default_instance), target, stream);
@@ -1352,6 +1621,13 @@ size_t CreateFileResponse::ByteSizeLong() const {
     total_size += 1 + 1;
   }
 
+  // int32 error_code = 99;
+  if (this->_internal_error_code() != 0) {
+    total_size += 2 +
+      ::_pbi::WireFormatLite::Int32Size(
+        this->_internal_error_code());
+  }
+
   return MaybeComputeUnknownFieldsSize(total_size, &_impl_._cached_size_);
 }
 
@@ -1379,6 +1655,9 @@ void CreateFileResponse::MergeImpl(::PROTOBUF_NAMESPACE_ID::Message& to_msg, con
   if (from._internal_success() != 0) {
     _this->_internal_set_success(from._internal_success());
   }
+  if (from._internal_error_code() != 0) {
+    _this->_internal_set_error_code(from._internal_error_code());
+  }
   _this->_internal_metadata_.MergeFrom<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(from._internal_metadata_);
 }
 
@@ -1403,8 +1682,8 @@ void CreateFileResponse::InternalSwap(CreateFileResponse* other) {
       &other->_impl_.error_, rhs_arena
   );
   ::PROTOBUF_NAMESPACE_ID::internal::memswap<
-      PROTOBUF_FIELD_OFFSET(CreateFileResponse, _impl_.success_)
-      + sizeof(CreateFileResponse::_impl_.success_)
+      PROTOBUF_FIELD_OFFSET(CreateFileResponse, _impl_.error_code_)
+      + sizeof(CreateFileResponse::_impl_.error_code_)
       - PROTOBUF_FIELD_OFFSET(CreateFileResponse, _impl_.id_)>(
           reinterpret_cast<char*>(&_impl_.id_),
           reinterpret_cast<char*>(&other->_impl_.id_));
@@ -1654,6 +1933,7 @@ GetFileResponse::GetFileResponse(const GetFileResponse& from)
     , decltype(_impl_.download_url_){}
     , decltype(_impl_.file_){nullptr}
     , decltype(_impl_.success_){}
+    , decltype(_impl_.error_code_){}
     , /*decltype(_impl_._cached_size_)*/{}};
 
   _internal_metadata_.MergeFrom<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(from._internal_metadata_);
@@ -1692,7 +1972,9 @@ GetFileResponse::GetFileResponse(const GetFileResponse& from)
   if (from._internal_has_file()) {
     _this->_impl_.file_ = new ::rpc::FileInfo(*from._impl_.file_);
   }
-  _this->_impl_.success_ = from._impl_.success_;
+  ::memcpy(&_impl_.success_, &from._impl_.success_,
+    static_cast<size_t>(reinterpret_cast<char*>(&_impl_.error_code_) -
+    reinterpret_cast<char*>(&_impl_.success_)) + sizeof(_impl_.error_code_));
   // @@protoc_insertion_point(copy_constructor:rpc.GetFileResponse)
 }
 
@@ -1707,6 +1989,7 @@ inline void GetFileResponse::SharedCtor(
     , decltype(_impl_.download_url_){}
     , decltype(_impl_.file_){nullptr}
     , decltype(_impl_.success_){false}
+    , decltype(_impl_.error_code_){0}
     , /*decltype(_impl_._cached_size_)*/{}
   };
   _impl_.cache_source_.InitDefault();
@@ -1763,7 +2046,9 @@ void GetFileResponse::Clear() {
     delete _impl_.file_;
   }
   _impl_.file_ = nullptr;
-  _impl_.success_ = false;
+  ::memset(&_impl_.success_, 0, static_cast<size_t>(
+      reinterpret_cast<char*>(&_impl_.error_code_) -
+      reinterpret_cast<char*>(&_impl_.success_)) + sizeof(_impl_.error_code_));
   _internal_metadata_.Clear<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>();
 }
 
@@ -1825,6 +2110,14 @@ const char* GetFileResponse::_InternalParse(const char* ptr, ::_pbi::ParseContex
           ptr = ::_pbi::InlineGreedyStringParser(str, ptr, ctx);
           CHK_(ptr);
           CHK_(::_pbi::VerifyUTF8(str, "rpc.GetFileResponse.download_url"));
+        } else
+          goto handle_unusual;
+        continue;
+      // int32 error_code = 99;
+      case 99:
+        if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 24)) {
+          _impl_.error_code_ = ::PROTOBUF_NAMESPACE_ID::internal::ReadVarint32(&ptr);
+          CHK_(ptr);
         } else
           goto handle_unusual;
         continue;
@@ -1906,6 +2199,12 @@ uint8_t* GetFileResponse::_InternalSerialize(
         6, this->_internal_download_url(), target);
   }
 
+  // int32 error_code = 99;
+  if (this->_internal_error_code() != 0) {
+    target = stream->EnsureSpace(target);
+    target = ::_pbi::WireFormatLite::WriteInt32ToArray(99, this->_internal_error_code(), target);
+  }
+
   if (PROTOBUF_PREDICT_FALSE(_internal_metadata_.have_unknown_fields())) {
     target = ::_pbi::WireFormat::InternalSerializeUnknownFieldsToArray(
         _internal_metadata_.unknown_fields<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(::PROTOBUF_NAMESPACE_ID::UnknownFieldSet::default_instance), target, stream);
@@ -1962,6 +2261,13 @@ size_t GetFileResponse::ByteSizeLong() const {
     total_size += 1 + 1;
   }
 
+  // int32 error_code = 99;
+  if (this->_internal_error_code() != 0) {
+    total_size += 2 +
+      ::_pbi::WireFormatLite::Int32Size(
+        this->_internal_error_code());
+  }
+
   return MaybeComputeUnknownFieldsSize(total_size, &_impl_._cached_size_);
 }
 
@@ -1999,6 +2305,9 @@ void GetFileResponse::MergeImpl(::PROTOBUF_NAMESPACE_ID::Message& to_msg, const 
   if (from._internal_success() != 0) {
     _this->_internal_set_success(from._internal_success());
   }
+  if (from._internal_error_code() != 0) {
+    _this->_internal_set_error_code(from._internal_error_code());
+  }
   _this->_internal_metadata_.MergeFrom<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(from._internal_metadata_);
 }
 
@@ -2035,8 +2344,8 @@ void GetFileResponse::InternalSwap(GetFileResponse* other) {
       &other->_impl_.download_url_, rhs_arena
   );
   ::PROTOBUF_NAMESPACE_ID::internal::memswap<
-      PROTOBUF_FIELD_OFFSET(GetFileResponse, _impl_.success_)
-      + sizeof(GetFileResponse::_impl_.success_)
+      PROTOBUF_FIELD_OFFSET(GetFileResponse, _impl_.error_code_)
+      + sizeof(GetFileResponse::_impl_.error_code_)
       - PROTOBUF_FIELD_OFFSET(GetFileResponse, _impl_.file_)>(
           reinterpret_cast<char*>(&_impl_.file_),
           reinterpret_cast<char*>(&other->_impl_.file_));
@@ -2064,15 +2373,27 @@ ListFilesRequest::ListFilesRequest(const ListFilesRequest& from)
   : ::PROTOBUF_NAMESPACE_ID::Message() {
   ListFilesRequest* const _this = this; (void)_this;
   new (&_impl_) Impl_{
-      decltype(_impl_.user_id_){}
+      decltype(_impl_.mime_filter_){}
+    , decltype(_impl_.user_id_){}
     , decltype(_impl_.page_){}
     , decltype(_impl_.page_size_){}
+    , decltype(_impl_.after_id_){}
+    , decltype(_impl_.folder_id_){}
+    , decltype(_impl_.limit_){}
     , /*decltype(_impl_._cached_size_)*/{}};
 
   _internal_metadata_.MergeFrom<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(from._internal_metadata_);
+  _impl_.mime_filter_.InitDefault();
+  #ifdef PROTOBUF_FORCE_COPY_DEFAULT_STRING
+    _impl_.mime_filter_.Set("", GetArenaForAllocation());
+  #endif // PROTOBUF_FORCE_COPY_DEFAULT_STRING
+  if (!from._internal_mime_filter().empty()) {
+    _this->_impl_.mime_filter_.Set(from._internal_mime_filter(), 
+      _this->GetArenaForAllocation());
+  }
   ::memcpy(&_impl_.user_id_, &from._impl_.user_id_,
-    static_cast<size_t>(reinterpret_cast<char*>(&_impl_.page_size_) -
-    reinterpret_cast<char*>(&_impl_.user_id_)) + sizeof(_impl_.page_size_));
+    static_cast<size_t>(reinterpret_cast<char*>(&_impl_.limit_) -
+    reinterpret_cast<char*>(&_impl_.user_id_)) + sizeof(_impl_.limit_));
   // @@protoc_insertion_point(copy_constructor:rpc.ListFilesRequest)
 }
 
@@ -2081,11 +2402,19 @@ inline void ListFilesRequest::SharedCtor(
   (void)arena;
   (void)is_message_owned;
   new (&_impl_) Impl_{
-      decltype(_impl_.user_id_){int64_t{0}}
+      decltype(_impl_.mime_filter_){}
+    , decltype(_impl_.user_id_){int64_t{0}}
     , decltype(_impl_.page_){0}
     , decltype(_impl_.page_size_){0}
+    , decltype(_impl_.after_id_){int64_t{0}}
+    , decltype(_impl_.folder_id_){int64_t{0}}
+    , decltype(_impl_.limit_){0}
     , /*decltype(_impl_._cached_size_)*/{}
   };
+  _impl_.mime_filter_.InitDefault();
+  #ifdef PROTOBUF_FORCE_COPY_DEFAULT_STRING
+    _impl_.mime_filter_.Set("", GetArenaForAllocation());
+  #endif // PROTOBUF_FORCE_COPY_DEFAULT_STRING
 }
 
 ListFilesRequest::~ListFilesRequest() {
@@ -2099,6 +2428,7 @@ ListFilesRequest::~ListFilesRequest() {
 
 inline void ListFilesRequest::SharedDtor() {
   GOOGLE_DCHECK(GetArenaForAllocation() == nullptr);
+  _impl_.mime_filter_.Destroy();
 }
 
 void ListFilesRequest::SetCachedSize(int size) const {
@@ -2111,9 +2441,10 @@ void ListFilesRequest::Clear() {
   // Prevent compiler warnings about cached_has_bits being unused
   (void) cached_has_bits;
 
+  _impl_.mime_filter_.ClearToEmpty();
   ::memset(&_impl_.user_id_, 0, static_cast<size_t>(
-      reinterpret_cast<char*>(&_impl_.page_size_) -
-      reinterpret_cast<char*>(&_impl_.user_id_)) + sizeof(_impl_.page_size_));
+      reinterpret_cast<char*>(&_impl_.limit_) -
+      reinterpret_cast<char*>(&_impl_.user_id_)) + sizeof(_impl_.limit_));
   _internal_metadata_.Clear<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>();
 }
 
@@ -2144,6 +2475,40 @@ const char* ListFilesRequest::_InternalParse(const char* ptr, ::_pbi::ParseConte
         if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 24)) {
           _impl_.page_size_ = ::PROTOBUF_NAMESPACE_ID::internal::ReadVarint32(&ptr);
           CHK_(ptr);
+        } else
+          goto handle_unusual;
+        continue;
+      // int64 after_id = 4;
+      case 4:
+        if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 32)) {
+          _impl_.after_id_ = ::PROTOBUF_NAMESPACE_ID::internal::ReadVarint64(&ptr);
+          CHK_(ptr);
+        } else
+          goto handle_unusual;
+        continue;
+      // int32 limit = 5;
+      case 5:
+        if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 40)) {
+          _impl_.limit_ = ::PROTOBUF_NAMESPACE_ID::internal::ReadVarint32(&ptr);
+          CHK_(ptr);
+        } else
+          goto handle_unusual;
+        continue;
+      // int64 folder_id = 6;
+      case 6:
+        if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 48)) {
+          _impl_.folder_id_ = ::PROTOBUF_NAMESPACE_ID::internal::ReadVarint64(&ptr);
+          CHK_(ptr);
+        } else
+          goto handle_unusual;
+        continue;
+      // string mime_filter = 7;
+      case 7:
+        if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 58)) {
+          auto str = _internal_mutable_mime_filter();
+          ptr = ::_pbi::InlineGreedyStringParser(str, ptr, ctx);
+          CHK_(ptr);
+          CHK_(::_pbi::VerifyUTF8(str, "rpc.ListFilesRequest.mime_filter"));
         } else
           goto handle_unusual;
         continue;
@@ -2194,6 +2559,34 @@ uint8_t* ListFilesRequest::_InternalSerialize(
     target = ::_pbi::WireFormatLite::WriteInt32ToArray(3, this->_internal_page_size(), target);
   }
 
+  // int64 after_id = 4;
+  if (this->_internal_after_id() != 0) {
+    target = stream->EnsureSpace(target);
+    target = ::_pbi::WireFormatLite::WriteInt64ToArray(4, this->_internal_after_id(), target);
+  }
+
+  // int32 limit = 5;
+  if (this->_internal_limit() != 0) {
+    target = stream->EnsureSpace(target);
+    target = ::_pbi::WireFormatLite::WriteInt32ToArray(5, this->_internal_limit(), target);
+  }
+
+  // int64 folder_id = 6;
+  if (this->_internal_folder_id() != 0) {
+    target = stream->EnsureSpace(target);
+    target = ::_pbi::WireFormatLite::WriteInt64ToArray(6, this->_internal_folder_id(), target);
+  }
+
+  // string mime_filter = 7;
+  if (!this->_internal_mime_filter().empty()) {
+    ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::VerifyUtf8String(
+      this->_internal_mime_filter().data(), static_cast<int>(this->_internal_mime_filter().length()),
+      ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::SERIALIZE,
+      "rpc.ListFilesRequest.mime_filter");
+    target = stream->WriteStringMaybeAliased(
+        7, this->_internal_mime_filter(), target);
+  }
+
   if (PROTOBUF_PREDICT_FALSE(_internal_metadata_.have_unknown_fields())) {
     target = ::_pbi::WireFormat::InternalSerializeUnknownFieldsToArray(
         _internal_metadata_.unknown_fields<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(::PROTOBUF_NAMESPACE_ID::UnknownFieldSet::default_instance), target, stream);
@@ -2210,6 +2603,13 @@ size_t ListFilesRequest::ByteSizeLong() const {
   // Prevent compiler warnings about cached_has_bits being unused
   (void) cached_has_bits;
 
+  // string mime_filter = 7;
+  if (!this->_internal_mime_filter().empty()) {
+    total_size += 1 +
+      ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::StringSize(
+        this->_internal_mime_filter());
+  }
+
   // int64 user_id = 1;
   if (this->_internal_user_id() != 0) {
     total_size += ::_pbi::WireFormatLite::Int64SizePlusOne(this->_internal_user_id());
@@ -2223,6 +2623,21 @@ size_t ListFilesRequest::ByteSizeLong() const {
   // int32 page_size = 3;
   if (this->_internal_page_size() != 0) {
     total_size += ::_pbi::WireFormatLite::Int32SizePlusOne(this->_internal_page_size());
+  }
+
+  // int64 after_id = 4;
+  if (this->_internal_after_id() != 0) {
+    total_size += ::_pbi::WireFormatLite::Int64SizePlusOne(this->_internal_after_id());
+  }
+
+  // int64 folder_id = 6;
+  if (this->_internal_folder_id() != 0) {
+    total_size += ::_pbi::WireFormatLite::Int64SizePlusOne(this->_internal_folder_id());
+  }
+
+  // int32 limit = 5;
+  if (this->_internal_limit() != 0) {
+    total_size += ::_pbi::WireFormatLite::Int32SizePlusOne(this->_internal_limit());
   }
 
   return MaybeComputeUnknownFieldsSize(total_size, &_impl_._cached_size_);
@@ -2243,6 +2658,9 @@ void ListFilesRequest::MergeImpl(::PROTOBUF_NAMESPACE_ID::Message& to_msg, const
   uint32_t cached_has_bits = 0;
   (void) cached_has_bits;
 
+  if (!from._internal_mime_filter().empty()) {
+    _this->_internal_set_mime_filter(from._internal_mime_filter());
+  }
   if (from._internal_user_id() != 0) {
     _this->_internal_set_user_id(from._internal_user_id());
   }
@@ -2251,6 +2669,15 @@ void ListFilesRequest::MergeImpl(::PROTOBUF_NAMESPACE_ID::Message& to_msg, const
   }
   if (from._internal_page_size() != 0) {
     _this->_internal_set_page_size(from._internal_page_size());
+  }
+  if (from._internal_after_id() != 0) {
+    _this->_internal_set_after_id(from._internal_after_id());
+  }
+  if (from._internal_folder_id() != 0) {
+    _this->_internal_set_folder_id(from._internal_folder_id());
+  }
+  if (from._internal_limit() != 0) {
+    _this->_internal_set_limit(from._internal_limit());
   }
   _this->_internal_metadata_.MergeFrom<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(from._internal_metadata_);
 }
@@ -2268,10 +2695,16 @@ bool ListFilesRequest::IsInitialized() const {
 
 void ListFilesRequest::InternalSwap(ListFilesRequest* other) {
   using std::swap;
+  auto* lhs_arena = GetArenaForAllocation();
+  auto* rhs_arena = other->GetArenaForAllocation();
   _internal_metadata_.InternalSwap(&other->_internal_metadata_);
+  ::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr::InternalSwap(
+      &_impl_.mime_filter_, lhs_arena,
+      &other->_impl_.mime_filter_, rhs_arena
+  );
   ::PROTOBUF_NAMESPACE_ID::internal::memswap<
-      PROTOBUF_FIELD_OFFSET(ListFilesRequest, _impl_.page_size_)
-      + sizeof(ListFilesRequest::_impl_.page_size_)
+      PROTOBUF_FIELD_OFFSET(ListFilesRequest, _impl_.limit_)
+      + sizeof(ListFilesRequest::_impl_.limit_)
       - PROTOBUF_FIELD_OFFSET(ListFilesRequest, _impl_.user_id_)>(
           reinterpret_cast<char*>(&_impl_.user_id_),
           reinterpret_cast<char*>(&other->_impl_.user_id_));
@@ -2302,8 +2735,11 @@ ListFilesResponse::ListFilesResponse(const ListFilesResponse& from)
       decltype(_impl_.files_){from._impl_.files_}
     , decltype(_impl_.cache_source_){}
     , decltype(_impl_.error_){}
-    , decltype(_impl_.success_){}
+    , decltype(_impl_.next_cursor_){}
     , decltype(_impl_.total_){}
+    , decltype(_impl_.success_){}
+    , decltype(_impl_.has_more_){}
+    , decltype(_impl_.error_code_){}
     , /*decltype(_impl_._cached_size_)*/{}};
 
   _internal_metadata_.MergeFrom<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(from._internal_metadata_);
@@ -2323,9 +2759,17 @@ ListFilesResponse::ListFilesResponse(const ListFilesResponse& from)
     _this->_impl_.error_.Set(from._internal_error(), 
       _this->GetArenaForAllocation());
   }
-  ::memcpy(&_impl_.success_, &from._impl_.success_,
-    static_cast<size_t>(reinterpret_cast<char*>(&_impl_.total_) -
-    reinterpret_cast<char*>(&_impl_.success_)) + sizeof(_impl_.total_));
+  _impl_.next_cursor_.InitDefault();
+  #ifdef PROTOBUF_FORCE_COPY_DEFAULT_STRING
+    _impl_.next_cursor_.Set("", GetArenaForAllocation());
+  #endif // PROTOBUF_FORCE_COPY_DEFAULT_STRING
+  if (!from._internal_next_cursor().empty()) {
+    _this->_impl_.next_cursor_.Set(from._internal_next_cursor(), 
+      _this->GetArenaForAllocation());
+  }
+  ::memcpy(&_impl_.total_, &from._impl_.total_,
+    static_cast<size_t>(reinterpret_cast<char*>(&_impl_.error_code_) -
+    reinterpret_cast<char*>(&_impl_.total_)) + sizeof(_impl_.error_code_));
   // @@protoc_insertion_point(copy_constructor:rpc.ListFilesResponse)
 }
 
@@ -2337,8 +2781,11 @@ inline void ListFilesResponse::SharedCtor(
       decltype(_impl_.files_){arena}
     , decltype(_impl_.cache_source_){}
     , decltype(_impl_.error_){}
-    , decltype(_impl_.success_){false}
+    , decltype(_impl_.next_cursor_){}
     , decltype(_impl_.total_){0}
+    , decltype(_impl_.success_){false}
+    , decltype(_impl_.has_more_){false}
+    , decltype(_impl_.error_code_){0}
     , /*decltype(_impl_._cached_size_)*/{}
   };
   _impl_.cache_source_.InitDefault();
@@ -2348,6 +2795,10 @@ inline void ListFilesResponse::SharedCtor(
   _impl_.error_.InitDefault();
   #ifdef PROTOBUF_FORCE_COPY_DEFAULT_STRING
     _impl_.error_.Set("", GetArenaForAllocation());
+  #endif // PROTOBUF_FORCE_COPY_DEFAULT_STRING
+  _impl_.next_cursor_.InitDefault();
+  #ifdef PROTOBUF_FORCE_COPY_DEFAULT_STRING
+    _impl_.next_cursor_.Set("", GetArenaForAllocation());
   #endif // PROTOBUF_FORCE_COPY_DEFAULT_STRING
 }
 
@@ -2365,6 +2816,7 @@ inline void ListFilesResponse::SharedDtor() {
   _impl_.files_.~RepeatedPtrField();
   _impl_.cache_source_.Destroy();
   _impl_.error_.Destroy();
+  _impl_.next_cursor_.Destroy();
 }
 
 void ListFilesResponse::SetCachedSize(int size) const {
@@ -2380,9 +2832,10 @@ void ListFilesResponse::Clear() {
   _impl_.files_.Clear();
   _impl_.cache_source_.ClearToEmpty();
   _impl_.error_.ClearToEmpty();
-  ::memset(&_impl_.success_, 0, static_cast<size_t>(
-      reinterpret_cast<char*>(&_impl_.total_) -
-      reinterpret_cast<char*>(&_impl_.success_)) + sizeof(_impl_.total_));
+  _impl_.next_cursor_.ClearToEmpty();
+  ::memset(&_impl_.total_, 0, static_cast<size_t>(
+      reinterpret_cast<char*>(&_impl_.error_code_) -
+      reinterpret_cast<char*>(&_impl_.total_)) + sizeof(_impl_.error_code_));
   _internal_metadata_.Clear<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>();
 }
 
@@ -2438,6 +2891,32 @@ const char* ListFilesResponse::_InternalParse(const char* ptr, ::_pbi::ParseCont
           ptr = ::_pbi::InlineGreedyStringParser(str, ptr, ctx);
           CHK_(ptr);
           CHK_(::_pbi::VerifyUTF8(str, "rpc.ListFilesResponse.error"));
+        } else
+          goto handle_unusual;
+        continue;
+      // string next_cursor = 6;
+      case 6:
+        if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 50)) {
+          auto str = _internal_mutable_next_cursor();
+          ptr = ::_pbi::InlineGreedyStringParser(str, ptr, ctx);
+          CHK_(ptr);
+          CHK_(::_pbi::VerifyUTF8(str, "rpc.ListFilesResponse.next_cursor"));
+        } else
+          goto handle_unusual;
+        continue;
+      // bool has_more = 7;
+      case 7:
+        if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 56)) {
+          _impl_.has_more_ = ::PROTOBUF_NAMESPACE_ID::internal::ReadVarint64(&ptr);
+          CHK_(ptr);
+        } else
+          goto handle_unusual;
+        continue;
+      // int32 error_code = 99;
+      case 99:
+        if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 24)) {
+          _impl_.error_code_ = ::PROTOBUF_NAMESPACE_ID::internal::ReadVarint32(&ptr);
+          CHK_(ptr);
         } else
           goto handle_unusual;
         continue;
@@ -2510,6 +2989,28 @@ uint8_t* ListFilesResponse::_InternalSerialize(
         5, this->_internal_error(), target);
   }
 
+  // string next_cursor = 6;
+  if (!this->_internal_next_cursor().empty()) {
+    ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::VerifyUtf8String(
+      this->_internal_next_cursor().data(), static_cast<int>(this->_internal_next_cursor().length()),
+      ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::SERIALIZE,
+      "rpc.ListFilesResponse.next_cursor");
+    target = stream->WriteStringMaybeAliased(
+        6, this->_internal_next_cursor(), target);
+  }
+
+  // bool has_more = 7;
+  if (this->_internal_has_more() != 0) {
+    target = stream->EnsureSpace(target);
+    target = ::_pbi::WireFormatLite::WriteBoolToArray(7, this->_internal_has_more(), target);
+  }
+
+  // int32 error_code = 99;
+  if (this->_internal_error_code() != 0) {
+    target = stream->EnsureSpace(target);
+    target = ::_pbi::WireFormatLite::WriteInt32ToArray(99, this->_internal_error_code(), target);
+  }
+
   if (PROTOBUF_PREDICT_FALSE(_internal_metadata_.have_unknown_fields())) {
     target = ::_pbi::WireFormat::InternalSerializeUnknownFieldsToArray(
         _internal_metadata_.unknown_fields<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(::PROTOBUF_NAMESPACE_ID::UnknownFieldSet::default_instance), target, stream);
@@ -2547,14 +3048,33 @@ size_t ListFilesResponse::ByteSizeLong() const {
         this->_internal_error());
   }
 
-  // bool success = 1;
-  if (this->_internal_success() != 0) {
-    total_size += 1 + 1;
+  // string next_cursor = 6;
+  if (!this->_internal_next_cursor().empty()) {
+    total_size += 1 +
+      ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::StringSize(
+        this->_internal_next_cursor());
   }
 
   // int32 total = 3;
   if (this->_internal_total() != 0) {
     total_size += ::_pbi::WireFormatLite::Int32SizePlusOne(this->_internal_total());
+  }
+
+  // bool success = 1;
+  if (this->_internal_success() != 0) {
+    total_size += 1 + 1;
+  }
+
+  // bool has_more = 7;
+  if (this->_internal_has_more() != 0) {
+    total_size += 1 + 1;
+  }
+
+  // int32 error_code = 99;
+  if (this->_internal_error_code() != 0) {
+    total_size += 2 +
+      ::_pbi::WireFormatLite::Int32Size(
+        this->_internal_error_code());
   }
 
   return MaybeComputeUnknownFieldsSize(total_size, &_impl_._cached_size_);
@@ -2582,11 +3102,20 @@ void ListFilesResponse::MergeImpl(::PROTOBUF_NAMESPACE_ID::Message& to_msg, cons
   if (!from._internal_error().empty()) {
     _this->_internal_set_error(from._internal_error());
   }
-  if (from._internal_success() != 0) {
-    _this->_internal_set_success(from._internal_success());
+  if (!from._internal_next_cursor().empty()) {
+    _this->_internal_set_next_cursor(from._internal_next_cursor());
   }
   if (from._internal_total() != 0) {
     _this->_internal_set_total(from._internal_total());
+  }
+  if (from._internal_success() != 0) {
+    _this->_internal_set_success(from._internal_success());
+  }
+  if (from._internal_has_more() != 0) {
+    _this->_internal_set_has_more(from._internal_has_more());
+  }
+  if (from._internal_error_code() != 0) {
+    _this->_internal_set_error_code(from._internal_error_code());
   }
   _this->_internal_metadata_.MergeFrom<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(from._internal_metadata_);
 }
@@ -2616,12 +3145,16 @@ void ListFilesResponse::InternalSwap(ListFilesResponse* other) {
       &_impl_.error_, lhs_arena,
       &other->_impl_.error_, rhs_arena
   );
+  ::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr::InternalSwap(
+      &_impl_.next_cursor_, lhs_arena,
+      &other->_impl_.next_cursor_, rhs_arena
+  );
   ::PROTOBUF_NAMESPACE_ID::internal::memswap<
-      PROTOBUF_FIELD_OFFSET(ListFilesResponse, _impl_.total_)
-      + sizeof(ListFilesResponse::_impl_.total_)
-      - PROTOBUF_FIELD_OFFSET(ListFilesResponse, _impl_.success_)>(
-          reinterpret_cast<char*>(&_impl_.success_),
-          reinterpret_cast<char*>(&other->_impl_.success_));
+      PROTOBUF_FIELD_OFFSET(ListFilesResponse, _impl_.error_code_)
+      + sizeof(ListFilesResponse::_impl_.error_code_)
+      - PROTOBUF_FIELD_OFFSET(ListFilesResponse, _impl_.total_)>(
+          reinterpret_cast<char*>(&_impl_.total_),
+          reinterpret_cast<char*>(&other->_impl_.total_));
 }
 
 ::PROTOBUF_NAMESPACE_ID::Metadata ListFilesResponse::GetMetadata() const {
@@ -2843,6 +3376,1567 @@ void DeleteFileRequest::InternalSwap(DeleteFileRequest* other) {
 
 // ===================================================================
 
+class CreateFolderRequest::_Internal {
+ public:
+};
+
+CreateFolderRequest::CreateFolderRequest(::PROTOBUF_NAMESPACE_ID::Arena* arena,
+                         bool is_message_owned)
+  : ::PROTOBUF_NAMESPACE_ID::Message(arena, is_message_owned) {
+  SharedCtor(arena, is_message_owned);
+  // @@protoc_insertion_point(arena_constructor:rpc.CreateFolderRequest)
+}
+CreateFolderRequest::CreateFolderRequest(const CreateFolderRequest& from)
+  : ::PROTOBUF_NAMESPACE_ID::Message() {
+  CreateFolderRequest* const _this = this; (void)_this;
+  new (&_impl_) Impl_{
+      decltype(_impl_.name_){}
+    , decltype(_impl_.user_id_){}
+    , decltype(_impl_.parent_folder_id_){}
+    , /*decltype(_impl_._cached_size_)*/{}};
+
+  _internal_metadata_.MergeFrom<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(from._internal_metadata_);
+  _impl_.name_.InitDefault();
+  #ifdef PROTOBUF_FORCE_COPY_DEFAULT_STRING
+    _impl_.name_.Set("", GetArenaForAllocation());
+  #endif // PROTOBUF_FORCE_COPY_DEFAULT_STRING
+  if (!from._internal_name().empty()) {
+    _this->_impl_.name_.Set(from._internal_name(), 
+      _this->GetArenaForAllocation());
+  }
+  ::memcpy(&_impl_.user_id_, &from._impl_.user_id_,
+    static_cast<size_t>(reinterpret_cast<char*>(&_impl_.parent_folder_id_) -
+    reinterpret_cast<char*>(&_impl_.user_id_)) + sizeof(_impl_.parent_folder_id_));
+  // @@protoc_insertion_point(copy_constructor:rpc.CreateFolderRequest)
+}
+
+inline void CreateFolderRequest::SharedCtor(
+    ::_pb::Arena* arena, bool is_message_owned) {
+  (void)arena;
+  (void)is_message_owned;
+  new (&_impl_) Impl_{
+      decltype(_impl_.name_){}
+    , decltype(_impl_.user_id_){int64_t{0}}
+    , decltype(_impl_.parent_folder_id_){int64_t{0}}
+    , /*decltype(_impl_._cached_size_)*/{}
+  };
+  _impl_.name_.InitDefault();
+  #ifdef PROTOBUF_FORCE_COPY_DEFAULT_STRING
+    _impl_.name_.Set("", GetArenaForAllocation());
+  #endif // PROTOBUF_FORCE_COPY_DEFAULT_STRING
+}
+
+CreateFolderRequest::~CreateFolderRequest() {
+  // @@protoc_insertion_point(destructor:rpc.CreateFolderRequest)
+  if (auto *arena = _internal_metadata_.DeleteReturnArena<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>()) {
+  (void)arena;
+    return;
+  }
+  SharedDtor();
+}
+
+inline void CreateFolderRequest::SharedDtor() {
+  GOOGLE_DCHECK(GetArenaForAllocation() == nullptr);
+  _impl_.name_.Destroy();
+}
+
+void CreateFolderRequest::SetCachedSize(int size) const {
+  _impl_._cached_size_.Set(size);
+}
+
+void CreateFolderRequest::Clear() {
+// @@protoc_insertion_point(message_clear_start:rpc.CreateFolderRequest)
+  uint32_t cached_has_bits = 0;
+  // Prevent compiler warnings about cached_has_bits being unused
+  (void) cached_has_bits;
+
+  _impl_.name_.ClearToEmpty();
+  ::memset(&_impl_.user_id_, 0, static_cast<size_t>(
+      reinterpret_cast<char*>(&_impl_.parent_folder_id_) -
+      reinterpret_cast<char*>(&_impl_.user_id_)) + sizeof(_impl_.parent_folder_id_));
+  _internal_metadata_.Clear<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>();
+}
+
+const char* CreateFolderRequest::_InternalParse(const char* ptr, ::_pbi::ParseContext* ctx) {
+#define CHK_(x) if (PROTOBUF_PREDICT_FALSE(!(x))) goto failure
+  while (!ctx->Done(&ptr)) {
+    uint32_t tag;
+    ptr = ::_pbi::ReadTag(ptr, &tag);
+    switch (tag >> 3) {
+      // int64 user_id = 1;
+      case 1:
+        if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 8)) {
+          _impl_.user_id_ = ::PROTOBUF_NAMESPACE_ID::internal::ReadVarint64(&ptr);
+          CHK_(ptr);
+        } else
+          goto handle_unusual;
+        continue;
+      // string name = 2;
+      case 2:
+        if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 18)) {
+          auto str = _internal_mutable_name();
+          ptr = ::_pbi::InlineGreedyStringParser(str, ptr, ctx);
+          CHK_(ptr);
+          CHK_(::_pbi::VerifyUTF8(str, "rpc.CreateFolderRequest.name"));
+        } else
+          goto handle_unusual;
+        continue;
+      // int64 parent_folder_id = 3;
+      case 3:
+        if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 24)) {
+          _impl_.parent_folder_id_ = ::PROTOBUF_NAMESPACE_ID::internal::ReadVarint64(&ptr);
+          CHK_(ptr);
+        } else
+          goto handle_unusual;
+        continue;
+      default:
+        goto handle_unusual;
+    }  // switch
+  handle_unusual:
+    if ((tag == 0) || ((tag & 7) == 4)) {
+      CHK_(ptr);
+      ctx->SetLastTag(tag);
+      goto message_done;
+    }
+    ptr = UnknownFieldParse(
+        tag,
+        _internal_metadata_.mutable_unknown_fields<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(),
+        ptr, ctx);
+    CHK_(ptr != nullptr);
+  }  // while
+message_done:
+  return ptr;
+failure:
+  ptr = nullptr;
+  goto message_done;
+#undef CHK_
+}
+
+uint8_t* CreateFolderRequest::_InternalSerialize(
+    uint8_t* target, ::PROTOBUF_NAMESPACE_ID::io::EpsCopyOutputStream* stream) const {
+  // @@protoc_insertion_point(serialize_to_array_start:rpc.CreateFolderRequest)
+  uint32_t cached_has_bits = 0;
+  (void) cached_has_bits;
+
+  // int64 user_id = 1;
+  if (this->_internal_user_id() != 0) {
+    target = stream->EnsureSpace(target);
+    target = ::_pbi::WireFormatLite::WriteInt64ToArray(1, this->_internal_user_id(), target);
+  }
+
+  // string name = 2;
+  if (!this->_internal_name().empty()) {
+    ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::VerifyUtf8String(
+      this->_internal_name().data(), static_cast<int>(this->_internal_name().length()),
+      ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::SERIALIZE,
+      "rpc.CreateFolderRequest.name");
+    target = stream->WriteStringMaybeAliased(
+        2, this->_internal_name(), target);
+  }
+
+  // int64 parent_folder_id = 3;
+  if (this->_internal_parent_folder_id() != 0) {
+    target = stream->EnsureSpace(target);
+    target = ::_pbi::WireFormatLite::WriteInt64ToArray(3, this->_internal_parent_folder_id(), target);
+  }
+
+  if (PROTOBUF_PREDICT_FALSE(_internal_metadata_.have_unknown_fields())) {
+    target = ::_pbi::WireFormat::InternalSerializeUnknownFieldsToArray(
+        _internal_metadata_.unknown_fields<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(::PROTOBUF_NAMESPACE_ID::UnknownFieldSet::default_instance), target, stream);
+  }
+  // @@protoc_insertion_point(serialize_to_array_end:rpc.CreateFolderRequest)
+  return target;
+}
+
+size_t CreateFolderRequest::ByteSizeLong() const {
+// @@protoc_insertion_point(message_byte_size_start:rpc.CreateFolderRequest)
+  size_t total_size = 0;
+
+  uint32_t cached_has_bits = 0;
+  // Prevent compiler warnings about cached_has_bits being unused
+  (void) cached_has_bits;
+
+  // string name = 2;
+  if (!this->_internal_name().empty()) {
+    total_size += 1 +
+      ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::StringSize(
+        this->_internal_name());
+  }
+
+  // int64 user_id = 1;
+  if (this->_internal_user_id() != 0) {
+    total_size += ::_pbi::WireFormatLite::Int64SizePlusOne(this->_internal_user_id());
+  }
+
+  // int64 parent_folder_id = 3;
+  if (this->_internal_parent_folder_id() != 0) {
+    total_size += ::_pbi::WireFormatLite::Int64SizePlusOne(this->_internal_parent_folder_id());
+  }
+
+  return MaybeComputeUnknownFieldsSize(total_size, &_impl_._cached_size_);
+}
+
+const ::PROTOBUF_NAMESPACE_ID::Message::ClassData CreateFolderRequest::_class_data_ = {
+    ::PROTOBUF_NAMESPACE_ID::Message::CopyWithSourceCheck,
+    CreateFolderRequest::MergeImpl
+};
+const ::PROTOBUF_NAMESPACE_ID::Message::ClassData*CreateFolderRequest::GetClassData() const { return &_class_data_; }
+
+
+void CreateFolderRequest::MergeImpl(::PROTOBUF_NAMESPACE_ID::Message& to_msg, const ::PROTOBUF_NAMESPACE_ID::Message& from_msg) {
+  auto* const _this = static_cast<CreateFolderRequest*>(&to_msg);
+  auto& from = static_cast<const CreateFolderRequest&>(from_msg);
+  // @@protoc_insertion_point(class_specific_merge_from_start:rpc.CreateFolderRequest)
+  GOOGLE_DCHECK_NE(&from, _this);
+  uint32_t cached_has_bits = 0;
+  (void) cached_has_bits;
+
+  if (!from._internal_name().empty()) {
+    _this->_internal_set_name(from._internal_name());
+  }
+  if (from._internal_user_id() != 0) {
+    _this->_internal_set_user_id(from._internal_user_id());
+  }
+  if (from._internal_parent_folder_id() != 0) {
+    _this->_internal_set_parent_folder_id(from._internal_parent_folder_id());
+  }
+  _this->_internal_metadata_.MergeFrom<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(from._internal_metadata_);
+}
+
+void CreateFolderRequest::CopyFrom(const CreateFolderRequest& from) {
+// @@protoc_insertion_point(class_specific_copy_from_start:rpc.CreateFolderRequest)
+  if (&from == this) return;
+  Clear();
+  MergeFrom(from);
+}
+
+bool CreateFolderRequest::IsInitialized() const {
+  return true;
+}
+
+void CreateFolderRequest::InternalSwap(CreateFolderRequest* other) {
+  using std::swap;
+  auto* lhs_arena = GetArenaForAllocation();
+  auto* rhs_arena = other->GetArenaForAllocation();
+  _internal_metadata_.InternalSwap(&other->_internal_metadata_);
+  ::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr::InternalSwap(
+      &_impl_.name_, lhs_arena,
+      &other->_impl_.name_, rhs_arena
+  );
+  ::PROTOBUF_NAMESPACE_ID::internal::memswap<
+      PROTOBUF_FIELD_OFFSET(CreateFolderRequest, _impl_.parent_folder_id_)
+      + sizeof(CreateFolderRequest::_impl_.parent_folder_id_)
+      - PROTOBUF_FIELD_OFFSET(CreateFolderRequest, _impl_.user_id_)>(
+          reinterpret_cast<char*>(&_impl_.user_id_),
+          reinterpret_cast<char*>(&other->_impl_.user_id_));
+}
+
+::PROTOBUF_NAMESPACE_ID::Metadata CreateFolderRequest::GetMetadata() const {
+  return ::_pbi::AssignDescriptors(
+      &descriptor_table_rpc_5ffile_2eproto_getter, &descriptor_table_rpc_5ffile_2eproto_once,
+      file_level_metadata_rpc_5ffile_2eproto[8]);
+}
+
+// ===================================================================
+
+class CreateFolderResponse::_Internal {
+ public:
+};
+
+CreateFolderResponse::CreateFolderResponse(::PROTOBUF_NAMESPACE_ID::Arena* arena,
+                         bool is_message_owned)
+  : ::PROTOBUF_NAMESPACE_ID::Message(arena, is_message_owned) {
+  SharedCtor(arena, is_message_owned);
+  // @@protoc_insertion_point(arena_constructor:rpc.CreateFolderResponse)
+}
+CreateFolderResponse::CreateFolderResponse(const CreateFolderResponse& from)
+  : ::PROTOBUF_NAMESPACE_ID::Message() {
+  CreateFolderResponse* const _this = this; (void)_this;
+  new (&_impl_) Impl_{
+      decltype(_impl_.error_){}
+    , decltype(_impl_.id_){}
+    , decltype(_impl_.success_){}
+    , decltype(_impl_.error_code_){}
+    , /*decltype(_impl_._cached_size_)*/{}};
+
+  _internal_metadata_.MergeFrom<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(from._internal_metadata_);
+  _impl_.error_.InitDefault();
+  #ifdef PROTOBUF_FORCE_COPY_DEFAULT_STRING
+    _impl_.error_.Set("", GetArenaForAllocation());
+  #endif // PROTOBUF_FORCE_COPY_DEFAULT_STRING
+  if (!from._internal_error().empty()) {
+    _this->_impl_.error_.Set(from._internal_error(), 
+      _this->GetArenaForAllocation());
+  }
+  ::memcpy(&_impl_.id_, &from._impl_.id_,
+    static_cast<size_t>(reinterpret_cast<char*>(&_impl_.error_code_) -
+    reinterpret_cast<char*>(&_impl_.id_)) + sizeof(_impl_.error_code_));
+  // @@protoc_insertion_point(copy_constructor:rpc.CreateFolderResponse)
+}
+
+inline void CreateFolderResponse::SharedCtor(
+    ::_pb::Arena* arena, bool is_message_owned) {
+  (void)arena;
+  (void)is_message_owned;
+  new (&_impl_) Impl_{
+      decltype(_impl_.error_){}
+    , decltype(_impl_.id_){int64_t{0}}
+    , decltype(_impl_.success_){false}
+    , decltype(_impl_.error_code_){0}
+    , /*decltype(_impl_._cached_size_)*/{}
+  };
+  _impl_.error_.InitDefault();
+  #ifdef PROTOBUF_FORCE_COPY_DEFAULT_STRING
+    _impl_.error_.Set("", GetArenaForAllocation());
+  #endif // PROTOBUF_FORCE_COPY_DEFAULT_STRING
+}
+
+CreateFolderResponse::~CreateFolderResponse() {
+  // @@protoc_insertion_point(destructor:rpc.CreateFolderResponse)
+  if (auto *arena = _internal_metadata_.DeleteReturnArena<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>()) {
+  (void)arena;
+    return;
+  }
+  SharedDtor();
+}
+
+inline void CreateFolderResponse::SharedDtor() {
+  GOOGLE_DCHECK(GetArenaForAllocation() == nullptr);
+  _impl_.error_.Destroy();
+}
+
+void CreateFolderResponse::SetCachedSize(int size) const {
+  _impl_._cached_size_.Set(size);
+}
+
+void CreateFolderResponse::Clear() {
+// @@protoc_insertion_point(message_clear_start:rpc.CreateFolderResponse)
+  uint32_t cached_has_bits = 0;
+  // Prevent compiler warnings about cached_has_bits being unused
+  (void) cached_has_bits;
+
+  _impl_.error_.ClearToEmpty();
+  ::memset(&_impl_.id_, 0, static_cast<size_t>(
+      reinterpret_cast<char*>(&_impl_.error_code_) -
+      reinterpret_cast<char*>(&_impl_.id_)) + sizeof(_impl_.error_code_));
+  _internal_metadata_.Clear<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>();
+}
+
+const char* CreateFolderResponse::_InternalParse(const char* ptr, ::_pbi::ParseContext* ctx) {
+#define CHK_(x) if (PROTOBUF_PREDICT_FALSE(!(x))) goto failure
+  while (!ctx->Done(&ptr)) {
+    uint32_t tag;
+    ptr = ::_pbi::ReadTag(ptr, &tag);
+    switch (tag >> 3) {
+      // bool success = 1;
+      case 1:
+        if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 8)) {
+          _impl_.success_ = ::PROTOBUF_NAMESPACE_ID::internal::ReadVarint64(&ptr);
+          CHK_(ptr);
+        } else
+          goto handle_unusual;
+        continue;
+      // int64 id = 2;
+      case 2:
+        if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 16)) {
+          _impl_.id_ = ::PROTOBUF_NAMESPACE_ID::internal::ReadVarint64(&ptr);
+          CHK_(ptr);
+        } else
+          goto handle_unusual;
+        continue;
+      // string error = 3;
+      case 3:
+        if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 26)) {
+          auto str = _internal_mutable_error();
+          ptr = ::_pbi::InlineGreedyStringParser(str, ptr, ctx);
+          CHK_(ptr);
+          CHK_(::_pbi::VerifyUTF8(str, "rpc.CreateFolderResponse.error"));
+        } else
+          goto handle_unusual;
+        continue;
+      // int32 error_code = 99;
+      case 99:
+        if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 24)) {
+          _impl_.error_code_ = ::PROTOBUF_NAMESPACE_ID::internal::ReadVarint32(&ptr);
+          CHK_(ptr);
+        } else
+          goto handle_unusual;
+        continue;
+      default:
+        goto handle_unusual;
+    }  // switch
+  handle_unusual:
+    if ((tag == 0) || ((tag & 7) == 4)) {
+      CHK_(ptr);
+      ctx->SetLastTag(tag);
+      goto message_done;
+    }
+    ptr = UnknownFieldParse(
+        tag,
+        _internal_metadata_.mutable_unknown_fields<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(),
+        ptr, ctx);
+    CHK_(ptr != nullptr);
+  }  // while
+message_done:
+  return ptr;
+failure:
+  ptr = nullptr;
+  goto message_done;
+#undef CHK_
+}
+
+uint8_t* CreateFolderResponse::_InternalSerialize(
+    uint8_t* target, ::PROTOBUF_NAMESPACE_ID::io::EpsCopyOutputStream* stream) const {
+  // @@protoc_insertion_point(serialize_to_array_start:rpc.CreateFolderResponse)
+  uint32_t cached_has_bits = 0;
+  (void) cached_has_bits;
+
+  // bool success = 1;
+  if (this->_internal_success() != 0) {
+    target = stream->EnsureSpace(target);
+    target = ::_pbi::WireFormatLite::WriteBoolToArray(1, this->_internal_success(), target);
+  }
+
+  // int64 id = 2;
+  if (this->_internal_id() != 0) {
+    target = stream->EnsureSpace(target);
+    target = ::_pbi::WireFormatLite::WriteInt64ToArray(2, this->_internal_id(), target);
+  }
+
+  // string error = 3;
+  if (!this->_internal_error().empty()) {
+    ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::VerifyUtf8String(
+      this->_internal_error().data(), static_cast<int>(this->_internal_error().length()),
+      ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::SERIALIZE,
+      "rpc.CreateFolderResponse.error");
+    target = stream->WriteStringMaybeAliased(
+        3, this->_internal_error(), target);
+  }
+
+  // int32 error_code = 99;
+  if (this->_internal_error_code() != 0) {
+    target = stream->EnsureSpace(target);
+    target = ::_pbi::WireFormatLite::WriteInt32ToArray(99, this->_internal_error_code(), target);
+  }
+
+  if (PROTOBUF_PREDICT_FALSE(_internal_metadata_.have_unknown_fields())) {
+    target = ::_pbi::WireFormat::InternalSerializeUnknownFieldsToArray(
+        _internal_metadata_.unknown_fields<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(::PROTOBUF_NAMESPACE_ID::UnknownFieldSet::default_instance), target, stream);
+  }
+  // @@protoc_insertion_point(serialize_to_array_end:rpc.CreateFolderResponse)
+  return target;
+}
+
+size_t CreateFolderResponse::ByteSizeLong() const {
+// @@protoc_insertion_point(message_byte_size_start:rpc.CreateFolderResponse)
+  size_t total_size = 0;
+
+  uint32_t cached_has_bits = 0;
+  // Prevent compiler warnings about cached_has_bits being unused
+  (void) cached_has_bits;
+
+  // string error = 3;
+  if (!this->_internal_error().empty()) {
+    total_size += 1 +
+      ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::StringSize(
+        this->_internal_error());
+  }
+
+  // int64 id = 2;
+  if (this->_internal_id() != 0) {
+    total_size += ::_pbi::WireFormatLite::Int64SizePlusOne(this->_internal_id());
+  }
+
+  // bool success = 1;
+  if (this->_internal_success() != 0) {
+    total_size += 1 + 1;
+  }
+
+  // int32 error_code = 99;
+  if (this->_internal_error_code() != 0) {
+    total_size += 2 +
+      ::_pbi::WireFormatLite::Int32Size(
+        this->_internal_error_code());
+  }
+
+  return MaybeComputeUnknownFieldsSize(total_size, &_impl_._cached_size_);
+}
+
+const ::PROTOBUF_NAMESPACE_ID::Message::ClassData CreateFolderResponse::_class_data_ = {
+    ::PROTOBUF_NAMESPACE_ID::Message::CopyWithSourceCheck,
+    CreateFolderResponse::MergeImpl
+};
+const ::PROTOBUF_NAMESPACE_ID::Message::ClassData*CreateFolderResponse::GetClassData() const { return &_class_data_; }
+
+
+void CreateFolderResponse::MergeImpl(::PROTOBUF_NAMESPACE_ID::Message& to_msg, const ::PROTOBUF_NAMESPACE_ID::Message& from_msg) {
+  auto* const _this = static_cast<CreateFolderResponse*>(&to_msg);
+  auto& from = static_cast<const CreateFolderResponse&>(from_msg);
+  // @@protoc_insertion_point(class_specific_merge_from_start:rpc.CreateFolderResponse)
+  GOOGLE_DCHECK_NE(&from, _this);
+  uint32_t cached_has_bits = 0;
+  (void) cached_has_bits;
+
+  if (!from._internal_error().empty()) {
+    _this->_internal_set_error(from._internal_error());
+  }
+  if (from._internal_id() != 0) {
+    _this->_internal_set_id(from._internal_id());
+  }
+  if (from._internal_success() != 0) {
+    _this->_internal_set_success(from._internal_success());
+  }
+  if (from._internal_error_code() != 0) {
+    _this->_internal_set_error_code(from._internal_error_code());
+  }
+  _this->_internal_metadata_.MergeFrom<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(from._internal_metadata_);
+}
+
+void CreateFolderResponse::CopyFrom(const CreateFolderResponse& from) {
+// @@protoc_insertion_point(class_specific_copy_from_start:rpc.CreateFolderResponse)
+  if (&from == this) return;
+  Clear();
+  MergeFrom(from);
+}
+
+bool CreateFolderResponse::IsInitialized() const {
+  return true;
+}
+
+void CreateFolderResponse::InternalSwap(CreateFolderResponse* other) {
+  using std::swap;
+  auto* lhs_arena = GetArenaForAllocation();
+  auto* rhs_arena = other->GetArenaForAllocation();
+  _internal_metadata_.InternalSwap(&other->_internal_metadata_);
+  ::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr::InternalSwap(
+      &_impl_.error_, lhs_arena,
+      &other->_impl_.error_, rhs_arena
+  );
+  ::PROTOBUF_NAMESPACE_ID::internal::memswap<
+      PROTOBUF_FIELD_OFFSET(CreateFolderResponse, _impl_.error_code_)
+      + sizeof(CreateFolderResponse::_impl_.error_code_)
+      - PROTOBUF_FIELD_OFFSET(CreateFolderResponse, _impl_.id_)>(
+          reinterpret_cast<char*>(&_impl_.id_),
+          reinterpret_cast<char*>(&other->_impl_.id_));
+}
+
+::PROTOBUF_NAMESPACE_ID::Metadata CreateFolderResponse::GetMetadata() const {
+  return ::_pbi::AssignDescriptors(
+      &descriptor_table_rpc_5ffile_2eproto_getter, &descriptor_table_rpc_5ffile_2eproto_once,
+      file_level_metadata_rpc_5ffile_2eproto[9]);
+}
+
+// ===================================================================
+
+class MoveFileRequest::_Internal {
+ public:
+};
+
+MoveFileRequest::MoveFileRequest(::PROTOBUF_NAMESPACE_ID::Arena* arena,
+                         bool is_message_owned)
+  : ::PROTOBUF_NAMESPACE_ID::Message(arena, is_message_owned) {
+  SharedCtor(arena, is_message_owned);
+  // @@protoc_insertion_point(arena_constructor:rpc.MoveFileRequest)
+}
+MoveFileRequest::MoveFileRequest(const MoveFileRequest& from)
+  : ::PROTOBUF_NAMESPACE_ID::Message() {
+  MoveFileRequest* const _this = this; (void)_this;
+  new (&_impl_) Impl_{
+      decltype(_impl_.id_){}
+    , decltype(_impl_.user_id_){}
+    , decltype(_impl_.target_folder_id_){}
+    , /*decltype(_impl_._cached_size_)*/{}};
+
+  _internal_metadata_.MergeFrom<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(from._internal_metadata_);
+  ::memcpy(&_impl_.id_, &from._impl_.id_,
+    static_cast<size_t>(reinterpret_cast<char*>(&_impl_.target_folder_id_) -
+    reinterpret_cast<char*>(&_impl_.id_)) + sizeof(_impl_.target_folder_id_));
+  // @@protoc_insertion_point(copy_constructor:rpc.MoveFileRequest)
+}
+
+inline void MoveFileRequest::SharedCtor(
+    ::_pb::Arena* arena, bool is_message_owned) {
+  (void)arena;
+  (void)is_message_owned;
+  new (&_impl_) Impl_{
+      decltype(_impl_.id_){int64_t{0}}
+    , decltype(_impl_.user_id_){int64_t{0}}
+    , decltype(_impl_.target_folder_id_){int64_t{0}}
+    , /*decltype(_impl_._cached_size_)*/{}
+  };
+}
+
+MoveFileRequest::~MoveFileRequest() {
+  // @@protoc_insertion_point(destructor:rpc.MoveFileRequest)
+  if (auto *arena = _internal_metadata_.DeleteReturnArena<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>()) {
+  (void)arena;
+    return;
+  }
+  SharedDtor();
+}
+
+inline void MoveFileRequest::SharedDtor() {
+  GOOGLE_DCHECK(GetArenaForAllocation() == nullptr);
+}
+
+void MoveFileRequest::SetCachedSize(int size) const {
+  _impl_._cached_size_.Set(size);
+}
+
+void MoveFileRequest::Clear() {
+// @@protoc_insertion_point(message_clear_start:rpc.MoveFileRequest)
+  uint32_t cached_has_bits = 0;
+  // Prevent compiler warnings about cached_has_bits being unused
+  (void) cached_has_bits;
+
+  ::memset(&_impl_.id_, 0, static_cast<size_t>(
+      reinterpret_cast<char*>(&_impl_.target_folder_id_) -
+      reinterpret_cast<char*>(&_impl_.id_)) + sizeof(_impl_.target_folder_id_));
+  _internal_metadata_.Clear<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>();
+}
+
+const char* MoveFileRequest::_InternalParse(const char* ptr, ::_pbi::ParseContext* ctx) {
+#define CHK_(x) if (PROTOBUF_PREDICT_FALSE(!(x))) goto failure
+  while (!ctx->Done(&ptr)) {
+    uint32_t tag;
+    ptr = ::_pbi::ReadTag(ptr, &tag);
+    switch (tag >> 3) {
+      // int64 id = 1;
+      case 1:
+        if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 8)) {
+          _impl_.id_ = ::PROTOBUF_NAMESPACE_ID::internal::ReadVarint64(&ptr);
+          CHK_(ptr);
+        } else
+          goto handle_unusual;
+        continue;
+      // int64 user_id = 2;
+      case 2:
+        if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 16)) {
+          _impl_.user_id_ = ::PROTOBUF_NAMESPACE_ID::internal::ReadVarint64(&ptr);
+          CHK_(ptr);
+        } else
+          goto handle_unusual;
+        continue;
+      // int64 target_folder_id = 3;
+      case 3:
+        if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 24)) {
+          _impl_.target_folder_id_ = ::PROTOBUF_NAMESPACE_ID::internal::ReadVarint64(&ptr);
+          CHK_(ptr);
+        } else
+          goto handle_unusual;
+        continue;
+      default:
+        goto handle_unusual;
+    }  // switch
+  handle_unusual:
+    if ((tag == 0) || ((tag & 7) == 4)) {
+      CHK_(ptr);
+      ctx->SetLastTag(tag);
+      goto message_done;
+    }
+    ptr = UnknownFieldParse(
+        tag,
+        _internal_metadata_.mutable_unknown_fields<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(),
+        ptr, ctx);
+    CHK_(ptr != nullptr);
+  }  // while
+message_done:
+  return ptr;
+failure:
+  ptr = nullptr;
+  goto message_done;
+#undef CHK_
+}
+
+uint8_t* MoveFileRequest::_InternalSerialize(
+    uint8_t* target, ::PROTOBUF_NAMESPACE_ID::io::EpsCopyOutputStream* stream) const {
+  // @@protoc_insertion_point(serialize_to_array_start:rpc.MoveFileRequest)
+  uint32_t cached_has_bits = 0;
+  (void) cached_has_bits;
+
+  // int64 id = 1;
+  if (this->_internal_id() != 0) {
+    target = stream->EnsureSpace(target);
+    target = ::_pbi::WireFormatLite::WriteInt64ToArray(1, this->_internal_id(), target);
+  }
+
+  // int64 user_id = 2;
+  if (this->_internal_user_id() != 0) {
+    target = stream->EnsureSpace(target);
+    target = ::_pbi::WireFormatLite::WriteInt64ToArray(2, this->_internal_user_id(), target);
+  }
+
+  // int64 target_folder_id = 3;
+  if (this->_internal_target_folder_id() != 0) {
+    target = stream->EnsureSpace(target);
+    target = ::_pbi::WireFormatLite::WriteInt64ToArray(3, this->_internal_target_folder_id(), target);
+  }
+
+  if (PROTOBUF_PREDICT_FALSE(_internal_metadata_.have_unknown_fields())) {
+    target = ::_pbi::WireFormat::InternalSerializeUnknownFieldsToArray(
+        _internal_metadata_.unknown_fields<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(::PROTOBUF_NAMESPACE_ID::UnknownFieldSet::default_instance), target, stream);
+  }
+  // @@protoc_insertion_point(serialize_to_array_end:rpc.MoveFileRequest)
+  return target;
+}
+
+size_t MoveFileRequest::ByteSizeLong() const {
+// @@protoc_insertion_point(message_byte_size_start:rpc.MoveFileRequest)
+  size_t total_size = 0;
+
+  uint32_t cached_has_bits = 0;
+  // Prevent compiler warnings about cached_has_bits being unused
+  (void) cached_has_bits;
+
+  // int64 id = 1;
+  if (this->_internal_id() != 0) {
+    total_size += ::_pbi::WireFormatLite::Int64SizePlusOne(this->_internal_id());
+  }
+
+  // int64 user_id = 2;
+  if (this->_internal_user_id() != 0) {
+    total_size += ::_pbi::WireFormatLite::Int64SizePlusOne(this->_internal_user_id());
+  }
+
+  // int64 target_folder_id = 3;
+  if (this->_internal_target_folder_id() != 0) {
+    total_size += ::_pbi::WireFormatLite::Int64SizePlusOne(this->_internal_target_folder_id());
+  }
+
+  return MaybeComputeUnknownFieldsSize(total_size, &_impl_._cached_size_);
+}
+
+const ::PROTOBUF_NAMESPACE_ID::Message::ClassData MoveFileRequest::_class_data_ = {
+    ::PROTOBUF_NAMESPACE_ID::Message::CopyWithSourceCheck,
+    MoveFileRequest::MergeImpl
+};
+const ::PROTOBUF_NAMESPACE_ID::Message::ClassData*MoveFileRequest::GetClassData() const { return &_class_data_; }
+
+
+void MoveFileRequest::MergeImpl(::PROTOBUF_NAMESPACE_ID::Message& to_msg, const ::PROTOBUF_NAMESPACE_ID::Message& from_msg) {
+  auto* const _this = static_cast<MoveFileRequest*>(&to_msg);
+  auto& from = static_cast<const MoveFileRequest&>(from_msg);
+  // @@protoc_insertion_point(class_specific_merge_from_start:rpc.MoveFileRequest)
+  GOOGLE_DCHECK_NE(&from, _this);
+  uint32_t cached_has_bits = 0;
+  (void) cached_has_bits;
+
+  if (from._internal_id() != 0) {
+    _this->_internal_set_id(from._internal_id());
+  }
+  if (from._internal_user_id() != 0) {
+    _this->_internal_set_user_id(from._internal_user_id());
+  }
+  if (from._internal_target_folder_id() != 0) {
+    _this->_internal_set_target_folder_id(from._internal_target_folder_id());
+  }
+  _this->_internal_metadata_.MergeFrom<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(from._internal_metadata_);
+}
+
+void MoveFileRequest::CopyFrom(const MoveFileRequest& from) {
+// @@protoc_insertion_point(class_specific_copy_from_start:rpc.MoveFileRequest)
+  if (&from == this) return;
+  Clear();
+  MergeFrom(from);
+}
+
+bool MoveFileRequest::IsInitialized() const {
+  return true;
+}
+
+void MoveFileRequest::InternalSwap(MoveFileRequest* other) {
+  using std::swap;
+  _internal_metadata_.InternalSwap(&other->_internal_metadata_);
+  ::PROTOBUF_NAMESPACE_ID::internal::memswap<
+      PROTOBUF_FIELD_OFFSET(MoveFileRequest, _impl_.target_folder_id_)
+      + sizeof(MoveFileRequest::_impl_.target_folder_id_)
+      - PROTOBUF_FIELD_OFFSET(MoveFileRequest, _impl_.id_)>(
+          reinterpret_cast<char*>(&_impl_.id_),
+          reinterpret_cast<char*>(&other->_impl_.id_));
+}
+
+::PROTOBUF_NAMESPACE_ID::Metadata MoveFileRequest::GetMetadata() const {
+  return ::_pbi::AssignDescriptors(
+      &descriptor_table_rpc_5ffile_2eproto_getter, &descriptor_table_rpc_5ffile_2eproto_once,
+      file_level_metadata_rpc_5ffile_2eproto[10]);
+}
+
+// ===================================================================
+
+class MoveFileResponse::_Internal {
+ public:
+};
+
+MoveFileResponse::MoveFileResponse(::PROTOBUF_NAMESPACE_ID::Arena* arena,
+                         bool is_message_owned)
+  : ::PROTOBUF_NAMESPACE_ID::Message(arena, is_message_owned) {
+  SharedCtor(arena, is_message_owned);
+  // @@protoc_insertion_point(arena_constructor:rpc.MoveFileResponse)
+}
+MoveFileResponse::MoveFileResponse(const MoveFileResponse& from)
+  : ::PROTOBUF_NAMESPACE_ID::Message() {
+  MoveFileResponse* const _this = this; (void)_this;
+  new (&_impl_) Impl_{
+      decltype(_impl_.error_){}
+    , decltype(_impl_.success_){}
+    , decltype(_impl_.error_code_){}
+    , /*decltype(_impl_._cached_size_)*/{}};
+
+  _internal_metadata_.MergeFrom<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(from._internal_metadata_);
+  _impl_.error_.InitDefault();
+  #ifdef PROTOBUF_FORCE_COPY_DEFAULT_STRING
+    _impl_.error_.Set("", GetArenaForAllocation());
+  #endif // PROTOBUF_FORCE_COPY_DEFAULT_STRING
+  if (!from._internal_error().empty()) {
+    _this->_impl_.error_.Set(from._internal_error(), 
+      _this->GetArenaForAllocation());
+  }
+  ::memcpy(&_impl_.success_, &from._impl_.success_,
+    static_cast<size_t>(reinterpret_cast<char*>(&_impl_.error_code_) -
+    reinterpret_cast<char*>(&_impl_.success_)) + sizeof(_impl_.error_code_));
+  // @@protoc_insertion_point(copy_constructor:rpc.MoveFileResponse)
+}
+
+inline void MoveFileResponse::SharedCtor(
+    ::_pb::Arena* arena, bool is_message_owned) {
+  (void)arena;
+  (void)is_message_owned;
+  new (&_impl_) Impl_{
+      decltype(_impl_.error_){}
+    , decltype(_impl_.success_){false}
+    , decltype(_impl_.error_code_){0}
+    , /*decltype(_impl_._cached_size_)*/{}
+  };
+  _impl_.error_.InitDefault();
+  #ifdef PROTOBUF_FORCE_COPY_DEFAULT_STRING
+    _impl_.error_.Set("", GetArenaForAllocation());
+  #endif // PROTOBUF_FORCE_COPY_DEFAULT_STRING
+}
+
+MoveFileResponse::~MoveFileResponse() {
+  // @@protoc_insertion_point(destructor:rpc.MoveFileResponse)
+  if (auto *arena = _internal_metadata_.DeleteReturnArena<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>()) {
+  (void)arena;
+    return;
+  }
+  SharedDtor();
+}
+
+inline void MoveFileResponse::SharedDtor() {
+  GOOGLE_DCHECK(GetArenaForAllocation() == nullptr);
+  _impl_.error_.Destroy();
+}
+
+void MoveFileResponse::SetCachedSize(int size) const {
+  _impl_._cached_size_.Set(size);
+}
+
+void MoveFileResponse::Clear() {
+// @@protoc_insertion_point(message_clear_start:rpc.MoveFileResponse)
+  uint32_t cached_has_bits = 0;
+  // Prevent compiler warnings about cached_has_bits being unused
+  (void) cached_has_bits;
+
+  _impl_.error_.ClearToEmpty();
+  ::memset(&_impl_.success_, 0, static_cast<size_t>(
+      reinterpret_cast<char*>(&_impl_.error_code_) -
+      reinterpret_cast<char*>(&_impl_.success_)) + sizeof(_impl_.error_code_));
+  _internal_metadata_.Clear<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>();
+}
+
+const char* MoveFileResponse::_InternalParse(const char* ptr, ::_pbi::ParseContext* ctx) {
+#define CHK_(x) if (PROTOBUF_PREDICT_FALSE(!(x))) goto failure
+  while (!ctx->Done(&ptr)) {
+    uint32_t tag;
+    ptr = ::_pbi::ReadTag(ptr, &tag);
+    switch (tag >> 3) {
+      // bool success = 1;
+      case 1:
+        if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 8)) {
+          _impl_.success_ = ::PROTOBUF_NAMESPACE_ID::internal::ReadVarint64(&ptr);
+          CHK_(ptr);
+        } else
+          goto handle_unusual;
+        continue;
+      // string error = 2;
+      case 2:
+        if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 18)) {
+          auto str = _internal_mutable_error();
+          ptr = ::_pbi::InlineGreedyStringParser(str, ptr, ctx);
+          CHK_(ptr);
+          CHK_(::_pbi::VerifyUTF8(str, "rpc.MoveFileResponse.error"));
+        } else
+          goto handle_unusual;
+        continue;
+      // int32 error_code = 99;
+      case 99:
+        if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 24)) {
+          _impl_.error_code_ = ::PROTOBUF_NAMESPACE_ID::internal::ReadVarint32(&ptr);
+          CHK_(ptr);
+        } else
+          goto handle_unusual;
+        continue;
+      default:
+        goto handle_unusual;
+    }  // switch
+  handle_unusual:
+    if ((tag == 0) || ((tag & 7) == 4)) {
+      CHK_(ptr);
+      ctx->SetLastTag(tag);
+      goto message_done;
+    }
+    ptr = UnknownFieldParse(
+        tag,
+        _internal_metadata_.mutable_unknown_fields<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(),
+        ptr, ctx);
+    CHK_(ptr != nullptr);
+  }  // while
+message_done:
+  return ptr;
+failure:
+  ptr = nullptr;
+  goto message_done;
+#undef CHK_
+}
+
+uint8_t* MoveFileResponse::_InternalSerialize(
+    uint8_t* target, ::PROTOBUF_NAMESPACE_ID::io::EpsCopyOutputStream* stream) const {
+  // @@protoc_insertion_point(serialize_to_array_start:rpc.MoveFileResponse)
+  uint32_t cached_has_bits = 0;
+  (void) cached_has_bits;
+
+  // bool success = 1;
+  if (this->_internal_success() != 0) {
+    target = stream->EnsureSpace(target);
+    target = ::_pbi::WireFormatLite::WriteBoolToArray(1, this->_internal_success(), target);
+  }
+
+  // string error = 2;
+  if (!this->_internal_error().empty()) {
+    ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::VerifyUtf8String(
+      this->_internal_error().data(), static_cast<int>(this->_internal_error().length()),
+      ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::SERIALIZE,
+      "rpc.MoveFileResponse.error");
+    target = stream->WriteStringMaybeAliased(
+        2, this->_internal_error(), target);
+  }
+
+  // int32 error_code = 99;
+  if (this->_internal_error_code() != 0) {
+    target = stream->EnsureSpace(target);
+    target = ::_pbi::WireFormatLite::WriteInt32ToArray(99, this->_internal_error_code(), target);
+  }
+
+  if (PROTOBUF_PREDICT_FALSE(_internal_metadata_.have_unknown_fields())) {
+    target = ::_pbi::WireFormat::InternalSerializeUnknownFieldsToArray(
+        _internal_metadata_.unknown_fields<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(::PROTOBUF_NAMESPACE_ID::UnknownFieldSet::default_instance), target, stream);
+  }
+  // @@protoc_insertion_point(serialize_to_array_end:rpc.MoveFileResponse)
+  return target;
+}
+
+size_t MoveFileResponse::ByteSizeLong() const {
+// @@protoc_insertion_point(message_byte_size_start:rpc.MoveFileResponse)
+  size_t total_size = 0;
+
+  uint32_t cached_has_bits = 0;
+  // Prevent compiler warnings about cached_has_bits being unused
+  (void) cached_has_bits;
+
+  // string error = 2;
+  if (!this->_internal_error().empty()) {
+    total_size += 1 +
+      ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::StringSize(
+        this->_internal_error());
+  }
+
+  // bool success = 1;
+  if (this->_internal_success() != 0) {
+    total_size += 1 + 1;
+  }
+
+  // int32 error_code = 99;
+  if (this->_internal_error_code() != 0) {
+    total_size += 2 +
+      ::_pbi::WireFormatLite::Int32Size(
+        this->_internal_error_code());
+  }
+
+  return MaybeComputeUnknownFieldsSize(total_size, &_impl_._cached_size_);
+}
+
+const ::PROTOBUF_NAMESPACE_ID::Message::ClassData MoveFileResponse::_class_data_ = {
+    ::PROTOBUF_NAMESPACE_ID::Message::CopyWithSourceCheck,
+    MoveFileResponse::MergeImpl
+};
+const ::PROTOBUF_NAMESPACE_ID::Message::ClassData*MoveFileResponse::GetClassData() const { return &_class_data_; }
+
+
+void MoveFileResponse::MergeImpl(::PROTOBUF_NAMESPACE_ID::Message& to_msg, const ::PROTOBUF_NAMESPACE_ID::Message& from_msg) {
+  auto* const _this = static_cast<MoveFileResponse*>(&to_msg);
+  auto& from = static_cast<const MoveFileResponse&>(from_msg);
+  // @@protoc_insertion_point(class_specific_merge_from_start:rpc.MoveFileResponse)
+  GOOGLE_DCHECK_NE(&from, _this);
+  uint32_t cached_has_bits = 0;
+  (void) cached_has_bits;
+
+  if (!from._internal_error().empty()) {
+    _this->_internal_set_error(from._internal_error());
+  }
+  if (from._internal_success() != 0) {
+    _this->_internal_set_success(from._internal_success());
+  }
+  if (from._internal_error_code() != 0) {
+    _this->_internal_set_error_code(from._internal_error_code());
+  }
+  _this->_internal_metadata_.MergeFrom<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(from._internal_metadata_);
+}
+
+void MoveFileResponse::CopyFrom(const MoveFileResponse& from) {
+// @@protoc_insertion_point(class_specific_copy_from_start:rpc.MoveFileResponse)
+  if (&from == this) return;
+  Clear();
+  MergeFrom(from);
+}
+
+bool MoveFileResponse::IsInitialized() const {
+  return true;
+}
+
+void MoveFileResponse::InternalSwap(MoveFileResponse* other) {
+  using std::swap;
+  auto* lhs_arena = GetArenaForAllocation();
+  auto* rhs_arena = other->GetArenaForAllocation();
+  _internal_metadata_.InternalSwap(&other->_internal_metadata_);
+  ::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr::InternalSwap(
+      &_impl_.error_, lhs_arena,
+      &other->_impl_.error_, rhs_arena
+  );
+  ::PROTOBUF_NAMESPACE_ID::internal::memswap<
+      PROTOBUF_FIELD_OFFSET(MoveFileResponse, _impl_.error_code_)
+      + sizeof(MoveFileResponse::_impl_.error_code_)
+      - PROTOBUF_FIELD_OFFSET(MoveFileResponse, _impl_.success_)>(
+          reinterpret_cast<char*>(&_impl_.success_),
+          reinterpret_cast<char*>(&other->_impl_.success_));
+}
+
+::PROTOBUF_NAMESPACE_ID::Metadata MoveFileResponse::GetMetadata() const {
+  return ::_pbi::AssignDescriptors(
+      &descriptor_table_rpc_5ffile_2eproto_getter, &descriptor_table_rpc_5ffile_2eproto_once,
+      file_level_metadata_rpc_5ffile_2eproto[11]);
+}
+
+// ===================================================================
+
+class BatchDeleteRequest::_Internal {
+ public:
+};
+
+BatchDeleteRequest::BatchDeleteRequest(::PROTOBUF_NAMESPACE_ID::Arena* arena,
+                         bool is_message_owned)
+  : ::PROTOBUF_NAMESPACE_ID::Message(arena, is_message_owned) {
+  SharedCtor(arena, is_message_owned);
+  // @@protoc_insertion_point(arena_constructor:rpc.BatchDeleteRequest)
+}
+BatchDeleteRequest::BatchDeleteRequest(const BatchDeleteRequest& from)
+  : ::PROTOBUF_NAMESPACE_ID::Message() {
+  BatchDeleteRequest* const _this = this; (void)_this;
+  new (&_impl_) Impl_{
+      decltype(_impl_.ids_){from._impl_.ids_}
+    , /*decltype(_impl_._ids_cached_byte_size_)*/{0}
+    , decltype(_impl_.user_id_){}
+    , /*decltype(_impl_._cached_size_)*/{}};
+
+  _internal_metadata_.MergeFrom<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(from._internal_metadata_);
+  _this->_impl_.user_id_ = from._impl_.user_id_;
+  // @@protoc_insertion_point(copy_constructor:rpc.BatchDeleteRequest)
+}
+
+inline void BatchDeleteRequest::SharedCtor(
+    ::_pb::Arena* arena, bool is_message_owned) {
+  (void)arena;
+  (void)is_message_owned;
+  new (&_impl_) Impl_{
+      decltype(_impl_.ids_){arena}
+    , /*decltype(_impl_._ids_cached_byte_size_)*/{0}
+    , decltype(_impl_.user_id_){int64_t{0}}
+    , /*decltype(_impl_._cached_size_)*/{}
+  };
+}
+
+BatchDeleteRequest::~BatchDeleteRequest() {
+  // @@protoc_insertion_point(destructor:rpc.BatchDeleteRequest)
+  if (auto *arena = _internal_metadata_.DeleteReturnArena<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>()) {
+  (void)arena;
+    return;
+  }
+  SharedDtor();
+}
+
+inline void BatchDeleteRequest::SharedDtor() {
+  GOOGLE_DCHECK(GetArenaForAllocation() == nullptr);
+  _impl_.ids_.~RepeatedField();
+}
+
+void BatchDeleteRequest::SetCachedSize(int size) const {
+  _impl_._cached_size_.Set(size);
+}
+
+void BatchDeleteRequest::Clear() {
+// @@protoc_insertion_point(message_clear_start:rpc.BatchDeleteRequest)
+  uint32_t cached_has_bits = 0;
+  // Prevent compiler warnings about cached_has_bits being unused
+  (void) cached_has_bits;
+
+  _impl_.ids_.Clear();
+  _impl_.user_id_ = int64_t{0};
+  _internal_metadata_.Clear<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>();
+}
+
+const char* BatchDeleteRequest::_InternalParse(const char* ptr, ::_pbi::ParseContext* ctx) {
+#define CHK_(x) if (PROTOBUF_PREDICT_FALSE(!(x))) goto failure
+  while (!ctx->Done(&ptr)) {
+    uint32_t tag;
+    ptr = ::_pbi::ReadTag(ptr, &tag);
+    switch (tag >> 3) {
+      // int64 user_id = 1;
+      case 1:
+        if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 8)) {
+          _impl_.user_id_ = ::PROTOBUF_NAMESPACE_ID::internal::ReadVarint64(&ptr);
+          CHK_(ptr);
+        } else
+          goto handle_unusual;
+        continue;
+      // repeated int64 ids = 2;
+      case 2:
+        if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 18)) {
+          ptr = ::PROTOBUF_NAMESPACE_ID::internal::PackedInt64Parser(_internal_mutable_ids(), ptr, ctx);
+          CHK_(ptr);
+        } else if (static_cast<uint8_t>(tag) == 16) {
+          _internal_add_ids(::PROTOBUF_NAMESPACE_ID::internal::ReadVarint64(&ptr));
+          CHK_(ptr);
+        } else
+          goto handle_unusual;
+        continue;
+      default:
+        goto handle_unusual;
+    }  // switch
+  handle_unusual:
+    if ((tag == 0) || ((tag & 7) == 4)) {
+      CHK_(ptr);
+      ctx->SetLastTag(tag);
+      goto message_done;
+    }
+    ptr = UnknownFieldParse(
+        tag,
+        _internal_metadata_.mutable_unknown_fields<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(),
+        ptr, ctx);
+    CHK_(ptr != nullptr);
+  }  // while
+message_done:
+  return ptr;
+failure:
+  ptr = nullptr;
+  goto message_done;
+#undef CHK_
+}
+
+uint8_t* BatchDeleteRequest::_InternalSerialize(
+    uint8_t* target, ::PROTOBUF_NAMESPACE_ID::io::EpsCopyOutputStream* stream) const {
+  // @@protoc_insertion_point(serialize_to_array_start:rpc.BatchDeleteRequest)
+  uint32_t cached_has_bits = 0;
+  (void) cached_has_bits;
+
+  // int64 user_id = 1;
+  if (this->_internal_user_id() != 0) {
+    target = stream->EnsureSpace(target);
+    target = ::_pbi::WireFormatLite::WriteInt64ToArray(1, this->_internal_user_id(), target);
+  }
+
+  // repeated int64 ids = 2;
+  {
+    int byte_size = _impl_._ids_cached_byte_size_.load(std::memory_order_relaxed);
+    if (byte_size > 0) {
+      target = stream->WriteInt64Packed(
+          2, _internal_ids(), byte_size, target);
+    }
+  }
+
+  if (PROTOBUF_PREDICT_FALSE(_internal_metadata_.have_unknown_fields())) {
+    target = ::_pbi::WireFormat::InternalSerializeUnknownFieldsToArray(
+        _internal_metadata_.unknown_fields<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(::PROTOBUF_NAMESPACE_ID::UnknownFieldSet::default_instance), target, stream);
+  }
+  // @@protoc_insertion_point(serialize_to_array_end:rpc.BatchDeleteRequest)
+  return target;
+}
+
+size_t BatchDeleteRequest::ByteSizeLong() const {
+// @@protoc_insertion_point(message_byte_size_start:rpc.BatchDeleteRequest)
+  size_t total_size = 0;
+
+  uint32_t cached_has_bits = 0;
+  // Prevent compiler warnings about cached_has_bits being unused
+  (void) cached_has_bits;
+
+  // repeated int64 ids = 2;
+  {
+    size_t data_size = ::_pbi::WireFormatLite::
+      Int64Size(this->_impl_.ids_);
+    if (data_size > 0) {
+      total_size += 1 +
+        ::_pbi::WireFormatLite::Int32Size(static_cast<int32_t>(data_size));
+    }
+    int cached_size = ::_pbi::ToCachedSize(data_size);
+    _impl_._ids_cached_byte_size_.store(cached_size,
+                                    std::memory_order_relaxed);
+    total_size += data_size;
+  }
+
+  // int64 user_id = 1;
+  if (this->_internal_user_id() != 0) {
+    total_size += ::_pbi::WireFormatLite::Int64SizePlusOne(this->_internal_user_id());
+  }
+
+  return MaybeComputeUnknownFieldsSize(total_size, &_impl_._cached_size_);
+}
+
+const ::PROTOBUF_NAMESPACE_ID::Message::ClassData BatchDeleteRequest::_class_data_ = {
+    ::PROTOBUF_NAMESPACE_ID::Message::CopyWithSourceCheck,
+    BatchDeleteRequest::MergeImpl
+};
+const ::PROTOBUF_NAMESPACE_ID::Message::ClassData*BatchDeleteRequest::GetClassData() const { return &_class_data_; }
+
+
+void BatchDeleteRequest::MergeImpl(::PROTOBUF_NAMESPACE_ID::Message& to_msg, const ::PROTOBUF_NAMESPACE_ID::Message& from_msg) {
+  auto* const _this = static_cast<BatchDeleteRequest*>(&to_msg);
+  auto& from = static_cast<const BatchDeleteRequest&>(from_msg);
+  // @@protoc_insertion_point(class_specific_merge_from_start:rpc.BatchDeleteRequest)
+  GOOGLE_DCHECK_NE(&from, _this);
+  uint32_t cached_has_bits = 0;
+  (void) cached_has_bits;
+
+  _this->_impl_.ids_.MergeFrom(from._impl_.ids_);
+  if (from._internal_user_id() != 0) {
+    _this->_internal_set_user_id(from._internal_user_id());
+  }
+  _this->_internal_metadata_.MergeFrom<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(from._internal_metadata_);
+}
+
+void BatchDeleteRequest::CopyFrom(const BatchDeleteRequest& from) {
+// @@protoc_insertion_point(class_specific_copy_from_start:rpc.BatchDeleteRequest)
+  if (&from == this) return;
+  Clear();
+  MergeFrom(from);
+}
+
+bool BatchDeleteRequest::IsInitialized() const {
+  return true;
+}
+
+void BatchDeleteRequest::InternalSwap(BatchDeleteRequest* other) {
+  using std::swap;
+  _internal_metadata_.InternalSwap(&other->_internal_metadata_);
+  _impl_.ids_.InternalSwap(&other->_impl_.ids_);
+  swap(_impl_.user_id_, other->_impl_.user_id_);
+}
+
+::PROTOBUF_NAMESPACE_ID::Metadata BatchDeleteRequest::GetMetadata() const {
+  return ::_pbi::AssignDescriptors(
+      &descriptor_table_rpc_5ffile_2eproto_getter, &descriptor_table_rpc_5ffile_2eproto_once,
+      file_level_metadata_rpc_5ffile_2eproto[12]);
+}
+
+// ===================================================================
+
+class BatchDeleteResponse::_Internal {
+ public:
+};
+
+BatchDeleteResponse::BatchDeleteResponse(::PROTOBUF_NAMESPACE_ID::Arena* arena,
+                         bool is_message_owned)
+  : ::PROTOBUF_NAMESPACE_ID::Message(arena, is_message_owned) {
+  SharedCtor(arena, is_message_owned);
+  // @@protoc_insertion_point(arena_constructor:rpc.BatchDeleteResponse)
+}
+BatchDeleteResponse::BatchDeleteResponse(const BatchDeleteResponse& from)
+  : ::PROTOBUF_NAMESPACE_ID::Message() {
+  BatchDeleteResponse* const _this = this; (void)_this;
+  new (&_impl_) Impl_{
+      decltype(_impl_.error_){}
+    , decltype(_impl_.success_){}
+    , decltype(_impl_.deleted_count_){}
+    , decltype(_impl_.error_code_){}
+    , /*decltype(_impl_._cached_size_)*/{}};
+
+  _internal_metadata_.MergeFrom<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(from._internal_metadata_);
+  _impl_.error_.InitDefault();
+  #ifdef PROTOBUF_FORCE_COPY_DEFAULT_STRING
+    _impl_.error_.Set("", GetArenaForAllocation());
+  #endif // PROTOBUF_FORCE_COPY_DEFAULT_STRING
+  if (!from._internal_error().empty()) {
+    _this->_impl_.error_.Set(from._internal_error(), 
+      _this->GetArenaForAllocation());
+  }
+  ::memcpy(&_impl_.success_, &from._impl_.success_,
+    static_cast<size_t>(reinterpret_cast<char*>(&_impl_.error_code_) -
+    reinterpret_cast<char*>(&_impl_.success_)) + sizeof(_impl_.error_code_));
+  // @@protoc_insertion_point(copy_constructor:rpc.BatchDeleteResponse)
+}
+
+inline void BatchDeleteResponse::SharedCtor(
+    ::_pb::Arena* arena, bool is_message_owned) {
+  (void)arena;
+  (void)is_message_owned;
+  new (&_impl_) Impl_{
+      decltype(_impl_.error_){}
+    , decltype(_impl_.success_){false}
+    , decltype(_impl_.deleted_count_){0}
+    , decltype(_impl_.error_code_){0}
+    , /*decltype(_impl_._cached_size_)*/{}
+  };
+  _impl_.error_.InitDefault();
+  #ifdef PROTOBUF_FORCE_COPY_DEFAULT_STRING
+    _impl_.error_.Set("", GetArenaForAllocation());
+  #endif // PROTOBUF_FORCE_COPY_DEFAULT_STRING
+}
+
+BatchDeleteResponse::~BatchDeleteResponse() {
+  // @@protoc_insertion_point(destructor:rpc.BatchDeleteResponse)
+  if (auto *arena = _internal_metadata_.DeleteReturnArena<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>()) {
+  (void)arena;
+    return;
+  }
+  SharedDtor();
+}
+
+inline void BatchDeleteResponse::SharedDtor() {
+  GOOGLE_DCHECK(GetArenaForAllocation() == nullptr);
+  _impl_.error_.Destroy();
+}
+
+void BatchDeleteResponse::SetCachedSize(int size) const {
+  _impl_._cached_size_.Set(size);
+}
+
+void BatchDeleteResponse::Clear() {
+// @@protoc_insertion_point(message_clear_start:rpc.BatchDeleteResponse)
+  uint32_t cached_has_bits = 0;
+  // Prevent compiler warnings about cached_has_bits being unused
+  (void) cached_has_bits;
+
+  _impl_.error_.ClearToEmpty();
+  ::memset(&_impl_.success_, 0, static_cast<size_t>(
+      reinterpret_cast<char*>(&_impl_.error_code_) -
+      reinterpret_cast<char*>(&_impl_.success_)) + sizeof(_impl_.error_code_));
+  _internal_metadata_.Clear<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>();
+}
+
+const char* BatchDeleteResponse::_InternalParse(const char* ptr, ::_pbi::ParseContext* ctx) {
+#define CHK_(x) if (PROTOBUF_PREDICT_FALSE(!(x))) goto failure
+  while (!ctx->Done(&ptr)) {
+    uint32_t tag;
+    ptr = ::_pbi::ReadTag(ptr, &tag);
+    switch (tag >> 3) {
+      // bool success = 1;
+      case 1:
+        if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 8)) {
+          _impl_.success_ = ::PROTOBUF_NAMESPACE_ID::internal::ReadVarint64(&ptr);
+          CHK_(ptr);
+        } else
+          goto handle_unusual;
+        continue;
+      // int32 deleted_count = 2;
+      case 2:
+        if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 16)) {
+          _impl_.deleted_count_ = ::PROTOBUF_NAMESPACE_ID::internal::ReadVarint32(&ptr);
+          CHK_(ptr);
+        } else
+          goto handle_unusual;
+        continue;
+      // string error = 3;
+      case 3:
+        if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 26)) {
+          auto str = _internal_mutable_error();
+          ptr = ::_pbi::InlineGreedyStringParser(str, ptr, ctx);
+          CHK_(ptr);
+          CHK_(::_pbi::VerifyUTF8(str, "rpc.BatchDeleteResponse.error"));
+        } else
+          goto handle_unusual;
+        continue;
+      // int32 error_code = 99;
+      case 99:
+        if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 24)) {
+          _impl_.error_code_ = ::PROTOBUF_NAMESPACE_ID::internal::ReadVarint32(&ptr);
+          CHK_(ptr);
+        } else
+          goto handle_unusual;
+        continue;
+      default:
+        goto handle_unusual;
+    }  // switch
+  handle_unusual:
+    if ((tag == 0) || ((tag & 7) == 4)) {
+      CHK_(ptr);
+      ctx->SetLastTag(tag);
+      goto message_done;
+    }
+    ptr = UnknownFieldParse(
+        tag,
+        _internal_metadata_.mutable_unknown_fields<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(),
+        ptr, ctx);
+    CHK_(ptr != nullptr);
+  }  // while
+message_done:
+  return ptr;
+failure:
+  ptr = nullptr;
+  goto message_done;
+#undef CHK_
+}
+
+uint8_t* BatchDeleteResponse::_InternalSerialize(
+    uint8_t* target, ::PROTOBUF_NAMESPACE_ID::io::EpsCopyOutputStream* stream) const {
+  // @@protoc_insertion_point(serialize_to_array_start:rpc.BatchDeleteResponse)
+  uint32_t cached_has_bits = 0;
+  (void) cached_has_bits;
+
+  // bool success = 1;
+  if (this->_internal_success() != 0) {
+    target = stream->EnsureSpace(target);
+    target = ::_pbi::WireFormatLite::WriteBoolToArray(1, this->_internal_success(), target);
+  }
+
+  // int32 deleted_count = 2;
+  if (this->_internal_deleted_count() != 0) {
+    target = stream->EnsureSpace(target);
+    target = ::_pbi::WireFormatLite::WriteInt32ToArray(2, this->_internal_deleted_count(), target);
+  }
+
+  // string error = 3;
+  if (!this->_internal_error().empty()) {
+    ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::VerifyUtf8String(
+      this->_internal_error().data(), static_cast<int>(this->_internal_error().length()),
+      ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::SERIALIZE,
+      "rpc.BatchDeleteResponse.error");
+    target = stream->WriteStringMaybeAliased(
+        3, this->_internal_error(), target);
+  }
+
+  // int32 error_code = 99;
+  if (this->_internal_error_code() != 0) {
+    target = stream->EnsureSpace(target);
+    target = ::_pbi::WireFormatLite::WriteInt32ToArray(99, this->_internal_error_code(), target);
+  }
+
+  if (PROTOBUF_PREDICT_FALSE(_internal_metadata_.have_unknown_fields())) {
+    target = ::_pbi::WireFormat::InternalSerializeUnknownFieldsToArray(
+        _internal_metadata_.unknown_fields<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(::PROTOBUF_NAMESPACE_ID::UnknownFieldSet::default_instance), target, stream);
+  }
+  // @@protoc_insertion_point(serialize_to_array_end:rpc.BatchDeleteResponse)
+  return target;
+}
+
+size_t BatchDeleteResponse::ByteSizeLong() const {
+// @@protoc_insertion_point(message_byte_size_start:rpc.BatchDeleteResponse)
+  size_t total_size = 0;
+
+  uint32_t cached_has_bits = 0;
+  // Prevent compiler warnings about cached_has_bits being unused
+  (void) cached_has_bits;
+
+  // string error = 3;
+  if (!this->_internal_error().empty()) {
+    total_size += 1 +
+      ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::StringSize(
+        this->_internal_error());
+  }
+
+  // bool success = 1;
+  if (this->_internal_success() != 0) {
+    total_size += 1 + 1;
+  }
+
+  // int32 deleted_count = 2;
+  if (this->_internal_deleted_count() != 0) {
+    total_size += ::_pbi::WireFormatLite::Int32SizePlusOne(this->_internal_deleted_count());
+  }
+
+  // int32 error_code = 99;
+  if (this->_internal_error_code() != 0) {
+    total_size += 2 +
+      ::_pbi::WireFormatLite::Int32Size(
+        this->_internal_error_code());
+  }
+
+  return MaybeComputeUnknownFieldsSize(total_size, &_impl_._cached_size_);
+}
+
+const ::PROTOBUF_NAMESPACE_ID::Message::ClassData BatchDeleteResponse::_class_data_ = {
+    ::PROTOBUF_NAMESPACE_ID::Message::CopyWithSourceCheck,
+    BatchDeleteResponse::MergeImpl
+};
+const ::PROTOBUF_NAMESPACE_ID::Message::ClassData*BatchDeleteResponse::GetClassData() const { return &_class_data_; }
+
+
+void BatchDeleteResponse::MergeImpl(::PROTOBUF_NAMESPACE_ID::Message& to_msg, const ::PROTOBUF_NAMESPACE_ID::Message& from_msg) {
+  auto* const _this = static_cast<BatchDeleteResponse*>(&to_msg);
+  auto& from = static_cast<const BatchDeleteResponse&>(from_msg);
+  // @@protoc_insertion_point(class_specific_merge_from_start:rpc.BatchDeleteResponse)
+  GOOGLE_DCHECK_NE(&from, _this);
+  uint32_t cached_has_bits = 0;
+  (void) cached_has_bits;
+
+  if (!from._internal_error().empty()) {
+    _this->_internal_set_error(from._internal_error());
+  }
+  if (from._internal_success() != 0) {
+    _this->_internal_set_success(from._internal_success());
+  }
+  if (from._internal_deleted_count() != 0) {
+    _this->_internal_set_deleted_count(from._internal_deleted_count());
+  }
+  if (from._internal_error_code() != 0) {
+    _this->_internal_set_error_code(from._internal_error_code());
+  }
+  _this->_internal_metadata_.MergeFrom<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(from._internal_metadata_);
+}
+
+void BatchDeleteResponse::CopyFrom(const BatchDeleteResponse& from) {
+// @@protoc_insertion_point(class_specific_copy_from_start:rpc.BatchDeleteResponse)
+  if (&from == this) return;
+  Clear();
+  MergeFrom(from);
+}
+
+bool BatchDeleteResponse::IsInitialized() const {
+  return true;
+}
+
+void BatchDeleteResponse::InternalSwap(BatchDeleteResponse* other) {
+  using std::swap;
+  auto* lhs_arena = GetArenaForAllocation();
+  auto* rhs_arena = other->GetArenaForAllocation();
+  _internal_metadata_.InternalSwap(&other->_internal_metadata_);
+  ::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr::InternalSwap(
+      &_impl_.error_, lhs_arena,
+      &other->_impl_.error_, rhs_arena
+  );
+  ::PROTOBUF_NAMESPACE_ID::internal::memswap<
+      PROTOBUF_FIELD_OFFSET(BatchDeleteResponse, _impl_.error_code_)
+      + sizeof(BatchDeleteResponse::_impl_.error_code_)
+      - PROTOBUF_FIELD_OFFSET(BatchDeleteResponse, _impl_.success_)>(
+          reinterpret_cast<char*>(&_impl_.success_),
+          reinterpret_cast<char*>(&other->_impl_.success_));
+}
+
+::PROTOBUF_NAMESPACE_ID::Metadata BatchDeleteResponse::GetMetadata() const {
+  return ::_pbi::AssignDescriptors(
+      &descriptor_table_rpc_5ffile_2eproto_getter, &descriptor_table_rpc_5ffile_2eproto_once,
+      file_level_metadata_rpc_5ffile_2eproto[13]);
+}
+
+// ===================================================================
+
 class DeleteFileResponse::_Internal {
  public:
 };
@@ -2859,6 +4953,7 @@ DeleteFileResponse::DeleteFileResponse(const DeleteFileResponse& from)
   new (&_impl_) Impl_{
       decltype(_impl_.error_){}
     , decltype(_impl_.success_){}
+    , decltype(_impl_.error_code_){}
     , /*decltype(_impl_._cached_size_)*/{}};
 
   _internal_metadata_.MergeFrom<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(from._internal_metadata_);
@@ -2870,7 +4965,9 @@ DeleteFileResponse::DeleteFileResponse(const DeleteFileResponse& from)
     _this->_impl_.error_.Set(from._internal_error(), 
       _this->GetArenaForAllocation());
   }
-  _this->_impl_.success_ = from._impl_.success_;
+  ::memcpy(&_impl_.success_, &from._impl_.success_,
+    static_cast<size_t>(reinterpret_cast<char*>(&_impl_.error_code_) -
+    reinterpret_cast<char*>(&_impl_.success_)) + sizeof(_impl_.error_code_));
   // @@protoc_insertion_point(copy_constructor:rpc.DeleteFileResponse)
 }
 
@@ -2881,6 +4978,7 @@ inline void DeleteFileResponse::SharedCtor(
   new (&_impl_) Impl_{
       decltype(_impl_.error_){}
     , decltype(_impl_.success_){false}
+    , decltype(_impl_.error_code_){0}
     , /*decltype(_impl_._cached_size_)*/{}
   };
   _impl_.error_.InitDefault();
@@ -2914,7 +5012,9 @@ void DeleteFileResponse::Clear() {
   (void) cached_has_bits;
 
   _impl_.error_.ClearToEmpty();
-  _impl_.success_ = false;
+  ::memset(&_impl_.success_, 0, static_cast<size_t>(
+      reinterpret_cast<char*>(&_impl_.error_code_) -
+      reinterpret_cast<char*>(&_impl_.success_)) + sizeof(_impl_.error_code_));
   _internal_metadata_.Clear<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>();
 }
 
@@ -2939,6 +5039,14 @@ const char* DeleteFileResponse::_InternalParse(const char* ptr, ::_pbi::ParseCon
           ptr = ::_pbi::InlineGreedyStringParser(str, ptr, ctx);
           CHK_(ptr);
           CHK_(::_pbi::VerifyUTF8(str, "rpc.DeleteFileResponse.error"));
+        } else
+          goto handle_unusual;
+        continue;
+      // int32 error_code = 99;
+      case 99:
+        if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 24)) {
+          _impl_.error_code_ = ::PROTOBUF_NAMESPACE_ID::internal::ReadVarint32(&ptr);
+          CHK_(ptr);
         } else
           goto handle_unusual;
         continue;
@@ -2987,6 +5095,12 @@ uint8_t* DeleteFileResponse::_InternalSerialize(
         2, this->_internal_error(), target);
   }
 
+  // int32 error_code = 99;
+  if (this->_internal_error_code() != 0) {
+    target = stream->EnsureSpace(target);
+    target = ::_pbi::WireFormatLite::WriteInt32ToArray(99, this->_internal_error_code(), target);
+  }
+
   if (PROTOBUF_PREDICT_FALSE(_internal_metadata_.have_unknown_fields())) {
     target = ::_pbi::WireFormat::InternalSerializeUnknownFieldsToArray(
         _internal_metadata_.unknown_fields<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(::PROTOBUF_NAMESPACE_ID::UnknownFieldSet::default_instance), target, stream);
@@ -3015,6 +5129,13 @@ size_t DeleteFileResponse::ByteSizeLong() const {
     total_size += 1 + 1;
   }
 
+  // int32 error_code = 99;
+  if (this->_internal_error_code() != 0) {
+    total_size += 2 +
+      ::_pbi::WireFormatLite::Int32Size(
+        this->_internal_error_code());
+  }
+
   return MaybeComputeUnknownFieldsSize(total_size, &_impl_._cached_size_);
 }
 
@@ -3039,6 +5160,9 @@ void DeleteFileResponse::MergeImpl(::PROTOBUF_NAMESPACE_ID::Message& to_msg, con
   if (from._internal_success() != 0) {
     _this->_internal_set_success(from._internal_success());
   }
+  if (from._internal_error_code() != 0) {
+    _this->_internal_set_error_code(from._internal_error_code());
+  }
   _this->_internal_metadata_.MergeFrom<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(from._internal_metadata_);
 }
 
@@ -3062,13 +5186,18 @@ void DeleteFileResponse::InternalSwap(DeleteFileResponse* other) {
       &_impl_.error_, lhs_arena,
       &other->_impl_.error_, rhs_arena
   );
-  swap(_impl_.success_, other->_impl_.success_);
+  ::PROTOBUF_NAMESPACE_ID::internal::memswap<
+      PROTOBUF_FIELD_OFFSET(DeleteFileResponse, _impl_.error_code_)
+      + sizeof(DeleteFileResponse::_impl_.error_code_)
+      - PROTOBUF_FIELD_OFFSET(DeleteFileResponse, _impl_.success_)>(
+          reinterpret_cast<char*>(&_impl_.success_),
+          reinterpret_cast<char*>(&other->_impl_.success_));
 }
 
 ::PROTOBUF_NAMESPACE_ID::Metadata DeleteFileResponse::GetMetadata() const {
   return ::_pbi::AssignDescriptors(
       &descriptor_table_rpc_5ffile_2eproto_getter, &descriptor_table_rpc_5ffile_2eproto_once,
-      file_level_metadata_rpc_5ffile_2eproto[8]);
+      file_level_metadata_rpc_5ffile_2eproto[14]);
 }
 
 // @@protoc_insertion_point(namespace_scope)
@@ -3105,6 +5234,30 @@ Arena::CreateMaybeMessage< ::rpc::ListFilesResponse >(Arena* arena) {
 template<> PROTOBUF_NOINLINE ::rpc::DeleteFileRequest*
 Arena::CreateMaybeMessage< ::rpc::DeleteFileRequest >(Arena* arena) {
   return Arena::CreateMessageInternal< ::rpc::DeleteFileRequest >(arena);
+}
+template<> PROTOBUF_NOINLINE ::rpc::CreateFolderRequest*
+Arena::CreateMaybeMessage< ::rpc::CreateFolderRequest >(Arena* arena) {
+  return Arena::CreateMessageInternal< ::rpc::CreateFolderRequest >(arena);
+}
+template<> PROTOBUF_NOINLINE ::rpc::CreateFolderResponse*
+Arena::CreateMaybeMessage< ::rpc::CreateFolderResponse >(Arena* arena) {
+  return Arena::CreateMessageInternal< ::rpc::CreateFolderResponse >(arena);
+}
+template<> PROTOBUF_NOINLINE ::rpc::MoveFileRequest*
+Arena::CreateMaybeMessage< ::rpc::MoveFileRequest >(Arena* arena) {
+  return Arena::CreateMessageInternal< ::rpc::MoveFileRequest >(arena);
+}
+template<> PROTOBUF_NOINLINE ::rpc::MoveFileResponse*
+Arena::CreateMaybeMessage< ::rpc::MoveFileResponse >(Arena* arena) {
+  return Arena::CreateMessageInternal< ::rpc::MoveFileResponse >(arena);
+}
+template<> PROTOBUF_NOINLINE ::rpc::BatchDeleteRequest*
+Arena::CreateMaybeMessage< ::rpc::BatchDeleteRequest >(Arena* arena) {
+  return Arena::CreateMessageInternal< ::rpc::BatchDeleteRequest >(arena);
+}
+template<> PROTOBUF_NOINLINE ::rpc::BatchDeleteResponse*
+Arena::CreateMaybeMessage< ::rpc::BatchDeleteResponse >(Arena* arena) {
+  return Arena::CreateMessageInternal< ::rpc::BatchDeleteResponse >(arena);
 }
 template<> PROTOBUF_NOINLINE ::rpc::DeleteFileResponse*
 Arena::CreateMaybeMessage< ::rpc::DeleteFileResponse >(Arena* arena) {

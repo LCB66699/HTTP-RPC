@@ -4,14 +4,48 @@ package rpc;
 
 option go_package = "rpc-server/proto/rpc";
 
+import "google/api/annotations.proto";
+
 service FileService {
-  rpc CreateFile(CreateFileRequest) returns (CreateFileResponse);
-  rpc GetFile(GetFileRequest) returns (GetFileResponse);
-  rpc ListFiles(ListFilesRequest) returns (ListFilesResponse);
-  rpc DeleteFile(DeleteFileRequest) returns (DeleteFileResponse);
-  rpc CreateFolder(CreateFolderRequest) returns (CreateFolderResponse);
-  rpc MoveFile(MoveFileRequest) returns (MoveFileResponse);
-  rpc BatchDelete(BatchDeleteRequest) returns (BatchDeleteResponse);
+  rpc CreateFile(CreateFileRequest) returns (CreateFileResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/files"
+      body: "*"
+    };
+  }
+  rpc GetFile(GetFileRequest) returns (GetFileResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/files/{id}"
+    };
+  }
+  rpc ListFiles(ListFilesRequest) returns (ListFilesResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/files"
+    };
+  }
+  rpc DeleteFile(DeleteFileRequest) returns (DeleteFileResponse) {
+    option (google.api.http) = {
+      delete: "/api/v1/files/{id}"
+    };
+  }
+  rpc CreateFolder(CreateFolderRequest) returns (CreateFolderResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/folders"
+      body: "*"
+    };
+  }
+  rpc MoveFile(MoveFileRequest) returns (MoveFileResponse) {
+    option (google.api.http) = {
+      put: "/api/v1/files/{id}/move"
+      body: "*"
+    };
+  }
+  rpc BatchDelete(BatchDeleteRequest) returns (BatchDeleteResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/files/batch-delete"
+      body: "*"
+    };
+  }
 }
 
 message FileInfo {

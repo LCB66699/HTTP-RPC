@@ -1,4 +1,4 @@
-﻿package gateway
+package gateway
 
 import (
 	"context"
@@ -168,19 +168,19 @@ func randomOTP() string {
 	return fmt.Sprintf("%06d", n)
 }
 
-func (g *Gateway) checkLoginRate(username string) bool {
+func (g *Gateway) checkLoginRate(ctx context.Context, username string) bool {
 	if username == "" || g.RDB == nil {
 		return false
 	}
 	blockKey := "rate:login:" + username + ":blocked"
-	if n, _ := g.RDB.Exists(context.Background(), blockKey).Result(); n > 0 {
+	if n, _ := g.RDB.Exists(ctx, blockKey).Result(); n > 0 {
 		return true
 	}
 	minKey := "rate:login:" + username + ":" + time.Now().Format("2006-01-02T15:04")
-	n, _ := g.RDB.Incr(context.Background(), minKey).Result()
-	g.RDB.Expire(context.Background(), minKey, 60*time.Second)
+	n, _ := g.RDB.Incr(ctx, minKey).Result()
+	g.RDB.Expire(ctx, minKey, 60*time.Second)
 	if n > 5 {
-		g.RDB.Set(context.Background(), blockKey, "1", 5*time.Minute)
+		g.RDB.Set(ctx, blockKey, "1", 5*time.Minute)
 		return true
 	}
 	return false
@@ -211,7 +211,7 @@ func (g *Gateway) Register(w http.ResponseWriter, r *http.Request) {
 func (g *Gateway) Login(w http.ResponseWriter, r *http.Request) {
 	var req pb.LoginRequest
 	json.NewDecoder(r.Body).Decode(&req)
-	if g.checkLoginRate(req.Username) {
+	if g.checkLoginRate(r.Context(), req.Username) {
 		WriteJSONStatus(w, http.StatusTooManyRequests,
 			map[string]interface{}{"success": false, "error": "Too many attempts, try again later"})
 		return
@@ -247,12 +247,10 @@ func (g *Gateway) Refresh(w http.ResponseWriter, r *http.Request) {
 	resp, err := g.AuthClient.RefreshToken(r.Context(), &req)
 	if err != nil {
 		log.Printf("[refresh] gRPC error: %v", err)
+		WriteGRPCError(w, err, "refresh failed")
+		return
 	}
-	at := ""
-	if resp != nil {
-		at = resp.AccessToken
-	}
-	g.setCookies(w, at, "")
+	g.setCookies(w, resp.GetAccessToken(), "")
 	WriteJSON(w, resp)
 }
 

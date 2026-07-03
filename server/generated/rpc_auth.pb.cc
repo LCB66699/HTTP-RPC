@@ -43,6 +43,7 @@ PROTOBUF_CONSTEXPR LoginResponse::LoginResponse(
   , /*decltype(_impl_.role_)*/{&::_pbi::fixed_address_empty_string, ::_pbi::ConstantInitialized{}}
   , /*decltype(_impl_.user_id_)*/int64_t{0}
   , /*decltype(_impl_.success_)*/false
+  , /*decltype(_impl_.error_code_)*/0
   , /*decltype(_impl_._cached_size_)*/{}} {}
 struct LoginResponseDefaultTypeInternal {
   PROTOBUF_CONSTEXPR LoginResponseDefaultTypeInternal()
@@ -75,6 +76,7 @@ PROTOBUF_CONSTEXPR RegisterResponse::RegisterResponse(
   , /*decltype(_impl_.role_)*/{&::_pbi::fixed_address_empty_string, ::_pbi::ConstantInitialized{}}
   , /*decltype(_impl_.user_id_)*/int64_t{0}
   , /*decltype(_impl_.success_)*/false
+  , /*decltype(_impl_.error_code_)*/0
   , /*decltype(_impl_._cached_size_)*/{}} {}
 struct RegisterResponseDefaultTypeInternal {
   PROTOBUF_CONSTEXPR RegisterResponseDefaultTypeInternal()
@@ -104,6 +106,7 @@ PROTOBUF_CONSTEXPR RefreshTokenResponse::RefreshTokenResponse(
     /*decltype(_impl_.error_)*/{&::_pbi::fixed_address_empty_string, ::_pbi::ConstantInitialized{}}
   , /*decltype(_impl_.access_token_)*/{&::_pbi::fixed_address_empty_string, ::_pbi::ConstantInitialized{}}
   , /*decltype(_impl_.success_)*/false
+  , /*decltype(_impl_.error_code_)*/0
   , /*decltype(_impl_._cached_size_)*/{}} {}
 struct RefreshTokenResponseDefaultTypeInternal {
   PROTOBUF_CONSTEXPR RefreshTokenResponseDefaultTypeInternal()
@@ -136,6 +139,7 @@ PROTOBUF_CONSTEXPR ValidateUserResponse::ValidateUserResponse(
   , /*decltype(_impl_.error_)*/{&::_pbi::fixed_address_empty_string, ::_pbi::ConstantInitialized{}}
   , /*decltype(_impl_.user_id_)*/int64_t{0}
   , /*decltype(_impl_.valid_)*/false
+  , /*decltype(_impl_.error_code_)*/0
   , /*decltype(_impl_._cached_size_)*/{}} {}
 struct ValidateUserResponseDefaultTypeInternal {
   PROTOBUF_CONSTEXPR ValidateUserResponseDefaultTypeInternal()
@@ -146,8 +150,52 @@ struct ValidateUserResponseDefaultTypeInternal {
   };
 };
 PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 ValidateUserResponseDefaultTypeInternal _ValidateUserResponse_default_instance_;
+PROTOBUF_CONSTEXPR ChangePasswordRequest::ChangePasswordRequest(
+    ::_pbi::ConstantInitialized): _impl_{
+    /*decltype(_impl_.old_password_)*/{&::_pbi::fixed_address_empty_string, ::_pbi::ConstantInitialized{}}
+  , /*decltype(_impl_.new_password_)*/{&::_pbi::fixed_address_empty_string, ::_pbi::ConstantInitialized{}}
+  , /*decltype(_impl_.user_id_)*/int64_t{0}
+  , /*decltype(_impl_._cached_size_)*/{}} {}
+struct ChangePasswordRequestDefaultTypeInternal {
+  PROTOBUF_CONSTEXPR ChangePasswordRequestDefaultTypeInternal()
+      : _instance(::_pbi::ConstantInitialized{}) {}
+  ~ChangePasswordRequestDefaultTypeInternal() {}
+  union {
+    ChangePasswordRequest _instance;
+  };
+};
+PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 ChangePasswordRequestDefaultTypeInternal _ChangePasswordRequest_default_instance_;
+PROTOBUF_CONSTEXPR ChangePasswordResponse::ChangePasswordResponse(
+    ::_pbi::ConstantInitialized): _impl_{
+    /*decltype(_impl_.error_)*/{&::_pbi::fixed_address_empty_string, ::_pbi::ConstantInitialized{}}
+  , /*decltype(_impl_.success_)*/false
+  , /*decltype(_impl_.error_code_)*/0
+  , /*decltype(_impl_._cached_size_)*/{}} {}
+struct ChangePasswordResponseDefaultTypeInternal {
+  PROTOBUF_CONSTEXPR ChangePasswordResponseDefaultTypeInternal()
+      : _instance(::_pbi::ConstantInitialized{}) {}
+  ~ChangePasswordResponseDefaultTypeInternal() {}
+  union {
+    ChangePasswordResponse _instance;
+  };
+};
+PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 ChangePasswordResponseDefaultTypeInternal _ChangePasswordResponse_default_instance_;
+PROTOBUF_CONSTEXPR PhoneLoginRequest::PhoneLoginRequest(
+    ::_pbi::ConstantInitialized): _impl_{
+    /*decltype(_impl_.phone_)*/{&::_pbi::fixed_address_empty_string, ::_pbi::ConstantInitialized{}}
+  , /*decltype(_impl_.otp_)*/{&::_pbi::fixed_address_empty_string, ::_pbi::ConstantInitialized{}}
+  , /*decltype(_impl_._cached_size_)*/{}} {}
+struct PhoneLoginRequestDefaultTypeInternal {
+  PROTOBUF_CONSTEXPR PhoneLoginRequestDefaultTypeInternal()
+      : _instance(::_pbi::ConstantInitialized{}) {}
+  ~PhoneLoginRequestDefaultTypeInternal() {}
+  union {
+    PhoneLoginRequest _instance;
+  };
+};
+PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 PhoneLoginRequestDefaultTypeInternal _PhoneLoginRequest_default_instance_;
 }  // namespace rpc
-static ::_pb::Metadata file_level_metadata_rpc_5fauth_2eproto[8];
+static ::_pb::Metadata file_level_metadata_rpc_5fauth_2eproto[11];
 static constexpr ::_pb::EnumDescriptor const** file_level_enum_descriptors_rpc_5fauth_2eproto = nullptr;
 static constexpr ::_pb::ServiceDescriptor const** file_level_service_descriptors_rpc_5fauth_2eproto = nullptr;
 
@@ -168,6 +216,7 @@ const uint32_t TableStruct_rpc_5fauth_2eproto::offsets[] PROTOBUF_SECTION_VARIAB
   ~0u,  // no _inlined_string_donated_
   PROTOBUF_FIELD_OFFSET(::rpc::LoginResponse, _impl_.success_),
   PROTOBUF_FIELD_OFFSET(::rpc::LoginResponse, _impl_.error_),
+  PROTOBUF_FIELD_OFFSET(::rpc::LoginResponse, _impl_.error_code_),
   PROTOBUF_FIELD_OFFSET(::rpc::LoginResponse, _impl_.user_id_),
   PROTOBUF_FIELD_OFFSET(::rpc::LoginResponse, _impl_.access_token_),
   PROTOBUF_FIELD_OFFSET(::rpc::LoginResponse, _impl_.refresh_token_),
@@ -188,6 +237,7 @@ const uint32_t TableStruct_rpc_5fauth_2eproto::offsets[] PROTOBUF_SECTION_VARIAB
   ~0u,  // no _inlined_string_donated_
   PROTOBUF_FIELD_OFFSET(::rpc::RegisterResponse, _impl_.success_),
   PROTOBUF_FIELD_OFFSET(::rpc::RegisterResponse, _impl_.error_),
+  PROTOBUF_FIELD_OFFSET(::rpc::RegisterResponse, _impl_.error_code_),
   PROTOBUF_FIELD_OFFSET(::rpc::RegisterResponse, _impl_.user_id_),
   PROTOBUF_FIELD_OFFSET(::rpc::RegisterResponse, _impl_.access_token_),
   PROTOBUF_FIELD_OFFSET(::rpc::RegisterResponse, _impl_.refresh_token_),
@@ -208,6 +258,7 @@ const uint32_t TableStruct_rpc_5fauth_2eproto::offsets[] PROTOBUF_SECTION_VARIAB
   ~0u,  // no _inlined_string_donated_
   PROTOBUF_FIELD_OFFSET(::rpc::RefreshTokenResponse, _impl_.success_),
   PROTOBUF_FIELD_OFFSET(::rpc::RefreshTokenResponse, _impl_.error_),
+  PROTOBUF_FIELD_OFFSET(::rpc::RefreshTokenResponse, _impl_.error_code_),
   PROTOBUF_FIELD_OFFSET(::rpc::RefreshTokenResponse, _impl_.access_token_),
   ~0u,  // no _has_bits_
   PROTOBUF_FIELD_OFFSET(::rpc::ValidateUserRequest, _internal_metadata_),
@@ -229,16 +280,46 @@ const uint32_t TableStruct_rpc_5fauth_2eproto::offsets[] PROTOBUF_SECTION_VARIAB
   PROTOBUF_FIELD_OFFSET(::rpc::ValidateUserResponse, _impl_.user_id_),
   PROTOBUF_FIELD_OFFSET(::rpc::ValidateUserResponse, _impl_.role_),
   PROTOBUF_FIELD_OFFSET(::rpc::ValidateUserResponse, _impl_.error_),
+  PROTOBUF_FIELD_OFFSET(::rpc::ValidateUserResponse, _impl_.error_code_),
+  ~0u,  // no _has_bits_
+  PROTOBUF_FIELD_OFFSET(::rpc::ChangePasswordRequest, _internal_metadata_),
+  ~0u,  // no _extensions_
+  ~0u,  // no _oneof_case_
+  ~0u,  // no _weak_field_map_
+  ~0u,  // no _inlined_string_donated_
+  PROTOBUF_FIELD_OFFSET(::rpc::ChangePasswordRequest, _impl_.user_id_),
+  PROTOBUF_FIELD_OFFSET(::rpc::ChangePasswordRequest, _impl_.old_password_),
+  PROTOBUF_FIELD_OFFSET(::rpc::ChangePasswordRequest, _impl_.new_password_),
+  ~0u,  // no _has_bits_
+  PROTOBUF_FIELD_OFFSET(::rpc::ChangePasswordResponse, _internal_metadata_),
+  ~0u,  // no _extensions_
+  ~0u,  // no _oneof_case_
+  ~0u,  // no _weak_field_map_
+  ~0u,  // no _inlined_string_donated_
+  PROTOBUF_FIELD_OFFSET(::rpc::ChangePasswordResponse, _impl_.success_),
+  PROTOBUF_FIELD_OFFSET(::rpc::ChangePasswordResponse, _impl_.error_),
+  PROTOBUF_FIELD_OFFSET(::rpc::ChangePasswordResponse, _impl_.error_code_),
+  ~0u,  // no _has_bits_
+  PROTOBUF_FIELD_OFFSET(::rpc::PhoneLoginRequest, _internal_metadata_),
+  ~0u,  // no _extensions_
+  ~0u,  // no _oneof_case_
+  ~0u,  // no _weak_field_map_
+  ~0u,  // no _inlined_string_donated_
+  PROTOBUF_FIELD_OFFSET(::rpc::PhoneLoginRequest, _impl_.phone_),
+  PROTOBUF_FIELD_OFFSET(::rpc::PhoneLoginRequest, _impl_.otp_),
 };
 static const ::_pbi::MigrationSchema schemas[] PROTOBUF_SECTION_VARIABLE(protodesc_cold) = {
   { 0, -1, -1, sizeof(::rpc::LoginRequest)},
   { 8, -1, -1, sizeof(::rpc::LoginResponse)},
-  { 20, -1, -1, sizeof(::rpc::RegisterRequest)},
-  { 28, -1, -1, sizeof(::rpc::RegisterResponse)},
-  { 40, -1, -1, sizeof(::rpc::RefreshTokenRequest)},
-  { 48, -1, -1, sizeof(::rpc::RefreshTokenResponse)},
-  { 57, -1, -1, sizeof(::rpc::ValidateUserRequest)},
-  { 66, -1, -1, sizeof(::rpc::ValidateUserResponse)},
+  { 21, -1, -1, sizeof(::rpc::RegisterRequest)},
+  { 29, -1, -1, sizeof(::rpc::RegisterResponse)},
+  { 42, -1, -1, sizeof(::rpc::RefreshTokenRequest)},
+  { 50, -1, -1, sizeof(::rpc::RefreshTokenResponse)},
+  { 60, -1, -1, sizeof(::rpc::ValidateUserRequest)},
+  { 69, -1, -1, sizeof(::rpc::ValidateUserResponse)},
+  { 81, -1, -1, sizeof(::rpc::ChangePasswordRequest)},
+  { 90, -1, -1, sizeof(::rpc::ChangePasswordResponse)},
+  { 99, -1, -1, sizeof(::rpc::PhoneLoginRequest)},
 };
 
 static const ::_pb::Message* const file_default_instances[] = {
@@ -250,40 +331,54 @@ static const ::_pb::Message* const file_default_instances[] = {
   &::rpc::_RefreshTokenResponse_default_instance_._instance,
   &::rpc::_ValidateUserRequest_default_instance_._instance,
   &::rpc::_ValidateUserResponse_default_instance_._instance,
+  &::rpc::_ChangePasswordRequest_default_instance_._instance,
+  &::rpc::_ChangePasswordResponse_default_instance_._instance,
+  &::rpc::_PhoneLoginRequest_default_instance_._instance,
 };
 
 const char descriptor_table_protodef_rpc_5fauth_2eproto[] PROTOBUF_SECTION_VARIABLE(protodesc_cold) =
   "\n\016rpc_auth.proto\022\003rpc\"2\n\014LoginRequest\022\020\n"
-  "\010username\030\001 \001(\t\022\020\n\010password\030\002 \001(\t\"{\n\rLog"
-  "inResponse\022\017\n\007success\030\001 \001(\010\022\r\n\005error\030\003 \001"
-  "(\t\022\017\n\007user_id\030\004 \001(\003\022\024\n\014access_token\030\005 \001("
-  "\t\022\025\n\rrefresh_token\030\006 \001(\t\022\014\n\004role\030\007 \001(\t\"5"
-  "\n\017RegisterRequest\022\020\n\010username\030\001 \001(\t\022\020\n\010p"
-  "assword\030\002 \001(\t\"~\n\020RegisterResponse\022\017\n\007suc"
-  "cess\030\001 \001(\010\022\r\n\005error\030\003 \001(\t\022\017\n\007user_id\030\004 \001"
-  "(\003\022\024\n\014access_token\030\005 \001(\t\022\025\n\rrefresh_toke"
-  "n\030\006 \001(\t\022\014\n\004role\030\007 \001(\t\">\n\023RefreshTokenReq"
-  "uest\022\020\n\010username\030\001 \001(\t\022\025\n\rrefresh_token\030"
-  "\002 \001(\t\"L\n\024RefreshTokenResponse\022\017\n\007success"
-  "\030\001 \001(\010\022\r\n\005error\030\002 \001(\t\022\024\n\014access_token\030\003 "
-  "\001(\t\"G\n\023ValidateUserRequest\022\017\n\007user_id\030\001 "
-  "\001(\003\022\020\n\010username\030\002 \001(\t\022\r\n\005token\030\003 \001(\t\"e\n\024"
-  "ValidateUserResponse\022\r\n\005valid\030\001 \001(\010\022\020\n\010u"
-  "sername\030\002 \001(\t\022\017\n\007user_id\030\003 \001(\003\022\014\n\004role\030\004"
-  " \001(\t\022\r\n\005error\030\005 \001(\t2\200\002\n\013AuthService\022.\n\005L"
-  "ogin\022\021.rpc.LoginRequest\032\022.rpc.LoginRespo"
-  "nse\0227\n\010Register\022\024.rpc.RegisterRequest\032\025."
-  "rpc.RegisterResponse\022C\n\014RefreshToken\022\030.r"
-  "pc.RefreshTokenRequest\032\031.rpc.RefreshToke"
-  "nResponse\022C\n\014ValidateUser\022\030.rpc.Validate"
-  "UserRequest\032\031.rpc.ValidateUserResponseB\026"
-  "Z\024rpc-server/proto/rpcb\006proto3"
+  "\010username\030\001 \001(\t\022\020\n\010password\030\002 \001(\t\"\217\001\n\rLo"
+  "ginResponse\022\017\n\007success\030\001 \001(\010\022\r\n\005error\030\003 "
+  "\001(\t\022\022\n\nerror_code\030c \001(\005\022\017\n\007user_id\030\004 \001(\003"
+  "\022\024\n\014access_token\030\005 \001(\t\022\025\n\rrefresh_token\030"
+  "\006 \001(\t\022\014\n\004role\030\007 \001(\t\"5\n\017RegisterRequest\022\020"
+  "\n\010username\030\001 \001(\t\022\020\n\010password\030\002 \001(\t\"\222\001\n\020R"
+  "egisterResponse\022\017\n\007success\030\001 \001(\010\022\r\n\005erro"
+  "r\030\003 \001(\t\022\022\n\nerror_code\030c \001(\005\022\017\n\007user_id\030\004"
+  " \001(\003\022\024\n\014access_token\030\005 \001(\t\022\025\n\rrefresh_to"
+  "ken\030\006 \001(\t\022\014\n\004role\030\007 \001(\t\">\n\023RefreshTokenR"
+  "equest\022\020\n\010username\030\001 \001(\t\022\025\n\rrefresh_toke"
+  "n\030\002 \001(\t\"`\n\024RefreshTokenResponse\022\017\n\007succe"
+  "ss\030\001 \001(\010\022\r\n\005error\030\002 \001(\t\022\022\n\nerror_code\030c "
+  "\001(\005\022\024\n\014access_token\030\003 \001(\t\"G\n\023ValidateUse"
+  "rRequest\022\017\n\007user_id\030\001 \001(\003\022\020\n\010username\030\002 "
+  "\001(\t\022\r\n\005token\030\003 \001(\t\"y\n\024ValidateUserRespon"
+  "se\022\r\n\005valid\030\001 \001(\010\022\020\n\010username\030\002 \001(\t\022\017\n\007u"
+  "ser_id\030\003 \001(\003\022\014\n\004role\030\004 \001(\t\022\r\n\005error\030\005 \001("
+  "\t\022\022\n\nerror_code\030c \001(\005\"T\n\025ChangePasswordR"
+  "equest\022\017\n\007user_id\030\001 \001(\003\022\024\n\014old_password\030"
+  "\002 \001(\t\022\024\n\014new_password\030\003 \001(\t\"L\n\026ChangePas"
+  "swordResponse\022\017\n\007success\030\001 \001(\010\022\r\n\005error\030"
+  "\002 \001(\t\022\022\n\nerror_code\030c \001(\005\"/\n\021PhoneLoginR"
+  "equest\022\r\n\005phone\030\001 \001(\t\022\013\n\003otp\030\002 \001(\t2\207\003\n\013A"
+  "uthService\022.\n\005Login\022\021.rpc.LoginRequest\032\022"
+  ".rpc.LoginResponse\0227\n\010Register\022\024.rpc.Reg"
+  "isterRequest\032\025.rpc.RegisterResponse\022C\n\014R"
+  "efreshToken\022\030.rpc.RefreshTokenRequest\032\031."
+  "rpc.RefreshTokenResponse\022C\n\014ValidateUser"
+  "\022\030.rpc.ValidateUserRequest\032\031.rpc.Validat"
+  "eUserResponse\022I\n\016ChangePassword\022\032.rpc.Ch"
+  "angePasswordRequest\032\033.rpc.ChangePassword"
+  "Response\022:\n\014LoginByPhone\022\026.rpc.PhoneLogi"
+  "nRequest\032\022.rpc.LoginResponseB\026Z\024rpc-serv"
+  "er/proto/rpcb\006proto3"
   ;
 static ::_pbi::once_flag descriptor_table_rpc_5fauth_2eproto_once;
 const ::_pbi::DescriptorTable descriptor_table_rpc_5fauth_2eproto = {
-    false, false, 990, descriptor_table_protodef_rpc_5fauth_2eproto,
+    false, false, 1420, descriptor_table_protodef_rpc_5fauth_2eproto,
     "rpc_auth.proto",
-    &descriptor_table_rpc_5fauth_2eproto_once, nullptr, 0, 8,
+    &descriptor_table_rpc_5fauth_2eproto_once, nullptr, 0, 11,
     schemas, file_default_instances, TableStruct_rpc_5fauth_2eproto::offsets,
     file_level_metadata_rpc_5fauth_2eproto, file_level_enum_descriptors_rpc_5fauth_2eproto,
     file_level_service_descriptors_rpc_5fauth_2eproto,
@@ -571,6 +666,7 @@ LoginResponse::LoginResponse(const LoginResponse& from)
     , decltype(_impl_.role_){}
     , decltype(_impl_.user_id_){}
     , decltype(_impl_.success_){}
+    , decltype(_impl_.error_code_){}
     , /*decltype(_impl_._cached_size_)*/{}};
 
   _internal_metadata_.MergeFrom<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(from._internal_metadata_);
@@ -607,8 +703,8 @@ LoginResponse::LoginResponse(const LoginResponse& from)
       _this->GetArenaForAllocation());
   }
   ::memcpy(&_impl_.user_id_, &from._impl_.user_id_,
-    static_cast<size_t>(reinterpret_cast<char*>(&_impl_.success_) -
-    reinterpret_cast<char*>(&_impl_.user_id_)) + sizeof(_impl_.success_));
+    static_cast<size_t>(reinterpret_cast<char*>(&_impl_.error_code_) -
+    reinterpret_cast<char*>(&_impl_.user_id_)) + sizeof(_impl_.error_code_));
   // @@protoc_insertion_point(copy_constructor:rpc.LoginResponse)
 }
 
@@ -623,6 +719,7 @@ inline void LoginResponse::SharedCtor(
     , decltype(_impl_.role_){}
     , decltype(_impl_.user_id_){int64_t{0}}
     , decltype(_impl_.success_){false}
+    , decltype(_impl_.error_code_){0}
     , /*decltype(_impl_._cached_size_)*/{}
   };
   _impl_.error_.InitDefault();
@@ -675,8 +772,8 @@ void LoginResponse::Clear() {
   _impl_.refresh_token_.ClearToEmpty();
   _impl_.role_.ClearToEmpty();
   ::memset(&_impl_.user_id_, 0, static_cast<size_t>(
-      reinterpret_cast<char*>(&_impl_.success_) -
-      reinterpret_cast<char*>(&_impl_.user_id_)) + sizeof(_impl_.success_));
+      reinterpret_cast<char*>(&_impl_.error_code_) -
+      reinterpret_cast<char*>(&_impl_.user_id_)) + sizeof(_impl_.error_code_));
   _internal_metadata_.Clear<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>();
 }
 
@@ -739,6 +836,14 @@ const char* LoginResponse::_InternalParse(const char* ptr, ::_pbi::ParseContext*
           ptr = ::_pbi::InlineGreedyStringParser(str, ptr, ctx);
           CHK_(ptr);
           CHK_(::_pbi::VerifyUTF8(str, "rpc.LoginResponse.role"));
+        } else
+          goto handle_unusual;
+        continue;
+      // int32 error_code = 99;
+      case 99:
+        if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 24)) {
+          _impl_.error_code_ = ::PROTOBUF_NAMESPACE_ID::internal::ReadVarint32(&ptr);
+          CHK_(ptr);
         } else
           goto handle_unusual;
         continue;
@@ -823,6 +928,12 @@ uint8_t* LoginResponse::_InternalSerialize(
         7, this->_internal_role(), target);
   }
 
+  // int32 error_code = 99;
+  if (this->_internal_error_code() != 0) {
+    target = stream->EnsureSpace(target);
+    target = ::_pbi::WireFormatLite::WriteInt32ToArray(99, this->_internal_error_code(), target);
+  }
+
   if (PROTOBUF_PREDICT_FALSE(_internal_metadata_.have_unknown_fields())) {
     target = ::_pbi::WireFormat::InternalSerializeUnknownFieldsToArray(
         _internal_metadata_.unknown_fields<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(::PROTOBUF_NAMESPACE_ID::UnknownFieldSet::default_instance), target, stream);
@@ -877,6 +988,13 @@ size_t LoginResponse::ByteSizeLong() const {
     total_size += 1 + 1;
   }
 
+  // int32 error_code = 99;
+  if (this->_internal_error_code() != 0) {
+    total_size += 2 +
+      ::_pbi::WireFormatLite::Int32Size(
+        this->_internal_error_code());
+  }
+
   return MaybeComputeUnknownFieldsSize(total_size, &_impl_._cached_size_);
 }
 
@@ -912,6 +1030,9 @@ void LoginResponse::MergeImpl(::PROTOBUF_NAMESPACE_ID::Message& to_msg, const ::
   }
   if (from._internal_success() != 0) {
     _this->_internal_set_success(from._internal_success());
+  }
+  if (from._internal_error_code() != 0) {
+    _this->_internal_set_error_code(from._internal_error_code());
   }
   _this->_internal_metadata_.MergeFrom<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(from._internal_metadata_);
 }
@@ -949,8 +1070,8 @@ void LoginResponse::InternalSwap(LoginResponse* other) {
       &other->_impl_.role_, rhs_arena
   );
   ::PROTOBUF_NAMESPACE_ID::internal::memswap<
-      PROTOBUF_FIELD_OFFSET(LoginResponse, _impl_.success_)
-      + sizeof(LoginResponse::_impl_.success_)
+      PROTOBUF_FIELD_OFFSET(LoginResponse, _impl_.error_code_)
+      + sizeof(LoginResponse::_impl_.error_code_)
       - PROTOBUF_FIELD_OFFSET(LoginResponse, _impl_.user_id_)>(
           reinterpret_cast<char*>(&_impl_.user_id_),
           reinterpret_cast<char*>(&other->_impl_.user_id_));
@@ -1237,6 +1358,7 @@ RegisterResponse::RegisterResponse(const RegisterResponse& from)
     , decltype(_impl_.role_){}
     , decltype(_impl_.user_id_){}
     , decltype(_impl_.success_){}
+    , decltype(_impl_.error_code_){}
     , /*decltype(_impl_._cached_size_)*/{}};
 
   _internal_metadata_.MergeFrom<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(from._internal_metadata_);
@@ -1273,8 +1395,8 @@ RegisterResponse::RegisterResponse(const RegisterResponse& from)
       _this->GetArenaForAllocation());
   }
   ::memcpy(&_impl_.user_id_, &from._impl_.user_id_,
-    static_cast<size_t>(reinterpret_cast<char*>(&_impl_.success_) -
-    reinterpret_cast<char*>(&_impl_.user_id_)) + sizeof(_impl_.success_));
+    static_cast<size_t>(reinterpret_cast<char*>(&_impl_.error_code_) -
+    reinterpret_cast<char*>(&_impl_.user_id_)) + sizeof(_impl_.error_code_));
   // @@protoc_insertion_point(copy_constructor:rpc.RegisterResponse)
 }
 
@@ -1289,6 +1411,7 @@ inline void RegisterResponse::SharedCtor(
     , decltype(_impl_.role_){}
     , decltype(_impl_.user_id_){int64_t{0}}
     , decltype(_impl_.success_){false}
+    , decltype(_impl_.error_code_){0}
     , /*decltype(_impl_._cached_size_)*/{}
   };
   _impl_.error_.InitDefault();
@@ -1341,8 +1464,8 @@ void RegisterResponse::Clear() {
   _impl_.refresh_token_.ClearToEmpty();
   _impl_.role_.ClearToEmpty();
   ::memset(&_impl_.user_id_, 0, static_cast<size_t>(
-      reinterpret_cast<char*>(&_impl_.success_) -
-      reinterpret_cast<char*>(&_impl_.user_id_)) + sizeof(_impl_.success_));
+      reinterpret_cast<char*>(&_impl_.error_code_) -
+      reinterpret_cast<char*>(&_impl_.user_id_)) + sizeof(_impl_.error_code_));
   _internal_metadata_.Clear<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>();
 }
 
@@ -1405,6 +1528,14 @@ const char* RegisterResponse::_InternalParse(const char* ptr, ::_pbi::ParseConte
           ptr = ::_pbi::InlineGreedyStringParser(str, ptr, ctx);
           CHK_(ptr);
           CHK_(::_pbi::VerifyUTF8(str, "rpc.RegisterResponse.role"));
+        } else
+          goto handle_unusual;
+        continue;
+      // int32 error_code = 99;
+      case 99:
+        if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 24)) {
+          _impl_.error_code_ = ::PROTOBUF_NAMESPACE_ID::internal::ReadVarint32(&ptr);
+          CHK_(ptr);
         } else
           goto handle_unusual;
         continue;
@@ -1489,6 +1620,12 @@ uint8_t* RegisterResponse::_InternalSerialize(
         7, this->_internal_role(), target);
   }
 
+  // int32 error_code = 99;
+  if (this->_internal_error_code() != 0) {
+    target = stream->EnsureSpace(target);
+    target = ::_pbi::WireFormatLite::WriteInt32ToArray(99, this->_internal_error_code(), target);
+  }
+
   if (PROTOBUF_PREDICT_FALSE(_internal_metadata_.have_unknown_fields())) {
     target = ::_pbi::WireFormat::InternalSerializeUnknownFieldsToArray(
         _internal_metadata_.unknown_fields<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(::PROTOBUF_NAMESPACE_ID::UnknownFieldSet::default_instance), target, stream);
@@ -1543,6 +1680,13 @@ size_t RegisterResponse::ByteSizeLong() const {
     total_size += 1 + 1;
   }
 
+  // int32 error_code = 99;
+  if (this->_internal_error_code() != 0) {
+    total_size += 2 +
+      ::_pbi::WireFormatLite::Int32Size(
+        this->_internal_error_code());
+  }
+
   return MaybeComputeUnknownFieldsSize(total_size, &_impl_._cached_size_);
 }
 
@@ -1578,6 +1722,9 @@ void RegisterResponse::MergeImpl(::PROTOBUF_NAMESPACE_ID::Message& to_msg, const
   }
   if (from._internal_success() != 0) {
     _this->_internal_set_success(from._internal_success());
+  }
+  if (from._internal_error_code() != 0) {
+    _this->_internal_set_error_code(from._internal_error_code());
   }
   _this->_internal_metadata_.MergeFrom<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(from._internal_metadata_);
 }
@@ -1615,8 +1762,8 @@ void RegisterResponse::InternalSwap(RegisterResponse* other) {
       &other->_impl_.role_, rhs_arena
   );
   ::PROTOBUF_NAMESPACE_ID::internal::memswap<
-      PROTOBUF_FIELD_OFFSET(RegisterResponse, _impl_.success_)
-      + sizeof(RegisterResponse::_impl_.success_)
+      PROTOBUF_FIELD_OFFSET(RegisterResponse, _impl_.error_code_)
+      + sizeof(RegisterResponse::_impl_.error_code_)
       - PROTOBUF_FIELD_OFFSET(RegisterResponse, _impl_.user_id_)>(
           reinterpret_cast<char*>(&_impl_.user_id_),
           reinterpret_cast<char*>(&other->_impl_.user_id_));
@@ -1900,6 +2047,7 @@ RefreshTokenResponse::RefreshTokenResponse(const RefreshTokenResponse& from)
       decltype(_impl_.error_){}
     , decltype(_impl_.access_token_){}
     , decltype(_impl_.success_){}
+    , decltype(_impl_.error_code_){}
     , /*decltype(_impl_._cached_size_)*/{}};
 
   _internal_metadata_.MergeFrom<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(from._internal_metadata_);
@@ -1919,7 +2067,9 @@ RefreshTokenResponse::RefreshTokenResponse(const RefreshTokenResponse& from)
     _this->_impl_.access_token_.Set(from._internal_access_token(), 
       _this->GetArenaForAllocation());
   }
-  _this->_impl_.success_ = from._impl_.success_;
+  ::memcpy(&_impl_.success_, &from._impl_.success_,
+    static_cast<size_t>(reinterpret_cast<char*>(&_impl_.error_code_) -
+    reinterpret_cast<char*>(&_impl_.success_)) + sizeof(_impl_.error_code_));
   // @@protoc_insertion_point(copy_constructor:rpc.RefreshTokenResponse)
 }
 
@@ -1931,6 +2081,7 @@ inline void RefreshTokenResponse::SharedCtor(
       decltype(_impl_.error_){}
     , decltype(_impl_.access_token_){}
     , decltype(_impl_.success_){false}
+    , decltype(_impl_.error_code_){0}
     , /*decltype(_impl_._cached_size_)*/{}
   };
   _impl_.error_.InitDefault();
@@ -1970,7 +2121,9 @@ void RefreshTokenResponse::Clear() {
 
   _impl_.error_.ClearToEmpty();
   _impl_.access_token_.ClearToEmpty();
-  _impl_.success_ = false;
+  ::memset(&_impl_.success_, 0, static_cast<size_t>(
+      reinterpret_cast<char*>(&_impl_.error_code_) -
+      reinterpret_cast<char*>(&_impl_.success_)) + sizeof(_impl_.error_code_));
   _internal_metadata_.Clear<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>();
 }
 
@@ -2005,6 +2158,14 @@ const char* RefreshTokenResponse::_InternalParse(const char* ptr, ::_pbi::ParseC
           ptr = ::_pbi::InlineGreedyStringParser(str, ptr, ctx);
           CHK_(ptr);
           CHK_(::_pbi::VerifyUTF8(str, "rpc.RefreshTokenResponse.access_token"));
+        } else
+          goto handle_unusual;
+        continue;
+      // int32 error_code = 99;
+      case 99:
+        if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 24)) {
+          _impl_.error_code_ = ::PROTOBUF_NAMESPACE_ID::internal::ReadVarint32(&ptr);
+          CHK_(ptr);
         } else
           goto handle_unusual;
         continue;
@@ -2063,6 +2224,12 @@ uint8_t* RefreshTokenResponse::_InternalSerialize(
         3, this->_internal_access_token(), target);
   }
 
+  // int32 error_code = 99;
+  if (this->_internal_error_code() != 0) {
+    target = stream->EnsureSpace(target);
+    target = ::_pbi::WireFormatLite::WriteInt32ToArray(99, this->_internal_error_code(), target);
+  }
+
   if (PROTOBUF_PREDICT_FALSE(_internal_metadata_.have_unknown_fields())) {
     target = ::_pbi::WireFormat::InternalSerializeUnknownFieldsToArray(
         _internal_metadata_.unknown_fields<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(::PROTOBUF_NAMESPACE_ID::UnknownFieldSet::default_instance), target, stream);
@@ -2098,6 +2265,13 @@ size_t RefreshTokenResponse::ByteSizeLong() const {
     total_size += 1 + 1;
   }
 
+  // int32 error_code = 99;
+  if (this->_internal_error_code() != 0) {
+    total_size += 2 +
+      ::_pbi::WireFormatLite::Int32Size(
+        this->_internal_error_code());
+  }
+
   return MaybeComputeUnknownFieldsSize(total_size, &_impl_._cached_size_);
 }
 
@@ -2124,6 +2298,9 @@ void RefreshTokenResponse::MergeImpl(::PROTOBUF_NAMESPACE_ID::Message& to_msg, c
   }
   if (from._internal_success() != 0) {
     _this->_internal_set_success(from._internal_success());
+  }
+  if (from._internal_error_code() != 0) {
+    _this->_internal_set_error_code(from._internal_error_code());
   }
   _this->_internal_metadata_.MergeFrom<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(from._internal_metadata_);
 }
@@ -2152,7 +2329,12 @@ void RefreshTokenResponse::InternalSwap(RefreshTokenResponse* other) {
       &_impl_.access_token_, lhs_arena,
       &other->_impl_.access_token_, rhs_arena
   );
-  swap(_impl_.success_, other->_impl_.success_);
+  ::PROTOBUF_NAMESPACE_ID::internal::memswap<
+      PROTOBUF_FIELD_OFFSET(RefreshTokenResponse, _impl_.error_code_)
+      + sizeof(RefreshTokenResponse::_impl_.error_code_)
+      - PROTOBUF_FIELD_OFFSET(RefreshTokenResponse, _impl_.success_)>(
+          reinterpret_cast<char*>(&_impl_.success_),
+          reinterpret_cast<char*>(&other->_impl_.success_));
 }
 
 ::PROTOBUF_NAMESPACE_ID::Metadata RefreshTokenResponse::GetMetadata() const {
@@ -2462,6 +2644,7 @@ ValidateUserResponse::ValidateUserResponse(const ValidateUserResponse& from)
     , decltype(_impl_.error_){}
     , decltype(_impl_.user_id_){}
     , decltype(_impl_.valid_){}
+    , decltype(_impl_.error_code_){}
     , /*decltype(_impl_._cached_size_)*/{}};
 
   _internal_metadata_.MergeFrom<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(from._internal_metadata_);
@@ -2490,8 +2673,8 @@ ValidateUserResponse::ValidateUserResponse(const ValidateUserResponse& from)
       _this->GetArenaForAllocation());
   }
   ::memcpy(&_impl_.user_id_, &from._impl_.user_id_,
-    static_cast<size_t>(reinterpret_cast<char*>(&_impl_.valid_) -
-    reinterpret_cast<char*>(&_impl_.user_id_)) + sizeof(_impl_.valid_));
+    static_cast<size_t>(reinterpret_cast<char*>(&_impl_.error_code_) -
+    reinterpret_cast<char*>(&_impl_.user_id_)) + sizeof(_impl_.error_code_));
   // @@protoc_insertion_point(copy_constructor:rpc.ValidateUserResponse)
 }
 
@@ -2505,6 +2688,7 @@ inline void ValidateUserResponse::SharedCtor(
     , decltype(_impl_.error_){}
     , decltype(_impl_.user_id_){int64_t{0}}
     , decltype(_impl_.valid_){false}
+    , decltype(_impl_.error_code_){0}
     , /*decltype(_impl_._cached_size_)*/{}
   };
   _impl_.username_.InitDefault();
@@ -2551,8 +2735,8 @@ void ValidateUserResponse::Clear() {
   _impl_.role_.ClearToEmpty();
   _impl_.error_.ClearToEmpty();
   ::memset(&_impl_.user_id_, 0, static_cast<size_t>(
-      reinterpret_cast<char*>(&_impl_.valid_) -
-      reinterpret_cast<char*>(&_impl_.user_id_)) + sizeof(_impl_.valid_));
+      reinterpret_cast<char*>(&_impl_.error_code_) -
+      reinterpret_cast<char*>(&_impl_.user_id_)) + sizeof(_impl_.error_code_));
   _internal_metadata_.Clear<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>();
 }
 
@@ -2605,6 +2789,14 @@ const char* ValidateUserResponse::_InternalParse(const char* ptr, ::_pbi::ParseC
           ptr = ::_pbi::InlineGreedyStringParser(str, ptr, ctx);
           CHK_(ptr);
           CHK_(::_pbi::VerifyUTF8(str, "rpc.ValidateUserResponse.error"));
+        } else
+          goto handle_unusual;
+        continue;
+      // int32 error_code = 99;
+      case 99:
+        if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 24)) {
+          _impl_.error_code_ = ::PROTOBUF_NAMESPACE_ID::internal::ReadVarint32(&ptr);
+          CHK_(ptr);
         } else
           goto handle_unusual;
         continue;
@@ -2679,6 +2871,12 @@ uint8_t* ValidateUserResponse::_InternalSerialize(
         5, this->_internal_error(), target);
   }
 
+  // int32 error_code = 99;
+  if (this->_internal_error_code() != 0) {
+    target = stream->EnsureSpace(target);
+    target = ::_pbi::WireFormatLite::WriteInt32ToArray(99, this->_internal_error_code(), target);
+  }
+
   if (PROTOBUF_PREDICT_FALSE(_internal_metadata_.have_unknown_fields())) {
     target = ::_pbi::WireFormat::InternalSerializeUnknownFieldsToArray(
         _internal_metadata_.unknown_fields<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(::PROTOBUF_NAMESPACE_ID::UnknownFieldSet::default_instance), target, stream);
@@ -2726,6 +2924,13 @@ size_t ValidateUserResponse::ByteSizeLong() const {
     total_size += 1 + 1;
   }
 
+  // int32 error_code = 99;
+  if (this->_internal_error_code() != 0) {
+    total_size += 2 +
+      ::_pbi::WireFormatLite::Int32Size(
+        this->_internal_error_code());
+  }
+
   return MaybeComputeUnknownFieldsSize(total_size, &_impl_._cached_size_);
 }
 
@@ -2759,6 +2964,9 @@ void ValidateUserResponse::MergeImpl(::PROTOBUF_NAMESPACE_ID::Message& to_msg, c
   if (from._internal_valid() != 0) {
     _this->_internal_set_valid(from._internal_valid());
   }
+  if (from._internal_error_code() != 0) {
+    _this->_internal_set_error_code(from._internal_error_code());
+  }
   _this->_internal_metadata_.MergeFrom<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(from._internal_metadata_);
 }
 
@@ -2791,8 +2999,8 @@ void ValidateUserResponse::InternalSwap(ValidateUserResponse* other) {
       &other->_impl_.error_, rhs_arena
   );
   ::PROTOBUF_NAMESPACE_ID::internal::memswap<
-      PROTOBUF_FIELD_OFFSET(ValidateUserResponse, _impl_.valid_)
-      + sizeof(ValidateUserResponse::_impl_.valid_)
+      PROTOBUF_FIELD_OFFSET(ValidateUserResponse, _impl_.error_code_)
+      + sizeof(ValidateUserResponse::_impl_.error_code_)
       - PROTOBUF_FIELD_OFFSET(ValidateUserResponse, _impl_.user_id_)>(
           reinterpret_cast<char*>(&_impl_.user_id_),
           reinterpret_cast<char*>(&other->_impl_.user_id_));
@@ -2802,6 +3010,804 @@ void ValidateUserResponse::InternalSwap(ValidateUserResponse* other) {
   return ::_pbi::AssignDescriptors(
       &descriptor_table_rpc_5fauth_2eproto_getter, &descriptor_table_rpc_5fauth_2eproto_once,
       file_level_metadata_rpc_5fauth_2eproto[7]);
+}
+
+// ===================================================================
+
+class ChangePasswordRequest::_Internal {
+ public:
+};
+
+ChangePasswordRequest::ChangePasswordRequest(::PROTOBUF_NAMESPACE_ID::Arena* arena,
+                         bool is_message_owned)
+  : ::PROTOBUF_NAMESPACE_ID::Message(arena, is_message_owned) {
+  SharedCtor(arena, is_message_owned);
+  // @@protoc_insertion_point(arena_constructor:rpc.ChangePasswordRequest)
+}
+ChangePasswordRequest::ChangePasswordRequest(const ChangePasswordRequest& from)
+  : ::PROTOBUF_NAMESPACE_ID::Message() {
+  ChangePasswordRequest* const _this = this; (void)_this;
+  new (&_impl_) Impl_{
+      decltype(_impl_.old_password_){}
+    , decltype(_impl_.new_password_){}
+    , decltype(_impl_.user_id_){}
+    , /*decltype(_impl_._cached_size_)*/{}};
+
+  _internal_metadata_.MergeFrom<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(from._internal_metadata_);
+  _impl_.old_password_.InitDefault();
+  #ifdef PROTOBUF_FORCE_COPY_DEFAULT_STRING
+    _impl_.old_password_.Set("", GetArenaForAllocation());
+  #endif // PROTOBUF_FORCE_COPY_DEFAULT_STRING
+  if (!from._internal_old_password().empty()) {
+    _this->_impl_.old_password_.Set(from._internal_old_password(), 
+      _this->GetArenaForAllocation());
+  }
+  _impl_.new_password_.InitDefault();
+  #ifdef PROTOBUF_FORCE_COPY_DEFAULT_STRING
+    _impl_.new_password_.Set("", GetArenaForAllocation());
+  #endif // PROTOBUF_FORCE_COPY_DEFAULT_STRING
+  if (!from._internal_new_password().empty()) {
+    _this->_impl_.new_password_.Set(from._internal_new_password(), 
+      _this->GetArenaForAllocation());
+  }
+  _this->_impl_.user_id_ = from._impl_.user_id_;
+  // @@protoc_insertion_point(copy_constructor:rpc.ChangePasswordRequest)
+}
+
+inline void ChangePasswordRequest::SharedCtor(
+    ::_pb::Arena* arena, bool is_message_owned) {
+  (void)arena;
+  (void)is_message_owned;
+  new (&_impl_) Impl_{
+      decltype(_impl_.old_password_){}
+    , decltype(_impl_.new_password_){}
+    , decltype(_impl_.user_id_){int64_t{0}}
+    , /*decltype(_impl_._cached_size_)*/{}
+  };
+  _impl_.old_password_.InitDefault();
+  #ifdef PROTOBUF_FORCE_COPY_DEFAULT_STRING
+    _impl_.old_password_.Set("", GetArenaForAllocation());
+  #endif // PROTOBUF_FORCE_COPY_DEFAULT_STRING
+  _impl_.new_password_.InitDefault();
+  #ifdef PROTOBUF_FORCE_COPY_DEFAULT_STRING
+    _impl_.new_password_.Set("", GetArenaForAllocation());
+  #endif // PROTOBUF_FORCE_COPY_DEFAULT_STRING
+}
+
+ChangePasswordRequest::~ChangePasswordRequest() {
+  // @@protoc_insertion_point(destructor:rpc.ChangePasswordRequest)
+  if (auto *arena = _internal_metadata_.DeleteReturnArena<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>()) {
+  (void)arena;
+    return;
+  }
+  SharedDtor();
+}
+
+inline void ChangePasswordRequest::SharedDtor() {
+  GOOGLE_DCHECK(GetArenaForAllocation() == nullptr);
+  _impl_.old_password_.Destroy();
+  _impl_.new_password_.Destroy();
+}
+
+void ChangePasswordRequest::SetCachedSize(int size) const {
+  _impl_._cached_size_.Set(size);
+}
+
+void ChangePasswordRequest::Clear() {
+// @@protoc_insertion_point(message_clear_start:rpc.ChangePasswordRequest)
+  uint32_t cached_has_bits = 0;
+  // Prevent compiler warnings about cached_has_bits being unused
+  (void) cached_has_bits;
+
+  _impl_.old_password_.ClearToEmpty();
+  _impl_.new_password_.ClearToEmpty();
+  _impl_.user_id_ = int64_t{0};
+  _internal_metadata_.Clear<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>();
+}
+
+const char* ChangePasswordRequest::_InternalParse(const char* ptr, ::_pbi::ParseContext* ctx) {
+#define CHK_(x) if (PROTOBUF_PREDICT_FALSE(!(x))) goto failure
+  while (!ctx->Done(&ptr)) {
+    uint32_t tag;
+    ptr = ::_pbi::ReadTag(ptr, &tag);
+    switch (tag >> 3) {
+      // int64 user_id = 1;
+      case 1:
+        if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 8)) {
+          _impl_.user_id_ = ::PROTOBUF_NAMESPACE_ID::internal::ReadVarint64(&ptr);
+          CHK_(ptr);
+        } else
+          goto handle_unusual;
+        continue;
+      // string old_password = 2;
+      case 2:
+        if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 18)) {
+          auto str = _internal_mutable_old_password();
+          ptr = ::_pbi::InlineGreedyStringParser(str, ptr, ctx);
+          CHK_(ptr);
+          CHK_(::_pbi::VerifyUTF8(str, "rpc.ChangePasswordRequest.old_password"));
+        } else
+          goto handle_unusual;
+        continue;
+      // string new_password = 3;
+      case 3:
+        if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 26)) {
+          auto str = _internal_mutable_new_password();
+          ptr = ::_pbi::InlineGreedyStringParser(str, ptr, ctx);
+          CHK_(ptr);
+          CHK_(::_pbi::VerifyUTF8(str, "rpc.ChangePasswordRequest.new_password"));
+        } else
+          goto handle_unusual;
+        continue;
+      default:
+        goto handle_unusual;
+    }  // switch
+  handle_unusual:
+    if ((tag == 0) || ((tag & 7) == 4)) {
+      CHK_(ptr);
+      ctx->SetLastTag(tag);
+      goto message_done;
+    }
+    ptr = UnknownFieldParse(
+        tag,
+        _internal_metadata_.mutable_unknown_fields<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(),
+        ptr, ctx);
+    CHK_(ptr != nullptr);
+  }  // while
+message_done:
+  return ptr;
+failure:
+  ptr = nullptr;
+  goto message_done;
+#undef CHK_
+}
+
+uint8_t* ChangePasswordRequest::_InternalSerialize(
+    uint8_t* target, ::PROTOBUF_NAMESPACE_ID::io::EpsCopyOutputStream* stream) const {
+  // @@protoc_insertion_point(serialize_to_array_start:rpc.ChangePasswordRequest)
+  uint32_t cached_has_bits = 0;
+  (void) cached_has_bits;
+
+  // int64 user_id = 1;
+  if (this->_internal_user_id() != 0) {
+    target = stream->EnsureSpace(target);
+    target = ::_pbi::WireFormatLite::WriteInt64ToArray(1, this->_internal_user_id(), target);
+  }
+
+  // string old_password = 2;
+  if (!this->_internal_old_password().empty()) {
+    ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::VerifyUtf8String(
+      this->_internal_old_password().data(), static_cast<int>(this->_internal_old_password().length()),
+      ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::SERIALIZE,
+      "rpc.ChangePasswordRequest.old_password");
+    target = stream->WriteStringMaybeAliased(
+        2, this->_internal_old_password(), target);
+  }
+
+  // string new_password = 3;
+  if (!this->_internal_new_password().empty()) {
+    ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::VerifyUtf8String(
+      this->_internal_new_password().data(), static_cast<int>(this->_internal_new_password().length()),
+      ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::SERIALIZE,
+      "rpc.ChangePasswordRequest.new_password");
+    target = stream->WriteStringMaybeAliased(
+        3, this->_internal_new_password(), target);
+  }
+
+  if (PROTOBUF_PREDICT_FALSE(_internal_metadata_.have_unknown_fields())) {
+    target = ::_pbi::WireFormat::InternalSerializeUnknownFieldsToArray(
+        _internal_metadata_.unknown_fields<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(::PROTOBUF_NAMESPACE_ID::UnknownFieldSet::default_instance), target, stream);
+  }
+  // @@protoc_insertion_point(serialize_to_array_end:rpc.ChangePasswordRequest)
+  return target;
+}
+
+size_t ChangePasswordRequest::ByteSizeLong() const {
+// @@protoc_insertion_point(message_byte_size_start:rpc.ChangePasswordRequest)
+  size_t total_size = 0;
+
+  uint32_t cached_has_bits = 0;
+  // Prevent compiler warnings about cached_has_bits being unused
+  (void) cached_has_bits;
+
+  // string old_password = 2;
+  if (!this->_internal_old_password().empty()) {
+    total_size += 1 +
+      ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::StringSize(
+        this->_internal_old_password());
+  }
+
+  // string new_password = 3;
+  if (!this->_internal_new_password().empty()) {
+    total_size += 1 +
+      ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::StringSize(
+        this->_internal_new_password());
+  }
+
+  // int64 user_id = 1;
+  if (this->_internal_user_id() != 0) {
+    total_size += ::_pbi::WireFormatLite::Int64SizePlusOne(this->_internal_user_id());
+  }
+
+  return MaybeComputeUnknownFieldsSize(total_size, &_impl_._cached_size_);
+}
+
+const ::PROTOBUF_NAMESPACE_ID::Message::ClassData ChangePasswordRequest::_class_data_ = {
+    ::PROTOBUF_NAMESPACE_ID::Message::CopyWithSourceCheck,
+    ChangePasswordRequest::MergeImpl
+};
+const ::PROTOBUF_NAMESPACE_ID::Message::ClassData*ChangePasswordRequest::GetClassData() const { return &_class_data_; }
+
+
+void ChangePasswordRequest::MergeImpl(::PROTOBUF_NAMESPACE_ID::Message& to_msg, const ::PROTOBUF_NAMESPACE_ID::Message& from_msg) {
+  auto* const _this = static_cast<ChangePasswordRequest*>(&to_msg);
+  auto& from = static_cast<const ChangePasswordRequest&>(from_msg);
+  // @@protoc_insertion_point(class_specific_merge_from_start:rpc.ChangePasswordRequest)
+  GOOGLE_DCHECK_NE(&from, _this);
+  uint32_t cached_has_bits = 0;
+  (void) cached_has_bits;
+
+  if (!from._internal_old_password().empty()) {
+    _this->_internal_set_old_password(from._internal_old_password());
+  }
+  if (!from._internal_new_password().empty()) {
+    _this->_internal_set_new_password(from._internal_new_password());
+  }
+  if (from._internal_user_id() != 0) {
+    _this->_internal_set_user_id(from._internal_user_id());
+  }
+  _this->_internal_metadata_.MergeFrom<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(from._internal_metadata_);
+}
+
+void ChangePasswordRequest::CopyFrom(const ChangePasswordRequest& from) {
+// @@protoc_insertion_point(class_specific_copy_from_start:rpc.ChangePasswordRequest)
+  if (&from == this) return;
+  Clear();
+  MergeFrom(from);
+}
+
+bool ChangePasswordRequest::IsInitialized() const {
+  return true;
+}
+
+void ChangePasswordRequest::InternalSwap(ChangePasswordRequest* other) {
+  using std::swap;
+  auto* lhs_arena = GetArenaForAllocation();
+  auto* rhs_arena = other->GetArenaForAllocation();
+  _internal_metadata_.InternalSwap(&other->_internal_metadata_);
+  ::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr::InternalSwap(
+      &_impl_.old_password_, lhs_arena,
+      &other->_impl_.old_password_, rhs_arena
+  );
+  ::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr::InternalSwap(
+      &_impl_.new_password_, lhs_arena,
+      &other->_impl_.new_password_, rhs_arena
+  );
+  swap(_impl_.user_id_, other->_impl_.user_id_);
+}
+
+::PROTOBUF_NAMESPACE_ID::Metadata ChangePasswordRequest::GetMetadata() const {
+  return ::_pbi::AssignDescriptors(
+      &descriptor_table_rpc_5fauth_2eproto_getter, &descriptor_table_rpc_5fauth_2eproto_once,
+      file_level_metadata_rpc_5fauth_2eproto[8]);
+}
+
+// ===================================================================
+
+class ChangePasswordResponse::_Internal {
+ public:
+};
+
+ChangePasswordResponse::ChangePasswordResponse(::PROTOBUF_NAMESPACE_ID::Arena* arena,
+                         bool is_message_owned)
+  : ::PROTOBUF_NAMESPACE_ID::Message(arena, is_message_owned) {
+  SharedCtor(arena, is_message_owned);
+  // @@protoc_insertion_point(arena_constructor:rpc.ChangePasswordResponse)
+}
+ChangePasswordResponse::ChangePasswordResponse(const ChangePasswordResponse& from)
+  : ::PROTOBUF_NAMESPACE_ID::Message() {
+  ChangePasswordResponse* const _this = this; (void)_this;
+  new (&_impl_) Impl_{
+      decltype(_impl_.error_){}
+    , decltype(_impl_.success_){}
+    , decltype(_impl_.error_code_){}
+    , /*decltype(_impl_._cached_size_)*/{}};
+
+  _internal_metadata_.MergeFrom<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(from._internal_metadata_);
+  _impl_.error_.InitDefault();
+  #ifdef PROTOBUF_FORCE_COPY_DEFAULT_STRING
+    _impl_.error_.Set("", GetArenaForAllocation());
+  #endif // PROTOBUF_FORCE_COPY_DEFAULT_STRING
+  if (!from._internal_error().empty()) {
+    _this->_impl_.error_.Set(from._internal_error(), 
+      _this->GetArenaForAllocation());
+  }
+  ::memcpy(&_impl_.success_, &from._impl_.success_,
+    static_cast<size_t>(reinterpret_cast<char*>(&_impl_.error_code_) -
+    reinterpret_cast<char*>(&_impl_.success_)) + sizeof(_impl_.error_code_));
+  // @@protoc_insertion_point(copy_constructor:rpc.ChangePasswordResponse)
+}
+
+inline void ChangePasswordResponse::SharedCtor(
+    ::_pb::Arena* arena, bool is_message_owned) {
+  (void)arena;
+  (void)is_message_owned;
+  new (&_impl_) Impl_{
+      decltype(_impl_.error_){}
+    , decltype(_impl_.success_){false}
+    , decltype(_impl_.error_code_){0}
+    , /*decltype(_impl_._cached_size_)*/{}
+  };
+  _impl_.error_.InitDefault();
+  #ifdef PROTOBUF_FORCE_COPY_DEFAULT_STRING
+    _impl_.error_.Set("", GetArenaForAllocation());
+  #endif // PROTOBUF_FORCE_COPY_DEFAULT_STRING
+}
+
+ChangePasswordResponse::~ChangePasswordResponse() {
+  // @@protoc_insertion_point(destructor:rpc.ChangePasswordResponse)
+  if (auto *arena = _internal_metadata_.DeleteReturnArena<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>()) {
+  (void)arena;
+    return;
+  }
+  SharedDtor();
+}
+
+inline void ChangePasswordResponse::SharedDtor() {
+  GOOGLE_DCHECK(GetArenaForAllocation() == nullptr);
+  _impl_.error_.Destroy();
+}
+
+void ChangePasswordResponse::SetCachedSize(int size) const {
+  _impl_._cached_size_.Set(size);
+}
+
+void ChangePasswordResponse::Clear() {
+// @@protoc_insertion_point(message_clear_start:rpc.ChangePasswordResponse)
+  uint32_t cached_has_bits = 0;
+  // Prevent compiler warnings about cached_has_bits being unused
+  (void) cached_has_bits;
+
+  _impl_.error_.ClearToEmpty();
+  ::memset(&_impl_.success_, 0, static_cast<size_t>(
+      reinterpret_cast<char*>(&_impl_.error_code_) -
+      reinterpret_cast<char*>(&_impl_.success_)) + sizeof(_impl_.error_code_));
+  _internal_metadata_.Clear<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>();
+}
+
+const char* ChangePasswordResponse::_InternalParse(const char* ptr, ::_pbi::ParseContext* ctx) {
+#define CHK_(x) if (PROTOBUF_PREDICT_FALSE(!(x))) goto failure
+  while (!ctx->Done(&ptr)) {
+    uint32_t tag;
+    ptr = ::_pbi::ReadTag(ptr, &tag);
+    switch (tag >> 3) {
+      // bool success = 1;
+      case 1:
+        if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 8)) {
+          _impl_.success_ = ::PROTOBUF_NAMESPACE_ID::internal::ReadVarint64(&ptr);
+          CHK_(ptr);
+        } else
+          goto handle_unusual;
+        continue;
+      // string error = 2;
+      case 2:
+        if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 18)) {
+          auto str = _internal_mutable_error();
+          ptr = ::_pbi::InlineGreedyStringParser(str, ptr, ctx);
+          CHK_(ptr);
+          CHK_(::_pbi::VerifyUTF8(str, "rpc.ChangePasswordResponse.error"));
+        } else
+          goto handle_unusual;
+        continue;
+      // int32 error_code = 99;
+      case 99:
+        if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 24)) {
+          _impl_.error_code_ = ::PROTOBUF_NAMESPACE_ID::internal::ReadVarint32(&ptr);
+          CHK_(ptr);
+        } else
+          goto handle_unusual;
+        continue;
+      default:
+        goto handle_unusual;
+    }  // switch
+  handle_unusual:
+    if ((tag == 0) || ((tag & 7) == 4)) {
+      CHK_(ptr);
+      ctx->SetLastTag(tag);
+      goto message_done;
+    }
+    ptr = UnknownFieldParse(
+        tag,
+        _internal_metadata_.mutable_unknown_fields<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(),
+        ptr, ctx);
+    CHK_(ptr != nullptr);
+  }  // while
+message_done:
+  return ptr;
+failure:
+  ptr = nullptr;
+  goto message_done;
+#undef CHK_
+}
+
+uint8_t* ChangePasswordResponse::_InternalSerialize(
+    uint8_t* target, ::PROTOBUF_NAMESPACE_ID::io::EpsCopyOutputStream* stream) const {
+  // @@protoc_insertion_point(serialize_to_array_start:rpc.ChangePasswordResponse)
+  uint32_t cached_has_bits = 0;
+  (void) cached_has_bits;
+
+  // bool success = 1;
+  if (this->_internal_success() != 0) {
+    target = stream->EnsureSpace(target);
+    target = ::_pbi::WireFormatLite::WriteBoolToArray(1, this->_internal_success(), target);
+  }
+
+  // string error = 2;
+  if (!this->_internal_error().empty()) {
+    ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::VerifyUtf8String(
+      this->_internal_error().data(), static_cast<int>(this->_internal_error().length()),
+      ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::SERIALIZE,
+      "rpc.ChangePasswordResponse.error");
+    target = stream->WriteStringMaybeAliased(
+        2, this->_internal_error(), target);
+  }
+
+  // int32 error_code = 99;
+  if (this->_internal_error_code() != 0) {
+    target = stream->EnsureSpace(target);
+    target = ::_pbi::WireFormatLite::WriteInt32ToArray(99, this->_internal_error_code(), target);
+  }
+
+  if (PROTOBUF_PREDICT_FALSE(_internal_metadata_.have_unknown_fields())) {
+    target = ::_pbi::WireFormat::InternalSerializeUnknownFieldsToArray(
+        _internal_metadata_.unknown_fields<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(::PROTOBUF_NAMESPACE_ID::UnknownFieldSet::default_instance), target, stream);
+  }
+  // @@protoc_insertion_point(serialize_to_array_end:rpc.ChangePasswordResponse)
+  return target;
+}
+
+size_t ChangePasswordResponse::ByteSizeLong() const {
+// @@protoc_insertion_point(message_byte_size_start:rpc.ChangePasswordResponse)
+  size_t total_size = 0;
+
+  uint32_t cached_has_bits = 0;
+  // Prevent compiler warnings about cached_has_bits being unused
+  (void) cached_has_bits;
+
+  // string error = 2;
+  if (!this->_internal_error().empty()) {
+    total_size += 1 +
+      ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::StringSize(
+        this->_internal_error());
+  }
+
+  // bool success = 1;
+  if (this->_internal_success() != 0) {
+    total_size += 1 + 1;
+  }
+
+  // int32 error_code = 99;
+  if (this->_internal_error_code() != 0) {
+    total_size += 2 +
+      ::_pbi::WireFormatLite::Int32Size(
+        this->_internal_error_code());
+  }
+
+  return MaybeComputeUnknownFieldsSize(total_size, &_impl_._cached_size_);
+}
+
+const ::PROTOBUF_NAMESPACE_ID::Message::ClassData ChangePasswordResponse::_class_data_ = {
+    ::PROTOBUF_NAMESPACE_ID::Message::CopyWithSourceCheck,
+    ChangePasswordResponse::MergeImpl
+};
+const ::PROTOBUF_NAMESPACE_ID::Message::ClassData*ChangePasswordResponse::GetClassData() const { return &_class_data_; }
+
+
+void ChangePasswordResponse::MergeImpl(::PROTOBUF_NAMESPACE_ID::Message& to_msg, const ::PROTOBUF_NAMESPACE_ID::Message& from_msg) {
+  auto* const _this = static_cast<ChangePasswordResponse*>(&to_msg);
+  auto& from = static_cast<const ChangePasswordResponse&>(from_msg);
+  // @@protoc_insertion_point(class_specific_merge_from_start:rpc.ChangePasswordResponse)
+  GOOGLE_DCHECK_NE(&from, _this);
+  uint32_t cached_has_bits = 0;
+  (void) cached_has_bits;
+
+  if (!from._internal_error().empty()) {
+    _this->_internal_set_error(from._internal_error());
+  }
+  if (from._internal_success() != 0) {
+    _this->_internal_set_success(from._internal_success());
+  }
+  if (from._internal_error_code() != 0) {
+    _this->_internal_set_error_code(from._internal_error_code());
+  }
+  _this->_internal_metadata_.MergeFrom<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(from._internal_metadata_);
+}
+
+void ChangePasswordResponse::CopyFrom(const ChangePasswordResponse& from) {
+// @@protoc_insertion_point(class_specific_copy_from_start:rpc.ChangePasswordResponse)
+  if (&from == this) return;
+  Clear();
+  MergeFrom(from);
+}
+
+bool ChangePasswordResponse::IsInitialized() const {
+  return true;
+}
+
+void ChangePasswordResponse::InternalSwap(ChangePasswordResponse* other) {
+  using std::swap;
+  auto* lhs_arena = GetArenaForAllocation();
+  auto* rhs_arena = other->GetArenaForAllocation();
+  _internal_metadata_.InternalSwap(&other->_internal_metadata_);
+  ::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr::InternalSwap(
+      &_impl_.error_, lhs_arena,
+      &other->_impl_.error_, rhs_arena
+  );
+  ::PROTOBUF_NAMESPACE_ID::internal::memswap<
+      PROTOBUF_FIELD_OFFSET(ChangePasswordResponse, _impl_.error_code_)
+      + sizeof(ChangePasswordResponse::_impl_.error_code_)
+      - PROTOBUF_FIELD_OFFSET(ChangePasswordResponse, _impl_.success_)>(
+          reinterpret_cast<char*>(&_impl_.success_),
+          reinterpret_cast<char*>(&other->_impl_.success_));
+}
+
+::PROTOBUF_NAMESPACE_ID::Metadata ChangePasswordResponse::GetMetadata() const {
+  return ::_pbi::AssignDescriptors(
+      &descriptor_table_rpc_5fauth_2eproto_getter, &descriptor_table_rpc_5fauth_2eproto_once,
+      file_level_metadata_rpc_5fauth_2eproto[9]);
+}
+
+// ===================================================================
+
+class PhoneLoginRequest::_Internal {
+ public:
+};
+
+PhoneLoginRequest::PhoneLoginRequest(::PROTOBUF_NAMESPACE_ID::Arena* arena,
+                         bool is_message_owned)
+  : ::PROTOBUF_NAMESPACE_ID::Message(arena, is_message_owned) {
+  SharedCtor(arena, is_message_owned);
+  // @@protoc_insertion_point(arena_constructor:rpc.PhoneLoginRequest)
+}
+PhoneLoginRequest::PhoneLoginRequest(const PhoneLoginRequest& from)
+  : ::PROTOBUF_NAMESPACE_ID::Message() {
+  PhoneLoginRequest* const _this = this; (void)_this;
+  new (&_impl_) Impl_{
+      decltype(_impl_.phone_){}
+    , decltype(_impl_.otp_){}
+    , /*decltype(_impl_._cached_size_)*/{}};
+
+  _internal_metadata_.MergeFrom<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(from._internal_metadata_);
+  _impl_.phone_.InitDefault();
+  #ifdef PROTOBUF_FORCE_COPY_DEFAULT_STRING
+    _impl_.phone_.Set("", GetArenaForAllocation());
+  #endif // PROTOBUF_FORCE_COPY_DEFAULT_STRING
+  if (!from._internal_phone().empty()) {
+    _this->_impl_.phone_.Set(from._internal_phone(), 
+      _this->GetArenaForAllocation());
+  }
+  _impl_.otp_.InitDefault();
+  #ifdef PROTOBUF_FORCE_COPY_DEFAULT_STRING
+    _impl_.otp_.Set("", GetArenaForAllocation());
+  #endif // PROTOBUF_FORCE_COPY_DEFAULT_STRING
+  if (!from._internal_otp().empty()) {
+    _this->_impl_.otp_.Set(from._internal_otp(), 
+      _this->GetArenaForAllocation());
+  }
+  // @@protoc_insertion_point(copy_constructor:rpc.PhoneLoginRequest)
+}
+
+inline void PhoneLoginRequest::SharedCtor(
+    ::_pb::Arena* arena, bool is_message_owned) {
+  (void)arena;
+  (void)is_message_owned;
+  new (&_impl_) Impl_{
+      decltype(_impl_.phone_){}
+    , decltype(_impl_.otp_){}
+    , /*decltype(_impl_._cached_size_)*/{}
+  };
+  _impl_.phone_.InitDefault();
+  #ifdef PROTOBUF_FORCE_COPY_DEFAULT_STRING
+    _impl_.phone_.Set("", GetArenaForAllocation());
+  #endif // PROTOBUF_FORCE_COPY_DEFAULT_STRING
+  _impl_.otp_.InitDefault();
+  #ifdef PROTOBUF_FORCE_COPY_DEFAULT_STRING
+    _impl_.otp_.Set("", GetArenaForAllocation());
+  #endif // PROTOBUF_FORCE_COPY_DEFAULT_STRING
+}
+
+PhoneLoginRequest::~PhoneLoginRequest() {
+  // @@protoc_insertion_point(destructor:rpc.PhoneLoginRequest)
+  if (auto *arena = _internal_metadata_.DeleteReturnArena<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>()) {
+  (void)arena;
+    return;
+  }
+  SharedDtor();
+}
+
+inline void PhoneLoginRequest::SharedDtor() {
+  GOOGLE_DCHECK(GetArenaForAllocation() == nullptr);
+  _impl_.phone_.Destroy();
+  _impl_.otp_.Destroy();
+}
+
+void PhoneLoginRequest::SetCachedSize(int size) const {
+  _impl_._cached_size_.Set(size);
+}
+
+void PhoneLoginRequest::Clear() {
+// @@protoc_insertion_point(message_clear_start:rpc.PhoneLoginRequest)
+  uint32_t cached_has_bits = 0;
+  // Prevent compiler warnings about cached_has_bits being unused
+  (void) cached_has_bits;
+
+  _impl_.phone_.ClearToEmpty();
+  _impl_.otp_.ClearToEmpty();
+  _internal_metadata_.Clear<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>();
+}
+
+const char* PhoneLoginRequest::_InternalParse(const char* ptr, ::_pbi::ParseContext* ctx) {
+#define CHK_(x) if (PROTOBUF_PREDICT_FALSE(!(x))) goto failure
+  while (!ctx->Done(&ptr)) {
+    uint32_t tag;
+    ptr = ::_pbi::ReadTag(ptr, &tag);
+    switch (tag >> 3) {
+      // string phone = 1;
+      case 1:
+        if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 10)) {
+          auto str = _internal_mutable_phone();
+          ptr = ::_pbi::InlineGreedyStringParser(str, ptr, ctx);
+          CHK_(ptr);
+          CHK_(::_pbi::VerifyUTF8(str, "rpc.PhoneLoginRequest.phone"));
+        } else
+          goto handle_unusual;
+        continue;
+      // string otp = 2;
+      case 2:
+        if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 18)) {
+          auto str = _internal_mutable_otp();
+          ptr = ::_pbi::InlineGreedyStringParser(str, ptr, ctx);
+          CHK_(ptr);
+          CHK_(::_pbi::VerifyUTF8(str, "rpc.PhoneLoginRequest.otp"));
+        } else
+          goto handle_unusual;
+        continue;
+      default:
+        goto handle_unusual;
+    }  // switch
+  handle_unusual:
+    if ((tag == 0) || ((tag & 7) == 4)) {
+      CHK_(ptr);
+      ctx->SetLastTag(tag);
+      goto message_done;
+    }
+    ptr = UnknownFieldParse(
+        tag,
+        _internal_metadata_.mutable_unknown_fields<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(),
+        ptr, ctx);
+    CHK_(ptr != nullptr);
+  }  // while
+message_done:
+  return ptr;
+failure:
+  ptr = nullptr;
+  goto message_done;
+#undef CHK_
+}
+
+uint8_t* PhoneLoginRequest::_InternalSerialize(
+    uint8_t* target, ::PROTOBUF_NAMESPACE_ID::io::EpsCopyOutputStream* stream) const {
+  // @@protoc_insertion_point(serialize_to_array_start:rpc.PhoneLoginRequest)
+  uint32_t cached_has_bits = 0;
+  (void) cached_has_bits;
+
+  // string phone = 1;
+  if (!this->_internal_phone().empty()) {
+    ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::VerifyUtf8String(
+      this->_internal_phone().data(), static_cast<int>(this->_internal_phone().length()),
+      ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::SERIALIZE,
+      "rpc.PhoneLoginRequest.phone");
+    target = stream->WriteStringMaybeAliased(
+        1, this->_internal_phone(), target);
+  }
+
+  // string otp = 2;
+  if (!this->_internal_otp().empty()) {
+    ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::VerifyUtf8String(
+      this->_internal_otp().data(), static_cast<int>(this->_internal_otp().length()),
+      ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::SERIALIZE,
+      "rpc.PhoneLoginRequest.otp");
+    target = stream->WriteStringMaybeAliased(
+        2, this->_internal_otp(), target);
+  }
+
+  if (PROTOBUF_PREDICT_FALSE(_internal_metadata_.have_unknown_fields())) {
+    target = ::_pbi::WireFormat::InternalSerializeUnknownFieldsToArray(
+        _internal_metadata_.unknown_fields<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(::PROTOBUF_NAMESPACE_ID::UnknownFieldSet::default_instance), target, stream);
+  }
+  // @@protoc_insertion_point(serialize_to_array_end:rpc.PhoneLoginRequest)
+  return target;
+}
+
+size_t PhoneLoginRequest::ByteSizeLong() const {
+// @@protoc_insertion_point(message_byte_size_start:rpc.PhoneLoginRequest)
+  size_t total_size = 0;
+
+  uint32_t cached_has_bits = 0;
+  // Prevent compiler warnings about cached_has_bits being unused
+  (void) cached_has_bits;
+
+  // string phone = 1;
+  if (!this->_internal_phone().empty()) {
+    total_size += 1 +
+      ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::StringSize(
+        this->_internal_phone());
+  }
+
+  // string otp = 2;
+  if (!this->_internal_otp().empty()) {
+    total_size += 1 +
+      ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::StringSize(
+        this->_internal_otp());
+  }
+
+  return MaybeComputeUnknownFieldsSize(total_size, &_impl_._cached_size_);
+}
+
+const ::PROTOBUF_NAMESPACE_ID::Message::ClassData PhoneLoginRequest::_class_data_ = {
+    ::PROTOBUF_NAMESPACE_ID::Message::CopyWithSourceCheck,
+    PhoneLoginRequest::MergeImpl
+};
+const ::PROTOBUF_NAMESPACE_ID::Message::ClassData*PhoneLoginRequest::GetClassData() const { return &_class_data_; }
+
+
+void PhoneLoginRequest::MergeImpl(::PROTOBUF_NAMESPACE_ID::Message& to_msg, const ::PROTOBUF_NAMESPACE_ID::Message& from_msg) {
+  auto* const _this = static_cast<PhoneLoginRequest*>(&to_msg);
+  auto& from = static_cast<const PhoneLoginRequest&>(from_msg);
+  // @@protoc_insertion_point(class_specific_merge_from_start:rpc.PhoneLoginRequest)
+  GOOGLE_DCHECK_NE(&from, _this);
+  uint32_t cached_has_bits = 0;
+  (void) cached_has_bits;
+
+  if (!from._internal_phone().empty()) {
+    _this->_internal_set_phone(from._internal_phone());
+  }
+  if (!from._internal_otp().empty()) {
+    _this->_internal_set_otp(from._internal_otp());
+  }
+  _this->_internal_metadata_.MergeFrom<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(from._internal_metadata_);
+}
+
+void PhoneLoginRequest::CopyFrom(const PhoneLoginRequest& from) {
+// @@protoc_insertion_point(class_specific_copy_from_start:rpc.PhoneLoginRequest)
+  if (&from == this) return;
+  Clear();
+  MergeFrom(from);
+}
+
+bool PhoneLoginRequest::IsInitialized() const {
+  return true;
+}
+
+void PhoneLoginRequest::InternalSwap(PhoneLoginRequest* other) {
+  using std::swap;
+  auto* lhs_arena = GetArenaForAllocation();
+  auto* rhs_arena = other->GetArenaForAllocation();
+  _internal_metadata_.InternalSwap(&other->_internal_metadata_);
+  ::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr::InternalSwap(
+      &_impl_.phone_, lhs_arena,
+      &other->_impl_.phone_, rhs_arena
+  );
+  ::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr::InternalSwap(
+      &_impl_.otp_, lhs_arena,
+      &other->_impl_.otp_, rhs_arena
+  );
+}
+
+::PROTOBUF_NAMESPACE_ID::Metadata PhoneLoginRequest::GetMetadata() const {
+  return ::_pbi::AssignDescriptors(
+      &descriptor_table_rpc_5fauth_2eproto_getter, &descriptor_table_rpc_5fauth_2eproto_once,
+      file_level_metadata_rpc_5fauth_2eproto[10]);
 }
 
 // @@protoc_insertion_point(namespace_scope)
@@ -2838,6 +3844,18 @@ Arena::CreateMaybeMessage< ::rpc::ValidateUserRequest >(Arena* arena) {
 template<> PROTOBUF_NOINLINE ::rpc::ValidateUserResponse*
 Arena::CreateMaybeMessage< ::rpc::ValidateUserResponse >(Arena* arena) {
   return Arena::CreateMessageInternal< ::rpc::ValidateUserResponse >(arena);
+}
+template<> PROTOBUF_NOINLINE ::rpc::ChangePasswordRequest*
+Arena::CreateMaybeMessage< ::rpc::ChangePasswordRequest >(Arena* arena) {
+  return Arena::CreateMessageInternal< ::rpc::ChangePasswordRequest >(arena);
+}
+template<> PROTOBUF_NOINLINE ::rpc::ChangePasswordResponse*
+Arena::CreateMaybeMessage< ::rpc::ChangePasswordResponse >(Arena* arena) {
+  return Arena::CreateMessageInternal< ::rpc::ChangePasswordResponse >(arena);
+}
+template<> PROTOBUF_NOINLINE ::rpc::PhoneLoginRequest*
+Arena::CreateMaybeMessage< ::rpc::PhoneLoginRequest >(Arena* arena) {
+  return Arena::CreateMessageInternal< ::rpc::PhoneLoginRequest >(arena);
 }
 PROTOBUF_NAMESPACE_CLOSE
 

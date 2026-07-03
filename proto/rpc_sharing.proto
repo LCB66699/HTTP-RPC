@@ -3,12 +3,36 @@ package rpc;
 
 option go_package = "rpc-server/proto/rpc";
 
+import "google/api/annotations.proto";
+
 service SharingService {
-  rpc Share(ShareRequest) returns (ShareResponse);
-  rpc Revoke(RevokeRequest) returns (RevokeResponse);
-  rpc ListShares(ResourceRequest) returns (ShareListResponse);
-  rpc CreateShareLink(ShareLinkRequest) returns (ShareLinkResponse);
-  rpc GetByToken(ShareTokenRequest) returns (SharedResourceResponse);
+  rpc Share(ShareRequest) returns (ShareResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/sheets/{resource_id}/share"
+      body: "*"
+    };
+  }
+  rpc Revoke(RevokeRequest) returns (RevokeResponse) {
+    option (google.api.http) = {
+      delete: "/api/v1/sheets/{resource_id}/share"
+    };
+  }
+  rpc ListShares(ResourceRequest) returns (ShareListResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/sheets/{resource_id}/share"
+    };
+  }
+  rpc CreateShareLink(ShareLinkRequest) returns (ShareLinkResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/sheets/{resource_id}/share-link"
+      body: "*"
+    };
+  }
+  rpc GetByToken(ShareTokenRequest) returns (SharedResourceResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/s/{token}"
+    };
+  }
 }
 
 message ShareRequest {

@@ -420,6 +420,7 @@ class SearchResponse final :
     kPageFieldNumber = 4,
     kTotalFieldNumber = 3,
     kPageSizeFieldNumber = 5,
+    kErrorCodeFieldNumber = 99,
   };
   // repeated .rpc.SearchResult results = 6;
   int results_size() const;
@@ -489,6 +490,15 @@ class SearchResponse final :
   void _internal_set_page_size(int32_t value);
   public:
 
+  // int32 error_code = 99;
+  void clear_error_code();
+  int32_t error_code() const;
+  void set_error_code(int32_t value);
+  private:
+  int32_t _internal_error_code() const;
+  void _internal_set_error_code(int32_t value);
+  public:
+
   // @@protoc_insertion_point(class_scope:rpc.SearchResponse)
  private:
   class _Internal;
@@ -503,6 +513,7 @@ class SearchResponse final :
     int32_t page_;
     int64_t total_;
     int32_t page_size_;
+    int32_t error_code_;
     mutable ::PROTOBUF_NAMESPACE_ID::internal::CachedSize _cached_size_;
   };
   union { Impl_ _impl_; };
@@ -1262,6 +1273,26 @@ inline const ::PROTOBUF_NAMESPACE_ID::RepeatedPtrField< ::rpc::SearchResult >&
 SearchResponse::results() const {
   // @@protoc_insertion_point(field_list:rpc.SearchResponse.results)
   return _impl_.results_;
+}
+
+// int32 error_code = 99;
+inline void SearchResponse::clear_error_code() {
+  _impl_.error_code_ = 0;
+}
+inline int32_t SearchResponse::_internal_error_code() const {
+  return _impl_.error_code_;
+}
+inline int32_t SearchResponse::error_code() const {
+  // @@protoc_insertion_point(field_get:rpc.SearchResponse.error_code)
+  return _internal_error_code();
+}
+inline void SearchResponse::_internal_set_error_code(int32_t value) {
+  
+  _impl_.error_code_ = value;
+}
+inline void SearchResponse::set_error_code(int32_t value) {
+  _internal_set_error_code(value);
+  // @@protoc_insertion_point(field_set:rpc.SearchResponse.error_code)
 }
 
 // -------------------------------------------------------------------

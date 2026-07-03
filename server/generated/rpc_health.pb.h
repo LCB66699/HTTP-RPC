@@ -407,6 +407,7 @@ class ReportResponse final :
 
   enum : int {
     kSuccessFieldNumber = 1,
+    kErrorCodeFieldNumber = 99,
   };
   // bool success = 1;
   void clear_success();
@@ -415,6 +416,15 @@ class ReportResponse final :
   private:
   bool _internal_success() const;
   void _internal_set_success(bool value);
+  public:
+
+  // int32 error_code = 99;
+  void clear_error_code();
+  int32_t error_code() const;
+  void set_error_code(int32_t value);
+  private:
+  int32_t _internal_error_code() const;
+  void _internal_set_error_code(int32_t value);
   public:
 
   // @@protoc_insertion_point(class_scope:rpc.ReportResponse)
@@ -426,6 +436,7 @@ class ReportResponse final :
   typedef void DestructorSkippable_;
   struct Impl_ {
     bool success_;
+    int32_t error_code_;
     mutable ::PROTOBUF_NAMESPACE_ID::internal::CachedSize _cached_size_;
   };
   union { Impl_ _impl_; };
@@ -930,6 +941,7 @@ class QueryResponse final :
     kNodesFieldNumber = 1,
     kTotalOnlineFieldNumber = 2,
     kTotalOfflineFieldNumber = 3,
+    kErrorCodeFieldNumber = 99,
   };
   // repeated .rpc.NodeInfo nodes = 1;
   int nodes_size() const;
@@ -967,6 +979,15 @@ class QueryResponse final :
   void _internal_set_total_offline(int32_t value);
   public:
 
+  // int32 error_code = 99;
+  void clear_error_code();
+  int32_t error_code() const;
+  void set_error_code(int32_t value);
+  private:
+  int32_t _internal_error_code() const;
+  void _internal_set_error_code(int32_t value);
+  public:
+
   // @@protoc_insertion_point(class_scope:rpc.QueryResponse)
  private:
   class _Internal;
@@ -978,6 +999,7 @@ class QueryResponse final :
     ::PROTOBUF_NAMESPACE_ID::RepeatedPtrField< ::rpc::NodeInfo > nodes_;
     int32_t total_online_;
     int32_t total_offline_;
+    int32_t error_code_;
     mutable ::PROTOBUF_NAMESPACE_ID::internal::CachedSize _cached_size_;
   };
   union { Impl_ _impl_; };
@@ -1236,6 +1258,26 @@ inline void ReportResponse::_internal_set_success(bool value) {
 inline void ReportResponse::set_success(bool value) {
   _internal_set_success(value);
   // @@protoc_insertion_point(field_set:rpc.ReportResponse.success)
+}
+
+// int32 error_code = 99;
+inline void ReportResponse::clear_error_code() {
+  _impl_.error_code_ = 0;
+}
+inline int32_t ReportResponse::_internal_error_code() const {
+  return _impl_.error_code_;
+}
+inline int32_t ReportResponse::error_code() const {
+  // @@protoc_insertion_point(field_get:rpc.ReportResponse.error_code)
+  return _internal_error_code();
+}
+inline void ReportResponse::_internal_set_error_code(int32_t value) {
+  
+  _impl_.error_code_ = value;
+}
+inline void ReportResponse::set_error_code(int32_t value) {
+  _internal_set_error_code(value);
+  // @@protoc_insertion_point(field_set:rpc.ReportResponse.error_code)
 }
 
 // -------------------------------------------------------------------
@@ -1668,6 +1710,26 @@ inline void QueryResponse::_internal_set_total_offline(int32_t value) {
 inline void QueryResponse::set_total_offline(int32_t value) {
   _internal_set_total_offline(value);
   // @@protoc_insertion_point(field_set:rpc.QueryResponse.total_offline)
+}
+
+// int32 error_code = 99;
+inline void QueryResponse::clear_error_code() {
+  _impl_.error_code_ = 0;
+}
+inline int32_t QueryResponse::_internal_error_code() const {
+  return _impl_.error_code_;
+}
+inline int32_t QueryResponse::error_code() const {
+  // @@protoc_insertion_point(field_get:rpc.QueryResponse.error_code)
+  return _internal_error_code();
+}
+inline void QueryResponse::_internal_set_error_code(int32_t value) {
+  
+  _impl_.error_code_ = value;
+}
+inline void QueryResponse::set_error_code(int32_t value) {
+  _internal_set_error_code(value);
+  // @@protoc_insertion_point(field_set:rpc.QueryResponse.error_code)
 }
 
 #ifdef __GNUC__
