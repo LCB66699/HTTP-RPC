@@ -359,57 +359,6 @@ func (g *Gateway) Search(w http.ResponseWriter, r *http.Request) {
 	WriteGRPCResponse(w, resp, err)
 }
 
-// ---- Sheet CRUD ----
-
-func (g *Gateway) CreateSheet(w http.ResponseWriter, r *http.Request) {
-	var req pb.CreateSpreadsheetRequest
-	json.NewDecoder(r.Body).Decode(&req)
-	req.UserId = 0
-	resp, err := g.SheetClient.CreateSpreadsheet(g.injectToken(r), &req)
-	WriteGRPCResponse(w, resp, err)
-}
-
-func (g *Gateway) ListSheets(w http.ResponseWriter, r *http.Request) {
-	resp, err := g.SheetClient.ListSpreadsheets(g.withAuth(r.Context(), r), &pb.ListSpreadsheetsRequest{UserId: 0})
-	WriteGRPCResponse(w, resp, err)
-}
-
-func (g *Gateway) GetSheet(w http.ResponseWriter, r *http.Request) {
-	id := parseInt64(r.PathValue("id"))
-	caller := GetUserFromCookie(r)
-	if caller == "" {
-		WriteJSONStatus(w, http.StatusUnauthorized, map[string]interface{}{"success": false, "error": "Unauthorized"})
-		return
-	}
-	resp, err := g.SheetClient.GetSpreadsheet(g.withAuth(r.Context(), r), &pb.GetSpreadsheetRequest{Id: id, UserId: 0})
-	if err != nil {
-		WriteGRPCError(w, err, "Not found")
-		return
-	}
-	if resp == nil || !resp.Success {
-		WriteJSONStatus(w, http.StatusNotFound, map[string]interface{}{"success": false, "error": "Not found"})
-		return
-	}
-	if resp.Spreadsheet != nil {
-		WriteJSON(w, resp)
-	}
-}
-
-func (g *Gateway) UpdateSheet(w http.ResponseWriter, r *http.Request) {
-	var req pb.UpdateSpreadsheetRequest
-	json.NewDecoder(r.Body).Decode(&req)
-	req.Id = parseInt64(r.PathValue("id"))
-	req.UserId = 0
-	resp, err := g.SheetClient.UpdateSpreadsheet(g.injectToken(r), &req)
-	WriteGRPCResponse(w, resp, err)
-}
-
-func (g *Gateway) DeleteSheet(w http.ResponseWriter, r *http.Request) {
-	id := parseInt64(r.PathValue("id"))
-	resp, err := g.SheetClient.DeleteSpreadsheet(g.withAuth(r.Context(), r), &pb.DeleteSpreadsheetRequest{Id: id, UserId: 0})
-	WriteGRPCResponse(w, resp, err)
-}
-
 // ---- Sharing ----
 
 func (g *Gateway) ShareSheet(w http.ResponseWriter, r *http.Request) {
@@ -499,13 +448,6 @@ func (g *Gateway) ShareByToken(w http.ResponseWriter, r *http.Request) {
 }
 
 // ---- File CRUD ----
-
-func (g *Gateway) Photos(w http.ResponseWriter, r *http.Request) {
-	resp, err := g.FileClient.ListFiles(g.injectToken(r), &pb.ListFilesRequest{
-		UserId: 0, MimeFilter: "image/",
-	})
-	WriteGRPCResponse(w, resp, err)
-}
 
 func (g *Gateway) MoveFile(w http.ResponseWriter, r *http.Request) {
 	id := parseInt64(r.PathValue("id"))

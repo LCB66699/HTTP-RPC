@@ -1,4 +1,4 @@
-package gateway_test
+﻿package gateway_test
 
 import (
 	"context"
@@ -117,7 +117,7 @@ type mockSharedClient struct {
 }
 
 func (m *mockSharedClient) Share(ctx context.Context, req *pb.ShareRequest, opts ...grpc.CallOption) (*pb.ShareResponse, error) {
-	return nil, nil
+	return &pb.ShareResponse{Success: true}, nil
 }
 func (m *mockSharedClient) Revoke(ctx context.Context, req *pb.RevokeRequest, opts ...grpc.CallOption) (*pb.RevokeResponse, error) {
 	return nil, nil
@@ -280,6 +280,82 @@ func TestSearch_Validation(t *testing.T) {
 	}
 }
 
+func TestRefresh_Success(t *testing.T) {
+	g := &gw.Gateway{
+		AuthClient: &mockAuthClient{
+			refreshResp: &pb.RefreshTokenResponse{Success: true, AccessToken: "new-at"},
+		},
+	}
+	req := httptest.NewRequest("POST", "/api/v1/refresh",
+		strings.NewReader(`{"username":"alice","refresh_token":"rt"}`))
+	w := httptest.NewRecorder()
+	g.Refresh(w, req)
+	if w.Code != http.StatusOK {
+		t.Errorf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+func TestMe_Success(t *testing.T) {
+	g := &gw.Gateway{}
+	req := httptest.NewRequest("GET", "/api/v1/me", nil)
+	req.Header.Set("X-Rpc-Uid", "12345")
+	w := httptest.NewRecorder()
+	g.Me(w, req)
+	if w.Code != http.StatusOK {
+		t.Errorf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+	if !strings.Contains(w.Body.String(), `"user_id":12345`) {
+		t.Errorf("expected user_id 12345, got: %s", w.Body.String())
+	}
+}
+
+
+
+func TestListFiles_Success(t *testing.T) {
+	g := &gw.Gateway{
+		FileClient: &mockFileClient{
+			listResp: &pb.ListFilesResponse{Success: true, Total: 10},
+		},
+	}
+	req := httptest.NewRequest("GET", "/api/v1/files", nil)
+	req.AddCookie(&http.Cookie{Name: "rpc_at", Value: validTestJWT()})
+	w := httptest.NewRecorder()
+	g.ListFiles(w, req)
+	if w.Code != http.StatusOK {
+		t.Errorf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+	if !strings.Contains(w.Body.String(), `"total":10`) {
+		t.Errorf("expected total:10, got: %s", w.Body.String())
+	}
+}
+
+func TestShareSheet_Success(t *testing.T) {
+	g := &gw.Gateway{SharedClient: &mockSharedClient{}}
+	req := httptest.NewRequest("POST", "/api/v1/sheets/123/share",
+		strings.NewReader(`{"username":"bob","permission":"view"}`))
+	req.Header.Set("X-Rpc-Uid", "12345")
+	w := httptest.NewRecorder()
+	g.ShareSheet(w, req)
+	if w.Code != http.StatusOK {
+		t.Errorf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+func TestListFiles_EmptyResult(t *testing.T) {
+	g := &gw.Gateway{
+		FileClient: &mockFileClient{
+			listResp: &pb.ListFilesResponse{Success: true, Total: 0},
+		},
+	}
+	req := httptest.NewRequest("GET", "/api/v1/files", nil)
+	req.AddCookie(&http.Cookie{Name: "rpc_at", Value: validTestJWT()})
+	w := httptest.NewRecorder()
+	g.ListFiles(w, req)
+	if w.Code != http.StatusOK {
+		t.Errorf("expected 200, got %d", w.Code)
+	}
+}
+
 func TestOTPSend_EmptyPhone_Rejected(t *testing.T) {
 	g := &gw.Gateway{}
 	req := httptest.NewRequest("POST", "/api/v1/auth/otp/send", strings.NewReader(`{"phone":""}`))
@@ -295,3 +371,6 @@ func TestOTPSend_EmptyPhone_Rejected(t *testing.T) {
 		t.Error("expected error message")
 	}
 }
+
+
+
