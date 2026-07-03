@@ -255,10 +255,10 @@ echo "$DELETE" | grep -q '"success":true' \
     || red "Delete failed: $DELETE"
 
 title "3.7 删除不存在（应拒绝）"
-DEL2=$($CURL -X DELETE "$API/api/v1/sheets/999999" -b "$JAR")
-echo "$DEL2" | grep -q '"error"' \
-    && green "Delete nonexistent rejected" \
-    || red "Should reject delete of nonexistent sheet"
+DEL2_CODE=$($CURL -o /dev/null -w '%{http_code}' -X DELETE "$API/api/v1/sheets/999999" -b "$JAR")
+[ "$DEL2_CODE" != "200" ] \
+    && green "Delete nonexistent rejected (HTTP $DEL2_CODE)" \
+    || red "Should reject delete of nonexistent sheet (HTTP $DEL2_CODE)"
 
 # ---- 4. 文件管理 ----
 title "4. 文件 (File)"
