@@ -1,10 +1,13 @@
 data/
 build/
 .claude/
+server/generated/google/
 *.exe
 .env
 .mcp.json
 test/logs/
+certs/
+test_jwt.txt
 mongo/
 mysql/
 redis/

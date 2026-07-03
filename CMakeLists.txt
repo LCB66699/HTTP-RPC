@@ -56,12 +56,16 @@ set(PROTO_FILES
     ${PROTO_DIR}/rpc_spreadsheet.proto
     ${PROTO_DIR}/rpc_health.proto
     ${PROTO_DIR}/rpc_search.proto
-    ${PROTO_DIR}/rpc_sharing.proto)
+    ${PROTO_DIR}/rpc_sharing.proto
+    ${PROTO_DIR}/google/api/annotations.proto
+    ${PROTO_DIR}/google/api/http.proto)
 
 foreach(PROTO ${PROTO_FILES})
-    get_filename_component(PROTO_NAME ${PROTO} NAME_WLE)
-    list(APPEND PROTO_SRCS ${GEN_DIR}/${PROTO_NAME}.pb.cc)
-    list(APPEND GRPC_SRCS ${GEN_DIR}/${PROTO_NAME}.grpc.pb.cc)
+    file(RELATIVE_PATH PROTO_REL ${PROTO_DIR} ${PROTO})
+    string(REGEX REPLACE "\\.proto$" ".pb.cc" PROTO_PB ${PROTO_REL})
+    string(REGEX REPLACE "\\.proto$" ".grpc.pb.cc" PROTO_GRPC ${PROTO_REL})
+    list(APPEND PROTO_SRCS ${GEN_DIR}/${PROTO_PB})
+    list(APPEND GRPC_SRCS ${GEN_DIR}/${PROTO_GRPC})
 endforeach()
 
 add_custom_command(
