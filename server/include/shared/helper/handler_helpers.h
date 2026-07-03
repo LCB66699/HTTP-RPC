@@ -80,10 +80,12 @@ inline void PublishEvent(IRabbitPublisher *rabbit, IDatabase *db, int64_t user_i
                          const char *routing_key, nlohmann::json ev) {
     ev["user_id"] = user_id;
     std::string body = ev.dump();
-    if (rabbit)
-        rabbit->Publish("rpc.events", routing_key, body);
+    // 先写 outbox（持久化保证），再 Publish（快速路径）
+    // 即使 Publish 失败或进程崩溃，补偿器会补发 pending 行
     if (db)
         db->InsertOutbox(user_id, routing_key, body);
+    if (rabbit)
+        rabbit->Publish("rpc.events", routing_key, body);
 }
 
 // ======== Scope timer ========

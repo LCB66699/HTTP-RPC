@@ -298,7 +298,14 @@ bool Database::Initialize() {
         "payload JSON NOT NULL, "
         "created_at DATETIME DEFAULT NOW())");
 
-    // indexes + migrations (骞傜瓑, 澶辫触蹇界暐)
+    // Outbox 状态字段: 0=pending 1=claimed 2=published 255=dead
+    exec("ALTER TABLE outbox ADD COLUMN status TINYINT NOT NULL DEFAULT 0");
+    exec("ALTER TABLE outbox ADD COLUMN attempts TINYINT NOT NULL DEFAULT 0");
+    exec("ALTER TABLE outbox ADD COLUMN published_at DATETIME DEFAULT NULL");
+    exec("ALTER TABLE outbox ADD COLUMN last_error VARCHAR(512) DEFAULT NULL");
+    exec("ALTER TABLE outbox ADD COLUMN message_id VARCHAR(64) DEFAULT NULL");
+
+    // indexes + migrations (幂等, 失败忽略)
     mysql_query(c, "ALTER TABLE spreadsheets ADD COLUMN version INT NOT NULL DEFAULT 1");
     mysql_query(c, "ALTER TABLE users MODIFY COLUMN password_hash VARCHAR(256) NOT NULL");
     mysql_query(c, "ALTER TABLE users ADD COLUMN token_version INT NOT NULL DEFAULT 0");
@@ -390,7 +397,10 @@ bool Database::Initialize() {
                 "ALTER TABLE users ADD UNIQUE INDEX idx_users_user_ver "
                 "(username, token_version)");
 
-    // INT 锟?BIGINT 鍗囩骇锛氬吋瀹瑰凡鏈夎〃锛孧ySQL 8.0 鏀寔 ALGORITHM=INSTANT
+    // Outbox composite index: accelerates SELECT status=0 ORDER BY id LIMIT N
+    mysql_query(c, "CREATE INDEX idx_outbox_status ON outbox(status, id)");
+
+    // INT -> BIGINT upgrade, backward compatible, MySQL 8.0 supports ALGORITHM=INSTANT
     mysql_query(c, "ALTER TABLE users MODIFY COLUMN id BIGINT AUTO_INCREMENT");
     mysql_query(c, "ALTER TABLE spreadsheets MODIFY COLUMN id BIGINT AUTO_INCREMENT");
     mysql_query(c,

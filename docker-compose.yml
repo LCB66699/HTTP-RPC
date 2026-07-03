@@ -704,6 +704,8 @@
       MONGO_DB: "rpc_search"
       ES_HOST: "http://elasticsearch:9200"
       CANAL_MYSQL_HOST: "mysql-spreadsheet-0"
+      OUTBOX_SHEET_HOSTS: "mysql-spreadsheet-0:rpc_spreadsheet,mysql-spreadsheet-1:rpc_spreadsheet_1"
+      OUTBOX_FILE_HOSTS: "mysql-file-0:rpc_file,mysql-file-1:rpc_file_1"
       MYSQL_ROOT_PASSWORD: "${MYSQL_ROOT_PASSWORD:-123456}"
       REDIS_ADDR: "redis-cluster-7000:7000"
       REDIS_PASSWORD: "${REDIS_PASSWORD:-rpc-redis-123456}"
@@ -715,6 +717,8 @@
       elasticsearch:
         condition: service_healthy
       mysql-spreadsheet-0:
+        condition: service_healthy
+      mysql-file-0:
         condition: service_healthy
     restart: unless-stopped
 

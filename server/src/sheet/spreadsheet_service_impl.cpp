@@ -493,10 +493,10 @@ grpc::Status SpreadsheetServiceImpl::UpdateSpreadsheet(grpc::ServerContext *cont
                 ev["description"] = req->description();
                 ev["headers"] = nlohmann::json::parse(req->headers_json().empty() ? "[]" : req->headers_json());
                 ev["cells"] = nlohmann::json::parse(req->data_json().empty() ? "[]" : req->data_json());
-                if (rabbit_)
-                    rabbit_->Publish("rpc.events", "sheet.updated", ev.dump());
                 if (db_)
                     db_->InsertOutbox(g_rpc_auth_ctx.user_id, "sheet.updated", ev.dump());
+                if (rabbit_)
+                    rabbit_->Publish("rpc.events", "sheet.updated", ev.dump());
             }
 
             // Invalidate caches: sync L1 + Pub/Sub + outbox fallback
