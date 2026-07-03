@@ -203,9 +203,15 @@ func main() {
 	mux.HandleFunc("GET /api/v1/files/{id}", gwInst.GetFile)
 	mux.HandleFunc("DELETE /api/v1/files/{id}", gwInst.DeleteFile)
 
-	// JWT authn and CORS are handled by Envoy at the edge.
-	// The gateway trusts x-rpc-uid / x-rpc-username headers injected
-	// by Envoy's jwt_authn filter. No additional middleware needed.
+	// ---- JWT verification middleware ----
+	// The gateway verifies JWT signatures from the rpc_at cookie independently
+	// (defense-in-depth). Even when Envoy injects X-Rpc-Uid at the edge,
+	// the middleware re-verifies and overwrites, preventing header forgery.
+	jwtSecret := getenv("JWT_SECRET", "")
+	if jwtSecret == "" {
+		log.Fatal("JWT_SECRET environment variable is required")
+	}
+	gw.SetJWTSecret(jwtSecret)
 
 	// ---- Dispatcher: sheet CRUD -> gwmux, everything else -> custom mux ----
 	top := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -221,10 +227,10 @@ func main() {
 		}
 		mux.ServeHTTP(w, r)
 	})
-	handler := metricsMiddleware(otelhttp.NewHandler(top, "gateway-grpc",
+	handler := gw.AuthMiddleware(metricsMiddleware(otelhttp.NewHandler(top, "gateway-grpc",
 		otelhttp.WithTracerProvider(otel.GetTracerProvider()),
 		otelhttp.WithPropagators(otel.GetTextMapPropagator()),
-	))
+	)))
 
 	port := getenv("PORT", "8080")
 	srv := &http.Server{Addr: ":" + port, Handler: h2c.NewHandler(handler, &http2.Server{})}

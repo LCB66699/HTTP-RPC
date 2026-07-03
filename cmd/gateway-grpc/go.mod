@@ -17,8 +17,8 @@ require (
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc v1.28.0
 	go.opentelemetry.io/otel/sdk v1.28.0
 	golang.org/x/net v0.28.0
-	google.golang.org/genproto/googleapis/api v0.0.0-20241021214115-324edc3d5d38
 	google.golang.org/grpc v1.67.1
+	google.golang.org/protobuf v1.35.1
 )
 
 require (
@@ -31,7 +31,6 @@ require (
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/go-redsync/redsync/v4 v4.13.0 // indirect
 	github.com/google/uuid v1.6.0 // indirect
-	github.com/grpc-ecosystem/grpc-gateway/v2 v2.23.0 // indirect
 	github.com/hashicorp/errwrap v1.1.0 // indirect
 	github.com/hashicorp/go-multierror v1.1.1 // indirect
 	github.com/prometheus/client_model v0.5.0 // indirect
@@ -45,7 +44,6 @@ require (
 	golang.org/x/text v0.19.0 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20241021214115-324edc3d5d38 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20241021214115-324edc3d5d38 // indirect
-	google.golang.org/protobuf v1.35.1 // indirect
 )
 
 replace gateway-grpc/gen/rpc => ./gen/rpc
