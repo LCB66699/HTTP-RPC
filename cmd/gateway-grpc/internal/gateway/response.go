@@ -50,8 +50,8 @@ func WriteGRPCResponse(w http.ResponseWriter, resp GRPCResponse, err error) {
 	WriteJSON(w, resp)
 }
 
-// grpcStatusHTTP maps gRPC status codes to HTTP status codes.
-func grpcStatusHTTP(code codes.Code) int {
+// GrpcStatusToHTTP maps gRPC status codes to HTTP status codes.
+func GrpcStatusToHTTP(code codes.Code) int {
 	switch code {
 	case codes.OK:
 		return http.StatusOK
@@ -105,7 +105,7 @@ func WriteGRPCError(w http.ResponseWriter, err error, fallback string) {
 		})
 		return
 	} else if st, ok := status.FromError(err); ok {
-		code = grpcStatusHTTP(st.Code())
+		code = GrpcStatusToHTTP(st.Code())
 		msg = st.Message()
 	}
 	WriteJSONStatus(w, code, map[string]interface{}{"success": false, "error": msg})

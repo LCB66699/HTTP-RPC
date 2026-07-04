@@ -92,20 +92,16 @@ message GetSpreadsheetResponse {
 
 message ListSpreadsheetsRequest {
   int64 user_id = 1;
-  int32 page = 2;
-  int32 page_size = 3;
-  // Cursor pagination: 上一页最后一条 id, 0=首页
-  int64 after_id = 4;
-  int32 limit = 5;  // 默认 20
+  int32 limit = 5;   // default 20, max 100
+  string cursor = 6;  // empty = first page, pass next_cursor for next page
 }
 
 message ListSpreadsheetsResponse {
   bool success = 1;
   repeated SpreadsheetSummary sheets = 2;
-  int32 total = 3;
   string cache_source = 4;
   string error = 5;
-  string next_cursor = 6;  // 下一页 after_id
+  string next_cursor = 6;  // cursor for next page, empty when has_more=false
   bool has_more = 7;
   int32 error_code = 99;
 }

@@ -34,6 +34,8 @@ TEST(SheetMock, GetSpreadsheetRedisCacheHit) {
     svc.SetDatabase(&db);
     svc.SetRedis(&redis);
 
+    AuthGuard auth(42);
+
     // Ownership check: caller 42 owns sheet 1
     EXPECT_CALL(db, GetSpreadsheetOwner(1, _, _))
         .WillOnce(DoAll(SetArgReferee<1>(42), Return(true)));
@@ -92,6 +94,8 @@ TEST(SheetMock, GetSpreadsheetCacheMissThenDbHit) {
     svc.SetDatabase(&db);
     svc.SetRedis(&redis);
 
+    AuthGuard auth(42);
+
     // Ownership check
     EXPECT_CALL(db, GetSpreadsheetOwner(2, _, _))
         .WillOnce(DoAll(SetArgReferee<1>(42), Return(true)));
@@ -135,6 +139,8 @@ TEST(SheetMock, GetSpreadsheetWrongOwner) {
     SpreadsheetServiceImpl svc;
     svc.SetDatabase(&db);
 
+    AuthGuard auth(42);
+
     EXPECT_CALL(db, GetSpreadsheetOwner(3, _, _))
         .WillOnce(DoAll(SetArgReferee<1>(99), Return(true)));
 
@@ -145,8 +151,8 @@ TEST(SheetMock, GetSpreadsheetWrongOwner) {
     req.set_user_id(42);
 
     auto status = svc.GetSpreadsheet(&ctx, &req, &resp);
-    EXPECT_TRUE(status.ok());
-    EXPECT_FALSE(resp.success());
+    EXPECT_FALSE(status.ok());
+    EXPECT_EQ(status.error_code(), grpc::NOT_FOUND);
 }
 
 // ===== GetSpreadsheet — DB hit + Mongo fills cells =====

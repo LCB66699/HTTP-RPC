@@ -1,18 +1,23 @@
 #include <gtest/gtest.h>
-#include "../server/include/file_helpers.h"
+#include "shared/helper/cache_helpers.h"
 
 TEST(FileHelpers, VersionKey) {
     EXPECT_EQ(FileVersionKey(7), "u:7:files:version");
 }
 
-TEST(FileHelpers, ListCacheKeyDefault) {
-    auto key = FileListCacheKey(5, 2, 0, 0);
+TEST(FileHelpers, ListCacheKeyNoLimit) {
+    auto key = FileListCacheKey(5, 2, 0, "");
     EXPECT_EQ(key, "u:5:files:v2");
 }
 
-TEST(FileHelpers, ListCacheKeyPaginated) {
-    auto key = FileListCacheKey(5, 2, 1, 20);
-    EXPECT_EQ(key, "u:5:files:v2:p1:ps20");
+TEST(FileHelpers, ListCacheKeyWithLimit) {
+    auto key = FileListCacheKey(5, 2, 20, "");
+    EXPECT_EQ(key, "u:5:files:v2:l20");
+}
+
+TEST(FileHelpers, ListCacheKeyWithCursor) {
+    auto key = FileListCacheKey(5, 2, 20, "99");
+    EXPECT_EQ(key, "u:5:files:v2:l20:c99");
 }
 
 TEST(FileHelpers, CacheKey) {

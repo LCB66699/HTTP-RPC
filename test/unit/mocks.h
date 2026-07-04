@@ -16,8 +16,9 @@ public:
          int64_t &out_id, const std::string &idempotency_key), (override));
     MOCK_METHOD(bool, GetSpreadsheet, (int64_t id, int64_t uid, SpreadsheetRow &out), (override));
     MOCK_METHOD(bool, ListSpreadsheets,
-        (int64_t uid, std::vector<SpreadsheetSummary> &out, int &total,
-         int page, int page_size, int64_t after_id), (override));
+        (int64_t uid, std::vector<SpreadsheetSummary> &out,
+         std::string &next_cursor, bool &has_more,
+         int limit, const std::string &cursor), (override));
     MOCK_METHOD(bool, UpdateSpreadsheet,
         (int64_t id, int64_t uid, const std::string &name, const std::string &desc,
          const std::string &headers, const std::string &data, int version), (override));
@@ -34,8 +35,9 @@ public:
          int64_t &out_id, const std::string &idempotency_key), (override));
     MOCK_METHOD(bool, GetFile, (int64_t id, int64_t uid, FileRow &out), (override));
     MOCK_METHOD(bool, ListFiles,
-        (int64_t uid, std::vector<FileRow> &out, int &total,
-         int page, int page_size, int64_t after_id), (override));
+        (int64_t uid, std::vector<FileRow> &out,
+         std::string &next_cursor, bool &has_more,
+         int limit, const std::string &cursor), (override));
     MOCK_METHOD(bool, DeleteFile, (int64_t id, int64_t uid), (override));
     MOCK_METHOD(bool, GetFileOwner, (int64_t id, int64_t &owner_uid), (override));
     MOCK_METHOD(bool, UpdateFileContent, (int64_t id, const std::string &content, int version), (override));

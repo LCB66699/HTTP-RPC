@@ -612,42 +612,32 @@ bool Database::GetSpreadsheet(int64_t id, int64_t user_id, SpreadsheetRow &out) 
     });
 }
 
-bool Database::ListSpreadsheets(int64_t user_id, std::vector<SpreadsheetSummary> &out, int &total, int page,
-                                int page_size, int64_t after_id) {
-    std::string where = make_sql("WHERE user_id={}", user_id);
-    if (after_id > 0)
-        where += make_sql(" AND id<{}", after_id);
+bool Database::ListSpreadsheets(int64_t user_id, std::vector<SpreadsheetSummary> &out,
+                                std::string &next_cursor, bool &has_more,
+                                int limit, const std::string &cursor) {
+    if (limit <= 0) limit = 20;
+    int64_t cursor_id = cursor.empty() ? INT64_MAX : std::stoll(cursor);
+    std::string where = make_sql("WHERE user_id={} AND id<{}", user_id, cursor_id);
 
-    // Always obtain exact total via COUNT(*) 锟?avoids loading all rows just to
-    // count them
-    total = 0;
-    ExecRead("SELECT COUNT(*) FROM spreadsheets " + where, [&](MYSQL_RES *res) {
-        MYSQL_ROW row = mysql_fetch_row(res);
-        if (row && row[0])
-            total = std::stoi(row[0]);
-        return true;
-    });
+    // Fetch limit+1 rows to detect has_more without COUNT(*)
+    std::string sql =
+        "SELECT s.id,s.name,s.description,s.row_count,s.col_count,s.updated_at "
+        "FROM spreadsheets s "
+        "JOIN (SELECT id FROM spreadsheets " +
+        where + make_sql(" ORDER BY id DESC LIMIT {}", limit + 1) +
+        ") tmp ON s.id=tmp.id "
+        "ORDER BY s.id DESC";
 
-    std::string sql;
-    if (page_size > 0) {
-        int offset = page * page_size;
-        // Delayed Join: subquery scans covering index for ids, then join to fetch
-        // full row data 锟?avoids deep-page row reads.  WHERE clause is built from
-        // safe int params above, so string concat is safe here.
-        sql =
-            "SELECT s.id,s.name,s.description,s.row_count,s.col_count,s.updated_at "
-            "FROM spreadsheets s "
-            "JOIN (SELECT id FROM spreadsheets " +
-            where + make_sql(" ORDER BY updated_at DESC LIMIT {} OFFSET {}", page_size, offset) +
-            ") tmp ON s.id=tmp.id "
-            "ORDER BY s.updated_at DESC";
-    } else {
-        sql = "SELECT id,name,description,row_count,col_count,updated_at "
-              "FROM spreadsheets " + where + " ORDER BY updated_at DESC";
-    }
+    has_more = false;
+    next_cursor.clear();
     return ExecRead(sql, [&](MYSQL_RES *res) {
         MYSQL_ROW row;
+        int count = 0;
         while ((row = mysql_fetch_row(res))) {
+            if (count >= limit) {
+                has_more = true;
+                break;
+            }
             SpreadsheetSummary s;
             s.id = std::stoll(row[0]);
             s.name = row[1] ? row[1] : "";
@@ -656,7 +646,10 @@ bool Database::ListSpreadsheets(int64_t user_id, std::vector<SpreadsheetSummary>
             s.col_count = row[4] ? std::stoi(row[4]) : 0;
             s.updated_at = row[5] ? row[5] : "";
             out.push_back(s);
+            count++;
         }
+        if (!out.empty())
+            next_cursor = std::to_string(out.back().id);
         return true;
     });
 }
@@ -804,44 +797,33 @@ bool Database::GetFile(int64_t id, int64_t user_id, FileRow &out) {
     });
 }
 
-bool Database::ListFiles(int64_t user_id, std::vector<FileRow> &out, int &total, int page, int page_size,
-                         int64_t after_id) {
-    std::string where = make_sql("WHERE user_id={}", user_id);
-    if (after_id > 0)
-        where += make_sql(" AND id<{}", after_id);
+bool Database::ListFiles(int64_t user_id, std::vector<FileRow> &out,
+                         std::string &next_cursor, bool &has_more,
+                         int limit, const std::string &cursor) {
+    if (limit <= 0) limit = 20;
+    int64_t cursor_id = cursor.empty() ? INT64_MAX : std::stoll(cursor);
+    std::string where = make_sql("WHERE user_id={} AND id<{}", user_id, cursor_id);
 
-    // Always obtain exact total via COUNT(*) to avoid loading all rows just to
-    // count
-    total = 0;
-    ExecRead("SELECT COUNT(*) FROM files " + where, [&](MYSQL_RES *res) {
-        MYSQL_ROW row = mysql_fetch_row(res);
-        if (row && row[0])
-            total = std::stoi(row[0]);
-        return true;
-    });
+    // Fetch limit+1 rows to detect has_more without COUNT(*)
+    std::string sql =
+        "SELECT "
+        "f.id,f.username,f.original_name,f.size,f.mime_type,f.created_at "
+        "FROM files f "
+        "JOIN (SELECT id FROM files " +
+        where + make_sql(" ORDER BY id DESC LIMIT {}", limit + 1) +
+        ") tmp ON f.id=tmp.id "
+        "ORDER BY f.id DESC";
 
-    std::string sql;
-    if (page_size > 0) {
-        int offset = page * page_size;
-        // Delayed Join: subquery uses covering index for id lookup, then join back
-        // to read full row 锟?avoids scanning large row data at deep offsets.
-        // WHERE clause is built from safe int params above.
-        sql =
-            "SELECT "
-            "f.id,f.username,f.original_name,f.size,f.mime_type,f.created_at "
-            "FROM files f "
-            "JOIN (SELECT id FROM files " +
-            where + make_sql(" ORDER BY created_at DESC LIMIT {} OFFSET {}", page_size, offset) +
-            ") tmp ON f.id=tmp.id "
-            "ORDER BY f.created_at DESC";
-    } else {
-        sql =
-            "SELECT id,username,original_name,size,mime_type,created_at "
-            "FROM files " + where + " ORDER BY created_at DESC";
-    }
+    has_more = false;
+    next_cursor.clear();
     return ExecRead(sql, [&](MYSQL_RES *res) {
         MYSQL_ROW row;
+        int count = 0;
         while ((row = mysql_fetch_row(res))) {
+            if (count >= limit) {
+                has_more = true;
+                break;
+            }
             FileRow f;
             f.id = std::stoll(row[0]);
             f.username = row[1] ? row[1] : "";
@@ -850,7 +832,10 @@ bool Database::ListFiles(int64_t user_id, std::vector<FileRow> &out, int &total,
             f.mime_type = row[4] ? row[4] : "";
             f.created_at = row[5] ? row[5] : "";
             out.push_back(f);
+            count++;
         }
+        if (!out.empty())
+            next_cursor = std::to_string(out.back().id);
         return true;
     });
 }
@@ -1127,9 +1112,10 @@ bool ShardedDatabase::CreateSpreadsheet(int64_t user_id, const std::string &user
 bool ShardedDatabase::GetSpreadsheet(int64_t id, int64_t user_id, SpreadsheetRow &out) {
     return ShardFor(user_id)->GetSpreadsheet(id, user_id, out);
 }
-bool ShardedDatabase::ListSpreadsheets(int64_t user_id, std::vector<SpreadsheetSummary> &out, int &total, int page,
-                                       int page_size, int64_t after_id) {
-    return ShardFor(user_id)->ListSpreadsheets(user_id, out, total, page, page_size, after_id);
+bool ShardedDatabase::ListSpreadsheets(int64_t user_id, std::vector<SpreadsheetSummary> &out,
+                                       std::string &next_cursor, bool &has_more,
+                                       int limit, const std::string &cursor) {
+    return ShardFor(user_id)->ListSpreadsheets(user_id, out, next_cursor, has_more, limit, cursor);
 }
 bool ShardedDatabase::UpdateSpreadsheet(int64_t id, int64_t user_id, const std::string &name, const std::string &desc,
                                         const std::string &headers_json, const std::string &data_json, int version) {
@@ -1185,9 +1171,10 @@ bool ShardedDatabase::UpdateFileContent(int64_t id, const std::string &content, 
 bool ShardedDatabase::GetFile(int64_t id, int64_t user_id, FileRow &out) {
     return ShardFor(user_id)->GetFile(id, user_id, out);
 }
-bool ShardedDatabase::ListFiles(int64_t user_id, std::vector<FileRow> &out, int &total, int page, int page_size,
-                                int64_t after_id) {
-    return ShardFor(user_id)->ListFiles(user_id, out, total, page, page_size, after_id);
+bool ShardedDatabase::ListFiles(int64_t user_id, std::vector<FileRow> &out,
+                                std::string &next_cursor, bool &has_more,
+                                int limit, const std::string &cursor) {
+    return ShardFor(user_id)->ListFiles(user_id, out, next_cursor, has_more, limit, cursor);
 }
 
 // Broadcast: id is globally unique

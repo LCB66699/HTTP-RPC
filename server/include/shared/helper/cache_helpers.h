@@ -8,10 +8,14 @@
 inline std::string ResourceVersionKey(const char *resource, int64_t user_id) {
     return "u:" + std::to_string(user_id) + ":" + resource + "s:version";
 }
-inline std::string ResourceListCacheKey(const char *resource, int64_t user_id, int64_t version, int page, int page_size) {
+inline std::string ResourceListCacheKey(const char *resource, int64_t user_id, int64_t version,
+                                        int limit, const std::string &cursor) {
     std::string key = "u:" + std::to_string(user_id) + ":" + resource + "s:v" + std::to_string(version);
-    if (page_size > 0)
-        key += ":p" + std::to_string(page) + ":ps" + std::to_string(page_size);
+    if (limit > 0) {
+        key += ":l" + std::to_string(limit);
+        if (!cursor.empty())
+            key += ":c" + cursor;
+    }
     return key;
 }
 inline std::string ResourceCacheKey(const char *resource, int64_t user_id, int64_t id) {
@@ -24,8 +28,8 @@ inline std::string ResourceLockKey(const char *resource, int64_t user_id, int64_
 // ======== File 快捷函数 ========
 
 inline std::string FileVersionKey(int64_t user_id)     { return ResourceVersionKey("file", user_id); }
-inline std::string FileListCacheKey(int64_t user_id, int64_t version, int page, int page_size) {
-    return ResourceListCacheKey("file", user_id, version, page, page_size);
+inline std::string FileListCacheKey(int64_t user_id, int64_t version, int limit, const std::string &cursor) {
+    return ResourceListCacheKey("file", user_id, version, limit, cursor);
 }
 inline std::string FileCacheKey(int64_t user_id, int64_t file_id)   { return ResourceCacheKey("file", user_id, file_id); }
 inline std::string FileLockKey(int64_t user_id, int64_t file_id)     { return ResourceLockKey("file", user_id, file_id); }
@@ -33,8 +37,8 @@ inline std::string FileLockKey(int64_t user_id, int64_t file_id)     { return Re
 // ======== Sheet 快捷函数 ========
 
 inline std::string SheetVersionKey(int64_t user_id)     { return ResourceVersionKey("sheet", user_id); }
-inline std::string SheetListCacheKey(int64_t user_id, int64_t version, int page, int page_size) {
-    return ResourceListCacheKey("sheet", user_id, version, page, page_size);
+inline std::string SheetListCacheKey(int64_t user_id, int64_t version, int limit, const std::string &cursor) {
+    return ResourceListCacheKey("sheet", user_id, version, limit, cursor);
 }
 inline std::string SheetCacheKey(int64_t user_id, int64_t sheet_id)   { return ResourceCacheKey("sheet", user_id, sheet_id); }
 inline std::string SheetLockKey(int64_t user_id, int64_t sheet_id)     { return ResourceLockKey("sheet", user_id, sheet_id); }

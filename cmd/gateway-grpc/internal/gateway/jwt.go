@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/golang-jwt/jwt/v5"
 )
@@ -58,27 +59,64 @@ func verifyJWT(tokenStr string) (*AuthContext, error) {
 	return ac, nil
 }
 
-// AuthMiddleware is HTTP middleware that verifies the rpc_at JWT cookie and
-// injects X-Rpc-Uid / X-Rpc-Username headers for downstream handlers.
+// publicPaths lists endpoints that do not require authentication.
+var publicPaths = map[string]bool{
+	"/api/v1/login":          true,
+	"/api/v1/register":       true,
+	"/api/v1/refresh":        true,
+	"/api/v1/auth/otp/send":  true,
+	"/api/v1/auth/phone/login": true,
+	"/api/v1/health":         true,
+	"/api/v1/health/ready":   true,
+	"/api/v1/metrics":        true,
+}
+
+// isPublicPath returns true if the path does not require authentication.
+func isPublicPath(path string) bool {
+	if publicPaths[path] {
+		return true
+	}
+	// prefix match for share-by-token: /api/v1/s/{token}
+	if strings.HasPrefix(path, "/api/v1/s/") {
+		return true
+	}
+	return false
+}
+
+// AuthMiddleware verifies the rpc_at JWT cookie on every request.
+// Public endpoints are passed through without authentication.
+// On missing or invalid token, the middleware returns 401 immediately.
 //
-// If the cookie is missing or the token is invalid, the middleware silently
-// passes through — handlers without auth simply see empty headers and
-// respond with 401 as they already do.
-//
-// If a previous layer (e.g. Envoy) already set these headers, the middleware
-// overwrites them with the verified value, providing defense-in-depth.
+// On successful verification, the middleware overwrites X-Rpc-Uid and
+// X-Rpc-Username headers with verified values (defense-in-depth: even if
+// Envoy already set them, we re-verify and overwrite).
 func AuthMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		cookie, err := r.Cookie("rpc_at")
-		if err == nil && cookie.Value != "" {
-			if ac, err := verifyJWT(cookie.Value); err == nil {
-				r.Header.Set("X-Rpc-Uid", strconv.FormatInt(ac.UserID, 10))
-				r.Header.Set("X-Rpc-Username", ac.Username)
-				ctx := context.WithValue(r.Context(), authCtxKey, ac)
-				r = r.WithContext(ctx)
-			}
+		if isPublicPath(r.URL.Path) {
+			next.ServeHTTP(w, r)
+			return
 		}
-		next.ServeHTTP(w, r)
+
+		cookie, err := r.Cookie("rpc_at")
+		if err != nil || cookie.Value == "" {
+			WriteJSONStatus(w, http.StatusUnauthorized, map[string]interface{}{
+				"success": false, "error": "authentication required",
+			})
+			return
+		}
+
+		ac, err := verifyJWT(cookie.Value)
+		if err != nil {
+			WriteJSONStatus(w, http.StatusUnauthorized, map[string]interface{}{
+				"success": false, "error": "invalid or expired token",
+			})
+			return
+		}
+
+		r.Header.Set("X-Rpc-Uid", strconv.FormatInt(ac.UserID, 10))
+		r.Header.Set("X-Rpc-Username", ac.Username)
+		ctx := context.WithValue(r.Context(), authCtxKey, ac)
+		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }
 
@@ -87,4 +125,22 @@ func AuthMiddleware(next http.Handler) http.Handler {
 func GetAuthContext(ctx context.Context) *AuthContext {
 	ac, _ := ctx.Value(authCtxKey).(*AuthContext)
 	return ac
+}
+
+// ExtractUID reads the user ID injected by AuthMiddleware from X-Rpc-Uid.
+func ExtractUID(r *http.Request) int64 {
+	uidStr := r.Header.Get("X-Rpc-Uid")
+	if uidStr == "" {
+		return 0
+	}
+	uid, err := strconv.ParseInt(uidStr, 10, 64)
+	if err != nil {
+		return 0
+	}
+	return uid
+}
+
+// GetUserFromCookie reads the username injected by AuthMiddleware from X-Rpc-Username.
+func GetUserFromCookie(r *http.Request) string {
+	return r.Header.Get("X-Rpc-Username")
 }

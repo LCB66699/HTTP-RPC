@@ -2,7 +2,7 @@ package main
 
 import (
 	"context"
-	"log"
+	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
@@ -30,6 +30,7 @@ import (
 	"google.golang.org/grpc/connectivity"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/keepalive"
+	"google.golang.org/grpc/status"
 
 	pb "gateway-grpc/gen/rpc"
 )
@@ -44,7 +45,7 @@ func initTracer() (*sdktrace.TracerProvider, error) {
 		otlptracegrpc.WithInsecure(),
 	)
 	if err != nil {
-		log.Printf("[tracing] OTLP exporter error: %v", err)
+		slog.Warn("tracing: OTLP exporter error", "error", err)
 		return nil, err
 	}
 	tp := sdktrace.NewTracerProvider(
@@ -60,19 +61,19 @@ func initTracer() (*sdktrace.TracerProvider, error) {
 		propagation.TraceContext{},
 		propagation.Baggage{},
 	))
-	log.Printf("[tracing] initialized, endpoint=%s", endpoint)
+	slog.Info("tracing initialized", "endpoint", endpoint)
 	return tp, nil
 }
 
 func main() {
 	tp, err := initTracer()
 	if err != nil {
-		log.Printf("[tracing] WARNING: tracer not available: %v", err)
+		slog.Warn("tracing: tracer not available", "error", err)
 	}
 	if tp != nil {
 		defer func() {
 			if err := tp.Shutdown(context.Background()); err != nil {
-				log.Printf("[tracing] shutdown error: %v", err)
+				slog.Warn("tracing shutdown error", "error", err)
 			}
 		}()
 	}
@@ -100,7 +101,7 @@ func main() {
 	sheetAddr := getenv("SHEET_ADDR", "rpc-sheet:50051")
 	fileAddr := getenv("FILE_ADDR", "rpc-file:50051")
 	searchAddr := getenv("SEARCH_ADDR", "rpc-search:50051")
-	log.Printf("Auth=%s Sheet=%s File=%s Search=%s", authAddr, sheetAddr, fileAddr, searchAddr)
+	slog.Info("backend addresses", "auth", authAddr, "sheet", sheetAddr, "file", fileAddr, "search", searchAddr)
 
 	baseOpts := []grpc.DialOption{creds, kp, lb, otelStats}
 	authConn, _ = grpc.NewClient("dns:///"+authAddr, append(baseOpts,
@@ -130,6 +131,15 @@ func main() {
 
 	// ---- gRPC-gateway mux (replaces SpreadsheetService CRUD handlers) ----
 	gwmux := runtime.NewServeMux(
+		runtime.WithErrorHandler(func(ctx context.Context, mux *runtime.ServeMux,
+			marshaler runtime.Marshaler, w http.ResponseWriter, r *http.Request, err error) {
+			st := status.Convert(err)
+			code := gw.GrpcStatusToHTTP(st.Code())
+			gw.WriteJSONStatus(w, code, map[string]interface{}{
+				"success": false,
+				"error":   st.Message(),
+			})
+		}),
 		runtime.WithMetadata(func(ctx context.Context, r *http.Request) metadata.MD {
 			for _, c := range r.Cookies() {
 				if c.Name == "rpc_at" {
@@ -151,7 +161,8 @@ func main() {
 	{
 		ctx := context.Background()
 		if err := pb.RegisterSpreadsheetServiceHandler(ctx, gwmux, sheetConn); err != nil {
-			log.Fatalf("register spreadsheet gRPC-gateway: %v", err)
+			slog.Error("register spreadsheet gRPC-gateway failed", "error", err)
+		os.Exit(1)
 		}
 	}
 
@@ -189,9 +200,12 @@ func main() {
 	// Search
 	mux.HandleFunc("POST /api/v1/search", gwInst.Search)
 
+	// Sheet CRUD — Create goes manual for idempotency guard, rest via gwmux
+	mux.HandleFunc("POST /api/v1/sheets", gwInst.CreateSheet)
+
 	// Sharing
 	mux.HandleFunc("POST /api/v1/sheets/{id}/share", gwInst.ShareSheet)
-	mux.HandleFunc("DELETE /api/v1/sheets/{id}/share", gwInst.RevokeShare)
+	mux.HandleFunc("DELETE /api/v1/sheets/{id}/share/{username}", gwInst.RevokeShare)
 	mux.HandleFunc("GET /api/v1/sheets/{id}/share", gwInst.ListShares)
 	mux.HandleFunc("POST /api/v1/sheets/{id}/share-link", gwInst.CreateShareLink)
 	mux.HandleFunc("GET /api/v1/s/{token}", gwInst.ShareByToken)
@@ -209,48 +223,57 @@ func main() {
 	// the middleware re-verifies and overwrites, preventing header forgery.
 	jwtSecret := getenv("JWT_SECRET", "")
 	if jwtSecret == "" {
-		log.Fatal("JWT_SECRET environment variable is required")
+		slog.Error("JWT_SECRET environment variable is required")
+	os.Exit(1)
 	}
 	gw.SetJWTSecret(jwtSecret)
 
 	// ---- Dispatcher: sheet CRUD -> gwmux, everything else -> custom mux ----
 	top := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if strings.HasPrefix(r.URL.Path, "/api/v1/sheets") {
-			rest := strings.TrimPrefix(r.URL.Path, "/api/v1/sheets")
-			segments := strings.Split(strings.Trim(rest, "/"), "/")
-			// CRUD: 0-1 segments after /api/v1/sheets (e.g. /sheets, /sheets/123)
-			// Sharing: 2+ segments (e.g. /sheets/123/share)
-			if len(segments) <= 2 {
+		path := r.URL.Path
+		if path == "/api/v1/sheets" {
+			if r.Method == "POST" {
+				mux.ServeHTTP(w, r) // manual handler with idempotency guard
+				return
+			}
+			gwmux.ServeHTTP(w, r) // GET → ListSpreadsheets
+			return
+		}
+		if strings.HasPrefix(path, "/api/v1/sheets/") {
+			rest := path[len("/api/v1/sheets/"):]
+			if !strings.Contains(rest, "/") {
 				gwmux.ServeHTTP(w, r)
 				return
 			}
 		}
 		mux.ServeHTTP(w, r)
 	})
-	handler := gw.AuthMiddleware(metricsMiddleware(otelhttp.NewHandler(top, "gateway-grpc",
+	handler := gw.RequestID(gw.AuthMiddleware(metricsMiddleware(otelhttp.NewHandler(top, "gateway-grpc",
 		otelhttp.WithTracerProvider(otel.GetTracerProvider()),
 		otelhttp.WithPropagators(otel.GetTextMapPropagator()),
-	)))
+	))))
 
 	port := getenv("PORT", "8080")
 	srv := &http.Server{Addr: ":" + port, Handler: h2c.NewHandler(handler, &http2.Server{})}
 	go func() {
-		log.Printf("[Gateway-gRPC] Listening on :%s", port)
+		slog.Info("gateway listening", "port", port)
 		if err := srv.ListenAndServe(); err != http.ErrServerClosed {
-			log.Fatalf("listen: %v", err)
+			slog.Error("listen failed", "error", err)
+		os.Exit(1)
 		}
 	}()
 
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
-	log.Println("Shutting down gracefully...")
+	slog.Info("shutting down gracefully")
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	if err := srv.Shutdown(ctx); err != nil {
-		log.Fatalf("shutdown: %v", err)
+		slog.Error("shutdown failed", "error", err)
+		os.Exit(1)
 	}
-	log.Println("Server stopped")
+	slog.Info("server stopped")
 }
 
 func getenv(key, fallback string) string {

@@ -1,5 +1,5 @@
 #include <gtest/gtest.h>
-#include "../server/include/sha256.h"
+#include "shared/base/sha256.h"
 
 TEST(SHA256, HashAndVerify) {
     std::string pw = "test_password_123";

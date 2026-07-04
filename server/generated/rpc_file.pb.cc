@@ -110,11 +110,9 @@ struct GetFileResponseDefaultTypeInternal {
 PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 GetFileResponseDefaultTypeInternal _GetFileResponse_default_instance_;
 PROTOBUF_CONSTEXPR ListFilesRequest::ListFilesRequest(
     ::_pbi::ConstantInitialized): _impl_{
-    /*decltype(_impl_.mime_filter_)*/{&::_pbi::fixed_address_empty_string, ::_pbi::ConstantInitialized{}}
+    /*decltype(_impl_.cursor_)*/{&::_pbi::fixed_address_empty_string, ::_pbi::ConstantInitialized{}}
+  , /*decltype(_impl_.mime_filter_)*/{&::_pbi::fixed_address_empty_string, ::_pbi::ConstantInitialized{}}
   , /*decltype(_impl_.user_id_)*/int64_t{0}
-  , /*decltype(_impl_.page_)*/0
-  , /*decltype(_impl_.page_size_)*/0
-  , /*decltype(_impl_.after_id_)*/int64_t{0}
   , /*decltype(_impl_.folder_id_)*/int64_t{0}
   , /*decltype(_impl_.limit_)*/0
   , /*decltype(_impl_._cached_size_)*/{}} {}
@@ -133,7 +131,6 @@ PROTOBUF_CONSTEXPR ListFilesResponse::ListFilesResponse(
   , /*decltype(_impl_.cache_source_)*/{&::_pbi::fixed_address_empty_string, ::_pbi::ConstantInitialized{}}
   , /*decltype(_impl_.error_)*/{&::_pbi::fixed_address_empty_string, ::_pbi::ConstantInitialized{}}
   , /*decltype(_impl_.next_cursor_)*/{&::_pbi::fixed_address_empty_string, ::_pbi::ConstantInitialized{}}
-  , /*decltype(_impl_.total_)*/0
   , /*decltype(_impl_.success_)*/false
   , /*decltype(_impl_.has_more_)*/false
   , /*decltype(_impl_.error_code_)*/0
@@ -338,10 +335,8 @@ const uint32_t TableStruct_rpc_5ffile_2eproto::offsets[] PROTOBUF_SECTION_VARIAB
   ~0u,  // no _weak_field_map_
   ~0u,  // no _inlined_string_donated_
   PROTOBUF_FIELD_OFFSET(::rpc::ListFilesRequest, _impl_.user_id_),
-  PROTOBUF_FIELD_OFFSET(::rpc::ListFilesRequest, _impl_.page_),
-  PROTOBUF_FIELD_OFFSET(::rpc::ListFilesRequest, _impl_.page_size_),
-  PROTOBUF_FIELD_OFFSET(::rpc::ListFilesRequest, _impl_.after_id_),
   PROTOBUF_FIELD_OFFSET(::rpc::ListFilesRequest, _impl_.limit_),
+  PROTOBUF_FIELD_OFFSET(::rpc::ListFilesRequest, _impl_.cursor_),
   PROTOBUF_FIELD_OFFSET(::rpc::ListFilesRequest, _impl_.folder_id_),
   PROTOBUF_FIELD_OFFSET(::rpc::ListFilesRequest, _impl_.mime_filter_),
   ~0u,  // no _has_bits_
@@ -352,11 +347,10 @@ const uint32_t TableStruct_rpc_5ffile_2eproto::offsets[] PROTOBUF_SECTION_VARIAB
   ~0u,  // no _inlined_string_donated_
   PROTOBUF_FIELD_OFFSET(::rpc::ListFilesResponse, _impl_.success_),
   PROTOBUF_FIELD_OFFSET(::rpc::ListFilesResponse, _impl_.files_),
-  PROTOBUF_FIELD_OFFSET(::rpc::ListFilesResponse, _impl_.total_),
   PROTOBUF_FIELD_OFFSET(::rpc::ListFilesResponse, _impl_.cache_source_),
+  PROTOBUF_FIELD_OFFSET(::rpc::ListFilesResponse, _impl_.error_),
   PROTOBUF_FIELD_OFFSET(::rpc::ListFilesResponse, _impl_.next_cursor_),
   PROTOBUF_FIELD_OFFSET(::rpc::ListFilesResponse, _impl_.has_more_),
-  PROTOBUF_FIELD_OFFSET(::rpc::ListFilesResponse, _impl_.error_),
   PROTOBUF_FIELD_OFFSET(::rpc::ListFilesResponse, _impl_.error_code_),
   ~0u,  // no _has_bits_
   PROTOBUF_FIELD_OFFSET(::rpc::DeleteFileRequest, _internal_metadata_),
@@ -438,15 +432,15 @@ static const ::_pbi::MigrationSchema schemas[] PROTOBUF_SECTION_VARIABLE(protode
   { 36, -1, -1, sizeof(::rpc::GetFileRequest)},
   { 44, -1, -1, sizeof(::rpc::GetFileResponse)},
   { 57, -1, -1, sizeof(::rpc::ListFilesRequest)},
-  { 70, -1, -1, sizeof(::rpc::ListFilesResponse)},
-  { 84, -1, -1, sizeof(::rpc::DeleteFileRequest)},
-  { 92, -1, -1, sizeof(::rpc::CreateFolderRequest)},
-  { 101, -1, -1, sizeof(::rpc::CreateFolderResponse)},
-  { 111, -1, -1, sizeof(::rpc::MoveFileRequest)},
-  { 120, -1, -1, sizeof(::rpc::MoveFileResponse)},
-  { 129, -1, -1, sizeof(::rpc::BatchDeleteRequest)},
-  { 137, -1, -1, sizeof(::rpc::BatchDeleteResponse)},
-  { 147, -1, -1, sizeof(::rpc::DeleteFileResponse)},
+  { 68, -1, -1, sizeof(::rpc::ListFilesResponse)},
+  { 81, -1, -1, sizeof(::rpc::DeleteFileRequest)},
+  { 89, -1, -1, sizeof(::rpc::CreateFolderRequest)},
+  { 98, -1, -1, sizeof(::rpc::CreateFolderResponse)},
+  { 108, -1, -1, sizeof(::rpc::MoveFileRequest)},
+  { 117, -1, -1, sizeof(::rpc::MoveFileResponse)},
+  { 126, -1, -1, sizeof(::rpc::BatchDeleteRequest)},
+  { 134, -1, -1, sizeof(::rpc::BatchDeleteResponse)},
+  { 144, -1, -1, sizeof(::rpc::DeleteFileResponse)},
 };
 
 static const ::_pb::Message* const file_default_instances[] = {
@@ -468,63 +462,70 @@ static const ::_pb::Message* const file_default_instances[] = {
 };
 
 const char descriptor_table_protodef_rpc_5ffile_2eproto[] PROTOBUF_SECTION_VARIABLE(protodesc_cold) =
-  "\n\016rpc_file.proto\022\003rpc\"\232\001\n\010FileInfo\022\n\n\002id"
-  "\030\001 \001(\003\022\020\n\010username\030\002 \001(\t\022\025\n\roriginal_nam"
-  "e\030\003 \001(\t\022\014\n\004size\030\004 \001(\003\022\021\n\tmime_type\030\005 \001(\t"
-  "\022\022\n\ncreated_at\030\006 \001(\t\022\021\n\tfolder_id\030\007 \001(\003\022"
-  "\021\n\tis_folder\030\010 \001(\010\"\213\001\n\021CreateFileRequest"
-  "\022\017\n\007user_id\030\001 \001(\003\022\025\n\roriginal_name\030\002 \001(\t"
-  "\022\014\n\004size\030\003 \001(\003\022\021\n\tmime_type\030\004 \001(\t\022\024\n\014fil"
-  "e_content\030\005 \001(\014\022\027\n\017idempotency_key\030\006 \001(\t"
-  "\"T\n\022CreateFileResponse\022\017\n\007success\030\001 \001(\010\022"
-  "\n\n\002id\030\002 \001(\003\022\r\n\005error\030\003 \001(\t\022\022\n\nerror_code"
-  "\030c \001(\005\"-\n\016GetFileRequest\022\n\n\002id\030\001 \001(\003\022\017\n\007"
-  "user_id\030\002 \001(\003\"\244\001\n\017GetFileResponse\022\017\n\007suc"
-  "cess\030\001 \001(\010\022\033\n\004file\030\002 \001(\0132\r.rpc.FileInfo\022"
-  "\024\n\014cache_source\030\003 \001(\t\022\r\n\005error\030\004 \001(\t\022\024\n\014"
-  "file_content\030\005 \001(\014\022\024\n\014download_url\030\006 \001(\t"
-  "\022\022\n\nerror_code\030c \001(\005\"\215\001\n\020ListFilesReques"
-  "t\022\017\n\007user_id\030\001 \001(\003\022\014\n\004page\030\002 \001(\005\022\021\n\tpage"
-  "_size\030\003 \001(\005\022\020\n\010after_id\030\004 \001(\003\022\r\n\005limit\030\005"
-  " \001(\005\022\021\n\tfolder_id\030\006 \001(\003\022\023\n\013mime_filter\030\007"
-  " \001(\t\"\261\001\n\021ListFilesResponse\022\017\n\007success\030\001 "
-  "\001(\010\022\034\n\005files\030\002 \003(\0132\r.rpc.FileInfo\022\r\n\005tot"
-  "al\030\003 \001(\005\022\024\n\014cache_source\030\004 \001(\t\022\023\n\013next_c"
-  "ursor\030\006 \001(\t\022\020\n\010has_more\030\007 \001(\010\022\r\n\005error\030\005"
-  " \001(\t\022\022\n\nerror_code\030c \001(\005\"0\n\021DeleteFileRe"
-  "quest\022\n\n\002id\030\001 \001(\003\022\017\n\007user_id\030\002 \001(\003\"N\n\023Cr"
-  "eateFolderRequest\022\017\n\007user_id\030\001 \001(\003\022\014\n\004na"
-  "me\030\002 \001(\t\022\030\n\020parent_folder_id\030\003 \001(\003\"V\n\024Cr"
-  "eateFolderResponse\022\017\n\007success\030\001 \001(\010\022\n\n\002i"
-  "d\030\002 \001(\003\022\r\n\005error\030\003 \001(\t\022\022\n\nerror_code\030c \001"
-  "(\005\"H\n\017MoveFileRequest\022\n\n\002id\030\001 \001(\003\022\017\n\007use"
-  "r_id\030\002 \001(\003\022\030\n\020target_folder_id\030\003 \001(\003\"F\n\020"
-  "MoveFileResponse\022\017\n\007success\030\001 \001(\010\022\r\n\005err"
-  "or\030\002 \001(\t\022\022\n\nerror_code\030c \001(\005\"2\n\022BatchDel"
-  "eteRequest\022\017\n\007user_id\030\001 \001(\003\022\013\n\003ids\030\002 \003(\003"
-  "\"`\n\023BatchDeleteResponse\022\017\n\007success\030\001 \001(\010"
-  "\022\025\n\rdeleted_count\030\002 \001(\005\022\r\n\005error\030\003 \001(\t\022\022"
-  "\n\nerror_code\030c \001(\005\"H\n\022DeleteFileResponse"
-  "\022\017\n\007success\030\001 \001(\010\022\r\n\005error\030\002 \001(\t\022\022\n\nerro"
-  "r_code\030c \001(\0052\275\003\n\013FileService\022=\n\nCreateFi"
-  "le\022\026.rpc.CreateFileRequest\032\027.rpc.CreateF"
-  "ileResponse\0224\n\007GetFile\022\023.rpc.GetFileRequ"
-  "est\032\024.rpc.GetFileResponse\022:\n\tListFiles\022\025"
-  ".rpc.ListFilesRequest\032\026.rpc.ListFilesRes"
-  "ponse\022=\n\nDeleteFile\022\026.rpc.DeleteFileRequ"
-  "est\032\027.rpc.DeleteFileResponse\022C\n\014CreateFo"
-  "lder\022\030.rpc.CreateFolderRequest\032\031.rpc.Cre"
-  "ateFolderResponse\0227\n\010MoveFile\022\024.rpc.Move"
-  "FileRequest\032\025.rpc.MoveFileResponse\022@\n\013Ba"
-  "tchDelete\022\027.rpc.BatchDeleteRequest\032\030.rpc"
-  ".BatchDeleteResponseB\026Z\024rpc-server/proto"
-  "/rpcb\006proto3"
+  "\n\016rpc_file.proto\022\003rpc\032\034google/api/annota"
+  "tions.proto\"\232\001\n\010FileInfo\022\n\n\002id\030\001 \001(\003\022\020\n\010"
+  "username\030\002 \001(\t\022\025\n\roriginal_name\030\003 \001(\t\022\014\n"
+  "\004size\030\004 \001(\003\022\021\n\tmime_type\030\005 \001(\t\022\022\n\ncreate"
+  "d_at\030\006 \001(\t\022\021\n\tfolder_id\030\007 \001(\003\022\021\n\tis_fold"
+  "er\030\010 \001(\010\"\213\001\n\021CreateFileRequest\022\017\n\007user_i"
+  "d\030\001 \001(\003\022\025\n\roriginal_name\030\002 \001(\t\022\014\n\004size\030\003"
+  " \001(\003\022\021\n\tmime_type\030\004 \001(\t\022\024\n\014file_content\030"
+  "\005 \001(\014\022\027\n\017idempotency_key\030\006 \001(\t\"T\n\022Create"
+  "FileResponse\022\017\n\007success\030\001 \001(\010\022\n\n\002id\030\002 \001("
+  "\003\022\r\n\005error\030\003 \001(\t\022\022\n\nerror_code\030c \001(\005\"-\n\016"
+  "GetFileRequest\022\n\n\002id\030\001 \001(\003\022\017\n\007user_id\030\002 "
+  "\001(\003\"\244\001\n\017GetFileResponse\022\017\n\007success\030\001 \001(\010"
+  "\022\033\n\004file\030\002 \001(\0132\r.rpc.FileInfo\022\024\n\014cache_s"
+  "ource\030\003 \001(\t\022\r\n\005error\030\004 \001(\t\022\024\n\014file_conte"
+  "nt\030\005 \001(\014\022\024\n\014download_url\030\006 \001(\t\022\022\n\nerror_"
+  "code\030c \001(\005\"j\n\020ListFilesRequest\022\017\n\007user_i"
+  "d\030\001 \001(\003\022\r\n\005limit\030\005 \001(\005\022\016\n\006cursor\030\006 \001(\t\022\021"
+  "\n\tfolder_id\030\007 \001(\003\022\023\n\013mime_filter\030\010 \001(\t\"\242"
+  "\001\n\021ListFilesResponse\022\017\n\007success\030\001 \001(\010\022\034\n"
+  "\005files\030\002 \003(\0132\r.rpc.FileInfo\022\024\n\014cache_sou"
+  "rce\030\004 \001(\t\022\r\n\005error\030\005 \001(\t\022\023\n\013next_cursor\030"
+  "\006 \001(\t\022\020\n\010has_more\030\007 \001(\010\022\022\n\nerror_code\030c "
+  "\001(\005\"0\n\021DeleteFileRequest\022\n\n\002id\030\001 \001(\003\022\017\n\007"
+  "user_id\030\002 \001(\003\"N\n\023CreateFolderRequest\022\017\n\007"
+  "user_id\030\001 \001(\003\022\014\n\004name\030\002 \001(\t\022\030\n\020parent_fo"
+  "lder_id\030\003 \001(\003\"V\n\024CreateFolderResponse\022\017\n"
+  "\007success\030\001 \001(\010\022\n\n\002id\030\002 \001(\003\022\r\n\005error\030\003 \001("
+  "\t\022\022\n\nerror_code\030c \001(\005\"H\n\017MoveFileRequest"
+  "\022\n\n\002id\030\001 \001(\003\022\017\n\007user_id\030\002 \001(\003\022\030\n\020target_"
+  "folder_id\030\003 \001(\003\"F\n\020MoveFileResponse\022\017\n\007s"
+  "uccess\030\001 \001(\010\022\r\n\005error\030\002 \001(\t\022\022\n\nerror_cod"
+  "e\030c \001(\005\"2\n\022BatchDeleteRequest\022\017\n\007user_id"
+  "\030\001 \001(\003\022\013\n\003ids\030\002 \003(\003\"`\n\023BatchDeleteRespon"
+  "se\022\017\n\007success\030\001 \001(\010\022\025\n\rdeleted_count\030\002 \001"
+  "(\005\022\r\n\005error\030\003 \001(\t\022\022\n\nerror_code\030c \001(\005\"H\n"
+  "\022DeleteFileResponse\022\017\n\007success\030\001 \001(\010\022\r\n\005"
+  "error\030\002 \001(\t\022\022\n\nerror_code\030c \001(\0052\215\005\n\013File"
+  "Service\022W\n\nCreateFile\022\026.rpc.CreateFileRe"
+  "quest\032\027.rpc.CreateFileResponse\"\030\202\323\344\223\002\022\"\r"
+  "/api/v1/files:\001*\022P\n\007GetFile\022\023.rpc.GetFil"
+  "eRequest\032\024.rpc.GetFileResponse\"\032\202\323\344\223\002\024\022\022"
+  "/api/v1/files/{id}\022Q\n\tListFiles\022\025.rpc.Li"
+  "stFilesRequest\032\026.rpc.ListFilesResponse\"\025"
+  "\202\323\344\223\002\017\022\r/api/v1/files\022Y\n\nDeleteFile\022\026.rp"
+  "c.DeleteFileRequest\032\027.rpc.DeleteFileResp"
+  "onse\"\032\202\323\344\223\002\024*\022/api/v1/files/{id}\022_\n\014Crea"
+  "teFolder\022\030.rpc.CreateFolderRequest\032\031.rpc"
+  ".CreateFolderResponse\"\032\202\323\344\223\002\024\"\017/api/v1/f"
+  "olders:\001*\022[\n\010MoveFile\022\024.rpc.MoveFileRequ"
+  "est\032\025.rpc.MoveFileResponse\"\"\202\323\344\223\002\034\032\027/api"
+  "/v1/files/{id}/move:\001*\022g\n\013BatchDelete\022\027."
+  "rpc.BatchDeleteRequest\032\030.rpc.BatchDelete"
+  "Response\"%\202\323\344\223\002\037\"\032/api/v1/files/batch-de"
+  "lete:\001*B\026Z\024rpc-server/proto/rpcb\006proto3"
   ;
+static const ::_pbi::DescriptorTable* const descriptor_table_rpc_5ffile_2eproto_deps[1] = {
+  &::descriptor_table_google_2fapi_2fannotations_2eproto,
+};
 static ::_pbi::once_flag descriptor_table_rpc_5ffile_2eproto_once;
 const ::_pbi::DescriptorTable descriptor_table_rpc_5ffile_2eproto = {
-    false, false, 2012, descriptor_table_protodef_rpc_5ffile_2eproto,
+    false, false, 2199, descriptor_table_protodef_rpc_5ffile_2eproto,
     "rpc_file.proto",
-    &descriptor_table_rpc_5ffile_2eproto_once, nullptr, 0, 15,
+    &descriptor_table_rpc_5ffile_2eproto_once, descriptor_table_rpc_5ffile_2eproto_deps, 1, 15,
     schemas, file_default_instances, TableStruct_rpc_5ffile_2eproto::offsets,
     file_level_metadata_rpc_5ffile_2eproto, file_level_enum_descriptors_rpc_5ffile_2eproto,
     file_level_service_descriptors_rpc_5ffile_2eproto,
@@ -2373,16 +2374,22 @@ ListFilesRequest::ListFilesRequest(const ListFilesRequest& from)
   : ::PROTOBUF_NAMESPACE_ID::Message() {
   ListFilesRequest* const _this = this; (void)_this;
   new (&_impl_) Impl_{
-      decltype(_impl_.mime_filter_){}
+      decltype(_impl_.cursor_){}
+    , decltype(_impl_.mime_filter_){}
     , decltype(_impl_.user_id_){}
-    , decltype(_impl_.page_){}
-    , decltype(_impl_.page_size_){}
-    , decltype(_impl_.after_id_){}
     , decltype(_impl_.folder_id_){}
     , decltype(_impl_.limit_){}
     , /*decltype(_impl_._cached_size_)*/{}};
 
   _internal_metadata_.MergeFrom<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(from._internal_metadata_);
+  _impl_.cursor_.InitDefault();
+  #ifdef PROTOBUF_FORCE_COPY_DEFAULT_STRING
+    _impl_.cursor_.Set("", GetArenaForAllocation());
+  #endif // PROTOBUF_FORCE_COPY_DEFAULT_STRING
+  if (!from._internal_cursor().empty()) {
+    _this->_impl_.cursor_.Set(from._internal_cursor(), 
+      _this->GetArenaForAllocation());
+  }
   _impl_.mime_filter_.InitDefault();
   #ifdef PROTOBUF_FORCE_COPY_DEFAULT_STRING
     _impl_.mime_filter_.Set("", GetArenaForAllocation());
@@ -2402,15 +2409,17 @@ inline void ListFilesRequest::SharedCtor(
   (void)arena;
   (void)is_message_owned;
   new (&_impl_) Impl_{
-      decltype(_impl_.mime_filter_){}
+      decltype(_impl_.cursor_){}
+    , decltype(_impl_.mime_filter_){}
     , decltype(_impl_.user_id_){int64_t{0}}
-    , decltype(_impl_.page_){0}
-    , decltype(_impl_.page_size_){0}
-    , decltype(_impl_.after_id_){int64_t{0}}
     , decltype(_impl_.folder_id_){int64_t{0}}
     , decltype(_impl_.limit_){0}
     , /*decltype(_impl_._cached_size_)*/{}
   };
+  _impl_.cursor_.InitDefault();
+  #ifdef PROTOBUF_FORCE_COPY_DEFAULT_STRING
+    _impl_.cursor_.Set("", GetArenaForAllocation());
+  #endif // PROTOBUF_FORCE_COPY_DEFAULT_STRING
   _impl_.mime_filter_.InitDefault();
   #ifdef PROTOBUF_FORCE_COPY_DEFAULT_STRING
     _impl_.mime_filter_.Set("", GetArenaForAllocation());
@@ -2428,6 +2437,7 @@ ListFilesRequest::~ListFilesRequest() {
 
 inline void ListFilesRequest::SharedDtor() {
   GOOGLE_DCHECK(GetArenaForAllocation() == nullptr);
+  _impl_.cursor_.Destroy();
   _impl_.mime_filter_.Destroy();
 }
 
@@ -2441,6 +2451,7 @@ void ListFilesRequest::Clear() {
   // Prevent compiler warnings about cached_has_bits being unused
   (void) cached_has_bits;
 
+  _impl_.cursor_.ClearToEmpty();
   _impl_.mime_filter_.ClearToEmpty();
   ::memset(&_impl_.user_id_, 0, static_cast<size_t>(
       reinterpret_cast<char*>(&_impl_.limit_) -
@@ -2462,30 +2473,6 @@ const char* ListFilesRequest::_InternalParse(const char* ptr, ::_pbi::ParseConte
         } else
           goto handle_unusual;
         continue;
-      // int32 page = 2;
-      case 2:
-        if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 16)) {
-          _impl_.page_ = ::PROTOBUF_NAMESPACE_ID::internal::ReadVarint32(&ptr);
-          CHK_(ptr);
-        } else
-          goto handle_unusual;
-        continue;
-      // int32 page_size = 3;
-      case 3:
-        if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 24)) {
-          _impl_.page_size_ = ::PROTOBUF_NAMESPACE_ID::internal::ReadVarint32(&ptr);
-          CHK_(ptr);
-        } else
-          goto handle_unusual;
-        continue;
-      // int64 after_id = 4;
-      case 4:
-        if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 32)) {
-          _impl_.after_id_ = ::PROTOBUF_NAMESPACE_ID::internal::ReadVarint64(&ptr);
-          CHK_(ptr);
-        } else
-          goto handle_unusual;
-        continue;
       // int32 limit = 5;
       case 5:
         if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 40)) {
@@ -2494,17 +2481,27 @@ const char* ListFilesRequest::_InternalParse(const char* ptr, ::_pbi::ParseConte
         } else
           goto handle_unusual;
         continue;
-      // int64 folder_id = 6;
+      // string cursor = 6;
       case 6:
-        if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 48)) {
+        if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 50)) {
+          auto str = _internal_mutable_cursor();
+          ptr = ::_pbi::InlineGreedyStringParser(str, ptr, ctx);
+          CHK_(ptr);
+          CHK_(::_pbi::VerifyUTF8(str, "rpc.ListFilesRequest.cursor"));
+        } else
+          goto handle_unusual;
+        continue;
+      // int64 folder_id = 7;
+      case 7:
+        if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 56)) {
           _impl_.folder_id_ = ::PROTOBUF_NAMESPACE_ID::internal::ReadVarint64(&ptr);
           CHK_(ptr);
         } else
           goto handle_unusual;
         continue;
-      // string mime_filter = 7;
-      case 7:
-        if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 58)) {
+      // string mime_filter = 8;
+      case 8:
+        if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 66)) {
           auto str = _internal_mutable_mime_filter();
           ptr = ::_pbi::InlineGreedyStringParser(str, ptr, ctx);
           CHK_(ptr);
@@ -2547,44 +2544,36 @@ uint8_t* ListFilesRequest::_InternalSerialize(
     target = ::_pbi::WireFormatLite::WriteInt64ToArray(1, this->_internal_user_id(), target);
   }
 
-  // int32 page = 2;
-  if (this->_internal_page() != 0) {
-    target = stream->EnsureSpace(target);
-    target = ::_pbi::WireFormatLite::WriteInt32ToArray(2, this->_internal_page(), target);
-  }
-
-  // int32 page_size = 3;
-  if (this->_internal_page_size() != 0) {
-    target = stream->EnsureSpace(target);
-    target = ::_pbi::WireFormatLite::WriteInt32ToArray(3, this->_internal_page_size(), target);
-  }
-
-  // int64 after_id = 4;
-  if (this->_internal_after_id() != 0) {
-    target = stream->EnsureSpace(target);
-    target = ::_pbi::WireFormatLite::WriteInt64ToArray(4, this->_internal_after_id(), target);
-  }
-
   // int32 limit = 5;
   if (this->_internal_limit() != 0) {
     target = stream->EnsureSpace(target);
     target = ::_pbi::WireFormatLite::WriteInt32ToArray(5, this->_internal_limit(), target);
   }
 
-  // int64 folder_id = 6;
-  if (this->_internal_folder_id() != 0) {
-    target = stream->EnsureSpace(target);
-    target = ::_pbi::WireFormatLite::WriteInt64ToArray(6, this->_internal_folder_id(), target);
+  // string cursor = 6;
+  if (!this->_internal_cursor().empty()) {
+    ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::VerifyUtf8String(
+      this->_internal_cursor().data(), static_cast<int>(this->_internal_cursor().length()),
+      ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::SERIALIZE,
+      "rpc.ListFilesRequest.cursor");
+    target = stream->WriteStringMaybeAliased(
+        6, this->_internal_cursor(), target);
   }
 
-  // string mime_filter = 7;
+  // int64 folder_id = 7;
+  if (this->_internal_folder_id() != 0) {
+    target = stream->EnsureSpace(target);
+    target = ::_pbi::WireFormatLite::WriteInt64ToArray(7, this->_internal_folder_id(), target);
+  }
+
+  // string mime_filter = 8;
   if (!this->_internal_mime_filter().empty()) {
     ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::VerifyUtf8String(
       this->_internal_mime_filter().data(), static_cast<int>(this->_internal_mime_filter().length()),
       ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::SERIALIZE,
       "rpc.ListFilesRequest.mime_filter");
     target = stream->WriteStringMaybeAliased(
-        7, this->_internal_mime_filter(), target);
+        8, this->_internal_mime_filter(), target);
   }
 
   if (PROTOBUF_PREDICT_FALSE(_internal_metadata_.have_unknown_fields())) {
@@ -2603,7 +2592,14 @@ size_t ListFilesRequest::ByteSizeLong() const {
   // Prevent compiler warnings about cached_has_bits being unused
   (void) cached_has_bits;
 
-  // string mime_filter = 7;
+  // string cursor = 6;
+  if (!this->_internal_cursor().empty()) {
+    total_size += 1 +
+      ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::StringSize(
+        this->_internal_cursor());
+  }
+
+  // string mime_filter = 8;
   if (!this->_internal_mime_filter().empty()) {
     total_size += 1 +
       ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::StringSize(
@@ -2615,22 +2611,7 @@ size_t ListFilesRequest::ByteSizeLong() const {
     total_size += ::_pbi::WireFormatLite::Int64SizePlusOne(this->_internal_user_id());
   }
 
-  // int32 page = 2;
-  if (this->_internal_page() != 0) {
-    total_size += ::_pbi::WireFormatLite::Int32SizePlusOne(this->_internal_page());
-  }
-
-  // int32 page_size = 3;
-  if (this->_internal_page_size() != 0) {
-    total_size += ::_pbi::WireFormatLite::Int32SizePlusOne(this->_internal_page_size());
-  }
-
-  // int64 after_id = 4;
-  if (this->_internal_after_id() != 0) {
-    total_size += ::_pbi::WireFormatLite::Int64SizePlusOne(this->_internal_after_id());
-  }
-
-  // int64 folder_id = 6;
+  // int64 folder_id = 7;
   if (this->_internal_folder_id() != 0) {
     total_size += ::_pbi::WireFormatLite::Int64SizePlusOne(this->_internal_folder_id());
   }
@@ -2658,20 +2639,14 @@ void ListFilesRequest::MergeImpl(::PROTOBUF_NAMESPACE_ID::Message& to_msg, const
   uint32_t cached_has_bits = 0;
   (void) cached_has_bits;
 
+  if (!from._internal_cursor().empty()) {
+    _this->_internal_set_cursor(from._internal_cursor());
+  }
   if (!from._internal_mime_filter().empty()) {
     _this->_internal_set_mime_filter(from._internal_mime_filter());
   }
   if (from._internal_user_id() != 0) {
     _this->_internal_set_user_id(from._internal_user_id());
-  }
-  if (from._internal_page() != 0) {
-    _this->_internal_set_page(from._internal_page());
-  }
-  if (from._internal_page_size() != 0) {
-    _this->_internal_set_page_size(from._internal_page_size());
-  }
-  if (from._internal_after_id() != 0) {
-    _this->_internal_set_after_id(from._internal_after_id());
   }
   if (from._internal_folder_id() != 0) {
     _this->_internal_set_folder_id(from._internal_folder_id());
@@ -2698,6 +2673,10 @@ void ListFilesRequest::InternalSwap(ListFilesRequest* other) {
   auto* lhs_arena = GetArenaForAllocation();
   auto* rhs_arena = other->GetArenaForAllocation();
   _internal_metadata_.InternalSwap(&other->_internal_metadata_);
+  ::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr::InternalSwap(
+      &_impl_.cursor_, lhs_arena,
+      &other->_impl_.cursor_, rhs_arena
+  );
   ::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr::InternalSwap(
       &_impl_.mime_filter_, lhs_arena,
       &other->_impl_.mime_filter_, rhs_arena
@@ -2736,7 +2715,6 @@ ListFilesResponse::ListFilesResponse(const ListFilesResponse& from)
     , decltype(_impl_.cache_source_){}
     , decltype(_impl_.error_){}
     , decltype(_impl_.next_cursor_){}
-    , decltype(_impl_.total_){}
     , decltype(_impl_.success_){}
     , decltype(_impl_.has_more_){}
     , decltype(_impl_.error_code_){}
@@ -2767,9 +2745,9 @@ ListFilesResponse::ListFilesResponse(const ListFilesResponse& from)
     _this->_impl_.next_cursor_.Set(from._internal_next_cursor(), 
       _this->GetArenaForAllocation());
   }
-  ::memcpy(&_impl_.total_, &from._impl_.total_,
+  ::memcpy(&_impl_.success_, &from._impl_.success_,
     static_cast<size_t>(reinterpret_cast<char*>(&_impl_.error_code_) -
-    reinterpret_cast<char*>(&_impl_.total_)) + sizeof(_impl_.error_code_));
+    reinterpret_cast<char*>(&_impl_.success_)) + sizeof(_impl_.error_code_));
   // @@protoc_insertion_point(copy_constructor:rpc.ListFilesResponse)
 }
 
@@ -2782,7 +2760,6 @@ inline void ListFilesResponse::SharedCtor(
     , decltype(_impl_.cache_source_){}
     , decltype(_impl_.error_){}
     , decltype(_impl_.next_cursor_){}
-    , decltype(_impl_.total_){0}
     , decltype(_impl_.success_){false}
     , decltype(_impl_.has_more_){false}
     , decltype(_impl_.error_code_){0}
@@ -2833,9 +2810,9 @@ void ListFilesResponse::Clear() {
   _impl_.cache_source_.ClearToEmpty();
   _impl_.error_.ClearToEmpty();
   _impl_.next_cursor_.ClearToEmpty();
-  ::memset(&_impl_.total_, 0, static_cast<size_t>(
+  ::memset(&_impl_.success_, 0, static_cast<size_t>(
       reinterpret_cast<char*>(&_impl_.error_code_) -
-      reinterpret_cast<char*>(&_impl_.total_)) + sizeof(_impl_.error_code_));
+      reinterpret_cast<char*>(&_impl_.success_)) + sizeof(_impl_.error_code_));
   _internal_metadata_.Clear<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>();
 }
 
@@ -2863,14 +2840,6 @@ const char* ListFilesResponse::_InternalParse(const char* ptr, ::_pbi::ParseCont
             CHK_(ptr);
             if (!ctx->DataAvailable(ptr)) break;
           } while (::PROTOBUF_NAMESPACE_ID::internal::ExpectTag<18>(ptr));
-        } else
-          goto handle_unusual;
-        continue;
-      // int32 total = 3;
-      case 3:
-        if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 24)) {
-          _impl_.total_ = ::PROTOBUF_NAMESPACE_ID::internal::ReadVarint32(&ptr);
-          CHK_(ptr);
         } else
           goto handle_unusual;
         continue;
@@ -2963,12 +2932,6 @@ uint8_t* ListFilesResponse::_InternalSerialize(
         InternalWriteMessage(2, repfield, repfield.GetCachedSize(), target, stream);
   }
 
-  // int32 total = 3;
-  if (this->_internal_total() != 0) {
-    target = stream->EnsureSpace(target);
-    target = ::_pbi::WireFormatLite::WriteInt32ToArray(3, this->_internal_total(), target);
-  }
-
   // string cache_source = 4;
   if (!this->_internal_cache_source().empty()) {
     ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::VerifyUtf8String(
@@ -3055,11 +3018,6 @@ size_t ListFilesResponse::ByteSizeLong() const {
         this->_internal_next_cursor());
   }
 
-  // int32 total = 3;
-  if (this->_internal_total() != 0) {
-    total_size += ::_pbi::WireFormatLite::Int32SizePlusOne(this->_internal_total());
-  }
-
   // bool success = 1;
   if (this->_internal_success() != 0) {
     total_size += 1 + 1;
@@ -3105,9 +3063,6 @@ void ListFilesResponse::MergeImpl(::PROTOBUF_NAMESPACE_ID::Message& to_msg, cons
   if (!from._internal_next_cursor().empty()) {
     _this->_internal_set_next_cursor(from._internal_next_cursor());
   }
-  if (from._internal_total() != 0) {
-    _this->_internal_set_total(from._internal_total());
-  }
   if (from._internal_success() != 0) {
     _this->_internal_set_success(from._internal_success());
   }
@@ -3152,9 +3107,9 @@ void ListFilesResponse::InternalSwap(ListFilesResponse* other) {
   ::PROTOBUF_NAMESPACE_ID::internal::memswap<
       PROTOBUF_FIELD_OFFSET(ListFilesResponse, _impl_.error_code_)
       + sizeof(ListFilesResponse::_impl_.error_code_)
-      - PROTOBUF_FIELD_OFFSET(ListFilesResponse, _impl_.total_)>(
-          reinterpret_cast<char*>(&_impl_.total_),
-          reinterpret_cast<char*>(&other->_impl_.total_));
+      - PROTOBUF_FIELD_OFFSET(ListFilesResponse, _impl_.success_)>(
+          reinterpret_cast<char*>(&_impl_.success_),
+          reinterpret_cast<char*>(&other->_impl_.success_));
 }
 
 ::PROTOBUF_NAMESPACE_ID::Metadata ListFilesResponse::GetMetadata() const {

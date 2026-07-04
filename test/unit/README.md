@@ -5,6 +5,23 @@
 ## 运行
 
 ```bash
+# 一键：构建 + 全部测试
+bash test/run_unit_tests.sh
+
+# 只跑某模块
+bash test/run_unit_tests.sh --filter L1Cache.*
+bash test/run_unit_tests.sh --filter "SheetMock.*:AuthService.*"
+
+# 只构建不跑
+bash test/run_unit_tests.sh --build-only
+
+# 跳过构建（已 build 过）
+bash test/run_unit_tests.sh --only-run
+```
+
+### 手动运行
+
+```bash
 # 构建
 cmake -B build
 cmake --build build --target cpp_test -j$(nproc)

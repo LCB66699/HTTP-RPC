@@ -14,7 +14,6 @@ class RabbitPublisher : public IRabbitPublisher {
 
     bool Publish(const std::string &exchange, const std::string &routing_key, const std::string &body);
 
-    // 甯?W3C traceparent 鐨勪簨浠跺彂甯?
     bool PublishWithTrace(const std::string &exchange, const std::string &routing_key, const std::string &body,
                           const std::string &traceparent, const std::string &tracestate = "");
 

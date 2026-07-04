@@ -97,22 +97,19 @@ message GetFileResponse {
 
 message ListFilesRequest {
   int64 user_id = 1;
-  int32 page = 2;
-  int32 page_size = 3;
-  int64 after_id = 4;  // cursor: 0=首页
-  int32 limit = 5;     // 默认 20
-  int64 folder_id = 6; // 0=root, -1=all
-  string mime_filter = 7; // e.g. "image/*" for photos
+  int32 limit = 5;    // default 20, max 100
+  string cursor = 6;   // empty = first page, pass next_cursor for next page
+  int64 folder_id = 7; // 0=root, -1=all
+  string mime_filter = 8; // e.g. "image/*" for photos
 }
 
 message ListFilesResponse {
   bool success = 1;
   repeated FileInfo files = 2;
-  int32 total = 3;
   string cache_source = 4;
-  string next_cursor = 6;
-  bool has_more = 7;
   string error = 5;
+  string next_cursor = 6;  // cursor for next page, empty when has_more=false
+  bool has_more = 7;
   int32 error_code = 99;
 }
 

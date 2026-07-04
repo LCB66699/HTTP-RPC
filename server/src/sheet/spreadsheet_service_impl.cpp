@@ -374,11 +374,11 @@ grpc::Status SpreadsheetServiceImpl::ListSpreadsheets(grpc::ServerContext *conte
     ScopeTimer timer;
     std::string username = UsernameFromMeta(context);
     int64_t uid = g_rpc_auth_ctx.user_id;
-    int page = req->page();
-    int page_size = req->page_size();
+    int limit = req->limit() > 0 ? req->limit() : 20;
+    std::string cursor = req->cursor();
 
     // 1) Try Redis cache
-    if (TryListCache(resp, uid, page, page_size, redis_, "sheet", slog_)) {
+    if (TryListCache(resp, uid, limit, cursor, redis_, "sheet", slog_)) {
         if (logger_) {
             json p, r;
             r["cache"] = json("redis");
@@ -394,12 +394,10 @@ grpc::Status SpreadsheetServiceImpl::ListSpreadsheets(grpc::ServerContext *conte
         return grpc::Status::OK;
     }
 
-    int64_t after_id = req->after_id();
-    int limit = req->limit() > 0 ? req->limit() : (page_size > 0 ? page_size : 20);
-
     std::vector<SpreadsheetSummary> sheets;
-    int total = 0;
-    if (!db_->ListSpreadsheets(uid, sheets, total, page, limit, after_id)) {
+    std::string next_cursor;
+    bool has_more = false;
+    if (!db_->ListSpreadsheets(uid, sheets, next_cursor, has_more, limit, cursor)) {
         resp->set_success(false);
         SET_ERROR(resp, "Query failed", rpc_error::INTERNAL);
         return grpc::Status::OK;
@@ -414,23 +412,18 @@ grpc::Status SpreadsheetServiceImpl::ListSpreadsheets(grpc::ServerContext *conte
         summary->set_col_count(s.col_count);
         summary->set_updated_at(s.updated_at);
     }
-    // Cursor pagination response
-    if (after_id >= 0 && limit > 0) {
-        resp->set_has_more((int)sheets.size() == limit);
-        if (!sheets.empty())
-            resp->set_next_cursor(std::to_string(sheets.back().id));
-    }
-    resp->set_total(total);
+    resp->set_next_cursor(next_cursor);
+    resp->set_has_more(has_more);
     resp->set_success(true);
     resp->set_cache_source("mysql");
 
     // 3) Populate Redis cache
-    PopulateListCache(resp, uid, page, page_size, redis_, "sheet", slog_);
+    PopulateListCache(resp, uid, limit, cursor, redis_, "sheet", slog_);
 
     if (logger_) {
         auto dur = timer.elapsedUs();
         json p, r;
-        r["total"] = json(static_cast<double>(total));
+        r["has_more"] = json(has_more);
         r["cache"] = json("mysql");
         logger_->Log(username, "SpreadsheetService", "List", p, r, true, dur);
     }

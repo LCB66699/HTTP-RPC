@@ -325,11 +325,11 @@ grpc::Status FileServiceImpl::ListFiles(grpc::ServerContext *context, const rpc:
     ScopeTimer timer;
     std::string username = UsernameFromMeta(context);
     int64_t uid = g_rpc_auth_ctx.user_id;
-    int page = req->page();
-    int page_size = req->page_size();
+    int limit = req->limit() > 0 ? req->limit() : 20;
+    std::string cursor = req->cursor();
 
     // 1) Try Redis cache
-    if (TryListCache(resp, uid, page, page_size, redis_, "file", slog_))
+    if (TryListCache(resp, uid, limit, cursor, redis_, "file", slog_))
         return grpc::Status::OK;
 
     // 2) Fallback to MySQL
@@ -339,12 +339,10 @@ grpc::Status FileServiceImpl::ListFiles(grpc::ServerContext *context, const rpc:
         return grpc::Status::OK;
     }
 
-    int64_t after_id = req->after_id();
-    int limit = req->limit() > 0 ? req->limit() : (page_size > 0 ? page_size : 20);
-
     std::vector<FileRow> files;
-    int total = 0;
-    if (!db_->ListFiles(uid, files, total, page, limit, after_id)) {
+    std::string next_cursor;
+    bool has_more = false;
+    if (!db_->ListFiles(uid, files, next_cursor, has_more, limit, cursor)) {
         resp->set_success(false);
         SET_ERROR(resp, "Query failed", rpc_error::INTERNAL);
         return grpc::Status::OK;
@@ -359,22 +357,18 @@ grpc::Status FileServiceImpl::ListFiles(grpc::ServerContext *context, const rpc:
         f->set_mime_type(row.mime_type);
         f->set_created_at(row.created_at);
     }
-    if (after_id >= 0 && limit > 0) {
-        resp->set_has_more((int)files.size() == limit);
-        if (!files.empty())
-            resp->set_next_cursor(std::to_string(files.back().id));
-    }
-    resp->set_total(total);
+    resp->set_next_cursor(next_cursor);
+    resp->set_has_more(has_more);
     resp->set_success(true);
     resp->set_cache_source("mysql");
 
     // 3) Populate Redis cache
-    PopulateListCache(resp, uid, page, page_size, redis_, "file", slog_);
+    PopulateListCache(resp, uid, limit, cursor, redis_, "file", slog_);
 
     if (logger_) {
         auto dur = timer.elapsedUs();
         json p, r;
-        r["total"] = json(static_cast<double>(total));
+        r["has_more"] = json(has_more);
         r["cache"] = json("mysql");
         logger_->Log(username, "FileService", "List", p, r, true, dur);
     }

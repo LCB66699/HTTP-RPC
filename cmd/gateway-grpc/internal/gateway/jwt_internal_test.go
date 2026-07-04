@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"net/http"
+	"net/http/httptest"
 	"testing"
 	"time"
 
@@ -92,14 +93,15 @@ func TestAuthMiddlewareSetsHeaders(t *testing.T) {
 
 	var headers http.Header
 	var ac *AuthContext
+	rec := httptest.NewRecorder()
 	middleware := AuthMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		headers = r.Header.Clone()
 		ac = GetAuthContext(r.Context())
 	}))
-	middleware.ServeHTTP(nil, req)
+	middleware.ServeHTTP(rec, req)
 
-	if headers == nil {
-		t.Fatal("middleware did not call next handler")
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200 OK, got %d", rec.Code)
 	}
 	if headers.Get("X-Rpc-Uid") != "42" {
 		t.Fatalf("expected X-Rpc-Uid=42, got %q", headers.Get("X-Rpc-Uid"))
@@ -118,15 +120,15 @@ func TestAuthMiddlewareSetsHeaders(t *testing.T) {
 func TestAuthMiddlewareMissingCookie(t *testing.T) {
 	SetJWTSecret("test-secret-32bytes-here-abcdef!")
 
-	req, _ := http.NewRequest("GET", "/", nil)
-	var headers http.Header
+	req, _ := http.NewRequest("GET", "/api/v1/me", nil)
+	rec := httptest.NewRecorder()
 	middleware := AuthMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		headers = r.Header.Clone()
+		t.Fatal("next handler should not be called")
 	}))
-	middleware.ServeHTTP(nil, req)
+	middleware.ServeHTTP(rec, req)
 
-	if headers.Get("X-Rpc-Uid") != "" {
-		t.Fatal("should not set headers without cookie")
+	if rec.Code != http.StatusUnauthorized {
+		t.Fatalf("expected 401, got %d", rec.Code)
 	}
 }
 
@@ -148,10 +150,15 @@ func TestAuthMiddlewareOverridesHeader(t *testing.T) {
 	req.AddCookie(&http.Cookie{Name: "rpc_at", Value: tokenStr})
 
 	var headers http.Header
+	rec := httptest.NewRecorder()
 	middleware := AuthMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		headers = r.Header.Clone()
 	}))
-	middleware.ServeHTTP(nil, req)
+	middleware.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200 OK, got %d", rec.Code)
+	}
 
 	// Middleware should overwrite forged headers with verified values
 	if headers.Get("X-Rpc-Uid") != "99" {

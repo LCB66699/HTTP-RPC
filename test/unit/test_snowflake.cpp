@@ -1,6 +1,6 @@
 #include <gtest/gtest.h>
 #include <set>
-#include "../server/include/snowflake.h"
+#include "shared/base/snowflake.h"
 
 TEST(Snowflake, GeneratesUniqueIDs) {
     Snowflake sf(1);

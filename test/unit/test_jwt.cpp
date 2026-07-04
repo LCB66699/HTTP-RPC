@@ -1,5 +1,5 @@
 #include <gtest/gtest.h>
-#include "../server/include/jwt.h"
+#include "shared/client/jwt.h"
 
 TEST(JWT, CreateAndVerify) {
     std::string secret = "test-secret-32bytes-here-abcdef!";

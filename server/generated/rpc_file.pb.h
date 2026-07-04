@@ -30,6 +30,7 @@
 #include <google/protobuf/repeated_field.h>  // IWYU pragma: export
 #include <google/protobuf/extension_set.h>  // IWYU pragma: export
 #include <google/protobuf/unknown_field_set.h>
+#include "google/api/annotations.pb.h"
 // @@protoc_insertion_point(includes)
 #include <google/protobuf/port_def.inc>
 #define PROTOBUF_INTERNAL_EXPORT_rpc_5ffile_2eproto
@@ -1289,15 +1290,27 @@ class ListFilesRequest final :
   // accessors -------------------------------------------------------
 
   enum : int {
-    kMimeFilterFieldNumber = 7,
+    kCursorFieldNumber = 6,
+    kMimeFilterFieldNumber = 8,
     kUserIdFieldNumber = 1,
-    kPageFieldNumber = 2,
-    kPageSizeFieldNumber = 3,
-    kAfterIdFieldNumber = 4,
-    kFolderIdFieldNumber = 6,
+    kFolderIdFieldNumber = 7,
     kLimitFieldNumber = 5,
   };
-  // string mime_filter = 7;
+  // string cursor = 6;
+  void clear_cursor();
+  const std::string& cursor() const;
+  template <typename ArgT0 = const std::string&, typename... ArgT>
+  void set_cursor(ArgT0&& arg0, ArgT... args);
+  std::string* mutable_cursor();
+  PROTOBUF_NODISCARD std::string* release_cursor();
+  void set_allocated_cursor(std::string* cursor);
+  private:
+  const std::string& _internal_cursor() const;
+  inline PROTOBUF_ALWAYS_INLINE void _internal_set_cursor(const std::string& value);
+  std::string* _internal_mutable_cursor();
+  public:
+
+  // string mime_filter = 8;
   void clear_mime_filter();
   const std::string& mime_filter() const;
   template <typename ArgT0 = const std::string&, typename... ArgT>
@@ -1320,34 +1333,7 @@ class ListFilesRequest final :
   void _internal_set_user_id(int64_t value);
   public:
 
-  // int32 page = 2;
-  void clear_page();
-  int32_t page() const;
-  void set_page(int32_t value);
-  private:
-  int32_t _internal_page() const;
-  void _internal_set_page(int32_t value);
-  public:
-
-  // int32 page_size = 3;
-  void clear_page_size();
-  int32_t page_size() const;
-  void set_page_size(int32_t value);
-  private:
-  int32_t _internal_page_size() const;
-  void _internal_set_page_size(int32_t value);
-  public:
-
-  // int64 after_id = 4;
-  void clear_after_id();
-  int64_t after_id() const;
-  void set_after_id(int64_t value);
-  private:
-  int64_t _internal_after_id() const;
-  void _internal_set_after_id(int64_t value);
-  public:
-
-  // int64 folder_id = 6;
+  // int64 folder_id = 7;
   void clear_folder_id();
   int64_t folder_id() const;
   void set_folder_id(int64_t value);
@@ -1373,11 +1359,9 @@ class ListFilesRequest final :
   typedef void InternalArenaConstructable_;
   typedef void DestructorSkippable_;
   struct Impl_ {
+    ::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr cursor_;
     ::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr mime_filter_;
     int64_t user_id_;
-    int32_t page_;
-    int32_t page_size_;
-    int64_t after_id_;
     int64_t folder_id_;
     int32_t limit_;
     mutable ::PROTOBUF_NAMESPACE_ID::internal::CachedSize _cached_size_;
@@ -1512,7 +1496,6 @@ class ListFilesResponse final :
     kCacheSourceFieldNumber = 4,
     kErrorFieldNumber = 5,
     kNextCursorFieldNumber = 6,
-    kTotalFieldNumber = 3,
     kSuccessFieldNumber = 1,
     kHasMoreFieldNumber = 7,
     kErrorCodeFieldNumber = 99,
@@ -1577,15 +1560,6 @@ class ListFilesResponse final :
   std::string* _internal_mutable_next_cursor();
   public:
 
-  // int32 total = 3;
-  void clear_total();
-  int32_t total() const;
-  void set_total(int32_t value);
-  private:
-  int32_t _internal_total() const;
-  void _internal_set_total(int32_t value);
-  public:
-
   // bool success = 1;
   void clear_success();
   bool success() const;
@@ -1625,7 +1599,6 @@ class ListFilesResponse final :
     ::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr cache_source_;
     ::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr error_;
     ::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr next_cursor_;
-    int32_t total_;
     bool success_;
     bool has_more_;
     int32_t error_code_;
@@ -4084,66 +4057,6 @@ inline void ListFilesRequest::set_user_id(int64_t value) {
   // @@protoc_insertion_point(field_set:rpc.ListFilesRequest.user_id)
 }
 
-// int32 page = 2;
-inline void ListFilesRequest::clear_page() {
-  _impl_.page_ = 0;
-}
-inline int32_t ListFilesRequest::_internal_page() const {
-  return _impl_.page_;
-}
-inline int32_t ListFilesRequest::page() const {
-  // @@protoc_insertion_point(field_get:rpc.ListFilesRequest.page)
-  return _internal_page();
-}
-inline void ListFilesRequest::_internal_set_page(int32_t value) {
-  
-  _impl_.page_ = value;
-}
-inline void ListFilesRequest::set_page(int32_t value) {
-  _internal_set_page(value);
-  // @@protoc_insertion_point(field_set:rpc.ListFilesRequest.page)
-}
-
-// int32 page_size = 3;
-inline void ListFilesRequest::clear_page_size() {
-  _impl_.page_size_ = 0;
-}
-inline int32_t ListFilesRequest::_internal_page_size() const {
-  return _impl_.page_size_;
-}
-inline int32_t ListFilesRequest::page_size() const {
-  // @@protoc_insertion_point(field_get:rpc.ListFilesRequest.page_size)
-  return _internal_page_size();
-}
-inline void ListFilesRequest::_internal_set_page_size(int32_t value) {
-  
-  _impl_.page_size_ = value;
-}
-inline void ListFilesRequest::set_page_size(int32_t value) {
-  _internal_set_page_size(value);
-  // @@protoc_insertion_point(field_set:rpc.ListFilesRequest.page_size)
-}
-
-// int64 after_id = 4;
-inline void ListFilesRequest::clear_after_id() {
-  _impl_.after_id_ = int64_t{0};
-}
-inline int64_t ListFilesRequest::_internal_after_id() const {
-  return _impl_.after_id_;
-}
-inline int64_t ListFilesRequest::after_id() const {
-  // @@protoc_insertion_point(field_get:rpc.ListFilesRequest.after_id)
-  return _internal_after_id();
-}
-inline void ListFilesRequest::_internal_set_after_id(int64_t value) {
-  
-  _impl_.after_id_ = value;
-}
-inline void ListFilesRequest::set_after_id(int64_t value) {
-  _internal_set_after_id(value);
-  // @@protoc_insertion_point(field_set:rpc.ListFilesRequest.after_id)
-}
-
 // int32 limit = 5;
 inline void ListFilesRequest::clear_limit() {
   _impl_.limit_ = 0;
@@ -4164,7 +4077,57 @@ inline void ListFilesRequest::set_limit(int32_t value) {
   // @@protoc_insertion_point(field_set:rpc.ListFilesRequest.limit)
 }
 
-// int64 folder_id = 6;
+// string cursor = 6;
+inline void ListFilesRequest::clear_cursor() {
+  _impl_.cursor_.ClearToEmpty();
+}
+inline const std::string& ListFilesRequest::cursor() const {
+  // @@protoc_insertion_point(field_get:rpc.ListFilesRequest.cursor)
+  return _internal_cursor();
+}
+template <typename ArgT0, typename... ArgT>
+inline PROTOBUF_ALWAYS_INLINE
+void ListFilesRequest::set_cursor(ArgT0&& arg0, ArgT... args) {
+ 
+ _impl_.cursor_.Set(static_cast<ArgT0 &&>(arg0), args..., GetArenaForAllocation());
+  // @@protoc_insertion_point(field_set:rpc.ListFilesRequest.cursor)
+}
+inline std::string* ListFilesRequest::mutable_cursor() {
+  std::string* _s = _internal_mutable_cursor();
+  // @@protoc_insertion_point(field_mutable:rpc.ListFilesRequest.cursor)
+  return _s;
+}
+inline const std::string& ListFilesRequest::_internal_cursor() const {
+  return _impl_.cursor_.Get();
+}
+inline void ListFilesRequest::_internal_set_cursor(const std::string& value) {
+  
+  _impl_.cursor_.Set(value, GetArenaForAllocation());
+}
+inline std::string* ListFilesRequest::_internal_mutable_cursor() {
+  
+  return _impl_.cursor_.Mutable(GetArenaForAllocation());
+}
+inline std::string* ListFilesRequest::release_cursor() {
+  // @@protoc_insertion_point(field_release:rpc.ListFilesRequest.cursor)
+  return _impl_.cursor_.Release();
+}
+inline void ListFilesRequest::set_allocated_cursor(std::string* cursor) {
+  if (cursor != nullptr) {
+    
+  } else {
+    
+  }
+  _impl_.cursor_.SetAllocated(cursor, GetArenaForAllocation());
+#ifdef PROTOBUF_FORCE_COPY_DEFAULT_STRING
+  if (_impl_.cursor_.IsDefault()) {
+    _impl_.cursor_.Set("", GetArenaForAllocation());
+  }
+#endif // PROTOBUF_FORCE_COPY_DEFAULT_STRING
+  // @@protoc_insertion_point(field_set_allocated:rpc.ListFilesRequest.cursor)
+}
+
+// int64 folder_id = 7;
 inline void ListFilesRequest::clear_folder_id() {
   _impl_.folder_id_ = int64_t{0};
 }
@@ -4184,7 +4147,7 @@ inline void ListFilesRequest::set_folder_id(int64_t value) {
   // @@protoc_insertion_point(field_set:rpc.ListFilesRequest.folder_id)
 }
 
-// string mime_filter = 7;
+// string mime_filter = 8;
 inline void ListFilesRequest::clear_mime_filter() {
   _impl_.mime_filter_.ClearToEmpty();
 }
@@ -4298,26 +4261,6 @@ ListFilesResponse::files() const {
   return _impl_.files_;
 }
 
-// int32 total = 3;
-inline void ListFilesResponse::clear_total() {
-  _impl_.total_ = 0;
-}
-inline int32_t ListFilesResponse::_internal_total() const {
-  return _impl_.total_;
-}
-inline int32_t ListFilesResponse::total() const {
-  // @@protoc_insertion_point(field_get:rpc.ListFilesResponse.total)
-  return _internal_total();
-}
-inline void ListFilesResponse::_internal_set_total(int32_t value) {
-  
-  _impl_.total_ = value;
-}
-inline void ListFilesResponse::set_total(int32_t value) {
-  _internal_set_total(value);
-  // @@protoc_insertion_point(field_set:rpc.ListFilesResponse.total)
-}
-
 // string cache_source = 4;
 inline void ListFilesResponse::clear_cache_source() {
   _impl_.cache_source_.ClearToEmpty();
@@ -4366,6 +4309,56 @@ inline void ListFilesResponse::set_allocated_cache_source(std::string* cache_sou
   }
 #endif // PROTOBUF_FORCE_COPY_DEFAULT_STRING
   // @@protoc_insertion_point(field_set_allocated:rpc.ListFilesResponse.cache_source)
+}
+
+// string error = 5;
+inline void ListFilesResponse::clear_error() {
+  _impl_.error_.ClearToEmpty();
+}
+inline const std::string& ListFilesResponse::error() const {
+  // @@protoc_insertion_point(field_get:rpc.ListFilesResponse.error)
+  return _internal_error();
+}
+template <typename ArgT0, typename... ArgT>
+inline PROTOBUF_ALWAYS_INLINE
+void ListFilesResponse::set_error(ArgT0&& arg0, ArgT... args) {
+ 
+ _impl_.error_.Set(static_cast<ArgT0 &&>(arg0), args..., GetArenaForAllocation());
+  // @@protoc_insertion_point(field_set:rpc.ListFilesResponse.error)
+}
+inline std::string* ListFilesResponse::mutable_error() {
+  std::string* _s = _internal_mutable_error();
+  // @@protoc_insertion_point(field_mutable:rpc.ListFilesResponse.error)
+  return _s;
+}
+inline const std::string& ListFilesResponse::_internal_error() const {
+  return _impl_.error_.Get();
+}
+inline void ListFilesResponse::_internal_set_error(const std::string& value) {
+  
+  _impl_.error_.Set(value, GetArenaForAllocation());
+}
+inline std::string* ListFilesResponse::_internal_mutable_error() {
+  
+  return _impl_.error_.Mutable(GetArenaForAllocation());
+}
+inline std::string* ListFilesResponse::release_error() {
+  // @@protoc_insertion_point(field_release:rpc.ListFilesResponse.error)
+  return _impl_.error_.Release();
+}
+inline void ListFilesResponse::set_allocated_error(std::string* error) {
+  if (error != nullptr) {
+    
+  } else {
+    
+  }
+  _impl_.error_.SetAllocated(error, GetArenaForAllocation());
+#ifdef PROTOBUF_FORCE_COPY_DEFAULT_STRING
+  if (_impl_.error_.IsDefault()) {
+    _impl_.error_.Set("", GetArenaForAllocation());
+  }
+#endif // PROTOBUF_FORCE_COPY_DEFAULT_STRING
+  // @@protoc_insertion_point(field_set_allocated:rpc.ListFilesResponse.error)
 }
 
 // string next_cursor = 6;
@@ -4436,56 +4429,6 @@ inline void ListFilesResponse::_internal_set_has_more(bool value) {
 inline void ListFilesResponse::set_has_more(bool value) {
   _internal_set_has_more(value);
   // @@protoc_insertion_point(field_set:rpc.ListFilesResponse.has_more)
-}
-
-// string error = 5;
-inline void ListFilesResponse::clear_error() {
-  _impl_.error_.ClearToEmpty();
-}
-inline const std::string& ListFilesResponse::error() const {
-  // @@protoc_insertion_point(field_get:rpc.ListFilesResponse.error)
-  return _internal_error();
-}
-template <typename ArgT0, typename... ArgT>
-inline PROTOBUF_ALWAYS_INLINE
-void ListFilesResponse::set_error(ArgT0&& arg0, ArgT... args) {
- 
- _impl_.error_.Set(static_cast<ArgT0 &&>(arg0), args..., GetArenaForAllocation());
-  // @@protoc_insertion_point(field_set:rpc.ListFilesResponse.error)
-}
-inline std::string* ListFilesResponse::mutable_error() {
-  std::string* _s = _internal_mutable_error();
-  // @@protoc_insertion_point(field_mutable:rpc.ListFilesResponse.error)
-  return _s;
-}
-inline const std::string& ListFilesResponse::_internal_error() const {
-  return _impl_.error_.Get();
-}
-inline void ListFilesResponse::_internal_set_error(const std::string& value) {
-  
-  _impl_.error_.Set(value, GetArenaForAllocation());
-}
-inline std::string* ListFilesResponse::_internal_mutable_error() {
-  
-  return _impl_.error_.Mutable(GetArenaForAllocation());
-}
-inline std::string* ListFilesResponse::release_error() {
-  // @@protoc_insertion_point(field_release:rpc.ListFilesResponse.error)
-  return _impl_.error_.Release();
-}
-inline void ListFilesResponse::set_allocated_error(std::string* error) {
-  if (error != nullptr) {
-    
-  } else {
-    
-  }
-  _impl_.error_.SetAllocated(error, GetArenaForAllocation());
-#ifdef PROTOBUF_FORCE_COPY_DEFAULT_STRING
-  if (_impl_.error_.IsDefault()) {
-    _impl_.error_.Set("", GetArenaForAllocation());
-  }
-#endif // PROTOBUF_FORCE_COPY_DEFAULT_STRING
-  // @@protoc_insertion_point(field_set_allocated:rpc.ListFilesResponse.error)
 }
 
 // int32 error_code = 99;

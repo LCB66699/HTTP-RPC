@@ -50,6 +50,7 @@
 
 | 文件 | 用途 | 耗时 |
 |------|------|------|
+| `run_unit_tests.sh` | C++ 单元测试：GoogleTest 构建 + CTest 运行 | ~20s |
 | `e2e/docker_health.sh` | 全容器健康检查，逐个验证 healthy 状态 | ~2min |
 | `e2e/functional_test.sh` | 功能正确性：认证、鉴权、CRUD、缓存、Token 刷新、文件完整性 | ~45s |
 | `e2e/performance_test.sh` | 性能基准：预热 → 单请求延迟 → 并发(P50/P95/P99) → 缓存命中率 → ab/wrk2 QPS | ~90s |

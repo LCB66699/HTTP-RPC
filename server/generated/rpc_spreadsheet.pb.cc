@@ -128,10 +128,8 @@ struct GetSpreadsheetResponseDefaultTypeInternal {
 PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 GetSpreadsheetResponseDefaultTypeInternal _GetSpreadsheetResponse_default_instance_;
 PROTOBUF_CONSTEXPR ListSpreadsheetsRequest::ListSpreadsheetsRequest(
     ::_pbi::ConstantInitialized): _impl_{
-    /*decltype(_impl_.user_id_)*/int64_t{0}
-  , /*decltype(_impl_.page_)*/0
-  , /*decltype(_impl_.page_size_)*/0
-  , /*decltype(_impl_.after_id_)*/int64_t{0}
+    /*decltype(_impl_.cursor_)*/{&::_pbi::fixed_address_empty_string, ::_pbi::ConstantInitialized{}}
+  , /*decltype(_impl_.user_id_)*/int64_t{0}
   , /*decltype(_impl_.limit_)*/0
   , /*decltype(_impl_._cached_size_)*/{}} {}
 struct ListSpreadsheetsRequestDefaultTypeInternal {
@@ -149,7 +147,6 @@ PROTOBUF_CONSTEXPR ListSpreadsheetsResponse::ListSpreadsheetsResponse(
   , /*decltype(_impl_.cache_source_)*/{&::_pbi::fixed_address_empty_string, ::_pbi::ConstantInitialized{}}
   , /*decltype(_impl_.error_)*/{&::_pbi::fixed_address_empty_string, ::_pbi::ConstantInitialized{}}
   , /*decltype(_impl_.next_cursor_)*/{&::_pbi::fixed_address_empty_string, ::_pbi::ConstantInitialized{}}
-  , /*decltype(_impl_.total_)*/0
   , /*decltype(_impl_.success_)*/false
   , /*decltype(_impl_.has_more_)*/false
   , /*decltype(_impl_.error_code_)*/0
@@ -307,10 +304,8 @@ const uint32_t TableStruct_rpc_5fspreadsheet_2eproto::offsets[] PROTOBUF_SECTION
   ~0u,  // no _weak_field_map_
   ~0u,  // no _inlined_string_donated_
   PROTOBUF_FIELD_OFFSET(::rpc::ListSpreadsheetsRequest, _impl_.user_id_),
-  PROTOBUF_FIELD_OFFSET(::rpc::ListSpreadsheetsRequest, _impl_.page_),
-  PROTOBUF_FIELD_OFFSET(::rpc::ListSpreadsheetsRequest, _impl_.page_size_),
-  PROTOBUF_FIELD_OFFSET(::rpc::ListSpreadsheetsRequest, _impl_.after_id_),
   PROTOBUF_FIELD_OFFSET(::rpc::ListSpreadsheetsRequest, _impl_.limit_),
+  PROTOBUF_FIELD_OFFSET(::rpc::ListSpreadsheetsRequest, _impl_.cursor_),
   ~0u,  // no _has_bits_
   PROTOBUF_FIELD_OFFSET(::rpc::ListSpreadsheetsResponse, _internal_metadata_),
   ~0u,  // no _extensions_
@@ -319,7 +314,6 @@ const uint32_t TableStruct_rpc_5fspreadsheet_2eproto::offsets[] PROTOBUF_SECTION
   ~0u,  // no _inlined_string_donated_
   PROTOBUF_FIELD_OFFSET(::rpc::ListSpreadsheetsResponse, _impl_.success_),
   PROTOBUF_FIELD_OFFSET(::rpc::ListSpreadsheetsResponse, _impl_.sheets_),
-  PROTOBUF_FIELD_OFFSET(::rpc::ListSpreadsheetsResponse, _impl_.total_),
   PROTOBUF_FIELD_OFFSET(::rpc::ListSpreadsheetsResponse, _impl_.cache_source_),
   PROTOBUF_FIELD_OFFSET(::rpc::ListSpreadsheetsResponse, _impl_.error_),
   PROTOBUF_FIELD_OFFSET(::rpc::ListSpreadsheetsResponse, _impl_.next_cursor_),
@@ -372,11 +366,11 @@ static const ::_pbi::MigrationSchema schemas[] PROTOBUF_SECTION_VARIABLE(protode
   { 50, -1, -1, sizeof(::rpc::GetSpreadsheetRequest)},
   { 58, -1, -1, sizeof(::rpc::GetSpreadsheetResponse)},
   { 69, -1, -1, sizeof(::rpc::ListSpreadsheetsRequest)},
-  { 80, -1, -1, sizeof(::rpc::ListSpreadsheetsResponse)},
-  { 94, -1, -1, sizeof(::rpc::UpdateSpreadsheetRequest)},
-  { 106, -1, -1, sizeof(::rpc::UpdateSpreadsheetResponse)},
-  { 115, -1, -1, sizeof(::rpc::DeleteSpreadsheetRequest)},
-  { 123, -1, -1, sizeof(::rpc::DeleteSpreadsheetResponse)},
+  { 78, -1, -1, sizeof(::rpc::ListSpreadsheetsResponse)},
+  { 91, -1, -1, sizeof(::rpc::UpdateSpreadsheetRequest)},
+  { 103, -1, -1, sizeof(::rpc::UpdateSpreadsheetResponse)},
+  { 112, -1, -1, sizeof(::rpc::DeleteSpreadsheetRequest)},
+  { 120, -1, -1, sizeof(::rpc::DeleteSpreadsheetResponse)},
 };
 
 static const ::_pb::Message* const file_default_instances[] = {
@@ -395,60 +389,66 @@ static const ::_pb::Message* const file_default_instances[] = {
 };
 
 const char descriptor_table_protodef_rpc_5fspreadsheet_2eproto[] PROTOBUF_SECTION_VARIABLE(protodesc_cold) =
-  "\n\025rpc_spreadsheet.proto\022\003rpc\"\305\001\n\013Spreads"
-  "heet\022\n\n\002id\030\001 \001(\003\022\020\n\010username\030\002 \001(\t\022\014\n\004na"
-  "me\030\003 \001(\t\022\023\n\013description\030\004 \001(\t\022\024\n\014headers"
-  "_json\030\005 \001(\t\022\021\n\tdata_json\030\006 \001(\t\022\021\n\trow_co"
-  "unt\030\007 \001(\005\022\021\n\tcol_count\030\010 \001(\005\022\022\n\ncreated_"
-  "at\030\t \001(\t\022\022\n\nupdated_at\030\n \001(\t\"}\n\022Spreadsh"
-  "eetSummary\022\n\n\002id\030\001 \001(\003\022\014\n\004name\030\002 \001(\t\022\023\n\013"
-  "description\030\003 \001(\t\022\021\n\trow_count\030\004 \001(\005\022\021\n\t"
-  "col_count\030\005 \001(\005\022\022\n\nupdated_at\030\006 \001(\t\"\220\001\n\030"
-  "CreateSpreadsheetRequest\022\017\n\007user_id\030\001 \001("
-  "\003\022\014\n\004name\030\002 \001(\t\022\023\n\013description\030\003 \001(\t\022\024\n\014"
-  "headers_json\030\004 \001(\t\022\021\n\tdata_json\030\005 \001(\t\022\027\n"
-  "\017idempotency_key\030\006 \001(\t\"[\n\031CreateSpreadsh"
-  "eetResponse\022\017\n\007success\030\001 \001(\010\022\n\n\002id\030\002 \001(\003"
-  "\022\r\n\005error\030\003 \001(\t\022\022\n\nerror_code\030c \001(\005\"4\n\025G"
-  "etSpreadsheetRequest\022\n\n\002id\030\001 \001(\003\022\017\n\007user"
-  "_id\030\002 \001(\003\"\211\001\n\026GetSpreadsheetResponse\022\017\n\007"
-  "success\030\001 \001(\010\022%\n\013spreadsheet\030\002 \001(\0132\020.rpc"
-  ".Spreadsheet\022\024\n\014cache_source\030\003 \001(\t\022\r\n\005er"
-  "ror\030\004 \001(\t\022\022\n\nerror_code\030c \001(\005\"l\n\027ListSpr"
-  "eadsheetsRequest\022\017\n\007user_id\030\001 \001(\003\022\014\n\004pag"
-  "e\030\002 \001(\005\022\021\n\tpage_size\030\003 \001(\005\022\020\n\010after_id\030\004"
-  " \001(\003\022\r\n\005limit\030\005 \001(\005\"\303\001\n\030ListSpreadsheets"
-  "Response\022\017\n\007success\030\001 \001(\010\022\'\n\006sheets\030\002 \003("
-  "\0132\027.rpc.SpreadsheetSummary\022\r\n\005total\030\003 \001("
-  "\005\022\024\n\014cache_source\030\004 \001(\t\022\r\n\005error\030\005 \001(\t\022\023"
-  "\n\013next_cursor\030\006 \001(\t\022\020\n\010has_more\030\007 \001(\010\022\022\n"
-  "\nerror_code\030c \001(\005\"\203\001\n\030UpdateSpreadsheetR"
-  "equest\022\n\n\002id\030\001 \001(\003\022\017\n\007user_id\030\002 \001(\003\022\014\n\004n"
-  "ame\030\003 \001(\t\022\023\n\013description\030\004 \001(\t\022\024\n\014header"
-  "s_json\030\005 \001(\t\022\021\n\tdata_json\030\006 \001(\t\"O\n\031Updat"
-  "eSpreadsheetResponse\022\017\n\007success\030\001 \001(\010\022\r\n"
-  "\005error\030\002 \001(\t\022\022\n\nerror_code\030c \001(\005\"7\n\030Dele"
-  "teSpreadsheetRequest\022\n\n\002id\030\001 \001(\003\022\017\n\007user"
-  "_id\030\002 \001(\003\"O\n\031DeleteSpreadsheetResponse\022\017"
-  "\n\007success\030\001 \001(\010\022\r\n\005error\030\002 \001(\t\022\022\n\nerror_"
-  "code\030c \001(\0052\254\003\n\022SpreadsheetService\022R\n\021Cre"
-  "ateSpreadsheet\022\035.rpc.CreateSpreadsheetRe"
-  "quest\032\036.rpc.CreateSpreadsheetResponse\022I\n"
-  "\016GetSpreadsheet\022\032.rpc.GetSpreadsheetRequ"
-  "est\032\033.rpc.GetSpreadsheetResponse\022O\n\020List"
-  "Spreadsheets\022\034.rpc.ListSpreadsheetsReque"
-  "st\032\035.rpc.ListSpreadsheetsResponse\022R\n\021Upd"
-  "ateSpreadsheet\022\035.rpc.UpdateSpreadsheetRe"
-  "quest\032\036.rpc.UpdateSpreadsheetResponse\022R\n"
-  "\021DeleteSpreadsheet\022\035.rpc.DeleteSpreadshe"
-  "etRequest\032\036.rpc.DeleteSpreadsheetRespons"
-  "eB\026Z\024rpc-server/proto/rpcb\006proto3"
+  "\n\025rpc_spreadsheet.proto\022\003rpc\032\034google/api"
+  "/annotations.proto\"\305\001\n\013Spreadsheet\022\n\n\002id"
+  "\030\001 \001(\003\022\020\n\010username\030\002 \001(\t\022\014\n\004name\030\003 \001(\t\022\023"
+  "\n\013description\030\004 \001(\t\022\024\n\014headers_json\030\005 \001("
+  "\t\022\021\n\tdata_json\030\006 \001(\t\022\021\n\trow_count\030\007 \001(\005\022"
+  "\021\n\tcol_count\030\010 \001(\005\022\022\n\ncreated_at\030\t \001(\t\022\022"
+  "\n\nupdated_at\030\n \001(\t\"}\n\022SpreadsheetSummary"
+  "\022\n\n\002id\030\001 \001(\003\022\014\n\004name\030\002 \001(\t\022\023\n\013descriptio"
+  "n\030\003 \001(\t\022\021\n\trow_count\030\004 \001(\005\022\021\n\tcol_count\030"
+  "\005 \001(\005\022\022\n\nupdated_at\030\006 \001(\t\"\220\001\n\030CreateSpre"
+  "adsheetRequest\022\017\n\007user_id\030\001 \001(\003\022\014\n\004name\030"
+  "\002 \001(\t\022\023\n\013description\030\003 \001(\t\022\024\n\014headers_js"
+  "on\030\004 \001(\t\022\021\n\tdata_json\030\005 \001(\t\022\027\n\017idempoten"
+  "cy_key\030\006 \001(\t\"[\n\031CreateSpreadsheetRespons"
+  "e\022\017\n\007success\030\001 \001(\010\022\n\n\002id\030\002 \001(\003\022\r\n\005error\030"
+  "\003 \001(\t\022\022\n\nerror_code\030c \001(\005\"4\n\025GetSpreadsh"
+  "eetRequest\022\n\n\002id\030\001 \001(\003\022\017\n\007user_id\030\002 \001(\003\""
+  "\211\001\n\026GetSpreadsheetResponse\022\017\n\007success\030\001 "
+  "\001(\010\022%\n\013spreadsheet\030\002 \001(\0132\020.rpc.Spreadshe"
+  "et\022\024\n\014cache_source\030\003 \001(\t\022\r\n\005error\030\004 \001(\t\022"
+  "\022\n\nerror_code\030c \001(\005\"I\n\027ListSpreadsheetsR"
+  "equest\022\017\n\007user_id\030\001 \001(\003\022\r\n\005limit\030\005 \001(\005\022\016"
+  "\n\006cursor\030\006 \001(\t\"\264\001\n\030ListSpreadsheetsRespo"
+  "nse\022\017\n\007success\030\001 \001(\010\022\'\n\006sheets\030\002 \003(\0132\027.r"
+  "pc.SpreadsheetSummary\022\024\n\014cache_source\030\004 "
+  "\001(\t\022\r\n\005error\030\005 \001(\t\022\023\n\013next_cursor\030\006 \001(\t\022"
+  "\020\n\010has_more\030\007 \001(\010\022\022\n\nerror_code\030c \001(\005\"\203\001"
+  "\n\030UpdateSpreadsheetRequest\022\n\n\002id\030\001 \001(\003\022\017"
+  "\n\007user_id\030\002 \001(\003\022\014\n\004name\030\003 \001(\t\022\023\n\013descrip"
+  "tion\030\004 \001(\t\022\024\n\014headers_json\030\005 \001(\t\022\021\n\tdata"
+  "_json\030\006 \001(\t\"O\n\031UpdateSpreadsheetResponse"
+  "\022\017\n\007success\030\001 \001(\010\022\r\n\005error\030\002 \001(\t\022\022\n\nerro"
+  "r_code\030c \001(\005\"7\n\030DeleteSpreadsheetRequest"
+  "\022\n\n\002id\030\001 \001(\003\022\017\n\007user_id\030\002 \001(\003\"O\n\031DeleteS"
+  "preadsheetResponse\022\017\n\007success\030\001 \001(\010\022\r\n\005e"
+  "rror\030\002 \001(\t\022\022\n\nerror_code\030c \001(\0052\271\004\n\022Sprea"
+  "dsheetService\022m\n\021CreateSpreadsheet\022\035.rpc"
+  ".CreateSpreadsheetRequest\032\036.rpc.CreateSp"
+  "readsheetResponse\"\031\202\323\344\223\002\023\"\016/api/v1/sheet"
+  "s:\001*\022f\n\016GetSpreadsheet\022\032.rpc.GetSpreadsh"
+  "eetRequest\032\033.rpc.GetSpreadsheetResponse\""
+  "\033\202\323\344\223\002\025\022\023/api/v1/sheets/{id}\022g\n\020ListSpre"
+  "adsheets\022\034.rpc.ListSpreadsheetsRequest\032\035"
+  ".rpc.ListSpreadsheetsResponse\"\026\202\323\344\223\002\020\022\016/"
+  "api/v1/sheets\022r\n\021UpdateSpreadsheet\022\035.rpc"
+  ".UpdateSpreadsheetRequest\032\036.rpc.UpdateSp"
+  "readsheetResponse\"\036\202\323\344\223\002\030\032\023/api/v1/sheet"
+  "s/{id}:\001*\022o\n\021DeleteSpreadsheet\022\035.rpc.Del"
+  "eteSpreadsheetRequest\032\036.rpc.DeleteSpread"
+  "sheetResponse\"\033\202\323\344\223\002\025*\023/api/v1/sheets/{i"
+  "d}B\026Z\024rpc-server/proto/rpcb\006proto3"
   ;
+static const ::_pbi::DescriptorTable* const descriptor_table_rpc_5fspreadsheet_2eproto_deps[1] = {
+  &::descriptor_table_google_2fapi_2fannotations_2eproto,
+};
 static ::_pbi::once_flag descriptor_table_rpc_5fspreadsheet_2eproto_once;
 const ::_pbi::DescriptorTable descriptor_table_rpc_5fspreadsheet_2eproto = {
-    false, false, 1913, descriptor_table_protodef_rpc_5fspreadsheet_2eproto,
+    false, false, 2034, descriptor_table_protodef_rpc_5fspreadsheet_2eproto,
     "rpc_spreadsheet.proto",
-    &descriptor_table_rpc_5fspreadsheet_2eproto_once, nullptr, 0, 12,
+    &descriptor_table_rpc_5fspreadsheet_2eproto_once, descriptor_table_rpc_5fspreadsheet_2eproto_deps, 1, 12,
     schemas, file_default_instances, TableStruct_rpc_5fspreadsheet_2eproto::offsets,
     file_level_metadata_rpc_5fspreadsheet_2eproto, file_level_enum_descriptors_rpc_5fspreadsheet_2eproto,
     file_level_service_descriptors_rpc_5fspreadsheet_2eproto,
@@ -2737,14 +2737,20 @@ ListSpreadsheetsRequest::ListSpreadsheetsRequest(const ListSpreadsheetsRequest& 
   : ::PROTOBUF_NAMESPACE_ID::Message() {
   ListSpreadsheetsRequest* const _this = this; (void)_this;
   new (&_impl_) Impl_{
-      decltype(_impl_.user_id_){}
-    , decltype(_impl_.page_){}
-    , decltype(_impl_.page_size_){}
-    , decltype(_impl_.after_id_){}
+      decltype(_impl_.cursor_){}
+    , decltype(_impl_.user_id_){}
     , decltype(_impl_.limit_){}
     , /*decltype(_impl_._cached_size_)*/{}};
 
   _internal_metadata_.MergeFrom<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(from._internal_metadata_);
+  _impl_.cursor_.InitDefault();
+  #ifdef PROTOBUF_FORCE_COPY_DEFAULT_STRING
+    _impl_.cursor_.Set("", GetArenaForAllocation());
+  #endif // PROTOBUF_FORCE_COPY_DEFAULT_STRING
+  if (!from._internal_cursor().empty()) {
+    _this->_impl_.cursor_.Set(from._internal_cursor(), 
+      _this->GetArenaForAllocation());
+  }
   ::memcpy(&_impl_.user_id_, &from._impl_.user_id_,
     static_cast<size_t>(reinterpret_cast<char*>(&_impl_.limit_) -
     reinterpret_cast<char*>(&_impl_.user_id_)) + sizeof(_impl_.limit_));
@@ -2756,13 +2762,15 @@ inline void ListSpreadsheetsRequest::SharedCtor(
   (void)arena;
   (void)is_message_owned;
   new (&_impl_) Impl_{
-      decltype(_impl_.user_id_){int64_t{0}}
-    , decltype(_impl_.page_){0}
-    , decltype(_impl_.page_size_){0}
-    , decltype(_impl_.after_id_){int64_t{0}}
+      decltype(_impl_.cursor_){}
+    , decltype(_impl_.user_id_){int64_t{0}}
     , decltype(_impl_.limit_){0}
     , /*decltype(_impl_._cached_size_)*/{}
   };
+  _impl_.cursor_.InitDefault();
+  #ifdef PROTOBUF_FORCE_COPY_DEFAULT_STRING
+    _impl_.cursor_.Set("", GetArenaForAllocation());
+  #endif // PROTOBUF_FORCE_COPY_DEFAULT_STRING
 }
 
 ListSpreadsheetsRequest::~ListSpreadsheetsRequest() {
@@ -2776,6 +2784,7 @@ ListSpreadsheetsRequest::~ListSpreadsheetsRequest() {
 
 inline void ListSpreadsheetsRequest::SharedDtor() {
   GOOGLE_DCHECK(GetArenaForAllocation() == nullptr);
+  _impl_.cursor_.Destroy();
 }
 
 void ListSpreadsheetsRequest::SetCachedSize(int size) const {
@@ -2788,6 +2797,7 @@ void ListSpreadsheetsRequest::Clear() {
   // Prevent compiler warnings about cached_has_bits being unused
   (void) cached_has_bits;
 
+  _impl_.cursor_.ClearToEmpty();
   ::memset(&_impl_.user_id_, 0, static_cast<size_t>(
       reinterpret_cast<char*>(&_impl_.limit_) -
       reinterpret_cast<char*>(&_impl_.user_id_)) + sizeof(_impl_.limit_));
@@ -2808,35 +2818,21 @@ const char* ListSpreadsheetsRequest::_InternalParse(const char* ptr, ::_pbi::Par
         } else
           goto handle_unusual;
         continue;
-      // int32 page = 2;
-      case 2:
-        if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 16)) {
-          _impl_.page_ = ::PROTOBUF_NAMESPACE_ID::internal::ReadVarint32(&ptr);
-          CHK_(ptr);
-        } else
-          goto handle_unusual;
-        continue;
-      // int32 page_size = 3;
-      case 3:
-        if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 24)) {
-          _impl_.page_size_ = ::PROTOBUF_NAMESPACE_ID::internal::ReadVarint32(&ptr);
-          CHK_(ptr);
-        } else
-          goto handle_unusual;
-        continue;
-      // int64 after_id = 4;
-      case 4:
-        if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 32)) {
-          _impl_.after_id_ = ::PROTOBUF_NAMESPACE_ID::internal::ReadVarint64(&ptr);
-          CHK_(ptr);
-        } else
-          goto handle_unusual;
-        continue;
       // int32 limit = 5;
       case 5:
         if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 40)) {
           _impl_.limit_ = ::PROTOBUF_NAMESPACE_ID::internal::ReadVarint32(&ptr);
           CHK_(ptr);
+        } else
+          goto handle_unusual;
+        continue;
+      // string cursor = 6;
+      case 6:
+        if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 50)) {
+          auto str = _internal_mutable_cursor();
+          ptr = ::_pbi::InlineGreedyStringParser(str, ptr, ctx);
+          CHK_(ptr);
+          CHK_(::_pbi::VerifyUTF8(str, "rpc.ListSpreadsheetsRequest.cursor"));
         } else
           goto handle_unusual;
         continue;
@@ -2875,28 +2871,20 @@ uint8_t* ListSpreadsheetsRequest::_InternalSerialize(
     target = ::_pbi::WireFormatLite::WriteInt64ToArray(1, this->_internal_user_id(), target);
   }
 
-  // int32 page = 2;
-  if (this->_internal_page() != 0) {
-    target = stream->EnsureSpace(target);
-    target = ::_pbi::WireFormatLite::WriteInt32ToArray(2, this->_internal_page(), target);
-  }
-
-  // int32 page_size = 3;
-  if (this->_internal_page_size() != 0) {
-    target = stream->EnsureSpace(target);
-    target = ::_pbi::WireFormatLite::WriteInt32ToArray(3, this->_internal_page_size(), target);
-  }
-
-  // int64 after_id = 4;
-  if (this->_internal_after_id() != 0) {
-    target = stream->EnsureSpace(target);
-    target = ::_pbi::WireFormatLite::WriteInt64ToArray(4, this->_internal_after_id(), target);
-  }
-
   // int32 limit = 5;
   if (this->_internal_limit() != 0) {
     target = stream->EnsureSpace(target);
     target = ::_pbi::WireFormatLite::WriteInt32ToArray(5, this->_internal_limit(), target);
+  }
+
+  // string cursor = 6;
+  if (!this->_internal_cursor().empty()) {
+    ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::VerifyUtf8String(
+      this->_internal_cursor().data(), static_cast<int>(this->_internal_cursor().length()),
+      ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::SERIALIZE,
+      "rpc.ListSpreadsheetsRequest.cursor");
+    target = stream->WriteStringMaybeAliased(
+        6, this->_internal_cursor(), target);
   }
 
   if (PROTOBUF_PREDICT_FALSE(_internal_metadata_.have_unknown_fields())) {
@@ -2915,24 +2903,16 @@ size_t ListSpreadsheetsRequest::ByteSizeLong() const {
   // Prevent compiler warnings about cached_has_bits being unused
   (void) cached_has_bits;
 
+  // string cursor = 6;
+  if (!this->_internal_cursor().empty()) {
+    total_size += 1 +
+      ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::StringSize(
+        this->_internal_cursor());
+  }
+
   // int64 user_id = 1;
   if (this->_internal_user_id() != 0) {
     total_size += ::_pbi::WireFormatLite::Int64SizePlusOne(this->_internal_user_id());
-  }
-
-  // int32 page = 2;
-  if (this->_internal_page() != 0) {
-    total_size += ::_pbi::WireFormatLite::Int32SizePlusOne(this->_internal_page());
-  }
-
-  // int32 page_size = 3;
-  if (this->_internal_page_size() != 0) {
-    total_size += ::_pbi::WireFormatLite::Int32SizePlusOne(this->_internal_page_size());
-  }
-
-  // int64 after_id = 4;
-  if (this->_internal_after_id() != 0) {
-    total_size += ::_pbi::WireFormatLite::Int64SizePlusOne(this->_internal_after_id());
   }
 
   // int32 limit = 5;
@@ -2958,17 +2938,11 @@ void ListSpreadsheetsRequest::MergeImpl(::PROTOBUF_NAMESPACE_ID::Message& to_msg
   uint32_t cached_has_bits = 0;
   (void) cached_has_bits;
 
+  if (!from._internal_cursor().empty()) {
+    _this->_internal_set_cursor(from._internal_cursor());
+  }
   if (from._internal_user_id() != 0) {
     _this->_internal_set_user_id(from._internal_user_id());
-  }
-  if (from._internal_page() != 0) {
-    _this->_internal_set_page(from._internal_page());
-  }
-  if (from._internal_page_size() != 0) {
-    _this->_internal_set_page_size(from._internal_page_size());
-  }
-  if (from._internal_after_id() != 0) {
-    _this->_internal_set_after_id(from._internal_after_id());
   }
   if (from._internal_limit() != 0) {
     _this->_internal_set_limit(from._internal_limit());
@@ -2989,7 +2963,13 @@ bool ListSpreadsheetsRequest::IsInitialized() const {
 
 void ListSpreadsheetsRequest::InternalSwap(ListSpreadsheetsRequest* other) {
   using std::swap;
+  auto* lhs_arena = GetArenaForAllocation();
+  auto* rhs_arena = other->GetArenaForAllocation();
   _internal_metadata_.InternalSwap(&other->_internal_metadata_);
+  ::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr::InternalSwap(
+      &_impl_.cursor_, lhs_arena,
+      &other->_impl_.cursor_, rhs_arena
+  );
   ::PROTOBUF_NAMESPACE_ID::internal::memswap<
       PROTOBUF_FIELD_OFFSET(ListSpreadsheetsRequest, _impl_.limit_)
       + sizeof(ListSpreadsheetsRequest::_impl_.limit_)
@@ -3024,7 +3004,6 @@ ListSpreadsheetsResponse::ListSpreadsheetsResponse(const ListSpreadsheetsRespons
     , decltype(_impl_.cache_source_){}
     , decltype(_impl_.error_){}
     , decltype(_impl_.next_cursor_){}
-    , decltype(_impl_.total_){}
     , decltype(_impl_.success_){}
     , decltype(_impl_.has_more_){}
     , decltype(_impl_.error_code_){}
@@ -3055,9 +3034,9 @@ ListSpreadsheetsResponse::ListSpreadsheetsResponse(const ListSpreadsheetsRespons
     _this->_impl_.next_cursor_.Set(from._internal_next_cursor(), 
       _this->GetArenaForAllocation());
   }
-  ::memcpy(&_impl_.total_, &from._impl_.total_,
+  ::memcpy(&_impl_.success_, &from._impl_.success_,
     static_cast<size_t>(reinterpret_cast<char*>(&_impl_.error_code_) -
-    reinterpret_cast<char*>(&_impl_.total_)) + sizeof(_impl_.error_code_));
+    reinterpret_cast<char*>(&_impl_.success_)) + sizeof(_impl_.error_code_));
   // @@protoc_insertion_point(copy_constructor:rpc.ListSpreadsheetsResponse)
 }
 
@@ -3070,7 +3049,6 @@ inline void ListSpreadsheetsResponse::SharedCtor(
     , decltype(_impl_.cache_source_){}
     , decltype(_impl_.error_){}
     , decltype(_impl_.next_cursor_){}
-    , decltype(_impl_.total_){0}
     , decltype(_impl_.success_){false}
     , decltype(_impl_.has_more_){false}
     , decltype(_impl_.error_code_){0}
@@ -3121,9 +3099,9 @@ void ListSpreadsheetsResponse::Clear() {
   _impl_.cache_source_.ClearToEmpty();
   _impl_.error_.ClearToEmpty();
   _impl_.next_cursor_.ClearToEmpty();
-  ::memset(&_impl_.total_, 0, static_cast<size_t>(
+  ::memset(&_impl_.success_, 0, static_cast<size_t>(
       reinterpret_cast<char*>(&_impl_.error_code_) -
-      reinterpret_cast<char*>(&_impl_.total_)) + sizeof(_impl_.error_code_));
+      reinterpret_cast<char*>(&_impl_.success_)) + sizeof(_impl_.error_code_));
   _internal_metadata_.Clear<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>();
 }
 
@@ -3151,14 +3129,6 @@ const char* ListSpreadsheetsResponse::_InternalParse(const char* ptr, ::_pbi::Pa
             CHK_(ptr);
             if (!ctx->DataAvailable(ptr)) break;
           } while (::PROTOBUF_NAMESPACE_ID::internal::ExpectTag<18>(ptr));
-        } else
-          goto handle_unusual;
-        continue;
-      // int32 total = 3;
-      case 3:
-        if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 24)) {
-          _impl_.total_ = ::PROTOBUF_NAMESPACE_ID::internal::ReadVarint32(&ptr);
-          CHK_(ptr);
         } else
           goto handle_unusual;
         continue;
@@ -3251,12 +3221,6 @@ uint8_t* ListSpreadsheetsResponse::_InternalSerialize(
         InternalWriteMessage(2, repfield, repfield.GetCachedSize(), target, stream);
   }
 
-  // int32 total = 3;
-  if (this->_internal_total() != 0) {
-    target = stream->EnsureSpace(target);
-    target = ::_pbi::WireFormatLite::WriteInt32ToArray(3, this->_internal_total(), target);
-  }
-
   // string cache_source = 4;
   if (!this->_internal_cache_source().empty()) {
     ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::VerifyUtf8String(
@@ -3343,11 +3307,6 @@ size_t ListSpreadsheetsResponse::ByteSizeLong() const {
         this->_internal_next_cursor());
   }
 
-  // int32 total = 3;
-  if (this->_internal_total() != 0) {
-    total_size += ::_pbi::WireFormatLite::Int32SizePlusOne(this->_internal_total());
-  }
-
   // bool success = 1;
   if (this->_internal_success() != 0) {
     total_size += 1 + 1;
@@ -3393,9 +3352,6 @@ void ListSpreadsheetsResponse::MergeImpl(::PROTOBUF_NAMESPACE_ID::Message& to_ms
   if (!from._internal_next_cursor().empty()) {
     _this->_internal_set_next_cursor(from._internal_next_cursor());
   }
-  if (from._internal_total() != 0) {
-    _this->_internal_set_total(from._internal_total());
-  }
   if (from._internal_success() != 0) {
     _this->_internal_set_success(from._internal_success());
   }
@@ -3440,9 +3396,9 @@ void ListSpreadsheetsResponse::InternalSwap(ListSpreadsheetsResponse* other) {
   ::PROTOBUF_NAMESPACE_ID::internal::memswap<
       PROTOBUF_FIELD_OFFSET(ListSpreadsheetsResponse, _impl_.error_code_)
       + sizeof(ListSpreadsheetsResponse::_impl_.error_code_)
-      - PROTOBUF_FIELD_OFFSET(ListSpreadsheetsResponse, _impl_.total_)>(
-          reinterpret_cast<char*>(&_impl_.total_),
-          reinterpret_cast<char*>(&other->_impl_.total_));
+      - PROTOBUF_FIELD_OFFSET(ListSpreadsheetsResponse, _impl_.success_)>(
+          reinterpret_cast<char*>(&_impl_.success_),
+          reinterpret_cast<char*>(&other->_impl_.success_));
 }
 
 ::PROTOBUF_NAMESPACE_ID::Metadata ListSpreadsheetsResponse::GetMetadata() const {

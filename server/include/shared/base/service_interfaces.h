@@ -18,8 +18,9 @@ class IDatabase {
                                    const std::string &data_json, int64_t &out_id,
                                    const std::string &idempotency_key = "") = 0;
     virtual bool GetSpreadsheet(int64_t id, int64_t user_id, SpreadsheetRow &out) = 0;
-    virtual bool ListSpreadsheets(int64_t user_id, std::vector<SpreadsheetSummary> &out, int &total, int page = 0,
-                                  int page_size = 0, int64_t after_id = 0) = 0;
+    virtual bool ListSpreadsheets(int64_t user_id, std::vector<SpreadsheetSummary> &out,
+                                  std::string &next_cursor, bool &has_more,
+                                  int limit = 20, const std::string &cursor = "") = 0;
     virtual bool UpdateSpreadsheet(int64_t id, int64_t user_id, const std::string &name, const std::string &desc,
                                    const std::string &headers_json, const std::string &data_json, int version = 0) = 0;
     virtual bool DeleteSpreadsheet(int64_t id, int64_t user_id = 0) = 0;
@@ -32,8 +33,9 @@ class IDatabase {
                             const std::string &mime_type, const std::string &storage_key, int64_t &out_id,
                             const std::string &idempotency_key = "") = 0;
     virtual bool GetFile(int64_t id, int64_t user_id, FileRow &out) = 0;
-    virtual bool ListFiles(int64_t user_id, std::vector<FileRow> &out, int &total, int page = 0, int page_size = 0,
-                           int64_t after_id = 0) = 0;
+    virtual bool ListFiles(int64_t user_id, std::vector<FileRow> &out,
+                           std::string &next_cursor, bool &has_more,
+                           int limit = 20, const std::string &cursor = "") = 0;
     virtual bool DeleteFile(int64_t id, int64_t user_id = 0) = 0;
     virtual bool GetFileOwner(int64_t id, int64_t &owner_user_id) = 0;
     virtual bool UpdateFileContent(int64_t id, const std::string &content, int version = 0) = 0;

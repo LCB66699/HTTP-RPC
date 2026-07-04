@@ -172,28 +172,33 @@ static const ::_pb::Message* const file_default_instances[] = {
 };
 
 const char descriptor_table_protodef_rpc_5fhealth_2eproto[] PROTOBUF_SECTION_VARIABLE(protodesc_cold) =
-  "\n\020rpc_health.proto\022\003rpc\"^\n\rReportRequest"
-  "\022\017\n\007node_id\030\001 \001(\t\022\017\n\007service\030\002 \001(\t\022\014\n\004ho"
-  "st\030\003 \001(\t\022\014\n\004port\030\004 \001(\005\022\017\n\007version\030\005 \001(\t\""
-  "5\n\016ReportResponse\022\017\n\007success\030\001 \001(\010\022\022\n\ner"
-  "ror_code\030c \001(\005\"\231\001\n\010NodeInfo\022\017\n\007node_id\030\001"
-  " \001(\t\022\017\n\007service\030\002 \001(\t\022\014\n\004host\030\003 \001(\t\022\014\n\004p"
-  "ort\030\004 \001(\005\022\016\n\006status\030\005 \001(\t\022\017\n\007version\030\006 \001"
-  "(\t\022\026\n\016last_heartbeat\030\007 \001(\t\022\026\n\016uptime_sec"
-  "onds\030\010 \001(\005\"\016\n\014QueryRequest\"n\n\rQueryRespo"
-  "nse\022\034\n\005nodes\030\001 \003(\0132\r.rpc.NodeInfo\022\024\n\014tot"
-  "al_online\030\002 \001(\005\022\025\n\rtotal_offline\030\003 \001(\005\022\022"
-  "\n\nerror_code\030c \001(\0052r\n\rHealthMonitor\0221\n\006R"
-  "eport\022\022.rpc.ReportRequest\032\023.rpc.ReportRe"
-  "sponse\022.\n\005Query\022\021.rpc.QueryRequest\032\022.rpc"
-  ".QueryResponseB\026Z\024rpc-server/proto/rpcb\006"
-  "proto3"
+  "\n\020rpc_health.proto\022\003rpc\032\034google/api/anno"
+  "tations.proto\"^\n\rReportRequest\022\017\n\007node_i"
+  "d\030\001 \001(\t\022\017\n\007service\030\002 \001(\t\022\014\n\004host\030\003 \001(\t\022\014"
+  "\n\004port\030\004 \001(\005\022\017\n\007version\030\005 \001(\t\"5\n\016ReportR"
+  "esponse\022\017\n\007success\030\001 \001(\010\022\022\n\nerror_code\030c"
+  " \001(\005\"\231\001\n\010NodeInfo\022\017\n\007node_id\030\001 \001(\t\022\017\n\007se"
+  "rvice\030\002 \001(\t\022\014\n\004host\030\003 \001(\t\022\014\n\004port\030\004 \001(\005\022"
+  "\016\n\006status\030\005 \001(\t\022\017\n\007version\030\006 \001(\t\022\026\n\016last"
+  "_heartbeat\030\007 \001(\t\022\026\n\016uptime_seconds\030\010 \001(\005"
+  "\"\016\n\014QueryRequest\"n\n\rQueryResponse\022\034\n\005nod"
+  "es\030\001 \003(\0132\r.rpc.NodeInfo\022\024\n\014total_online\030"
+  "\002 \001(\005\022\025\n\rtotal_offline\030\003 \001(\005\022\022\n\nerror_co"
+  "de\030c \001(\0052\262\001\n\rHealthMonitor\022S\n\006Report\022\022.r"
+  "pc.ReportRequest\032\023.rpc.ReportResponse\" \202"
+  "\323\344\223\002\032\"\025/api/v1/health/report:\001*\022L\n\005Query"
+  "\022\021.rpc.QueryRequest\032\022.rpc.QueryResponse\""
+  "\034\202\323\344\223\002\026\022\024/api/v1/health/nodesB\026Z\024rpc-ser"
+  "ver/proto/rpcb\006proto3"
   ;
+static const ::_pbi::DescriptorTable* const descriptor_table_rpc_5fhealth_2eproto_deps[1] = {
+  &::descriptor_table_google_2fapi_2fannotations_2eproto,
+};
 static ::_pbi::once_flag descriptor_table_rpc_5fhealth_2eproto_once;
 const ::_pbi::DescriptorTable descriptor_table_rpc_5fhealth_2eproto = {
-    false, false, 606, descriptor_table_protodef_rpc_5fhealth_2eproto,
+    false, false, 701, descriptor_table_protodef_rpc_5fhealth_2eproto,
     "rpc_health.proto",
-    &descriptor_table_rpc_5fhealth_2eproto_once, nullptr, 0, 5,
+    &descriptor_table_rpc_5fhealth_2eproto_once, descriptor_table_rpc_5fhealth_2eproto_deps, 1, 5,
     schemas, file_default_instances, TableStruct_rpc_5fhealth_2eproto::offsets,
     file_level_metadata_rpc_5fhealth_2eproto, file_level_enum_descriptors_rpc_5fhealth_2eproto,
     file_level_service_descriptors_rpc_5fhealth_2eproto,

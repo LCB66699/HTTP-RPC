@@ -3,7 +3,7 @@
 #include <thread>
 #include <vector>
 
-#include "shared/l1_cache.h"
+#include "shared/cache/l1_cache.h"
 
 TEST(L1Cache, GetNonexistentReturnsNullopt) {
     L1Cache cache(10, 30);
@@ -97,7 +97,7 @@ TEST(L1Cache, LruEvictionAtCapacity) {
     // Access k1 to make k2 the LRU tail
     cache.Get("k1");
 
-    // Insert k3 â€?k2 should be evicted (LRU, not expired)
+    // Insert k3 ï¿½?k2 should be evicted (LRU, not expired)
     cache.Set("k3", "v3");
     EXPECT_EQ(cache.Size(), 2);
     EXPECT_TRUE(cache.Get("k1").has_value());
@@ -111,7 +111,7 @@ TEST(L1Cache, LruPromotionOnGet) {
     cache.Set("k1", "v1");
     cache.Set("k2", "v2");
 
-    // Access k2 twice â€?it should be promoted to front
+    // Access k2 twice ï¿½?it should be promoted to front
     cache.Get("k2");
     cache.Get("k2");
 

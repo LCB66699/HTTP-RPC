@@ -66,11 +66,11 @@ void FinishCreate(Resp *resp, int64_t id, int64_t user_id,
 
 // TryListCache — attempt to serve list from Redis cache. Returns true on hit.
 template <typename Resp>
-bool TryListCache(Resp *resp, int64_t uid, int page, int page_size,
+bool TryListCache(Resp *resp, int64_t uid, int limit, const std::string &cursor,
                   IRedisClient *redis, const char *resource, SystemLogger *slog) {
     if (!redis || !redis->IsConnected()) return false;
     int64_t version = redis->GetInt(ResourceVersionKey(resource, uid));
-    std::string cache_key = ResourceListCacheKey(resource, uid, version, page, page_size);
+    std::string cache_key = ResourceListCacheKey(resource, uid, version, limit, cursor);
     std::string cached;
     if (redis->GetJSON(cache_key, cached) && resp->ParseFromString(cached)) {
         resp->set_cache_source("redis");
@@ -84,11 +84,11 @@ bool TryListCache(Resp *resp, int64_t uid, int page, int page_size,
 
 // PopulateListCache — write MySQL result back to Redis for future requests.
 template <typename Resp>
-void PopulateListCache(Resp *resp, int64_t uid, int page, int page_size,
+void PopulateListCache(Resp *resp, int64_t uid, int limit, const std::string &cursor,
                        IRedisClient *redis, const char *resource, SystemLogger *slog) {
     if (!redis || !redis->IsConnected()) return;
     int64_t version = redis->GetInt(ResourceVersionKey(resource, uid));
-    std::string cache_key = ResourceListCacheKey(resource, uid, version, page, page_size);
+    std::string cache_key = ResourceListCacheKey(resource, uid, version, limit, cursor);
     std::string serialized;
     if (resp->SerializeToString(&serialized)) {
         redis->SetJSON(cache_key, serialized, 120);

@@ -1,5 +1,5 @@
 #include <gtest/gtest.h>
-#include "../server/include/data_helpers.h"
+#include "shared/helper/json_helpers.h"
 
 TEST(DataHelpers, CountRowsEmpty) {
     EXPECT_EQ(countRows(""), 0);
