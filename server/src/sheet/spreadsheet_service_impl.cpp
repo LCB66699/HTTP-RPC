@@ -447,88 +447,83 @@ grpc::Status SpreadsheetServiceImpl::UpdateSpreadsheet(grpc::ServerContext *cont
         return grpc::Status::OK;
     }
 
-    const int MAX_RETRIES = 3;
-    for (int attempt = 0; attempt < MAX_RETRIES; ++attempt) {
-        int64_t owner_uid = 0;
-        int version = 0;
-        if (!db_->GetSpreadsheetOwner(req->id(), owner_uid, &version) || owner_uid != g_rpc_auth_ctx.user_id) {
+    auto ok = UpdateWithCAS(
+        req->id(), g_rpc_auth_ctx.user_id,
+        [&](int64_t id, int64_t &owner, int &ver) {
+            return db_ && db_->GetSpreadsheetOwner(id, owner, &ver);
+        },
+        [&](int64_t id, int ver) {
+            return db_->UpdateSpreadsheet(id, g_rpc_auth_ctx.user_id,
+                req->name(), req->description(),
+                req->headers_json(), req->data_json(), ver);
+        },
+        [&](int latest) { resp->set_latest_version(latest); });
+
+    if (!ok) {
+        if (resp->latest_version() > 0) {
+            resp->set_success(false);
+            SET_ERROR(resp, "Update conflict", rpc_error::CONFLICT);
+        } else {
             resp->set_success(false);
             SET_ERROR(resp, "Not found or permission denied", rpc_error::NOT_FOUND);
-            return grpc::Status(grpc::StatusCode::NOT_FOUND, "Not found or permission denied");
         }
-
-        bool ok = db_->UpdateSpreadsheet(req->id(), g_rpc_auth_ctx.user_id, req->name(), req->description(),
-                                         req->headers_json(), req->data_json(), version);
-
-        if (ok) {
-            // Store cells/headers in MongoDB
-            if (mongo_) {
-                mongo_->UpsertSheetCells(req->id(), g_rpc_auth_ctx.user_id,
-                                         req->headers_json(), req->data_json());
-            }
-
-            if (redis_ && redis_->IsConnected()) {
-                redis_->DeleteKey("u:" + std::to_string(g_rpc_auth_ctx.user_id) + ":sheet:" + std::to_string(req->id()));
-                redis_->DeleteKey("u:" + std::to_string(g_rpc_auth_ctx.user_id) + ":sheet:" + std::to_string(req->id()) +
-                                  ":ts");
-                redis_->Increment(SheetVersionKey(g_rpc_auth_ctx.user_id));
-                if (slog_)
-                    LOG_DEBUG(*slog_, "Update id=" + std::to_string(req->id()) +
-                                          " INVALIDATED + INCR version uid=" + std::to_string(g_rpc_auth_ctx.user_id));
-            }
-
-            {
-                nlohmann::json ev;
-                ev["type"] = "sheet.updated";
-                ev["id"] = req->id();
-                ev["user_id"] = g_rpc_auth_ctx.user_id;
-                ev["name"] = req->name();
-                ev["description"] = req->description();
-                ev["headers"] = nlohmann::json::parse(req->headers_json().empty() ? "[]" : req->headers_json());
-                ev["cells"] = nlohmann::json::parse(req->data_json().empty() ? "[]" : req->data_json());
-                if (db_)
-                    db_->InsertOutbox(g_rpc_auth_ctx.user_id, "sheet.updated", ev.dump());
-                if (rabbit_)
-                    rabbit_->Publish("rpc.events", "sheet.updated", ev.dump());
-            }
-
-            // Invalidate caches: sync L1 + Pub/Sub + outbox fallback
-            InvalidateCaches(db_, g_rpc_auth_ctx.user_id, {
-                SheetCacheKey(g_rpc_auth_ctx.user_id, req->id()),
-                SheetVersionKey(g_rpc_auth_ctx.user_id)
-            }, l1_, redis_);
-
-            resp->set_success(true);
-
-            if (logger_) {
-                auto dur = std::chrono::duration_cast<std::chrono::microseconds>(
-                               std::chrono::high_resolution_clock::now() - start)
-                               .count();
-                json p, r;
-                p["id"] = json(static_cast<double>(req->id()));
-                logger_->Log(username, "SpreadsheetService", "Update", p, r, true, dur);
-            }
-            if (slog_)
-                LOG_INFO(*slog_, "Updated id=" + std::to_string(req->id()) + " by " + username);
-            return grpc::Status::OK;
+        if (logger_) {
+            auto dur = std::chrono::duration_cast<std::chrono::microseconds>(
+                           std::chrono::high_resolution_clock::now() - start)
+                           .count();
+            json p, r;
+            p["id"] = json(static_cast<double>(req->id()));
+            r["error"] = json("Update conflict");
+            logger_->Log(username, "SpreadsheetService", "Update", p, r, false, dur);
         }
-
-        if (slog_)
-            LOG_WARN(*slog_, "Update id=" + std::to_string(req->id()) + " version conflict, retry " +
-                                 std::to_string(attempt + 1) + "/" + std::to_string(MAX_RETRIES));
+        return grpc::Status::OK;
     }
 
-    resp->set_success(false);
-    SET_ERROR(resp, "Update conflict, please retry", rpc_error::CONFLICT);
+    // Store cells/headers in MongoDB
+    if (mongo_) {
+        mongo_->UpsertSheetCells(req->id(), g_rpc_auth_ctx.user_id,
+                                 req->headers_json(), req->data_json());
+    }
+
+    if (redis_ && redis_->IsConnected()) {
+        redis_->DeleteKey("u:" + std::to_string(g_rpc_auth_ctx.user_id) + ":sheet:" + std::to_string(req->id()));
+        redis_->DeleteKey("u:" + std::to_string(g_rpc_auth_ctx.user_id) + ":sheet:" + std::to_string(req->id()) +
+                          ":ts");
+        redis_->Increment(SheetVersionKey(g_rpc_auth_ctx.user_id));
+    }
+
+    {
+        nlohmann::json ev;
+        ev["type"] = "sheet.updated";
+        ev["id"] = req->id();
+        ev["user_id"] = g_rpc_auth_ctx.user_id;
+        ev["name"] = req->name();
+        ev["description"] = req->description();
+        ev["headers"] = nlohmann::json::parse(req->headers_json().empty() ? "[]" : req->headers_json());
+        ev["cells"] = nlohmann::json::parse(req->data_json().empty() ? "[]" : req->data_json());
+        if (db_)
+            db_->InsertOutbox(g_rpc_auth_ctx.user_id, "sheet.updated", ev.dump());
+        if (rabbit_)
+            rabbit_->Publish("rpc.events", "sheet.updated", ev.dump());
+    }
+
+    InvalidateCaches(db_, g_rpc_auth_ctx.user_id, {
+        SheetCacheKey(g_rpc_auth_ctx.user_id, req->id()),
+        SheetVersionKey(g_rpc_auth_ctx.user_id)
+    }, l1_, redis_);
+
+    resp->set_success(true);
+
     if (logger_) {
-        auto dur =
-            std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now() - start)
-                .count();
+        auto dur = std::chrono::duration_cast<std::chrono::microseconds>(
+                       std::chrono::high_resolution_clock::now() - start)
+                       .count();
         json p, r;
         p["id"] = json(static_cast<double>(req->id()));
-        r["error"] = json("Update conflict");
-        logger_->Log(username, "SpreadsheetService", "Update", p, r, false, dur);
+        logger_->Log(username, "SpreadsheetService", "Update", p, r, true, dur);
     }
+    if (slog_)
+        LOG_INFO(*slog_, "Updated id=" + std::to_string(req->id()) + " by " + username);
     return grpc::Status::OK;
 }
 

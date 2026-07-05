@@ -182,6 +182,7 @@ PROTOBUF_CONSTEXPR UpdateSpreadsheetResponse::UpdateSpreadsheetResponse(
     ::_pbi::ConstantInitialized): _impl_{
     /*decltype(_impl_.error_)*/{&::_pbi::fixed_address_empty_string, ::_pbi::ConstantInitialized{}}
   , /*decltype(_impl_.success_)*/false
+  , /*decltype(_impl_.latest_version_)*/0
   , /*decltype(_impl_.error_code_)*/0
   , /*decltype(_impl_._cached_size_)*/{}} {}
 struct UpdateSpreadsheetResponseDefaultTypeInternal {
@@ -339,6 +340,7 @@ const uint32_t TableStruct_rpc_5fspreadsheet_2eproto::offsets[] PROTOBUF_SECTION
   ~0u,  // no _inlined_string_donated_
   PROTOBUF_FIELD_OFFSET(::rpc::UpdateSpreadsheetResponse, _impl_.success_),
   PROTOBUF_FIELD_OFFSET(::rpc::UpdateSpreadsheetResponse, _impl_.error_),
+  PROTOBUF_FIELD_OFFSET(::rpc::UpdateSpreadsheetResponse, _impl_.latest_version_),
   PROTOBUF_FIELD_OFFSET(::rpc::UpdateSpreadsheetResponse, _impl_.error_code_),
   ~0u,  // no _has_bits_
   PROTOBUF_FIELD_OFFSET(::rpc::DeleteSpreadsheetRequest, _internal_metadata_),
@@ -369,8 +371,8 @@ static const ::_pbi::MigrationSchema schemas[] PROTOBUF_SECTION_VARIABLE(protode
   { 78, -1, -1, sizeof(::rpc::ListSpreadsheetsResponse)},
   { 91, -1, -1, sizeof(::rpc::UpdateSpreadsheetRequest)},
   { 103, -1, -1, sizeof(::rpc::UpdateSpreadsheetResponse)},
-  { 112, -1, -1, sizeof(::rpc::DeleteSpreadsheetRequest)},
-  { 120, -1, -1, sizeof(::rpc::DeleteSpreadsheetResponse)},
+  { 113, -1, -1, sizeof(::rpc::DeleteSpreadsheetRequest)},
+  { 121, -1, -1, sizeof(::rpc::DeleteSpreadsheetResponse)},
 };
 
 static const ::_pb::Message* const file_default_instances[] = {
@@ -419,34 +421,35 @@ const char descriptor_table_protodef_rpc_5fspreadsheet_2eproto[] PROTOBUF_SECTIO
   "\n\030UpdateSpreadsheetRequest\022\n\n\002id\030\001 \001(\003\022\017"
   "\n\007user_id\030\002 \001(\003\022\014\n\004name\030\003 \001(\t\022\023\n\013descrip"
   "tion\030\004 \001(\t\022\024\n\014headers_json\030\005 \001(\t\022\021\n\tdata"
-  "_json\030\006 \001(\t\"O\n\031UpdateSpreadsheetResponse"
-  "\022\017\n\007success\030\001 \001(\010\022\r\n\005error\030\002 \001(\t\022\022\n\nerro"
-  "r_code\030c \001(\005\"7\n\030DeleteSpreadsheetRequest"
-  "\022\n\n\002id\030\001 \001(\003\022\017\n\007user_id\030\002 \001(\003\"O\n\031DeleteS"
-  "preadsheetResponse\022\017\n\007success\030\001 \001(\010\022\r\n\005e"
-  "rror\030\002 \001(\t\022\022\n\nerror_code\030c \001(\0052\271\004\n\022Sprea"
-  "dsheetService\022m\n\021CreateSpreadsheet\022\035.rpc"
-  ".CreateSpreadsheetRequest\032\036.rpc.CreateSp"
-  "readsheetResponse\"\031\202\323\344\223\002\023\"\016/api/v1/sheet"
-  "s:\001*\022f\n\016GetSpreadsheet\022\032.rpc.GetSpreadsh"
-  "eetRequest\032\033.rpc.GetSpreadsheetResponse\""
-  "\033\202\323\344\223\002\025\022\023/api/v1/sheets/{id}\022g\n\020ListSpre"
-  "adsheets\022\034.rpc.ListSpreadsheetsRequest\032\035"
-  ".rpc.ListSpreadsheetsResponse\"\026\202\323\344\223\002\020\022\016/"
-  "api/v1/sheets\022r\n\021UpdateSpreadsheet\022\035.rpc"
-  ".UpdateSpreadsheetRequest\032\036.rpc.UpdateSp"
-  "readsheetResponse\"\036\202\323\344\223\002\030\032\023/api/v1/sheet"
-  "s/{id}:\001*\022o\n\021DeleteSpreadsheet\022\035.rpc.Del"
-  "eteSpreadsheetRequest\032\036.rpc.DeleteSpread"
-  "sheetResponse\"\033\202\323\344\223\002\025*\023/api/v1/sheets/{i"
-  "d}B\026Z\024rpc-server/proto/rpcb\006proto3"
+  "_json\030\006 \001(\t\"g\n\031UpdateSpreadsheetResponse"
+  "\022\017\n\007success\030\001 \001(\010\022\r\n\005error\030\002 \001(\t\022\026\n\016late"
+  "st_version\030\003 \001(\005\022\022\n\nerror_code\030c \001(\005\"7\n\030"
+  "DeleteSpreadsheetRequest\022\n\n\002id\030\001 \001(\003\022\017\n\007"
+  "user_id\030\002 \001(\003\"O\n\031DeleteSpreadsheetRespon"
+  "se\022\017\n\007success\030\001 \001(\010\022\r\n\005error\030\002 \001(\t\022\022\n\ner"
+  "ror_code\030c \001(\0052\271\004\n\022SpreadsheetService\022m\n"
+  "\021CreateSpreadsheet\022\035.rpc.CreateSpreadshe"
+  "etRequest\032\036.rpc.CreateSpreadsheetRespons"
+  "e\"\031\202\323\344\223\002\023\"\016/api/v1/sheets:\001*\022f\n\016GetSprea"
+  "dsheet\022\032.rpc.GetSpreadsheetRequest\032\033.rpc"
+  ".GetSpreadsheetResponse\"\033\202\323\344\223\002\025\022\023/api/v1"
+  "/sheets/{id}\022g\n\020ListSpreadsheets\022\034.rpc.L"
+  "istSpreadsheetsRequest\032\035.rpc.ListSpreads"
+  "heetsResponse\"\026\202\323\344\223\002\020\022\016/api/v1/sheets\022r\n"
+  "\021UpdateSpreadsheet\022\035.rpc.UpdateSpreadshe"
+  "etRequest\032\036.rpc.UpdateSpreadsheetRespons"
+  "e\"\036\202\323\344\223\002\030\032\023/api/v1/sheets/{id}:\001*\022o\n\021Del"
+  "eteSpreadsheet\022\035.rpc.DeleteSpreadsheetRe"
+  "quest\032\036.rpc.DeleteSpreadsheetResponse\"\033\202"
+  "\323\344\223\002\025*\023/api/v1/sheets/{id}B\026Z\024rpc-server"
+  "/proto/rpcb\006proto3"
   ;
 static const ::_pbi::DescriptorTable* const descriptor_table_rpc_5fspreadsheet_2eproto_deps[1] = {
   &::descriptor_table_google_2fapi_2fannotations_2eproto,
 };
 static ::_pbi::once_flag descriptor_table_rpc_5fspreadsheet_2eproto_once;
 const ::_pbi::DescriptorTable descriptor_table_rpc_5fspreadsheet_2eproto = {
-    false, false, 2034, descriptor_table_protodef_rpc_5fspreadsheet_2eproto,
+    false, false, 2058, descriptor_table_protodef_rpc_5fspreadsheet_2eproto,
     "rpc_spreadsheet.proto",
     &descriptor_table_rpc_5fspreadsheet_2eproto_once, descriptor_table_rpc_5fspreadsheet_2eproto_deps, 1, 12,
     schemas, file_default_instances, TableStruct_rpc_5fspreadsheet_2eproto::offsets,
@@ -3838,6 +3841,7 @@ UpdateSpreadsheetResponse::UpdateSpreadsheetResponse(const UpdateSpreadsheetResp
   new (&_impl_) Impl_{
       decltype(_impl_.error_){}
     , decltype(_impl_.success_){}
+    , decltype(_impl_.latest_version_){}
     , decltype(_impl_.error_code_){}
     , /*decltype(_impl_._cached_size_)*/{}};
 
@@ -3863,6 +3867,7 @@ inline void UpdateSpreadsheetResponse::SharedCtor(
   new (&_impl_) Impl_{
       decltype(_impl_.error_){}
     , decltype(_impl_.success_){false}
+    , decltype(_impl_.latest_version_){0}
     , decltype(_impl_.error_code_){0}
     , /*decltype(_impl_._cached_size_)*/{}
   };
@@ -3927,6 +3932,14 @@ const char* UpdateSpreadsheetResponse::_InternalParse(const char* ptr, ::_pbi::P
         } else
           goto handle_unusual;
         continue;
+      // int32 latest_version = 3;
+      case 3:
+        if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 24)) {
+          _impl_.latest_version_ = ::PROTOBUF_NAMESPACE_ID::internal::ReadVarint32(&ptr);
+          CHK_(ptr);
+        } else
+          goto handle_unusual;
+        continue;
       // int32 error_code = 99;
       case 99:
         if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 24)) {
@@ -3980,6 +3993,12 @@ uint8_t* UpdateSpreadsheetResponse::_InternalSerialize(
         2, this->_internal_error(), target);
   }
 
+  // int32 latest_version = 3;
+  if (this->_internal_latest_version() != 0) {
+    target = stream->EnsureSpace(target);
+    target = ::_pbi::WireFormatLite::WriteInt32ToArray(3, this->_internal_latest_version(), target);
+  }
+
   // int32 error_code = 99;
   if (this->_internal_error_code() != 0) {
     target = stream->EnsureSpace(target);
@@ -4014,6 +4033,11 @@ size_t UpdateSpreadsheetResponse::ByteSizeLong() const {
     total_size += 1 + 1;
   }
 
+  // int32 latest_version = 3;
+  if (this->_internal_latest_version() != 0) {
+    total_size += ::_pbi::WireFormatLite::Int32SizePlusOne(this->_internal_latest_version());
+  }
+
   // int32 error_code = 99;
   if (this->_internal_error_code() != 0) {
     total_size += 2 +
@@ -4044,6 +4068,9 @@ void UpdateSpreadsheetResponse::MergeImpl(::PROTOBUF_NAMESPACE_ID::Message& to_m
   }
   if (from._internal_success() != 0) {
     _this->_internal_set_success(from._internal_success());
+  }
+  if (from._internal_latest_version() != 0) {
+    _this->_internal_set_latest_version(from._internal_latest_version());
   }
   if (from._internal_error_code() != 0) {
     _this->_internal_set_error_code(from._internal_error_code());

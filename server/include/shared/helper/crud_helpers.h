@@ -123,6 +123,51 @@ bool CheckOwnerWithRetry(int64_t id, int64_t caller_uid, IDatabase *db,
     return found && owner_uid == caller_uid;
 }
 
+// ======== CAS Update ========
+
+struct CasConfig {
+    int max_retries      = 7;
+    int base_backoff_ms  = 50;   // initial delay
+    int max_backoff_ms   = 1000; // cap at 1s per retry
+};
+
+// UpdateWithCAS — read latest version, attempt write, backoff-retry on conflict.
+// The backend handles all retries internally; the caller (frontend) never makes
+// retry decisions.  Returns true on success.  On final failure, invokes
+// on_conflict(latest_version) so the response can carry the current version.
+//
+// read_ver(id, owner, version):  fetch owner + current version
+// do_write(id, version):         attempt UPDATE WHERE version=?
+// on_conflict(latest_ver):       called once when all retries exhausted
+template <typename ReadVer, typename DoWrite, typename OnConflict>
+bool UpdateWithCAS(int64_t id, int64_t caller_uid,
+                   ReadVer read_ver, DoWrite do_write,
+                   OnConflict on_conflict,
+                   const CasConfig &cfg = {}) {
+    for (int attempt = 0; attempt < cfg.max_retries; ++attempt) {
+        int64_t owner = 0;
+        int version = 0;
+        if (!read_ver(id, owner, version) || owner != caller_uid)
+            return false;
+
+        if (do_write(id, version))
+            return true;
+
+        if (attempt < cfg.max_retries - 1) {
+            int delay = cfg.base_backoff_ms * (1 << attempt);
+            if (delay > cfg.max_backoff_ms)
+                delay = cfg.max_backoff_ms;
+            std::this_thread::sleep_for(std::chrono::milliseconds(delay));
+        } else {
+            int64_t _owner = 0;
+            int latest = 0;
+            read_ver(id, _owner, latest);
+            on_conflict(latest);
+        }
+    }
+    return false;
+}
+
 // ======== DeleteSpec ========
 
 struct DeleteSpec {

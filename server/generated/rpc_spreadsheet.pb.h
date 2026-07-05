@@ -2144,6 +2144,7 @@ class UpdateSpreadsheetResponse final :
   enum : int {
     kErrorFieldNumber = 2,
     kSuccessFieldNumber = 1,
+    kLatestVersionFieldNumber = 3,
     kErrorCodeFieldNumber = 99,
   };
   // string error = 2;
@@ -2169,6 +2170,15 @@ class UpdateSpreadsheetResponse final :
   void _internal_set_success(bool value);
   public:
 
+  // int32 latest_version = 3;
+  void clear_latest_version();
+  int32_t latest_version() const;
+  void set_latest_version(int32_t value);
+  private:
+  int32_t _internal_latest_version() const;
+  void _internal_set_latest_version(int32_t value);
+  public:
+
   // int32 error_code = 99;
   void clear_error_code();
   int32_t error_code() const;
@@ -2188,6 +2198,7 @@ class UpdateSpreadsheetResponse final :
   struct Impl_ {
     ::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr error_;
     bool success_;
+    int32_t latest_version_;
     int32_t error_code_;
     mutable ::PROTOBUF_NAMESPACE_ID::internal::CachedSize _cached_size_;
   };
@@ -4493,6 +4504,26 @@ inline void UpdateSpreadsheetResponse::set_allocated_error(std::string* error) {
   }
 #endif // PROTOBUF_FORCE_COPY_DEFAULT_STRING
   // @@protoc_insertion_point(field_set_allocated:rpc.UpdateSpreadsheetResponse.error)
+}
+
+// int32 latest_version = 3;
+inline void UpdateSpreadsheetResponse::clear_latest_version() {
+  _impl_.latest_version_ = 0;
+}
+inline int32_t UpdateSpreadsheetResponse::_internal_latest_version() const {
+  return _impl_.latest_version_;
+}
+inline int32_t UpdateSpreadsheetResponse::latest_version() const {
+  // @@protoc_insertion_point(field_get:rpc.UpdateSpreadsheetResponse.latest_version)
+  return _internal_latest_version();
+}
+inline void UpdateSpreadsheetResponse::_internal_set_latest_version(int32_t value) {
+  
+  _impl_.latest_version_ = value;
+}
+inline void UpdateSpreadsheetResponse::set_latest_version(int32_t value) {
+  _internal_set_latest_version(value);
+  // @@protoc_insertion_point(field_set:rpc.UpdateSpreadsheetResponse.latest_version)
 }
 
 // int32 error_code = 99;
