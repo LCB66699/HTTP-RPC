@@ -118,18 +118,20 @@ jobs:
 
       - name: Debug - Nginx to Envoy connectivity
         run: |
-          echo "=== DNS: resolving envoy from nginx ==="
-          docker compose exec nginx sh -c "nslookup envoy 2>/dev/null || getent hosts envoy || ping -c1 envoy || true"
-          echo "=== DNS: resolving envoy-2 from nginx ==="
-          docker compose exec nginx sh -c "nslookup envoy-2 2>/dev/null || getent hosts envoy-2 || ping -c1 envoy-2 || true"
-          echo "=== TCP: nginx -> envoy:10000 ==="
-          docker compose exec nginx sh -c "(echo > /dev/tcp/envoy/10000 && echo 'OK envoy:10000') 2>&1 || echo 'FAIL envoy:10000'"
-          echo "=== TCP: nginx -> envoy-2:10000 ==="
-          docker compose exec nginx sh -c "(echo > /dev/tcp/envoy-2/10000 && echo 'OK envoy-2:10000') 2>&1 || echo 'FAIL envoy-2:10000'"
-          echo "=== Curl: nginx -> envoy:10000/health ==="
-          docker compose exec nginx sh -c "wget -qO- --timeout=3 http://envoy:10000/api/v1/health 2>&1 || curl -sS --max-time 3 http://envoy:10000/api/v1/health 2>&1 || echo 'FAIL curl envoy'"
-          echo "=== Curl: envoy -> grpc-gateway:8080/health ==="
-          docker compose exec envoy sh -c "curl -sS --max-time 3 http://grpc-gateway:8080/api/v1/health 2>&1 || wget -qO- --timeout=3 http://grpc-gateway:8080/api/v1/health 2>&1 || echo 'FAIL curl gateway'"
+          echo "=== Envoy port 10000 listening? ==="
+          docker compose exec envoy netstat -tlnp 2>/dev/null || docker compose exec envoy ss -tlnp || echo "netstat/ss not available"
+          echo "=== Envoy admin: listeners ==="
+          curl -sS --max-time 5 http://localhost:9901/listeners 2>/dev/null || echo "admin port not exposed, try docker exec"
+          echo "=== Envoy admin: clusters ==="
+          curl -sS --max-time 5 http://localhost:9901/clusters 2>/dev/null || echo "admin port not exposed"
+          echo "=== Envoy admin: config_dump (listeners only) ==="
+          curl -sS --max-time 5 http://localhost:9901/config_dump?resource=dynamic_listeners 2>/dev/null || echo "config_dump not available"
+          echo "=== Direct health check from runner -> gateway via docker ==="
+          docker compose exec grpc-gateway wget -qO- --timeout=3 http://localhost:8080/api/v1/health 2>&1 || echo "FAIL direct gateway health check"
+          echo "=== Docker network: nginx can ping envoy? ==="
+          docker compose exec nginx ping -c1 -W2 envoy 2>&1 || echo "FAIL ping envoy from nginx"
+          echo "=== Docker network: nginx can ping envoy-2? ==="
+          docker compose exec nginx ping -c1 -W2 envoy-2 2>&1 || echo "FAIL ping envoy-2 from nginx"
 
       - name: Debug - Gateway container logs
         if: always()
