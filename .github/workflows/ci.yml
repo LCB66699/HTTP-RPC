@@ -141,6 +141,14 @@ jobs:
           echo "=== grpc-gateway-2 logs ==="
           docker compose logs grpc-gateway-2 --tail=30 2>&1 || true
 
+      - name: Restart nginx to reconnect envoy
+        if: always()
+        run: |
+          docker compose restart nginx
+          sleep 5
+          echo "=== Test nginx -> envoy -> gateway ==="
+          docker compose exec nginx sh -c "wget -qO- --timeout=5 http://envoy:10000/api/v1/health 2>&1 || echo 'FAIL nginx->envoy'"
+
       - name: Functional tests
         run: bash test/e2e/functional_test.sh
 
