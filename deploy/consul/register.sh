@@ -1,7 +1,7 @@
 #!/bin/bash
 # Service registration wrapper for Consul.
 # Usage: register.sh <service-name> <port> -- <binary> [args...]
-# Registers the service on startup, deregisters on SIGTERM/SIGINT.
+# Retries Consul registration up to 10 times (20s total), then aborts.
 
 set -e
 
@@ -30,8 +30,8 @@ if [ -z "$MY_IP" ] || [ "$MY_IP" = "127.0.0.1" ]; then
   MY_IP=$(ip -o -4 addr show eth0 2>/dev/null | awk '{print $4}' | cut -d/ -f1)
 fi
 if [ -z "$MY_IP" ]; then
-  MY_IP="127.0.0.1"
-  echo "[consul] WARNING: could not determine routable IP, using ${MY_IP}"
+  echo "[consul] FATAL: could not determine routable IP"
+  exit 1
 fi
 
 REGISTER_PAYLOAD=$(cat <<EOF
@@ -52,8 +52,18 @@ REGISTER_PAYLOAD=$(cat <<EOF
 EOF
 )
 
-curl -s -X PUT "${CONSUL}/v1/agent/service/register" -d "${REGISTER_PAYLOAD}" > /dev/null
-echo "[consul] registered ${NODE_ID} at ${MY_IP}:${PORT}"
+for i in $(seq 1 10); do
+  if curl -s -f -X PUT "${CONSUL}/v1/agent/service/register" -d "${REGISTER_PAYLOAD}" > /dev/null 2>&1; then
+    echo "[consul] registered ${NODE_ID} at ${MY_IP}:${PORT}"
+    break
+  fi
+  if [ "$i" -eq 10 ]; then
+    echo "[consul] FATAL: registration failed after 10 attempts"
+    exit 1
+  fi
+  echo "[consul] attempt $i/10 failed, retrying in 2s..."
+  sleep 2
+done
 
 cleanup() {
   echo "[consul] deregistering ${NODE_ID}"
