@@ -2,17 +2,49 @@ package handler
 
 import (
 	"net/http"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	pb "gateway-grpc/gen/rpc"
+
+	"github.com/lcb66699/http-rpc/server/middleware"
 )
 
+func cbStatus(cb *middleware.CBSlow) gin.H {
+	if cb == nil {
+		return gin.H{"breaker": "unknown"}
+	}
+	state := cb.State().String()
+	channel := "READY"
+	if state == "open" {
+		channel = "DEGRADED"
+	}
+	return gin.H{"channel": channel, "breaker": strings.ToUpper(state)}
+}
+
 func (h *Handlers) Health(c *gin.Context) {
-	c.JSON(http.StatusOK, gin.H{"gateway": "READY"})
+	c.JSON(http.StatusOK, gin.H{
+		"gateway": "READY",
+		"auth":    cbStatus(h.CBAuth),
+		"sheet":   cbStatus(h.CBSheet),
+		"file":    cbStatus(h.CBFile),
+		"search":  cbStatus(h.CBSearch),
+	})
 }
 
 func (h *Handlers) HealthReady(c *gin.Context) {
-	c.JSON(http.StatusOK, gin.H{"gateway": "READY"})
+	allReady := true
+	for _, cb := range []*middleware.CBSlow{h.CBAuth, h.CBSheet, h.CBFile, h.CBSearch} {
+		if cb != nil && cb.State().String() == "open" {
+			allReady = false
+			break
+		}
+	}
+	status := http.StatusOK
+	if !allReady {
+		status = http.StatusServiceUnavailable
+	}
+	c.JSON(status, gin.H{"ready": allReady})
 }
 
 func (h *Handlers) Me(c *gin.Context) {

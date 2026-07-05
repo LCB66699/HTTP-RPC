@@ -29,7 +29,7 @@ func NewCBSlow(name string, metricsCb func(name string, val float64)) *CBSlow {
 		ReadyToTrip: func(counts gobreaker.Counts) bool {
 			slow := float64(cbs.slowCalls.Load())
 			total := float64(counts.Requests)
-			return counts.ConsecutiveFailures >= 5 ||
+			return counts.ConsecutiveFailures >= 3 ||
 				(total >= 10 && float64(counts.TotalFailures)/total >= 0.5) ||
 				(total >= 10 && slow/total >= 0.8)
 		},

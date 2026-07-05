@@ -1,5 +1,6 @@
 ﻿// File Service main 鈥?鐙珛缂栬瘧
 #include <grpcpp/grpcpp.h>
+#include <grpcpp/health_check_service_interface.h>
 
 #include <csignal>
 #include <cstdio>
@@ -150,6 +151,7 @@ int main(int argc, char *argv[]) {
         file_service.SetMinio(&minio_client);
     builder.RegisterService(&file_service);
 
+    grpc::EnableDefaultHealthCheckService(true);
     g_server = builder.BuildAndStart();
     printf("[File] Listening on %s\n", addr.c_str());
     g_server->Wait();

@@ -278,6 +278,23 @@
     entrypoint: ["/bin/sh", "/init.sh"]
     restart: "no"
 
+  # ===== Consul Service Registry =====
+  consul:
+    image: hashicorp/consul:1.20
+    volumes:
+      - ./deploy/consul/consul.hcl:/consul/config/consul.hcl:ro
+      - consul_data:/consul/data
+    ports:
+      - "8500:8500"
+      - "8600:8600/udp"
+    command: agent
+    healthcheck:
+      test: ["CMD", "consul", "operator", "raft", "list-peers"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+
   # ===== RabbitMQ ? ???? =====
   rabbitmq:
     image: rabbitmq:3.13-management-alpine
@@ -410,7 +427,8 @@
       JWT_SECRET: "${JWT_SECRET:-default-secret-32bytes-here!!!!!}"
       LOG_LEVEL: "${LOG_LEVEL:-INFO}"
     command: >
-      /app/rpc_server --service auth --port 50051
+      /app/register.sh rpc-auth 50051 -- /app/rpc_server
+      --service auth --port 50051
       --mysql-write-host mysql-auth --mysql-read-hosts mysql-auth --mysql-password ${MYSQL_ROOT_PASSWORD:-123456} --mysql-db rpc_auth --mysql-shards 1
       --redis-cluster redis-cluster-7000:7000 --redis-cluster redis-cluster-7001:7001 --redis-cluster redis-cluster-7002:7002 --redis-password ${REDIS_PASSWORD:-rpc-redis-123456}
     networks:
@@ -420,7 +438,7 @@
       mysql-auth:
         condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "bash -c 'echo > /dev/tcp/localhost/50051' 2>/dev/null"]
+      test: ["CMD", "grpc_health_probe", "-addr=localhost:50051"]
       interval: 5s
       timeout: 3s
       retries: 12
@@ -432,7 +450,8 @@
       JWT_SECRET: "${JWT_SECRET:-default-secret-32bytes-here!!!!!}"
       LOG_LEVEL: "${LOG_LEVEL:-INFO}"
     command: >
-      /app/rpc_server --service auth --port 50051
+      /app/register.sh rpc-auth 50051 -- /app/rpc_server
+      --service auth --port 50051
       --mysql-write-host mysql-auth --mysql-read-hosts mysql-auth --mysql-password ${MYSQL_ROOT_PASSWORD:-123456} --mysql-db rpc_auth --mysql-shards 1
       --redis-cluster redis-cluster-7000:7000 --redis-cluster redis-cluster-7001:7001 --redis-cluster redis-cluster-7002:7002 --redis-password ${REDIS_PASSWORD:-rpc-redis-123456}
     networks:
@@ -442,7 +461,7 @@
       mysql-auth:
         condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "bash -c 'echo > /dev/tcp/localhost/50051' 2>/dev/null"]
+      test: ["CMD", "grpc_health_probe", "-addr=localhost:50051"]
       interval: 5s
       timeout: 3s
       retries: 12
@@ -468,7 +487,8 @@
       MINIO_PUBLIC_URL: "http://localhost:9000"
       MONGODB_URI: "${MONGODB_URI:-mongodb://mongodb:27017}"
     command: >
-      /app/rpc_server --service spreadsheet --port 50051
+      /app/register.sh rpc-sheet 50051 -- /app/rpc_server
+      --service spreadsheet --port 50051
       --mysql-write-host mysql-spreadsheet --mysql-read-hosts mysql-spreadsheet-r --mysql-password ${MYSQL_ROOT_PASSWORD:-123456} --mysql-db rpc_spreadsheet --mysql-shards 2
       --redis-cluster redis-cluster-7000:7000 --redis-cluster redis-cluster-7001:7001 --redis-cluster redis-cluster-7002:7002 --redis-password ${REDIS_PASSWORD:-rpc-redis-123456}
     networks:
@@ -482,7 +502,7 @@
       redis-cluster-init:
         condition: service_completed_successfully
     healthcheck:
-      test: ["CMD-SHELL", "bash -c 'echo > /dev/tcp/localhost/50051' 2>/dev/null"]
+      test: ["CMD", "grpc_health_probe", "-addr=localhost:50051"]
       interval: 5s
       timeout: 3s
       retries: 12
@@ -502,7 +522,8 @@
       MINIO_PUBLIC_URL: "http://localhost:9000"
       MONGODB_URI: "${MONGODB_URI:-mongodb://mongodb:27017}"
     command: >
-      /app/rpc_server --service spreadsheet --port 50051
+      /app/register.sh rpc-sheet 50051 -- /app/rpc_server
+      --service spreadsheet --port 50051
       --mysql-write-host mysql-spreadsheet --mysql-read-hosts mysql-spreadsheet-r --mysql-password ${MYSQL_ROOT_PASSWORD:-123456} --mysql-db rpc_spreadsheet --mysql-shards 2
       --redis-cluster redis-cluster-7000:7000 --redis-cluster redis-cluster-7001:7001 --redis-cluster redis-cluster-7002:7002 --redis-password ${REDIS_PASSWORD:-rpc-redis-123456}
     networks:
@@ -516,7 +537,7 @@
       redis-cluster-init:
         condition: service_completed_successfully
     healthcheck:
-      test: ["CMD-SHELL", "bash -c 'echo > /dev/tcp/localhost/50051' 2>/dev/null"]
+      test: ["CMD", "grpc_health_probe", "-addr=localhost:50051"]
       interval: 5s
       timeout: 3s
       retries: 12
@@ -541,7 +562,8 @@
       MINIO_BUCKET: "rpc-files"
       MINIO_PUBLIC_URL: "http://localhost:9000"
     command: >
-      /app/rpc_server --service file --port 50051
+      /app/register.sh rpc-file 50051 -- /app/rpc_server
+      --service file --port 50051
       --mysql-write-host mysql-file --mysql-read-hosts mysql-file-r --mysql-password ${MYSQL_ROOT_PASSWORD:-123456} --mysql-db rpc_file --mysql-shards 2
       --redis-cluster redis-cluster-7000:7000 --redis-cluster redis-cluster-7001:7001 --redis-cluster redis-cluster-7002:7002 --redis-password ${REDIS_PASSWORD:-rpc-redis-123456}
     networks:
@@ -555,7 +577,7 @@
       rabbitmq:
         condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "bash -c 'echo > /dev/tcp/localhost/50051' 2>/dev/null"]
+      test: ["CMD", "grpc_health_probe", "-addr=localhost:50051"]
       interval: 5s
       timeout: 3s
       retries: 12
@@ -574,7 +596,8 @@
       MINIO_BUCKET: "rpc-files"
       MINIO_PUBLIC_URL: "http://localhost:9000"
     command: >
-      /app/rpc_server --service file --port 50051
+      /app/register.sh rpc-file 50051 -- /app/rpc_server
+      --service file --port 50051
       --mysql-write-host mysql-file --mysql-read-hosts mysql-file-r --mysql-password ${MYSQL_ROOT_PASSWORD:-123456} --mysql-db rpc_file --mysql-shards 2
       --redis-cluster redis-cluster-7000:7000 --redis-cluster redis-cluster-7001:7001 --redis-cluster redis-cluster-7002:7002 --redis-password ${REDIS_PASSWORD:-rpc-redis-123456}
     networks:
@@ -588,7 +611,7 @@
       rabbitmq:
         condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "bash -c 'echo > /dev/tcp/localhost/50051' 2>/dev/null"]
+      test: ["CMD", "grpc_health_probe", "-addr=localhost:50051"]
       interval: 5s
       timeout: 3s
       retries: 12
@@ -606,7 +629,8 @@
       ES_HOST: "http://elasticsearch:9200"
       JWT_SECRET: "${JWT_SECRET:-default-secret-32bytes-here!!!!!}"
     command: >
-      /app/rpc_server --service search --port 50051
+      /app/register.sh rpc-search 50051 -- /app/rpc_server
+      --service search --port 50051
     networks:
       default:
         aliases: [rpc-search]
@@ -614,7 +638,7 @@
       elasticsearch:
         condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "bash -c 'echo > /dev/tcp/localhost/50051' 2>/dev/null"]
+      test: ["CMD", "grpc_health_probe", "-addr=localhost:50051"]
       interval: 5s
       timeout: 3s
       retries: 12
@@ -629,13 +653,13 @@
     environment:
       JWT_SECRET: "${JWT_SECRET:-default-secret-32bytes-here!!!!!}"
       LOG_LEVEL: "${LOG_LEVEL:-INFO}"
-      AUTH_ADDR: "rpc-auth:50051"
-      SHEET_ADDR: "rpc-sheet:50051"
+      AUTH_ADDR: "rpc-auth"
+      SHEET_ADDR: "rpc-sheet"
       REDIS_ADDR: "redis-cluster-7000:7000"
       REDIS_PASSWORD: "${REDIS_PASSWORD:-rpc-redis-123456}"
       MONGO_URI: "mongodb://mongodb:27017"
-      FILE_ADDR: "rpc-file:50051"
-      SEARCH_ADDR: "rpc-search:50051"
+      FILE_ADDR: "rpc-file"
+      SEARCH_ADDR: "rpc-search"
     ports:
       - "8082:8080"
     depends_on:
@@ -661,13 +685,13 @@
     environment:
       JWT_SECRET: "${JWT_SECRET:-default-secret-32bytes-here!!!!!}"
       LOG_LEVEL: "${LOG_LEVEL:-INFO}"
-      AUTH_ADDR: "rpc-auth:50051"
-      SHEET_ADDR: "rpc-sheet:50051"
+      AUTH_ADDR: "rpc-auth"
+      SHEET_ADDR: "rpc-sheet"
       REDIS_ADDR: "redis-cluster-7000:7000"
       REDIS_PASSWORD: "${REDIS_PASSWORD:-rpc-redis-123456}"
       MONGO_URI: "mongodb://mongodb:27017"
-      FILE_ADDR: "rpc-file:50051"
-      SEARCH_ADDR: "rpc-search:50051"
+      FILE_ADDR: "rpc-file"
+      SEARCH_ADDR: "rpc-search"
     networks:
       default:
         aliases: [grpc-gateway]
@@ -772,4 +796,6 @@
 
 volumes:
   es_data:
+    driver: local
+  consul_data:
     driver: local

@@ -25,6 +25,9 @@ import (
 	"github.com/lcb66699/http-rpc/server/handler"
 	"github.com/lcb66699/http-rpc/server/middleware"
 	"github.com/lcb66699/http-rpc/server/router"
+
+	// Register consul:// resolver for gRPC service discovery.
+	_ "github.com/lcb66699/http-rpc/server/discovery"
 )
 
 func initTracer() (*sdktrace.TracerProvider, error) {
@@ -68,7 +71,7 @@ func main() {
 		Time: 10 * time.Second, Timeout: 3 * time.Second,
 	})
 	creds := grpc.WithTransportCredentials(insecure.NewCredentials())
-	lb := grpc.WithDefaultServiceConfig(`{"loadBalancingConfig":[{"round_robin":{}}]}`)
+	lb := grpc.WithDefaultServiceConfig(`{"loadBalancingConfig":[{"round_robin":{}}],"healthCheckConfig":{"serviceName":""}}`)
 	otelStats := grpc.WithStatsHandler(otelgrpc.NewClientHandler())
 
 	cbAuth := middleware.NewCBSlow("auth", nil)
@@ -76,22 +79,22 @@ func main() {
 	cbFile := middleware.NewCBSlow("file", nil)
 	cbSearch := middleware.NewCBSlow("search", nil)
 
-	authAddr := getenv("AUTH_ADDR", "rpc-auth:50051")
-	sheetAddr := getenv("SHEET_ADDR", "rpc-sheet:50051")
-	fileAddr := getenv("FILE_ADDR", "rpc-file:50051")
-	searchAddr := getenv("SEARCH_ADDR", "rpc-search:50051")
-	slog.Info("backend addresses", "auth", authAddr, "sheet", sheetAddr, "file", fileAddr, "search", searchAddr)
+	authAddr := getenv("AUTH_ADDR", "rpc-auth")
+	sheetAddr := getenv("SHEET_ADDR", "rpc-sheet")
+	fileAddr := getenv("FILE_ADDR", "rpc-file")
+	searchAddr := getenv("SEARCH_ADDR", "rpc-search")
+	slog.Info("backend addresses (consul)", "auth", authAddr, "sheet", sheetAddr, "file", fileAddr, "search", searchAddr)
 
-	authConn, _ := grpc.NewClient("dns:///"+authAddr,
+	authConn, _ := grpc.NewClient("consul:///"+authAddr,
 		append([]grpc.DialOption{creds, kp, lb, otelStats},
 			grpc.WithChainUnaryInterceptor(middleware.GrpcMetricsInterceptor(), cbAuth.Interceptor()))...)
-	sheetConn, _ := grpc.NewClient("dns:///"+sheetAddr,
+	sheetConn, _ := grpc.NewClient("consul:///"+sheetAddr,
 		append([]grpc.DialOption{creds, kp, lb, otelStats},
 			grpc.WithChainUnaryInterceptor(middleware.GrpcMetricsInterceptor(), cbSheet.Interceptor()))...)
-	fileConn, _ := grpc.NewClient("dns:///"+fileAddr,
+	fileConn, _ := grpc.NewClient("consul:///"+fileAddr,
 		append([]grpc.DialOption{creds, kp, lb, otelStats},
 			grpc.WithChainUnaryInterceptor(middleware.GrpcMetricsInterceptor(), cbFile.Interceptor()))...)
-	searchConn, _ := grpc.NewClient("dns:///"+searchAddr,
+	searchConn, _ := grpc.NewClient("consul:///"+searchAddr,
 		append([]grpc.DialOption{creds, kp, lb, otelStats},
 			grpc.WithChainUnaryInterceptor(middleware.GrpcMetricsInterceptor(), cbSearch.Interceptor()))...)
 
@@ -112,7 +115,7 @@ func main() {
 		SearchClient: pb.NewSearchServiceClient(searchConn),
 		Share:   pb.NewSharingServiceClient(authConn),
 		RDB:     rdb,
-		CBSearch: cbSearch, CBSheet: cbSheet, CBFile: cbFile,
+		CBAuth: cbAuth, CBSearch: cbSearch, CBSheet: cbSheet, CBFile: cbFile,
 		JWTSecret: jwtSecret,
 	}
 

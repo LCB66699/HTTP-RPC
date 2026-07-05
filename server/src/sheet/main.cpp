@@ -1,5 +1,6 @@
 ﻿// Sheet Service main 
 #include <grpcpp/grpcpp.h>
+#include <grpcpp/health_check_service_interface.h>
 
 #include <csignal>
 #include <cstdio>
@@ -166,6 +167,7 @@ int main(int argc, char *argv[]) {
 
     builder.RegisterService(&sheet_service);
 
+    grpc::EnableDefaultHealthCheckService(true);
     g_server = builder.BuildAndStart();
     printf("[Sheet] Listening on %s\n", addr.c_str());
     g_server->Wait();

@@ -23,6 +23,7 @@ type Handlers struct {
 	Share  pb.SharingServiceClient
 	RDB    *redis.Client
 
+	CBAuth   *middleware.CBSlow
 	CBSearch *middleware.CBSlow
 	CBSheet  *middleware.CBSlow
 	CBFile   *middleware.CBSlow

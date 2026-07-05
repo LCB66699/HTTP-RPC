@@ -1,5 +1,6 @@
 ﻿// Search Service main 鈥?鏈€杞婚噺锛屽彧渚濊禆 httplib
 #include <grpcpp/grpcpp.h>
+#include <grpcpp/health_check_service_interface.h>
 
 #include <csignal>
 #include <cstdio>
@@ -58,6 +59,7 @@ int main(int argc, char *argv[]) {
     SearchServiceImpl search_service(es_host ? es_host : "http://elasticsearch:9200");
     builder.RegisterService(&search_service);
 
+    grpc::EnableDefaultHealthCheckService(true);
     g_server = builder.BuildAndStart();
     printf("[Search] Listening on %s (ES: %s)\n", addr.c_str(), es_host ? es_host : "default");
     g_server->Wait();
