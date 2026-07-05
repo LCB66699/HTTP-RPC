@@ -624,7 +624,7 @@
   grpc-gateway:
     build:
       context: .
-      dockerfile: cmd/gateway-grpc/Dockerfile
+      dockerfile: cmd/server/Dockerfile
     image: ${DOCKER_USER:-http-rpc}/gateway:latest
     environment:
       JWT_SECRET: "${JWT_SECRET:-default-secret-32bytes-here!!!!!}"
@@ -656,7 +656,7 @@
   grpc-gateway-2:
     build:
       context: .
-      dockerfile: cmd/gateway-grpc/Dockerfile
+      dockerfile: cmd/server/Dockerfile
     image: ${DOCKER_USER:-http-rpc}/gateway:latest
     environment:
       JWT_SECRET: "${JWT_SECRET:-default-secret-32bytes-here!!!!!}"

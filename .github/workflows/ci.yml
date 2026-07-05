@@ -19,7 +19,7 @@ jobs:
 
       - name: Go format check
         run: |
-          cd cmd/gateway-grpc
+          cd cmd/server
           gofmt -l . | tee /dev/stderr | test ! -s /dev/stdin
           cd ../../services/notify-service
           gofmt -l . | tee /dev/stderr | test ! -s /dev/stdin
