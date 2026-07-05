@@ -131,6 +131,14 @@ jobs:
           echo "=== Curl: envoy -> grpc-gateway:8080/health ==="
           docker compose exec envoy sh -c "curl -sS --max-time 3 http://grpc-gateway:8080/api/v1/health 2>&1 || wget -qO- --timeout=3 http://grpc-gateway:8080/api/v1/health 2>&1 || echo 'FAIL curl gateway'"
 
+      - name: Debug - Gateway container logs
+        if: always()
+        run: |
+          echo "=== grpc-gateway logs ==="
+          docker compose logs grpc-gateway --tail=30 2>&1 || true
+          echo "=== grpc-gateway-2 logs ==="
+          docker compose logs grpc-gateway-2 --tail=30 2>&1 || true
+
       - name: Functional tests
         run: bash test/e2e/functional_test.sh
 
