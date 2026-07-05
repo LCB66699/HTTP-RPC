@@ -4,7 +4,6 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
 	pb "gateway-grpc/gen/rpc"
 )
 
@@ -13,12 +12,7 @@ func (h *Handlers) Health(c *gin.Context) {
 }
 
 func (h *Handlers) HealthReady(c *gin.Context) {
-	// Simple readiness — in a full implementation, check gRPC connections.
 	c.JSON(http.StatusOK, gin.H{"gateway": "READY"})
-}
-
-func (h *Handlers) Metrics(c *gin.Context) {
-	promhttp.Handler().ServeHTTP(c.Writer, c.Request)
 }
 
 func (h *Handlers) Me(c *gin.Context) {
@@ -59,9 +53,6 @@ func (h *Handlers) Search(c *gin.Context) {
 	resp, err := h.SearchClient.Search(h.token(c.Request.Context(), c), &pb.SearchRequest{
 		Query: body.Q, UserId: 0, Sort: body.Sort,
 	})
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": err.Error()})
-		return
-	}
+	if grpcErr(c, err, "search failed") { return }
 	c.JSON(http.StatusOK, resp)
 }

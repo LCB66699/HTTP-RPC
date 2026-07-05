@@ -23,20 +23,14 @@ func (h *Handlers) CreateSheet(c *gin.Context) {
 		return
 	}
 	resp, err := h.Sheet.CreateSpreadsheet(h.token(c.Request.Context(), c), &req)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": err.Error()})
-		return
-	}
+	if grpcErr(c, err, "create sheet failed") { return }
 	c.JSON(http.StatusOK, resp)
 }
 
 func (h *Handlers) GetSheet(c *gin.Context) {
 	id := parseID(c)
 	resp, err := h.Sheet.GetSpreadsheet(h.token(c.Request.Context(), c), &pb.GetSpreadsheetRequest{Id: id})
-	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"success": false, "error": "Not found"})
-		return
-	}
+	if grpcErr(c, err, "Not found") { return }
 	c.JSON(http.StatusOK, resp)
 }
 
@@ -45,10 +39,7 @@ func (h *Handlers) ListSheets(c *gin.Context) {
 		h.token(c.Request.Context(), c),
 		&pb.ListSpreadsheetsRequest{UserId: 0},
 	)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": err.Error()})
-		return
-	}
+	if grpcErr(c, err, "list sheets failed") { return }
 	c.JSON(http.StatusOK, resp)
 }
 
@@ -62,10 +53,7 @@ func (h *Handlers) UpdateSheet(c *gin.Context) {
 	req.Id = id
 	req.UserId = h.uid(c)
 	resp, err := h.Sheet.UpdateSpreadsheet(h.token(c.Request.Context(), c), &req)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": err.Error()})
-		return
-	}
+	if grpcErr(c, err, "update sheet failed") { return }
 	c.JSON(http.StatusOK, resp)
 }
 
@@ -75,10 +63,7 @@ func (h *Handlers) DeleteSheet(c *gin.Context) {
 		h.token(c.Request.Context(), c),
 		&pb.DeleteSpreadsheetRequest{Id: id, UserId: h.uid(c)},
 	)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": err.Error()})
-		return
-	}
+	if grpcErr(c, err, "delete sheet failed") { return }
 	c.JSON(http.StatusOK, resp)
 }
 

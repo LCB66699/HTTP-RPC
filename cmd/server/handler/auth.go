@@ -27,10 +27,7 @@ func (h *Handlers) Login(c *gin.Context) {
 		return
 	}
 	resp, err := h.Auth.Login(c.Request.Context(), &req)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": err.Error()})
-		return
-	}
+	if grpcErr(c, err, "auth operation failed") { return }
 	if !resp.GetSuccess() {
 		c.JSON(http.StatusUnauthorized, gin.H{"success": false, "error": resp.GetError()})
 		return
@@ -50,10 +47,7 @@ func (h *Handlers) Register(c *gin.Context) {
 		return
 	}
 	resp, err := h.Auth.Register(c.Request.Context(), &req)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": err.Error()})
-		return
-	}
+	if grpcErr(c, err, "auth operation failed") { return }
 	if !resp.GetSuccess() {
 		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": resp.GetError()})
 		return
@@ -76,9 +70,8 @@ func (h *Handlers) Refresh(c *gin.Context) {
 	resp, err := h.Auth.RefreshToken(c.Request.Context(), &req)
 	if err != nil {
 		slog.Error("refresh gRPC error", "error", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": "refresh failed"})
-		return
 	}
+	if grpcErr(c, err, "refresh failed") { return }
 	h.setCookies(c, resp.GetAccessToken(), "")
 	c.JSON(http.StatusOK, resp)
 }
@@ -103,10 +96,7 @@ func (h *Handlers) ChangePassword(c *gin.Context) {
 	}
 	req := &pb.ChangePasswordRequest{UserId: uid, OldPassword: body.OldPassword, NewPassword: body.NewPassword}
 	resp, err := h.Auth.ChangePassword(c.Request.Context(), req)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": err.Error()})
-		return
-	}
+	if grpcErr(c, err, "auth operation failed") { return }
 	c.JSON(http.StatusOK, resp)
 }
 
@@ -138,10 +128,7 @@ func (h *Handlers) PhoneLogin(c *gin.Context) {
 	}
 	h.RDB.Del(c.Request.Context(), "otp:"+body.Phone)
 	resp, err := h.Auth.LoginByPhone(c.Request.Context(), &pb.PhoneLoginRequest{Phone: body.Phone, Otp: body.OTP})
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": "phone login failed"})
-		return
-	}
+	if grpcErr(c, err, "phone login failed") { return }
 	h.setCookies(c, resp.GetAccessToken(), resp.GetRefreshToken())
 	c.JSON(http.StatusOK, resp)
 }

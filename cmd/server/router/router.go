@@ -2,14 +2,23 @@ package router
 
 import (
 	"github.com/gin-gonic/gin"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/lcb66699/http-rpc/server/handler"
 	"github.com/lcb66699/http-rpc/server/middleware"
 )
+
+func MetricsHandler() gin.HandlerFunc {
+	h := promhttp.Handler()
+	return func(c *gin.Context) {
+		h.ServeHTTP(c.Writer, c.Request)
+	}
+}
 
 func Setup(h *handler.Handlers, jwtSecret string) *gin.Engine {
 	r := gin.New()
 	r.Use(middleware.CORSMiddleware())
 	r.Use(middleware.RequestID())
+	r.Use(middleware.GinMetrics())
 	r.Use(middleware.Logger())
 	r.Use(gin.Recovery())
 
@@ -23,7 +32,7 @@ func Setup(h *handler.Handlers, jwtSecret string) *gin.Engine {
 		api.POST("/auth/phone/login", h.PhoneLogin)
 		api.GET("/health", h.Health)
 		api.GET("/health/ready", h.HealthReady)
-		api.GET("/metrics", h.Metrics)
+		api.GET("/metrics", MetricsHandler())
 
 		// Share by token (public)
 		api.GET("/s/:token", h.ShareByToken)

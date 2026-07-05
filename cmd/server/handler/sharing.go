@@ -22,10 +22,7 @@ func (h *Handlers) ShareSheet(c *gin.Context) {
 		OwnerId: h.uid(c), ResourceType: "sheet", ResourceId: id,
 		GranteeUsername: body.Username, Permission: body.Permission,
 	})
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": err.Error()})
-		return
-	}
+	if grpcErr(c, err, "sharing operation failed") { return }
 	c.JSON(http.StatusOK, resp)
 }
 
@@ -36,10 +33,7 @@ func (h *Handlers) RevokeShare(c *gin.Context) {
 		OwnerId: h.uid(c), ResourceType: "sheet", ResourceId: id,
 		GranteeUsername: username,
 	})
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": err.Error()})
-		return
-	}
+	if grpcErr(c, err, "sharing operation failed") { return }
 	c.JSON(http.StatusOK, resp)
 }
 
@@ -48,10 +42,7 @@ func (h *Handlers) ListShares(c *gin.Context) {
 	resp, err := h.Share.ListShares(h.token(c.Request.Context(), c), &pb.ResourceRequest{
 		OwnerId: h.uid(c), ResourceType: "sheet", ResourceId: id,
 	})
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": err.Error()})
-		return
-	}
+	if grpcErr(c, err, "sharing operation failed") { return }
 	c.JSON(http.StatusOK, resp)
 }
 
@@ -60,10 +51,7 @@ func (h *Handlers) CreateShareLink(c *gin.Context) {
 	resp, err := h.Share.CreateShareLink(h.token(c.Request.Context(), c), &pb.ShareLinkRequest{
 		OwnerId: h.uid(c), ResourceType: "sheet", ResourceId: id, Permission: "view",
 	})
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": err.Error()})
-		return
-	}
+	if grpcErr(c, err, "sharing operation failed") { return }
 	c.JSON(http.StatusOK, resp)
 }
 

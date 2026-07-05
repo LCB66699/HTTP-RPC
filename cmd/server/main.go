@@ -84,16 +84,16 @@ func main() {
 
 	authConn, _ := grpc.NewClient("dns:///"+authAddr,
 		append([]grpc.DialOption{creds, kp, lb, otelStats},
-			grpc.WithChainUnaryInterceptor(cbAuth.Interceptor()))...)
+			grpc.WithChainUnaryInterceptor(middleware.GrpcMetricsInterceptor(), cbAuth.Interceptor()))...)
 	sheetConn, _ := grpc.NewClient("dns:///"+sheetAddr,
 		append([]grpc.DialOption{creds, kp, lb, otelStats},
-			grpc.WithChainUnaryInterceptor(cbSheet.Interceptor()))...)
+			grpc.WithChainUnaryInterceptor(middleware.GrpcMetricsInterceptor(), cbSheet.Interceptor()))...)
 	fileConn, _ := grpc.NewClient("dns:///"+fileAddr,
 		append([]grpc.DialOption{creds, kp, lb, otelStats},
-			grpc.WithChainUnaryInterceptor(cbFile.Interceptor()))...)
+			grpc.WithChainUnaryInterceptor(middleware.GrpcMetricsInterceptor(), cbFile.Interceptor()))...)
 	searchConn, _ := grpc.NewClient("dns:///"+searchAddr,
 		append([]grpc.DialOption{creds, kp, lb, otelStats},
-			grpc.WithChainUnaryInterceptor(cbSearch.Interceptor()))...)
+			grpc.WithChainUnaryInterceptor(middleware.GrpcMetricsInterceptor(), cbSearch.Interceptor()))...)
 
 	redisAddr := getenv("REDIS_ADDR", "redis-cluster-7000:7000")
 	redisPass := getenv("REDIS_PASSWORD", "rpc-redis-123456")

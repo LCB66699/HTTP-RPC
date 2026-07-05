@@ -67,4 +67,4 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
 
-replace gateway-grpc/gen/rpc => ../gateway-grpc/gen/rpc
+replace gateway-grpc/gen/rpc => ./gen/rpc

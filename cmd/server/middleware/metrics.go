@@ -1,14 +1,13 @@
-package main
+package middleware
 
 import (
-	"net/http"
+	"context"
 	"strconv"
 	"strings"
-	"context"
 	"time"
 
+	"github.com/gin-gonic/gin"
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"google.golang.org/grpc"
 )
 
@@ -43,29 +42,18 @@ func init() {
 	prometheus.MustRegister(circuitBreakerState)
 }
 
-func metricsHandler() http.Handler { return promhttp.Handler() }
-
-// statusRecorder 拦截 WriteHeader 以捕获 HTTP 状态码
-type statusRecorder struct {
-	http.ResponseWriter
-	status int
+// GinMetrics collects HTTP request metrics for Prometheus.
+func GinMetrics() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		c.Next()
+		httpRequestsTotal.WithLabelValues(
+			c.Request.Method, c.FullPath(), strconv.Itoa(c.Writer.Status()),
+		).Inc()
+	}
 }
 
-func (r *statusRecorder) WriteHeader(code int) {
-	r.status = code
-	r.ResponseWriter.WriteHeader(code)
-}
-
-func metricsMiddleware(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		sr := &statusRecorder{ResponseWriter: w, status: 200}
-		next.ServeHTTP(sr, r)
-		httpRequestsTotal.WithLabelValues(r.Method, r.URL.Path, strconv.Itoa(sr.status)).Inc()
-	})
-}
-
-// grpcMetricsInterceptor 记录每个 gRPC 调用的延迟
-func grpcMetricsInterceptor() grpc.UnaryClientInterceptor {
+// GrpcMetricsInterceptor records gRPC call duration.
+func GrpcMetricsInterceptor() grpc.UnaryClientInterceptor {
 	return func(ctx context.Context, method string, req, reply any, cc *grpc.ClientConn, invoker grpc.UnaryInvoker, opts ...grpc.CallOption) error {
 		start := time.Now()
 		err := invoker(ctx, method, req, reply, cc, opts...)

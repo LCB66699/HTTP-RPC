@@ -24,10 +24,7 @@ func (h *Handlers) UploadFile(c *gin.Context) {
 		MimeType: fh.Header.Get("Content-Type"), FileContent: data,
 		IdempotencyKey: idemKey,
 	})
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": err.Error()})
-		return
-	}
+	if grpcErr(c, err, "file operation failed") { return }
 	c.JSON(http.StatusOK, resp)
 }
 
@@ -56,19 +53,13 @@ func (h *Handlers) GetFile(c *gin.Context) {
 func (h *Handlers) DeleteFile(c *gin.Context) {
 	id := parseID(c)
 	resp, err := h.File.DeleteFile(h.token(c.Request.Context(), c), &pb.DeleteFileRequest{Id: id, UserId: 0})
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": err.Error()})
-		return
-	}
+	if grpcErr(c, err, "file operation failed") { return }
 	c.JSON(http.StatusOK, resp)
 }
 
 func (h *Handlers) ListFiles(c *gin.Context) {
 	resp, err := h.File.ListFiles(h.token(c.Request.Context(), c), &pb.ListFilesRequest{UserId: 0})
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": err.Error()})
-		return
-	}
+	if grpcErr(c, err, "file operation failed") { return }
 	c.JSON(http.StatusOK, resp)
 }
 
@@ -80,10 +71,7 @@ func (h *Handlers) MoveFile(c *gin.Context) {
 		return
 	}
 	resp, err := h.File.MoveFile(h.token(c.Request.Context(), c), &pb.MoveFileRequest{Id: id, TargetFolderId: body.TargetFolderId})
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": err.Error()})
-		return
-	}
+	if grpcErr(c, err, "file operation failed") { return }
 	c.JSON(http.StatusOK, resp)
 }
 
@@ -99,9 +87,6 @@ func (h *Handlers) CreateFolder(c *gin.Context) {
 	resp, err := h.File.CreateFolder(h.token(c.Request.Context(), c), &pb.CreateFolderRequest{
 		UserId: 0, Name: body.Name, ParentFolderId: body.ParentFolderId,
 	})
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": err.Error()})
-		return
-	}
+	if grpcErr(c, err, "file operation failed") { return }
 	c.JSON(http.StatusOK, resp)
 }
