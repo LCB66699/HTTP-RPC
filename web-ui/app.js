@@ -1448,10 +1448,12 @@ function renderSheetList(data) {
         <div class="sheet-card-meta">
           <span>${s.row_count} 行 × ${s.col_count} 列</span>
           <span>更新于 ${esc(s.updated_at || '--')}</span>
+          <span>ID: ${s.id}</span>
         </div>
       </div>
       <div class="sheet-card-actions">
         <button class="btn btn-primary btn-sm" onclick="openSheet('${s.id}')">打开</button>
+        <button class="btn btn-sm" onclick="shareResourceById('sheet','${s.id}')">分享</button>
         <button class="btn btn-sm" onclick="deleteSheet('${s.id}', '${esc(s.name)}')">删除</button>
       </div>
     </div>
@@ -1827,10 +1829,11 @@ function renderFileList(data) {
         <div class="sheet-card-meta">
           <span>${sizeStr}</span>
           <span>${isFolder ? '文件夹' : esc(f.mime_type)}</span>
-          <span>${esc(f.created_at || '')}</span>
+          <span>ID: ${f.id}</span>
         </div>
       </div>
       <div class="sheet-card-actions">
+        <button class="btn btn-sm" onclick="shareResourceById('file','${f.id}')">分享</button>
         ${isFolder
           ? `<button class="btn btn-sm" onclick="deleteFile('${f.id}', '${esc(f.original_name)}')">删除</button>`
           : `<button class="btn btn-sm" onclick="previewFile('${f.id}', '${esc(f.original_name)}', '${esc(f.mime_type)}')">预览</button>
@@ -2003,9 +2006,27 @@ async function batchDelete() {
 }
 
 async function shareResource(type) {
-  const id = type === 'sheet' ? window.currentSheetId : prompt('输入 ' + type + ' ID:');
-  if (!id) return;
+  let id = null;
+  if (type === 'sheet') {
+    id = window.currentSheetId;
+    if (!id) { alert('请先打开一个表格'); return; }
+  } else {
+    id = prompt('输入文件 ID (可在文件列表中查看):');
+    if (!id) return;
+  }
   const username = prompt('分享给哪个用户?');
+  if (!username) return;
+  const perm = confirm('编辑权限? (取消=只读)') ? 'edit' : 'view';
+  const res = await fetch(API + '/' + type + 's/' + id + '/share', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ username, permission: perm }), credentials: 'same-origin'
+  });
+  const data = await res.json();
+  alert(data.success ? '分享成功' : ('分享失败: ' + (data.error || '')));
+}
+
+async function shareResourceById(type, id) {
+  const username = prompt(`分享此${type === 'sheet' ? '表格' : '文件'}给哪个用户? (ID: ${id})`);
   if (!username) return;
   const perm = confirm('编辑权限? (取消=只读)') ? 'edit' : 'view';
   const res = await fetch(API + '/' + type + 's/' + id + '/share', {
