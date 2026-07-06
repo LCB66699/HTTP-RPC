@@ -128,9 +128,12 @@ message Order {
 message SeckillOrderRequest {
   int64 seckill_id = 1;
   string idempotency_key = 2;
+  int64 user_id = 3;
 }
 
-message ListOrdersRequest {}
+message ListOrdersRequest {
+  int64 user_id = 1;
+}
 
 message OrderResponse {
   bool success = 1;

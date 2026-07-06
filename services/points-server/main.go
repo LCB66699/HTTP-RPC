@@ -231,6 +231,7 @@ func (s *pointsServer) consumeEvents() {
 			Type           string `json:"type"`
 			UserID         int64  `json:"user_id"`
 			IdempotencyKey string `json:"key"`
+			Amount         int64  `json:"amount"`
 		}
 		if err := json.Unmarshal([]byte(msg.Payload), &ev); err != nil {
 			continue
@@ -257,6 +258,14 @@ func (s *pointsServer) consumeEvents() {
 		case "file.uploaded":
 			amount = 3
 			limit = 10
+		case "seckill_order":
+			ctx2, cancel2 := context.WithTimeout(context.Background(), 3*time.Second)
+			defer cancel2()
+			s.Deduct(ctx2, &pb.DeductRequest{
+				UserId: ev.UserID, Amount: ev.Amount,
+				Reason: "seckill_order", RefId: ev.IdempotencyKey,
+			})
+			continue
 		default:
 			continue
 		}
