@@ -1,0 +1,147 @@
+syntax = "proto3";
+package rpc;
+
+option go_package = "rpc-server/proto/rpc";
+
+import "google/api/annotations.proto";
+
+service MallService {
+  // Products
+  rpc ListProducts(ListProductsRequest) returns (ListProductsResponse) {
+    option (google.api.http) = { get: "/api/v1/mall/products" };
+  }
+  rpc GetProduct(GetProductRequest) returns (ProductResponse) {
+    option (google.api.http) = { get: "/api/v1/mall/products/{id}" };
+  }
+  rpc CreateProduct(CreateProductRequest) returns (ProductResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/mall/products"
+      body: "*"
+    };
+  }
+
+  // Seckill
+  rpc ListSeckills(ListSeckillsRequest) returns (ListSeckillsResponse) {
+    option (google.api.http) = { get: "/api/v1/mall/seckills" };
+  }
+  rpc CreateSeckill(CreateSeckillRequest) returns (SeckillResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/mall/seckills"
+      body: "*"
+    };
+  }
+
+  // Orders
+  rpc SeckillOrder(SeckillOrderRequest) returns (OrderResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/mall/seckill/order"
+      body: "*"
+    };
+  }
+  rpc ListOrders(ListOrdersRequest) returns (ListOrdersResponse) {
+    option (google.api.http) = { get: "/api/v1/mall/orders" };
+  }
+}
+
+// ---- Product ----
+message Product {
+  int64 id = 1;
+  string name = 2;
+  string description = 3;
+  int64 price = 4;        // 积分价格
+  int64 stock = 5;        // 库存
+  string image_url = 6;
+}
+
+message CreateProductRequest {
+  string name = 1;
+  string description = 2;
+  int64 price = 3;
+  int64 stock = 4;
+  string image_url = 5;
+}
+
+message GetProductRequest    { int64 id = 1; }
+message ListProductsRequest  {}
+
+message ProductResponse {
+  bool success = 1;
+  Product product = 2;
+  string error = 3;
+  int32 error_code = 99;
+}
+
+message ListProductsResponse {
+  bool success = 1;
+  repeated Product products = 2;
+  string error = 3;
+  int32 error_code = 99;
+}
+
+// ---- Seckill ----
+message Seckill {
+  int64 id = 1;
+  int64 product_id = 2;
+  int64 seckill_price = 3;   // 秒杀价
+  int64 seckill_stock = 4;   // 秒杀库存
+  int64 start_at = 5;         // 开始时间戳
+  int64 end_at = 6;           // 结束时间戳
+  string product_name = 7;
+}
+
+message CreateSeckillRequest {
+  int64 product_id = 1;
+  int64 seckill_price = 2;
+  int64 seckill_stock = 3;
+  int64 start_at = 4;
+  int64 end_at = 5;
+}
+
+message ListSeckillsRequest {}
+
+message SeckillResponse {
+  bool success = 1;
+  Seckill seckill = 2;
+  string error = 3;
+  int32 error_code = 99;
+}
+
+message ListSeckillsResponse {
+  bool success = 1;
+  repeated Seckill seckills = 2;
+  string error = 3;
+  int32 error_code = 99;
+}
+
+// ---- Order ----
+message Order {
+  int64 id = 1;
+  int64 user_id = 2;
+  int64 product_id = 3;
+  int64 seckill_id = 4;
+  int64 amount = 5;           // 实付积分
+  string status = 6;          // paid / cancelled
+  string created_at = 7;
+  string product_name = 8;
+}
+
+message SeckillOrderRequest {
+  int64 seckill_id = 1;
+  string idempotency_key = 2;
+}
+
+message ListOrdersRequest {}
+
+message OrderResponse {
+  bool success = 1;
+  Order order = 2;
+  string error = 3;
+  int32 error_code = 99;
+}
+
+message ListOrdersResponse {
+  bool success = 1;
+  repeated Order orders = 2;
+  string error = 3;
+  int32 error_code = 99;
+}
