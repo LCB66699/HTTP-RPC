@@ -24,6 +24,7 @@ type Handlers struct {
 	SearchClient pb.SearchServiceClient
 	Share     pb.SharingServiceClient
 	Workspace pb.WorkspaceServiceClient
+	Points    pb.PointsServiceClient
 	RDB       *redis.Client
 
 	CBAuth   *middleware.CBSlow
