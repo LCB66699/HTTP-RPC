@@ -270,3 +270,4 @@ Prometheus 自动抓取 `http://grpc-gateway:8080/api/v1/metrics`，Grafana 数�
 - Prometheus: `http://<host>:9090`
 - Grafana: `http://<host>:3000` (admin / admin)
 - Jaeger: `http://<host>:16686`
+branch-protection-test-2
