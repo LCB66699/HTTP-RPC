@@ -22,4 +22,4 @@ require (
 	google.golang.org/protobuf v1.35.1 // indirect
 )
 
-replace gateway-grpc/gen/rpc => ../../cmd/server/gen/rpc
+replace gateway-grpc/gen/rpc => ./cmd/server/gen/rpc
