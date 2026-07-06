@@ -1497,3 +1497,87 @@ bool Database::GetShareLinkByToken(const std::string &token, std::string &resour
     });
     return found;
 }
+
+// ===== Workspace =====
+
+bool Database::EnsureWorkspaceTables() {
+    return ExecWrite(
+        "CREATE TABLE IF NOT EXISTS workspaces ("
+        "  id BIGINT PRIMARY KEY,"
+        "  name VARCHAR(128) NOT NULL,"
+        "  owner_id BIGINT NOT NULL,"
+        "  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP"
+        ")") &&
+    ExecWrite(
+        "CREATE TABLE IF NOT EXISTS workspace_members ("
+        "  workspace_id BIGINT NOT NULL,"
+        "  user_id BIGINT NOT NULL,"
+        "  username VARCHAR(64) NOT NULL,"
+        "  role VARCHAR(16) NOT NULL DEFAULT 'viewer',"
+        "  joined_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,"
+        "  PRIMARY KEY (workspace_id, user_id)"
+        ")");
+}
+
+bool Database::CreateWorkspace(int64_t owner_id, const std::string &name, int64_t &out_id) {
+    MYSQL *ec = EscConn();
+    return ExecWriteInsert(make_sql(
+        "INSERT INTO workspaces (id,name,owner_id) VALUES ({},{},{})",
+        owner_id, sql_param(ec, name), owner_id), out_id);
+}
+
+bool Database::GetWorkspace(int64_t id, std::string &name, int64_t &owner_id, std::string &created_at) {
+    bool found = false;
+    ExecRead(make_sql("SELECT name,owner_id,created_at FROM workspaces WHERE id={}", id),
+             [&](MYSQL_RES *res) -> bool {
+                 MYSQL_ROW row = mysql_fetch_row(res);
+                 if (row) {
+                     name = row[0] ? row[0] : "";
+                     owner_id = row[1] ? std::stoll(row[1]) : 0;
+                     created_at = row[2] ? row[2] : "";
+                     found = true;
+                 }
+                 return true;
+             });
+    return found;
+}
+
+bool Database::UpdateWorkspace(int64_t id, const std::string &name) {
+    MYSQL *ec = EscConn();
+    return ExecWrite(make_sql("UPDATE workspaces SET name={} WHERE id={}", sql_param(ec, name), id));
+}
+
+bool Database::DeleteWorkspace(int64_t id) {
+    ExecWrite(make_sql("DELETE FROM workspace_members WHERE workspace_id={}", id));
+    return ExecWrite(make_sql("DELETE FROM workspaces WHERE id={}", id));
+}
+
+bool Database::AddWorkspaceMember(int64_t wid, int64_t uid, const std::string &username, const std::string &role) {
+    MYSQL *ec = EscConn();
+    return ExecWrite(make_sql(
+        "INSERT INTO workspace_members (workspace_id,user_id,username,role) VALUES ({},{},{},{}) "
+        "ON DUPLICATE KEY UPDATE role={}",
+        wid, uid, sql_param(ec, username), sql_param(ec, role), sql_param(ec, role)));
+}
+
+bool Database::RemoveWorkspaceMember(int64_t wid, int64_t uid) {
+    return ExecWrite(make_sql("DELETE FROM workspace_members WHERE workspace_id={} AND user_id={}", wid, uid));
+}
+
+bool Database::IsWorkspaceOwner(int64_t wid, int64_t uid) {
+    bool found = false;
+    ExecRead(make_sql("SELECT 1 FROM workspaces WHERE id={} AND owner_id={}", wid, uid),
+             [&](MYSQL_RES *res) -> bool { found = (mysql_fetch_row(res) != nullptr); return true; });
+    return found;
+}
+
+bool Database::GetWorkspaceMemberRole(int64_t wid, int64_t uid, std::string &out_role) {
+    bool found = false;
+    ExecRead(make_sql("SELECT role FROM workspace_members WHERE workspace_id={} AND user_id={}", wid, uid),
+             [&](MYSQL_RES *res) -> bool {
+                 MYSQL_ROW row = mysql_fetch_row(res);
+                 if (row) { out_role = row[0] ? row[0] : ""; found = true; }
+                 return true;
+             });
+    return found;
+}

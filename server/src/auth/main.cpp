@@ -9,6 +9,7 @@
 #include "shared/base/auth_interceptor.h"
 #include "auth/auth_service_impl.h"
 #include "auth/sharing_service_impl.h"
+#include "auth/workspace_service_impl.h"
 #include "shared/base/call_logger.h"
 #include "shared/client/database.h"
 #include "shared/base/health_service_impl.h"
@@ -113,6 +114,9 @@ int main(int argc, char *argv[]) {
 
     SharingServiceImpl sharing_service(db.get());
     builder.RegisterService(&sharing_service);
+
+    WorkspaceServiceImpl workspace_service(db.get());
+    builder.RegisterService(&workspace_service);
 
     grpc::EnableDefaultHealthCheckService(true);
     g_server = builder.BuildAndStart();

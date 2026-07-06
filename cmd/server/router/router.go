@@ -34,6 +34,7 @@ func Setup(h *handler.Handlers, jwtSecret string) *gin.Engine {
 	h.RegisterSharingRoutes(api, auth)  // share, revoke, share-link, share-by-token
 	h.RegisterSheetRoutes(auth)         // sheet CRUD
 	h.RegisterFileRoutes(auth)          // file CRUD + folder
+	h.RegisterWorkspaceRoutes(auth)      // workspace CRUD + members
 
 	// WebSocket
 	auth.GET("/ws", h.WS.ServeWS)
