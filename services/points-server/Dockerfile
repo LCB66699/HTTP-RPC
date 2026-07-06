@@ -6,7 +6,7 @@ RUN sed -i "s|dl-cdn.alpinelinux.org|mirrors.aliyun.com|g" /etc/apk/repositories
 
 WORKDIR /build
 COPY services/points-server/ ./
-COPY cmd/server/gen ./cmd/server/gen
+COPY cmd/server/gen /cmd/server/gen
 RUN go mod download
 RUN CGO_ENABLED=0 go build -o points-server .
 
