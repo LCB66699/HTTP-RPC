@@ -697,13 +697,14 @@ const file_rpc_points_proto_rawDesc = "" +
 	"\x13LeaderboardResponse\x12\x18\n" +
 	"\asuccess\x18\x01 \x01(\bR\asuccess\x12/\n" +
 	"\aentries\x18\x02 \x03(\v2\x15.rpc.LeaderboardEntryR\aentries\x12\x14\n" +
-	"\x05error\x18\x03 \x01(\tR\x05error2\x81\x03\n" +
+	"\x05error\x18\x03 \x01(\tR\x05error2\xea\x03\n" +
 	"\rPointsService\x12Z\n" +
 	"\n" +
 	"GetBalance\x12\x16.rpc.GetBalanceRequest\x1a\x14.rpc.BalanceResponse\"\x1e\x82\xd3\xe4\x93\x02\x18\x12\x16/api/v1/points/balance\x12n\n" +
 	"\x0fGetTransactions\x12\x1b.rpc.GetTransactionsRequest\x1a\x19.rpc.TransactionsResponse\"#\x82\xd3\xe4\x93\x02\x1d\x12\x1b/api/v1/points/transactions\x12N\n" +
 	"\x04Earn\x12\x10.rpc.EarnRequest\x1a\x14.rpc.BalanceResponse\"\x1e\x82\xd3\xe4\x93\x02\x18:\x01*\"\x13/api/v1/points/earn\x12T\n" +
-	"\x06Deduct\x12\x12.rpc.DeductRequest\x1a\x14.rpc.BalanceResponse\" \x82\xd3\xe4\x93\x02\x1a:\x01*\"\x15/api/v1/points/deductB\x16Z\x14rpc-server/proto/rpcb\x06proto3"
+	"\x06Deduct\x12\x12.rpc.DeductRequest\x1a\x14.rpc.BalanceResponse\" \x82\xd3\xe4\x93\x02\x1a:\x01*\"\x15/api/v1/points/deduct\x12g\n" +
+	"\x0eGetLeaderboard\x12\x17.rpc.LeaderboardRequest\x1a\x18.rpc.LeaderboardResponse\"\"\x82\xd3\xe4\x93\x02\x1c\x12\x1a/api/v1/points/leaderboardB\x16Z\x14rpc-server/proto/rpcb\x06proto3"
 
 var (
 	file_rpc_points_proto_rawDescOnce sync.Once
@@ -737,12 +738,14 @@ var file_rpc_points_proto_depIdxs = []int32{
 	1, // 3: rpc.PointsService.GetTransactions:input_type -> rpc.GetTransactionsRequest
 	2, // 4: rpc.PointsService.Earn:input_type -> rpc.EarnRequest
 	3, // 5: rpc.PointsService.Deduct:input_type -> rpc.DeductRequest
-	4, // 6: rpc.PointsService.GetBalance:output_type -> rpc.BalanceResponse
-	6, // 7: rpc.PointsService.GetTransactions:output_type -> rpc.TransactionsResponse
-	4, // 8: rpc.PointsService.Earn:output_type -> rpc.BalanceResponse
-	4, // 9: rpc.PointsService.Deduct:output_type -> rpc.BalanceResponse
-	6, // [6:10] is the sub-list for method output_type
-	2, // [2:6] is the sub-list for method input_type
+	7, // 6: rpc.PointsService.GetLeaderboard:input_type -> rpc.LeaderboardRequest
+	4, // 7: rpc.PointsService.GetBalance:output_type -> rpc.BalanceResponse
+	6, // 8: rpc.PointsService.GetTransactions:output_type -> rpc.TransactionsResponse
+	4, // 9: rpc.PointsService.Earn:output_type -> rpc.BalanceResponse
+	4, // 10: rpc.PointsService.Deduct:output_type -> rpc.BalanceResponse
+	9, // 11: rpc.PointsService.GetLeaderboard:output_type -> rpc.LeaderboardResponse
+	7, // [7:12] is the sub-list for method output_type
+	2, // [2:7] is the sub-list for method input_type
 	2, // [2:2] is the sub-list for extension type_name
 	2, // [2:2] is the sub-list for extension extendee
 	0, // [0:2] is the sub-list for field type_name

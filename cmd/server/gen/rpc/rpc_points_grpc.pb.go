@@ -23,6 +23,7 @@ const (
 	PointsService_GetTransactions_FullMethodName = "/rpc.PointsService/GetTransactions"
 	PointsService_Earn_FullMethodName            = "/rpc.PointsService/Earn"
 	PointsService_Deduct_FullMethodName          = "/rpc.PointsService/Deduct"
+	PointsService_GetLeaderboard_FullMethodName  = "/rpc.PointsService/GetLeaderboard"
 )
 
 // PointsServiceClient is the client API for PointsService service.
@@ -33,6 +34,7 @@ type PointsServiceClient interface {
 	GetTransactions(ctx context.Context, in *GetTransactionsRequest, opts ...grpc.CallOption) (*TransactionsResponse, error)
 	Earn(ctx context.Context, in *EarnRequest, opts ...grpc.CallOption) (*BalanceResponse, error)
 	Deduct(ctx context.Context, in *DeductRequest, opts ...grpc.CallOption) (*BalanceResponse, error)
+	GetLeaderboard(ctx context.Context, in *LeaderboardRequest, opts ...grpc.CallOption) (*LeaderboardResponse, error)
 }
 
 type pointsServiceClient struct {
@@ -83,6 +85,16 @@ func (c *pointsServiceClient) Deduct(ctx context.Context, in *DeductRequest, opt
 	return out, nil
 }
 
+func (c *pointsServiceClient) GetLeaderboard(ctx context.Context, in *LeaderboardRequest, opts ...grpc.CallOption) (*LeaderboardResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(LeaderboardResponse)
+	err := c.cc.Invoke(ctx, PointsService_GetLeaderboard_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // PointsServiceServer is the server API for PointsService service.
 // All implementations must embed UnimplementedPointsServiceServer
 // for forward compatibility.
@@ -91,6 +103,7 @@ type PointsServiceServer interface {
 	GetTransactions(context.Context, *GetTransactionsRequest) (*TransactionsResponse, error)
 	Earn(context.Context, *EarnRequest) (*BalanceResponse, error)
 	Deduct(context.Context, *DeductRequest) (*BalanceResponse, error)
+	GetLeaderboard(context.Context, *LeaderboardRequest) (*LeaderboardResponse, error)
 	mustEmbedUnimplementedPointsServiceServer()
 }
 
@@ -112,6 +125,9 @@ func (UnimplementedPointsServiceServer) Earn(context.Context, *EarnRequest) (*Ba
 }
 func (UnimplementedPointsServiceServer) Deduct(context.Context, *DeductRequest) (*BalanceResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method Deduct not implemented")
+}
+func (UnimplementedPointsServiceServer) GetLeaderboard(context.Context, *LeaderboardRequest) (*LeaderboardResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetLeaderboard not implemented")
 }
 func (UnimplementedPointsServiceServer) mustEmbedUnimplementedPointsServiceServer() {}
 func (UnimplementedPointsServiceServer) testEmbeddedByValue()                       {}
@@ -206,6 +222,24 @@ func _PointsService_Deduct_Handler(srv interface{}, ctx context.Context, dec fun
 	return interceptor(ctx, in, info, handler)
 }
 
+func _PointsService_GetLeaderboard_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(LeaderboardRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(PointsServiceServer).GetLeaderboard(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: PointsService_GetLeaderboard_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(PointsServiceServer).GetLeaderboard(ctx, req.(*LeaderboardRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // PointsService_ServiceDesc is the grpc.ServiceDesc for PointsService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -228,6 +262,10 @@ var PointsService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "Deduct",
 			Handler:    _PointsService_Deduct_Handler,
+		},
+		{
+			MethodName: "GetLeaderboard",
+			Handler:    _PointsService_GetLeaderboard_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
