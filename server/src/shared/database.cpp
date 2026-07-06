@@ -1542,6 +1542,28 @@ bool Database::GetWorkspace(int64_t id, std::string &name, int64_t &owner_id, st
     return found;
 }
 
+bool Database::ListWorkspaces(int64_t user_id, std::string &out_json) {
+    std::vector<nlohmann::json> items;
+    ExecRead(make_sql(
+        "SELECT w.id,w.name,w.owner_id,w.created_at FROM workspaces w "
+        "INNER JOIN workspace_members m ON w.id=m.workspace_id "
+        "WHERE m.user_id={} ORDER BY w.created_at DESC", user_id),
+        [&](MYSQL_RES *res) -> bool {
+            MYSQL_ROW row;
+            while ((row = mysql_fetch_row(res))) {
+                nlohmann::json j;
+                j["id"] = row[0] ? std::stoll(row[0]) : 0;
+                j["name"] = row[1] ? row[1] : "";
+                j["owner_id"] = row[2] ? std::stoll(row[2]) : 0;
+                j["created_at"] = row[3] ? row[3] : "";
+                items.push_back(j);
+            }
+            return true;
+        });
+    out_json = nlohmann::json(items).dump();
+    return true;
+}
+
 bool Database::UpdateWorkspace(int64_t id, const std::string &name) {
     MYSQL *ec = EscConn();
     return ExecWrite(make_sql("UPDATE workspaces SET name={} WHERE id={}", sql_param(ec, name), id));
