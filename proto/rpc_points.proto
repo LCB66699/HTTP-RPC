@@ -1,0 +1,91 @@
+syntax = "proto3";
+package rpc;
+
+option go_package = "rpc-server/proto/rpc";
+
+import "google/api/annotations.proto";
+
+service PointsService {
+  rpc GetBalance(GetBalanceRequest) returns (BalanceResponse) {
+    option (google.api.http) = { get: "/api/v1/points/balance" };
+  }
+  rpc GetTransactions(GetTransactionsRequest) returns (TransactionsResponse) {
+    option (google.api.http) = { get: "/api/v1/points/transactions" };
+  }
+  rpc Earn(EarnRequest) returns (BalanceResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/points/earn"
+      body: "*"
+    };
+  }
+  rpc Deduct(DeductRequest) returns (BalanceResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/points/deduct"
+      body: "*"
+    };
+  }
+}
+
+message GetBalanceRequest {
+  int64 user_id = 1;
+}
+
+message GetTransactionsRequest {
+  int64 user_id = 1;
+  int32 limit = 2;
+}
+
+message EarnRequest {
+  int64 user_id = 1;
+  int64 amount = 2;
+  string reason = 3;            // daily_login / create_sheet / upload_file / invite
+  string idempotency_key = 4;   // 幂等去重
+}
+
+message DeductRequest {
+  int64 user_id = 1;
+  int64 amount = 2;
+  string reason = 3;
+  string ref_id = 4;            // 关联订单号
+}
+
+message BalanceResponse {
+  bool success = 1;
+  int64 user_id = 2;
+  int64 balance = 3;
+  int64 total_earned = 4;
+  string error = 5;
+  int32 error_code = 99;
+}
+
+message Transaction {
+  int64 id = 1;
+  string type = 2;
+  int64 amount = 3;
+  string reason = 4;
+  string created_at = 5;
+}
+
+message TransactionsResponse {
+  bool success = 1;
+  repeated Transaction transactions = 2;
+  string error = 3;
+  int32 error_code = 99;
+}
+
+// Leaderboard entry (served from Redis, no DB table)
+message LeaderboardRequest {
+  int32 limit = 1;  // default 20
+}
+
+message LeaderboardEntry {
+  int64 user_id = 1;
+  string username = 2;
+  int64 total_earned = 3;
+}
+
+message LeaderboardResponse {
+  bool success = 1;
+  repeated LeaderboardEntry entries = 2;
+  string error = 3;
+}
