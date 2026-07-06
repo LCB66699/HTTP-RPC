@@ -104,6 +104,11 @@ func main() {
 		append([]grpc.DialOption{creds, kp, lb, otelStats},
 			grpc.WithChainUnaryInterceptor(middleware.GrpcMetricsInterceptor()))...)
 
+	mallAddr := getenv("MALL_ADDR", "rpc-mall")
+	mallConn, _ := grpc.NewClient("consul:///"+mallAddr,
+		append([]grpc.DialOption{creds, kp, lb, otelStats},
+			grpc.WithChainUnaryInterceptor(middleware.GrpcMetricsInterceptor()))...)
+
 	redisAddr := getenv("REDIS_ADDR", "redis-cluster-7000:7000")
 	redisPass := getenv("REDIS_PASSWORD", "rpc-redis-123456")
 	rdb := redis.NewClient(&redis.Options{Addr: redisAddr, Password: redisPass})
@@ -125,6 +130,7 @@ func main() {
 		Share:     pb.NewSharingServiceClient(authConn),
 		Workspace: pb.NewWorkspaceServiceClient(authConn),
 		Points:    pb.NewPointsServiceClient(pointsConn),
+		Mall:      pb.NewMallServiceClient(mallConn),
 		RDB:       rdb,
 		CBAuth: cbAuth, CBSearch: cbSearch, CBSheet: cbSheet, CBFile: cbFile,
 		WSHub: hub, WS: &ws.Handler{Hub: hub},

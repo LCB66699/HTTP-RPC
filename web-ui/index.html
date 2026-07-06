@@ -76,6 +76,7 @@
     <button class="tab active" data-tab="sheets">数据表格</button>
     <button class="tab" data-tab="workspace">工作空间</button>
     <button class="tab" data-tab="points">积分</button>
+    <button class="tab" data-tab="mall">商城</button>
     <button class="tab" data-tab="files">文件管理</button>
     <button class="tab" data-tab="search">🔍 搜索</button>
     <button class="tab admin-only" data-tab="services" style="display:none">服务列表</button>
@@ -217,6 +218,27 @@
       <div class="points-card">
         <h3>排行榜</h3>
         <div id="points-leaderboard"><p style="color:var(--text-secondary)">加载中...</p></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Mall Panel -->
+  <section id="panel-mall" class="panel">
+    <div class="toolbar">
+      <h2>积分商城</h2>
+    </div>
+    <div class="mall-grid">
+      <div class="mall-section">
+        <h3>商品列表</h3>
+        <div id="mall-products" class="products-grid"></div>
+      </div>
+      <div class="mall-section">
+        <h3>秒杀活动</h3>
+        <div id="mall-seckills" class="seckill-list"></div>
+      </div>
+      <div class="mall-section">
+        <h3>我的订单</h3>
+        <div id="mall-orders"><p style="color:var(--text-secondary)">加载中...</p></div>
       </div>
     </div>
   </section>
