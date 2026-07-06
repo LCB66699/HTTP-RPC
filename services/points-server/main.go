@@ -153,9 +153,9 @@ func (s *pointsServer) checkLoginStreak(ctx context.Context, uid int64) (int, bo
 	}
 
 	yesterday := time.Now().AddDate(0, 0, -1).Format("2006-01-02")
-	var streak int
+	var streak int64
 	if lastDate == yesterday {
-		streak, _ = s.rdb.Incr(ctx, countKey).Result()
+		streak = s.rdb.Incr(ctx, countKey).Val()
 	} else {
 		s.rdb.Set(ctx, countKey, 1, 7*24*time.Hour)
 		streak = 1
