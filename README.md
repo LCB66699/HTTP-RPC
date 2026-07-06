@@ -8,7 +8,7 @@
 浏览器 (Web UI)
    │  HTTPS
    ▼
-nginx :443                           ← TLS 终结 + 令牌桶限流 (3层)
+nginx :443                           ← TLS 终结 +  令牌桶限流 (3层)
    │  least_conn → gateway_pool
    ▼
 gRPC-Gateway (Go) ×2 :8080          ← HTTP/JSON ↔ gRPC + JWT + 熔断器 + 重试 + readiness + Prometheus 指标
