@@ -418,6 +418,54 @@ echo "$SHARE" | grep -q '"token"' \
     && green "Share link created" \
     || warn "Share feature not implemented: $SHARE"
 
+# ---- 6f. 分享权限校验 ----
+title "6f. 分享权限校验"
+
+# user1 shares their sheet with user2 (view permission)
+SHARE_RESP=$($CURL -X POST "$API/api/v1/sheets/$SHEET_ID/share" \
+    -H 'Content-Type: application/json' \
+    -b "$JAR" \
+    -d "{\"username\":\"$TEST_USER2\",\"permission\":\"view\"}")
+echo "$SHARE_RESP" | grep -q '"success":true' \
+    && green "Share with user2 OK" \
+    || red "Share failed: $SHARE_RESP"
+
+# user2 reads the shared sheet — should succeed
+READ_SHARED=$($CURL "$API/api/v1/sheets/$SHEET_ID" -b "$JAR2")
+echo "$READ_SHARED" | grep -q '"success":true' \
+    && green "Shared user read OK" \
+    || red "Shared user read denied: $READ_SHARED"
+
+# user2 tries to update with view-only permission — should fail
+UPDATE_SHARED=$($CURL -X PUT "$API/api/v1/sheets/$SHEET_ID" \
+    -H 'Content-Type: application/json' \
+    -b "$JAR2" \
+    -d '{"name":"hacked","headers_json":"[]","data_json":"[]"}')
+echo "$UPDATE_SHARED" | grep -q '"success":true' \
+    && red "Shared user with view-only was able to edit" \
+    || green "Shared user view-only edit blocked OK"
+
+# user1 upgrades to edit permission
+$CURL -X POST "$API/api/v1/sheets/$SHEET_ID/share" \
+    -H 'Content-Type: application/json' \
+    -b "$JAR" \
+    -d "{\"username\":\"$TEST_USER2\",\"permission\":\"edit\"}" > /dev/null 2>&1
+
+# user2 now tries to update — should succeed
+UPDATE_EDIT=$($CURL -X PUT "$API/api/v1/sheets/$SHEET_ID" \
+    -H 'Content-Type: application/json' \
+    -b "$JAR2" \
+    -d '{"name":"shared-edit","headers_json":"[]","data_json":"[]"}')
+echo "$UPDATE_EDIT" | grep -q '"success":true' \
+    && green "Shared user edit OK" \
+    || warn "Shared user edit denied (may need Go proto regen): $UPDATE_EDIT"
+
+# user2 tries to delete — should fail (only owner can delete)
+DELETE_SHARED=$($CURL -X DELETE "$API/api/v1/sheets/$SHEET_ID" -b "$JAR2" -w "%{http_code}" -o /dev/null)
+[ "$DELETE_SHARED" != "200" ] \
+    && green "Shared user delete blocked OK" \
+    || red "Shared user was able to delete"
+
 title "8. 健康检查"
 
 HEALTH=$($CURL "$API/api/v1/health")

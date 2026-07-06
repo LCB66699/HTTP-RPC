@@ -363,3 +363,193 @@ TEST(SheetMock, DeleteSpreadsheetMongoDelete) {
     EXPECT_TRUE(status.ok());
     EXPECT_TRUE(resp.success());
 }
+
+// ===== GetSpreadsheet — shared with view permission =====
+TEST(SheetMock, GetSpreadsheetShareViewAllowed) {
+    AuthGuard auth(99);  // non-owner
+    MockDB db;
+    MockRedis redis;
+    SpreadsheetServiceImpl svc;
+
+    svc.SetDatabase(&db);
+    svc.SetRedis(&redis);
+
+    // Owner is 42, caller is 99 — not owner
+    EXPECT_CALL(db, GetSpreadsheetOwner(1, _, _))
+        .WillOnce(DoAll(SetArgReferee<1>(42), Return(true)));
+    // Share check: caller 99 has "view" on sheet 1
+    svc.SetSharingChecker([&](int64_t uid, const std::string &type, int64_t rid, std::string &perm) -> bool {
+        if (uid == 99 && type == "sheet" && rid == 1) { perm = "view"; return true; }
+        return false;
+    });
+
+    EXPECT_CALL(redis, IsConnected()).WillRepeatedly(Return(true));
+    EXPECT_CALL(redis, GetJSON(_, _)).WillRepeatedly(Return(false));
+    EXPECT_CALL(redis, SetNX(_, _, _)).WillRepeatedly(Return(true));
+    EXPECT_CALL(redis, SetJSON(_, _, _)).WillRepeatedly(Return(true));
+    EXPECT_CALL(redis, DeleteKey(_)).WillRepeatedly(Return(true));
+    EXPECT_CALL(redis, ExpireKey(_, _)).WillRepeatedly(Return(true));
+
+    SpreadsheetRow row;
+    row.id = 1;
+    row.name = "shared-sheet";
+    EXPECT_CALL(db, GetSpreadsheet(1, 99, _))
+        .WillOnce(DoAll(SetArgReferee<2>(row), Return(true)));
+
+    grpc::ServerContext ctx;
+    rpc::GetSpreadsheetRequest req;
+    rpc::GetSpreadsheetResponse resp;
+    req.set_id(1);
+    req.set_user_id(99);
+
+    auto status = svc.GetSpreadsheet(&ctx, &req, &resp);
+    EXPECT_TRUE(status.ok());
+    EXPECT_TRUE(resp.success());
+    EXPECT_EQ(resp.spreadsheet().name(), "shared-sheet");
+    std::this_thread::sleep_for(std::chrono::milliseconds(50));
+}
+
+// ===== GetSpreadsheet — shared with edit permission =====
+TEST(SheetMock, GetSpreadsheetShareEditAllowed) {
+    AuthGuard auth(99);
+    MockDB db;
+    MockRedis redis;
+    SpreadsheetServiceImpl svc;
+
+    svc.SetDatabase(&db);
+    svc.SetRedis(&redis);
+
+    EXPECT_CALL(db, GetSpreadsheetOwner(2, _, _))
+        .WillOnce(DoAll(SetArgReferee<1>(42), Return(true)));
+    svc.SetSharingChecker([&](int64_t uid, const std::string &type, int64_t rid, std::string &perm) -> bool {
+        if (uid == 99 && type == "sheet" && rid == 2) { perm = "edit"; return true; }
+        return false;
+    });
+
+    EXPECT_CALL(redis, IsConnected()).WillRepeatedly(Return(true));
+    EXPECT_CALL(redis, GetJSON(_, _)).WillRepeatedly(Return(false));
+    EXPECT_CALL(redis, SetNX(_, _, _)).WillRepeatedly(Return(true));
+    EXPECT_CALL(redis, SetJSON(_, _, _)).WillRepeatedly(Return(true));
+    EXPECT_CALL(redis, DeleteKey(_)).WillRepeatedly(Return(true));
+    EXPECT_CALL(redis, ExpireKey(_, _)).WillRepeatedly(Return(true));
+
+    SpreadsheetRow row;
+    row.id = 2;
+    row.name = "edit-shared-sheet";
+    EXPECT_CALL(db, GetSpreadsheet(2, 99, _))
+        .WillOnce(DoAll(SetArgReferee<2>(row), Return(true)));
+
+    grpc::ServerContext ctx;
+    rpc::GetSpreadsheetRequest req;
+    rpc::GetSpreadsheetResponse resp;
+    req.set_id(2);
+    req.set_user_id(99);
+
+    auto status = svc.GetSpreadsheet(&ctx, &req, &resp);
+    EXPECT_TRUE(status.ok());
+    EXPECT_TRUE(resp.success());
+    std::this_thread::sleep_for(std::chrono::milliseconds(50));
+}
+
+// ===== GetSpreadsheet — shared checker returns false, no gRPC stub =====
+TEST(SheetMock, GetSpreadsheetShareDeniedIfCheckerReturnsFalse) {
+    AuthGuard auth(99);
+    MockDB db;
+    SpreadsheetServiceImpl svc;
+    svc.SetDatabase(&db);
+
+    // Owner is 42, caller 99 is not owner
+    EXPECT_CALL(db, GetSpreadsheetOwner(3, _, _))
+        .WillOnce(DoAll(SetArgReferee<1>(42), Return(true)));
+    // Sharing checker returns false — no share permission
+    svc.SetSharingChecker([](int64_t, const std::string &, int64_t, std::string &) { return false; });
+
+    grpc::ServerContext ctx;
+    rpc::GetSpreadsheetRequest req;
+    rpc::GetSpreadsheetResponse resp;
+    req.set_id(3);
+    req.set_user_id(99);
+
+    auto status = svc.GetSpreadsheet(&ctx, &req, &resp);
+    EXPECT_FALSE(status.ok());
+    EXPECT_EQ(status.error_code(), grpc::NOT_FOUND);
+}
+
+// ===== UpdateSpreadsheet — shared with edit permission bypasses owner check =====
+TEST(SheetMock, UpdateSpreadsheetShareEditAllowed) {
+    AuthGuard auth(99);
+    MockDB db;
+    MockRedis redis;
+    MockMongo mongo;
+    SpreadsheetServiceImpl svc;
+
+    svc.SetDatabase(&db);
+    svc.SetRedis(&redis);
+    svc.SetMongo(&mongo);
+
+    // Share check: caller 99 has "edit" on sheet 4, skip owner check
+    svc.SetSharingChecker([&](int64_t uid, const std::string &type, int64_t rid, std::string &perm) -> bool {
+        if (uid == 99 && type == "sheet" && rid == 4) { perm = "edit"; return true; }
+        return false;
+    });
+
+    // GetSpreadsheetOwner is called by UpdateWithCAS; owner is 42
+    EXPECT_CALL(db, GetSpreadsheetOwner(4, _, _))
+        .WillRepeatedly(DoAll(SetArgReferee<1>(42), Return(true)));
+    EXPECT_CALL(db, UpdateSpreadsheet(4, 99, "shared-update", "desc", "[]", "[]", 0))
+        .WillOnce(Return(true));
+
+    EXPECT_CALL(mongo, UpsertSheetCells(4, 99, "[]", "[]"))
+        .WillOnce(Return(true));
+
+    EXPECT_CALL(redis, IsConnected()).WillRepeatedly(Return(true));
+    EXPECT_CALL(redis, DeleteKey(_)).WillRepeatedly(Return(true));
+    EXPECT_CALL(redis, Increment(_)).WillRepeatedly(Return(1));
+    EXPECT_CALL(redis, Publish(_, _)).WillRepeatedly(Return(true));
+
+    grpc::ServerContext ctx;
+    rpc::UpdateSpreadsheetRequest req;
+    rpc::UpdateSpreadsheetResponse resp;
+    req.set_id(4);
+    req.set_name("shared-update");
+    req.set_description("desc");
+    req.set_headers_json("[]");
+    req.set_data_json("[]");
+
+    auto status = svc.UpdateSpreadsheet(&ctx, &req, &resp);
+    EXPECT_TRUE(status.ok());
+    EXPECT_TRUE(resp.success());
+}
+
+// ===== UpdateSpreadsheet — shared with view permission cannot edit =====
+TEST(SheetMock, UpdateSpreadsheetShareViewDenied) {
+    AuthGuard auth(99);
+    MockDB db;
+    SpreadsheetServiceImpl svc;
+
+    svc.SetDatabase(&db);
+
+    // Share check: caller 99 has "view" on sheet 5 — not enough for edit
+    svc.SetSharingChecker([&](int64_t uid, const std::string &type, int64_t rid, std::string &perm) -> bool {
+        if (uid == 99 && type == "sheet" && rid == 5) { perm = "view"; return true; }
+        return false;
+    });
+
+    // Owner is 42 — UpdateWithCAS checks this since skip_owner stays false
+    EXPECT_CALL(db, GetSpreadsheetOwner(5, _, _))
+        .WillRepeatedly(DoAll(SetArgReferee<1>(42), Return(true)));
+
+    grpc::ServerContext ctx;
+    rpc::UpdateSpreadsheetRequest req;
+    rpc::UpdateSpreadsheetResponse resp;
+    req.set_id(5);
+    req.set_name("should-fail");
+    req.set_description("desc");
+    req.set_headers_json("[]");
+    req.set_data_json("[]");
+
+    auto status = svc.UpdateSpreadsheet(&ctx, &req, &resp);
+    // skip_owner stays false, UpdateWithCAS sees owner 42 != caller 99 → fail
+    EXPECT_TRUE(status.ok());          // gRPC status is OK (business error in response)
+    EXPECT_FALSE(resp.success());
+}

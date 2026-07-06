@@ -126,6 +126,10 @@ grpc::Status SpreadsheetServiceImpl::GetSpreadsheet(grpc::ServerContext *context
     int64_t req_uid = g_rpc_auth_ctx.user_id;
     bool has_access = CheckOwnerWithRetry(req->id(), req_uid, db_,
             [&](auto id, auto &uid) { return db_->GetSpreadsheetOwner(id, uid); }, slog_);
+    if (!has_access && sharing_checker_) {
+        std::string perm;
+        has_access = sharing_checker_(req_uid, "sheet", req->id(), perm);
+    }
     if (!has_access && sharing_stub_) {
         grpc::ClientContext sctx;
         sctx.set_deadline(std::chrono::system_clock::now() + std::chrono::milliseconds(1500));
@@ -458,7 +462,11 @@ grpc::Status SpreadsheetServiceImpl::UpdateSpreadsheet(grpc::ServerContext *cont
     }
 
     bool skip_owner = false;
-    if (sharing_stub_) {
+    if (sharing_checker_) {
+        std::string perm;
+        skip_owner = sharing_checker_(g_rpc_auth_ctx.user_id, "sheet", req->id(), perm) && perm == "edit";
+    }
+    if (!skip_owner && sharing_stub_) {
         grpc::ClientContext sctx;
         sctx.set_deadline(std::chrono::system_clock::now() + std::chrono::milliseconds(1500));
         rpc::CheckAccessRequest ca;

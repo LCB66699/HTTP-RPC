@@ -1,6 +1,7 @@
 ﻿#pragma once
 #include <grpcpp/grpcpp.h>
 
+#include <functional>
 #include <string>
 
 #include "generated/rpc_auth.grpc.pb.h"
@@ -32,6 +33,11 @@ class SpreadsheetServiceImpl final : public rpc::SpreadsheetService::Service {
         sharing_stub_ = rpc::SharingService::NewStub(ch);
     }
 
+    // Test-only injection: bypasses gRPC for sharing permission checks.
+    // Called as: fn(uid, resource_type, resource_id, out_permission) -> bool allowed.
+    using SharingCheckFn = std::function<bool(int64_t, const std::string&, int64_t, std::string&)>;
+    void SetSharingChecker(SharingCheckFn fn) { sharing_checker_ = std::move(fn); }
+
     // 浠?gRPC metadata 鎻愬彇 token 骞惰皟鐢?Auth.ValidateUser
     bool ValidateCaller(grpc::ServerContext *ctx, int64_t user_id, std::string &out_username,
                         std::string &out_role) const;
@@ -55,6 +61,7 @@ class SpreadsheetServiceImpl final : public rpc::SpreadsheetService::Service {
     SystemLogger *slog_ = nullptr;
     std::unique_ptr<rpc::AuthService::Stub>    auth_stub_;
     std::unique_ptr<rpc::SharingService::Stub> sharing_stub_;
+    SharingCheckFn                              sharing_checker_;
     mutable GrpcCircuitBreaker auth_cb_;
     IRabbitPublisher *rabbit_ = nullptr;
     minio::Client *minio_ = nullptr;
