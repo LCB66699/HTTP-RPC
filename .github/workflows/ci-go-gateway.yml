@@ -1,0 +1,32 @@
+name: CI Go Gateway
+
+on:
+  push:
+    paths:
+      - 'cmd/server/**'
+      - 'proto/*.proto'
+  pull_request:
+    paths:
+      - 'cmd/server/**'
+      - 'proto/*.proto'
+  workflow_dispatch:
+
+jobs:
+  go-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with: { go-version: "1.22" }
+
+      - name: Go test
+        run: |
+          cd cmd/server
+          go test ./... -v -count=1
+
+      - name: Go build
+        run: |
+          cd cmd/server
+          go build -o /dev/null ./...

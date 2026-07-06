@@ -1,0 +1,34 @@
+#!/bin/bash
+# Pre-commit hook: checks staged changes for formatting and secrets.
+# Install: git config core.hooksPath .githooks
+
+set -e
+
+STAGED_GO=$(git diff --cached --name-only --diff-filter=ACM | grep '\.go$' || true)
+if [ -n "$STAGED_GO" ]; then
+    unformatted=$(gofmt -l $STAGED_GO 2>&1 || true)
+    if [ -n "$unformatted" ]; then
+        echo "ERROR: unformatted Go files. Run: gofmt -w <file>"
+        echo "$unformatted"
+        exit 1
+    fi
+fi
+
+STAGED_CPP=$(git diff --cached --name-only --diff-filter=ACM | grep -E '\.(cpp|h)$' || true)
+if [ -n "$STAGED_CPP" ]; then
+    unformatted=$(clang-format --dry-run --Werror $STAGED_CPP 2>&1 || true)
+    if [ -n "$unformatted" ]; then
+        echo "ERROR: unformatted C++ files. Run: clang-format -i <file>"
+        echo "$unformatted"
+        exit 1
+    fi
+fi
+
+# Secret detection: looks for passwords, private keys, and API key patterns
+STAGED_DIFF=$(git diff --cached)
+if echo "$STAGED_DIFF" | grep -Eq '(password\s*=\s*["'"'"'][^$]{1,30}|-----BEGIN (RSA |EC )?PRIVATE KEY-----|sk-[a-zA-Z0-9]{32,})'; then
+    echo "ERROR: Possible secret detected in staged changes!"
+    exit 1
+fi
+
+echo "pre-commit: OK"

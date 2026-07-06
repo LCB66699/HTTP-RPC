@@ -1,0 +1,83 @@
+name: CI C++ Auth
+
+on:
+  push:
+    paths:
+      - 'server/src/auth/**'
+      - 'server/src/shared/**'
+      - 'server/include/auth/**'
+      - 'server/include/shared/**'
+      - 'proto/rpc_auth.proto'
+      - 'proto/rpc_sharing.proto'
+      - 'proto/rpc_common.proto'
+      - 'CMakeLists.txt'
+      - 'Dockerfile'
+  pull_request:
+    paths:
+      - 'server/src/auth/**'
+      - 'server/src/shared/**'
+      - 'server/include/auth/**'
+      - 'server/include/shared/**'
+      - 'proto/rpc_auth.proto'
+      - 'proto/rpc_sharing.proto'
+      - 'proto/rpc_common.proto'
+      - 'CMakeLists.txt'
+      - 'Dockerfile'
+  workflow_dispatch:
+
+jobs:
+  auth-build-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build auth image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          target: runtime
+          build-args: SERVICE=auth
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          load: true
+          push: false
+
+      - name: Start minimal services
+        run: |
+          docker compose up -d consul mysql-auth
+          for i in $(seq 1 60); do
+            if docker compose ps consul | grep -q 'healthy' && \
+               docker compose ps mysql-auth | grep -q 'healthy'; then
+              echo "infra ready after ${i}s"
+              break
+            fi
+            [ "$i" -eq 60 ] && { echo "timeout"; docker compose ps; exit 1; }
+            sleep 2
+          done
+
+      - name: Run auth service
+        env:
+          JWT_SECRET: ci-test-secret-32bytes-here!!!!
+          MYSQL_ROOT_PASSWORD: "123456"
+          REDIS_PASSWORD: rpc-redis-123456
+          LOG_LEVEL: DEBUG
+        run: |
+          docker compose up -d auth-1
+          sleep 10
+          docker compose logs auth-1 --tail=20
+
+      - name: Verify auth gRPC
+        run: |
+          docker compose exec auth-1 /usr/local/bin/grpc_health_probe -addr=localhost:50051
+          echo "Auth health check passed"
+
+      - name: Container logs on failure
+        if: failure()
+        run: |
+          docker compose logs consul --tail=20
+          docker compose logs mysql-auth --tail=20
+          docker compose logs auth-1 --tail=40

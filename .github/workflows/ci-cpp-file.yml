@@ -1,0 +1,89 @@
+name: CI C++ File
+
+on:
+  push:
+    paths:
+      - 'server/src/file/**'
+      - 'server/src/shared/**'
+      - 'server/include/file/**'
+      - 'server/include/shared/**'
+      - 'proto/rpc_file.proto'
+      - 'proto/rpc_common.proto'
+      - 'CMakeLists.txt'
+      - 'Dockerfile'
+  pull_request:
+    paths:
+      - 'server/src/file/**'
+      - 'server/src/shared/**'
+      - 'server/include/file/**'
+      - 'server/include/shared/**'
+      - 'proto/rpc_file.proto'
+      - 'proto/rpc_common.proto'
+      - 'CMakeLists.txt'
+      - 'Dockerfile'
+  workflow_dispatch:
+
+jobs:
+  file-build-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build auth image (dependency)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          target: runtime
+          build-args: SERVICE=auth
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          load: true
+          push: false
+
+      - name: Build file image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          target: runtime
+          build-args: SERVICE=file
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          load: true
+          push: false
+
+      - name: Start minimal services
+        env:
+          JWT_SECRET: ci-test-secret-32bytes-here!!!!
+          MYSQL_ROOT_PASSWORD: "123456"
+          REDIS_PASSWORD: rpc-redis-123456
+        run: |
+          docker compose up -d consul mysql-auth mysql-file-0 minio minio-init rabbitmq
+          for i in $(seq 1 90); do
+            if docker compose ps mysql-auth | grep -q 'healthy' && \
+               docker compose ps mysql-file-0 | grep -q 'healthy' && \
+               docker compose ps consul | grep -q 'healthy' && \
+               docker compose ps minio | grep -q 'healthy'; then
+              echo "infra ready after ${i}s"
+              break
+            fi
+            [ "$i" -eq 90 ] && { echo "timeout"; docker compose ps; exit 1; }
+            sleep 2
+          done
+          docker compose up -d auth-1 file-1
+          sleep 15
+
+      - name: Verify services
+        run: |
+          docker compose exec file-1 /usr/local/bin/grpc_health_probe -addr=localhost:50051
+          echo "File health check passed"
+
+      - name: Container logs on failure
+        if: failure()
+        run: |
+          docker compose logs auth-1 --tail=20
+          docker compose logs file-1 --tail=40
+          docker compose logs consul --tail=10
