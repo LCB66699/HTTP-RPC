@@ -140,6 +140,13 @@ grpc::Status SpreadsheetServiceImpl::GetSpreadsheet(grpc::ServerContext *context
         rpc::CheckAccessResponse cr;
         has_access = sharing_stub_->CheckAccess(&sctx, ca, &cr).ok() && cr.allowed();
     }
+    if (!has_access) {
+        int64_t wid = 0;
+        if (db_->GetSpreadsheetWorkspaceId(req->id(), wid) && wid > 0) {
+            std::string role;
+            has_access = db_->GetWorkspaceMemberRole(wid, req_uid, role);
+        }
+    }
     if (!has_access)
         return WriteResult(resp, HandlerResult<>::Fail("Not found", rpc_error::NOT_FOUND)),
                grpc::Status(grpc::StatusCode::NOT_FOUND, "Not found");
@@ -476,6 +483,14 @@ grpc::Status SpreadsheetServiceImpl::UpdateSpreadsheet(grpc::ServerContext *cont
         rpc::CheckAccessResponse cr;
         if (sharing_stub_->CheckAccess(&sctx, ca, &cr).ok() && cr.allowed() && cr.permission() == "edit")
             skip_owner = true;
+    }
+    if (!skip_owner) {
+        int64_t wid = 0;
+        if (db_->GetSpreadsheetWorkspaceId(req->id(), wid) && wid > 0) {
+            std::string role;
+            if (db_->GetWorkspaceMemberRole(wid, g_rpc_auth_ctx.user_id, role))
+                skip_owner = (role == "editor" || role == "admin");
+        }
     }
 
     auto ok = UpdateWithCAS(

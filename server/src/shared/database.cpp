@@ -1605,3 +1605,25 @@ bool Database::GetWorkspaceMemberRole(int64_t wid, int64_t uid, std::string &out
              });
     return found;
 }
+
+bool Database::GetSpreadsheetWorkspaceId(int64_t id, int64_t &workspace_id) {
+    bool found = false;
+    ExecRead(make_sql("SELECT workspace_id FROM spreadsheets WHERE id={}", id),
+             [&](MYSQL_RES *res) -> bool {
+                 MYSQL_ROW row = mysql_fetch_row(res);
+                 if (row) { workspace_id = row[0] ? std::stoll(row[0]) : 0; found = true; }
+                 return true;
+             });
+    return found;
+}
+
+bool Database::GetFileWorkspaceId(int64_t id, int64_t &workspace_id) {
+    bool found = false;
+    ExecRead(make_sql("SELECT workspace_id FROM files WHERE id={}", id),
+             [&](MYSQL_RES *res) -> bool {
+                 MYSQL_ROW row = mysql_fetch_row(res);
+                 if (row) { workspace_id = row[0] ? std::stoll(row[0]) : 0; found = true; }
+                 return true;
+             });
+    return found;
+}

@@ -69,6 +69,7 @@ message CreateFileRequest {
   bytes file_content = 5;
   // Client-generated UUID for idempotency; empty = no dedup.
   string idempotency_key = 6;
+  int64 workspace_id = 7;  // 0 = personal (default)
 }
 
 message CreateFileResponse {
@@ -97,10 +98,11 @@ message GetFileResponse {
 
 message ListFilesRequest {
   int64 user_id = 1;
-  int32 limit = 5;    // default 20, max 100
-  string cursor = 6;   // empty = first page, pass next_cursor for next page
-  int64 folder_id = 7; // 0=root, -1=all
+  int32 limit = 5;       // default 20, max 100
+  string cursor = 6;      // empty = first page, pass next_cursor for next page
+  int64 folder_id = 7;    // 0=root, -1=all
   string mime_filter = 8; // e.g. "image/*" for photos
+  int64 workspace_id = 9; // 0 = all (default), positive = filter by workspace
 }
 
 message ListFilesResponse {
