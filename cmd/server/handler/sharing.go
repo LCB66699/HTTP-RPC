@@ -55,6 +55,14 @@ func (h *Handlers) CreateShareLink(c *gin.Context) {
 	c.JSON(http.StatusOK, resp)
 }
 
+func (h *Handlers) RegisterSharingRoutes(public, auth *gin.RouterGroup) {
+	public.GET("/s/:token", h.ShareByToken)
+	auth.POST("/sheets/:id/share", h.ShareSheet)
+	auth.GET("/sheets/:id/share", h.ListShares)
+	auth.DELETE("/sheets/:id/share/:username", h.RevokeShare)
+	auth.POST("/sheets/:id/share-link", h.CreateShareLink)
+}
+
 func (h *Handlers) ShareByToken(c *gin.Context) {
 	token := c.Param("token")
 	if h.Share == nil {

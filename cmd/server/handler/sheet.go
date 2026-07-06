@@ -67,6 +67,14 @@ func (h *Handlers) DeleteSheet(c *gin.Context) {
 	c.JSON(http.StatusOK, resp)
 }
 
+func (h *Handlers) RegisterSheetRoutes(auth *gin.RouterGroup) {
+	auth.POST("/sheets", h.CreateSheet)
+	auth.GET("/sheets", h.ListSheets)
+	auth.GET("/sheets/:id", h.GetSheet)
+	auth.PUT("/sheets/:id", h.UpdateSheet)
+	auth.DELETE("/sheets/:id", h.DeleteSheet)
+}
+
 func validateSheet(name, headersJSON, dataJSON string) (string, int) {
 	if name == "" {
 		return "name required", http.StatusBadRequest

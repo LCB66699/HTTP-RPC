@@ -23,55 +23,17 @@ func Setup(h *handler.Handlers, jwtSecret string) *gin.Engine {
 	r.Use(gin.Recovery())
 
 	api := r.Group("/api/v1")
-	{
-		// Public
-		api.POST("/login", h.Login)
-		api.POST("/register", h.Register)
-		api.POST("/refresh", h.Refresh)
-		api.POST("/auth/otp/send", h.OTPSend)
-		api.POST("/auth/phone/login", h.PhoneLogin)
-		api.GET("/health", h.Health)
-		api.GET("/health/ready", h.HealthReady)
-		api.GET("/metrics", MetricsHandler())
+	api.GET("/metrics", MetricsHandler())
 
-		// Share by token (public)
-		api.GET("/s/:token", h.ShareByToken)
+	auth := api.Group("")
+	auth.Use(middleware.Auth(jwtSecret))
 
-		// Authenticated
-		auth := api.Group("")
-		auth.Use(middleware.Auth(jwtSecret))
-		{
-			// User
-			auth.PUT("/me/password", h.ChangePassword)
-			auth.GET("/me", h.Me)
-			auth.GET("/services", h.Services)
-			auth.GET("/history", h.History)
-
-			// Sheet CRUD
-			auth.POST("/sheets", h.CreateSheet)
-			auth.GET("/sheets", h.ListSheets)
-			auth.GET("/sheets/:id", h.GetSheet)
-			auth.PUT("/sheets/:id", h.UpdateSheet)
-			auth.DELETE("/sheets/:id", h.DeleteSheet)
-
-			// Sharing
-			auth.POST("/sheets/:id/share", h.ShareSheet)
-			auth.GET("/sheets/:id/share", h.ListShares)
-			auth.DELETE("/sheets/:id/share/:username", h.RevokeShare)
-			auth.POST("/sheets/:id/share-link", h.CreateShareLink)
-
-			// File
-			auth.GET("/files", h.ListFiles)
-			auth.POST("/files/upload", h.UploadFile)
-			auth.GET("/files/:id", h.GetFile)
-			auth.DELETE("/files/:id", h.DeleteFile)
-			auth.PUT("/files/:id/move", h.MoveFile)
-			auth.POST("/files/folder", h.CreateFolder)
-
-			// Search
-			auth.POST("/search", h.Search)
-		}
-	}
+	// Resource routes — each domain registers its own.
+	h.RegisterAuthRoutes(api, auth)     // login, register, refresh, OTP, change-password
+	h.RegisterMiscRoutes(api, auth)     // health, me, services, history, search
+	h.RegisterSharingRoutes(api, auth)  // share, revoke, share-link, share-by-token
+	h.RegisterSheetRoutes(auth)         // sheet CRUD
+	h.RegisterFileRoutes(auth)          // file CRUD + folder
 
 	return r
 }

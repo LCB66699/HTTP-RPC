@@ -8,6 +8,15 @@ import (
 	pb "gateway-grpc/gen/rpc"
 )
 
+func (h *Handlers) RegisterFileRoutes(auth *gin.RouterGroup) {
+	auth.POST("/files/upload", h.UploadFile)
+	auth.GET("/files", h.ListFiles)
+	auth.GET("/files/:id", h.GetFile)
+	auth.DELETE("/files/:id", h.DeleteFile)
+	auth.PUT("/files/:id/move", h.MoveFile)
+	auth.POST("/files/folder", h.CreateFolder)
+}
+
 func (h *Handlers) UploadFile(c *gin.Context) {
 	idemKey := c.GetHeader("Idempotency-Key")
 

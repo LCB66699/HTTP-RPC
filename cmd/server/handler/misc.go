@@ -22,6 +22,15 @@ func cbStatus(cb *middleware.CBSlow) gin.H {
 	return gin.H{"channel": channel, "breaker": strings.ToUpper(state)}
 }
 
+func (h *Handlers) RegisterMiscRoutes(public, auth *gin.RouterGroup) {
+	public.GET("/health", h.Health)
+	public.GET("/health/ready", h.HealthReady)
+	auth.GET("/me", h.Me)
+	auth.GET("/services", h.Services)
+	auth.GET("/history", h.History)
+	auth.POST("/search", h.Search)
+}
+
 func (h *Handlers) Health(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"gateway": "READY",

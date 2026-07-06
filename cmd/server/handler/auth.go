@@ -161,6 +161,15 @@ func validateRegister(username, password string) (string, int) {
 	return "", 0
 }
 
+func (h *Handlers) RegisterAuthRoutes(public, auth *gin.RouterGroup) {
+	public.POST("/login", h.Login)
+	public.POST("/register", h.Register)
+	public.POST("/refresh", h.Refresh)
+	public.POST("/auth/otp/send", h.OTPSend)
+	public.POST("/auth/phone/login", h.PhoneLogin)
+	auth.PUT("/me/password", h.ChangePassword)
+}
+
 func validateChangePassword(oldPwd, newPwd string) (string, int) {
 	if oldPwd == "" || newPwd == "" {
 		return "old_password and new_password required", http.StatusBadRequest
