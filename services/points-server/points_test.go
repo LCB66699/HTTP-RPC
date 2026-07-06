@@ -275,14 +275,12 @@ func TestLoginStreakSevenDays(t *testing.T) {
 	srv, _ := setupTestServer(t)
 	ctx := context.Background()
 
-	// Simulate 7 consecutive logins
+	// Simulate: last login was yesterday with streak count = 6
 	uid := int64(1)
-	for day := 0; day < 7; day++ {
-		date := time.Now().AddDate(0, 0, -6+day).Format("2006-01-02")
-		// Directly set the streak counter in Redis
-		srv.rdb.Set(ctx, fmt.Sprintf("pts:streak:%d:last", uid), date, 48*time.Hour)
-		srv.rdb.Set(ctx, fmt.Sprintf("pts:streak:%d:count", uid), day+1, 7*24*time.Hour)
-	}
+	srv.rdb.Set(ctx, fmt.Sprintf("pts:streak:%d:last", uid),
+		time.Now().AddDate(0, 0, -1).Format("2006-01-02"), 48*time.Hour)
+	srv.rdb.Set(ctx, fmt.Sprintf("pts:streak:%d:count", uid), 6, 7*24*time.Hour)
+
 	streak, bonus := srv.checkLoginStreak(ctx, uid)
 	if streak != 7 {
 		t.Errorf("streak = %d, want 7", streak)
