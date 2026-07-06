@@ -1,6 +1,6 @@
 # Gin Gateway
 
-Gin 框架重构的 HTTP Gateway，替代 `cmd/gateway-grpc`（net/http + grpc-gateway）。
+Gin 框架的 HTTP Gateway，提供 REST API → gRPC 转译、JWT 认证、熔断器、Prometheus 指标、WebSocket 实时推送。
 
 ## 启动
 
@@ -16,10 +16,11 @@ JWT_SECRET=xxx ./gin-gateway
 |------|--------|------|
 | `PORT` | 8080 | 监听端口 |
 | `JWT_SECRET` | - | JWT HMAC 密钥（必填） |
-| `AUTH_ADDR` | rpc-auth:50051 | Auth gRPC 地址 |
-| `SHEET_ADDR` | rpc-sheet:50051 | Sheet gRPC 地址 |
-| `FILE_ADDR` | rpc-file:50051 | File gRPC 地址 |
-| `SEARCH_ADDR` | rpc-search:50051 | Search gRPC 地址 |
+| `AUTH_ADDR` | rpc-auth | Auth/Sharing/Workspace 服务名 (Consul) |
+| `SHEET_ADDR` | rpc-sheet | Sheet 服务名 |
+| `FILE_ADDR` | rpc-file | File 服务名 |
+| `SEARCH_ADDR` | rpc-search | Search 服务名 |
+| `POINTS_ADDR` | rpc-points | Points 服务名 |
 | `REDIS_ADDR` | redis-cluster-7000:7000 | Redis 地址 |
 | `REDIS_PASSWORD` | rpc-redis-123456 | Redis 密码 |
 
@@ -34,8 +35,8 @@ JWT_SECRET=xxx ./gin-gateway
 | POST | /api/v1/refresh | 刷新 Token |
 | POST | /api/v1/auth/otp/send | 发送验证码 |
 | POST | /api/v1/auth/phone/login | 手机验证码登录 |
-| GET | /api/v1/health | 存活检查 |
-| GET | /api/v1/health/ready | 就绪检查 |
+| GET | /api/v1/health | 存活检查 + 后端熔断器状态 |
+| GET | /api/v1/health/ready | 就绪检查（断路器开时 503） |
 | GET | /api/v1/metrics | Prometheus 指标 |
 | GET | /api/v1/s/:token | 分享链接跳转 |
 
@@ -64,28 +65,62 @@ JWT_SECRET=xxx ./gin-gateway
 | POST | /api/v1/files/folder | 创建文件夹 |
 | POST | /api/v1/search | 全文搜索 |
 
+### 工作空间
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| POST | /api/v1/workspaces | 创建 |
+| GET | /api/v1/workspaces | 列表 |
+| GET | /api/v1/workspaces/:id | 详情 |
+| PUT | /api/v1/workspaces/:id | 更新 |
+| DELETE | /api/v1/workspaces/:id | 删除 |
+| POST | /api/v1/workspaces/:id/members | 添加成员 |
+| DELETE | /api/v1/workspaces/:id/members/:uid | 移除成员 |
+
+### 积分
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| GET | /api/v1/points/balance | 查询积分余额 |
+| GET | /api/v1/points/transactions | 积分流水 |
+| GET | /api/v1/points/leaderboard | 积分排行 |
+
+### WebSocket
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| GET | /api/v1/ws | WebSocket 实时推送（JWT Cookie 认证） |
+
 ## 目录结构
 
 ```
 cmd/server/
-├── main.go                     # 启动 + gRPC 连接 + 依赖注入
+├── main.go                     # 启动 + gRPC Consul 客户端 + 依赖注入
 ├── router/
-│   ├── router.go               # 路由注册 + MetricsHandler
-│   └── router_test.go           # 路由层测试（8 个）
+│   ├── router.go               # 路由注册（5 个业务模块组装）
+│   └── router_test.go           # 路由层测试
 ├── handler/
-│   ├── handler.go              # Handlers struct + 公共 helper
-│   ├── auth.go                 # 认证端点（Login/Register/Refresh/OTP）
-│   ├── sheet.go                # 表格 CRUD
-│   ├── file.go                 # 文件 CRUD
-│   ├── sharing.go              # 分享相关
+│   ├── handler.go              # Handlers struct + broadcastRoom + JWT helpers
+│   ├── auth.go                 # 登录/注册/刷新/OTP/改密码（含积分奖励）
+│   ├── sheet.go                # 表格 CRUD（含积分奖励 + 广播）
+│   ├── file.go                 # 文件 CRUD（含积分奖励）
+│   ├── sharing.go              # 分享权限管理
+│   ├── workspace.go            # 工作空间 CRUD + 成员管理
+│   ├── points.go               # 积分查询 + 事件发布
 │   ├── misc.go                 # 健康检查 / 搜索 / 用户信息
 │   ├── pb.go                   # gRPC 错误码 → HTTP 状态码映射
-│   └── handler_test.go         # handler 层测试（23 个）
+│   └── handler_test.go         # handler 层测试
 ├── middleware/
 │   ├── auth.go                 # JWT 验证中间件
 │   ├── circuit_breaker.go      # CBSlow 熔断器 + gRPC Interceptor
-│   ├── metrics.go              # Prometheus 指标（变量 + GinMetrics + GrpcMetricsInterceptor）
+│   ├── metrics.go              # Prometheus 指标
 │   └── middleware.go            # RequestID / Logger / CORS
+├── ws/
+│   ├── hub.go                  # Hub 房间管理 + Redis Pub/Sub 广播
+│   ├── client.go               # WebSocket 读写协程
+│   └── handler.go              # HTTP → WS 升级
+├── discovery/
+│   └── consul.go               # Consul gRPC Resolver（consul:/// scheme）
 └── gen/rpc/                    # Proto 生成的 Go 代码
 ```
 
@@ -98,14 +133,9 @@ CORS → RequestID → Prometheus Metrics → Logger → Recovery → [Auth(认�
 ## 测试
 
 ```bash
-# 全部
-go test ./... -v
-
-# 路由层（8 个用例）
-go test ./router/ -v -count=1
-
-# handler 层（23 个用例）
-go test ./handler/ -v -count=1
+go test ./... -v                # 全部
+go test ./router/ -v -count=1   # 路由层
+go test ./handler/ -v -count=1  # handler 层
 ```
 
 ### 路由层覆盖
@@ -114,7 +144,7 @@ go test ./handler/ -v -count=1
 |------|------|
 | TestHealthEndpoint | 健康检查返回 200 |
 | TestMetricsEndpoint | Prometheus 指标可访问 |
-| TestAuthRequiredWithoutCookie | 9 个受保护端点无 Cookie 返回 401 |
+| TestAuthRequiredWithoutCookie | 受保护端点无 Cookie 返回 401 |
 | TestPublicEndpointsNoAuth | 公开端点不拦截 |
 | TestRequestIDInResponse | 响应头带 X-Request-ID |
 | TestCORSMiddleware | OPTIONS 预检返回 204 |
@@ -123,48 +153,22 @@ go test ./handler/ -v -count=1
 
 | 测试 | 说明 |
 |------|------|
-| TestLoginSuccess | 登录成功 200 + Set-Cookie |
-| TestLoginWrongPassword | 密码错误 401 |
-| TestLoginValidation | 空用户名/空密码 400 |
-| TestLoginGrpcUnavailable | 后端不可用 503 |
-| TestRegisterSuccess | 注册成功 200 |
-| TestRegisterUsernameTooShort | 用户名校验 400 |
-| TestChangePasswordUnauthorized | uid=0 返回 401 |
-| TestChangePasswordSuccess | 修改成功 200 |
-| TestSheetCreateSuccess | 创建表格 200 |
-| TestSheetCreateValidation | 空名称 400 |
-| TestSheetGetSuccess | 获取表格 200 |
-| TestSheetGetNotFound | gRPC NotFound → 404 |
-| TestSheetDeleteSuccess | 删除表格 200 |
-| TestShareSheetSuccess | 分享成功 200 |
-| TestRevokeShareSuccess | 撤销分享 200 |
-| TestFileCreateFolderSuccess | 创建文件夹 200 |
-| TestFileDeleteSuccess | 删除文件 200 |
-| TestFileGetNotFound | gRPC NotFound → 404 |
-| TestFileListSuccess | 文件列表 200 |
-| TestSearchSuccess | 搜索成功 200 |
-| TestSearchEmptyQuery | 空查询 400 |
+| TestLogin~ | 登录成功/失败/校验/gRPC 不可用 |
+| TestRegister~ | 注册成功/用户名校验 |
+| TestSheetCreate/Get/Delete~ | 表格 CRUD |
+| TestShare/Revoke~ | 分享管理 |
+| TestFileCreate/Delete/List~ | 文件 CRUD |
+| TestSearch~ | 搜索成功/空查询 |
+| TestGrpcXxxReturnsYyy | 6 个 gRPC 错误码 → HTTP 状态映射 |
+| TestGetBalance/Transactions/Leaderboard | 积分查询端点 |
+| TestPublishPointEvent~ | 积分事件发布边界情况 |
 
-### gRPC 错误码映射覆盖
+## gRPC 错误码映射
 
-| 测试 | gRPC Code | HTTP Status |
-|------|-----------|-------------|
-| TestGrpcNotFoundReturns404 | NotFound | 404 |
-| TestGrpcPermissionDeniedReturns403 | PermissionDenied | 403 |
-| TestGrpcUnauthenticatedReturns401 | Unauthenticated | 401 |
-| TestGrpcInvalidArgumentReturns400 | InvalidArgument | 400 |
-| TestGrpcDeadlineExceededReturns504 | DeadlineExceeded | 504 |
-
-## 与旧代码对比
-
-| | 旧 gateway-grpc | Gin 版本 |
-|---|---|---|
-| 框架 | net/http + grpc-gateway | Gin |
-| 中间件 | 手动函数嵌套 | r.Use() 链式声明 |
-| 路由 | 两套 mux + 分发器 | 路由组 r.Group() |
-| JSON 解析 | json.NewDecoder 手写 | c.ShouldBindJSON() |
-| JSON 响应 | response.go 150 行 | c.JSON(status, obj) |
-| 错误处理 | WriteGRPCResponse 等 5 个函数 | grpcErr() 一个函数 |
-| 校验 | validate.go 80 行 | 内联到 handler |
-| 接口层 | interfaces.go 60 行 | 直接注入 proto Client |
-| 总文件数 | 15 | 13 |
+| gRPC Code | HTTP Status |
+|-----------|-------------|
+| NotFound | 404 |
+| PermissionDenied | 403 |
+| Unauthenticated | 401 |
+| InvalidArgument | 400 |
+| DeadlineExceeded | 504 |
