@@ -1607,3 +1607,35 @@ em.search-highlight {
   font-size: 12px; padding: 2px 8px; border-radius: 12px;
   background: var(--border-light); color: var(--text-secondary);
 }
+
+/* Points */
+.points-grid {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 16px; padding: 16px;
+}
+.points-card {
+  background: var(--card-bg); border-radius: 12px; padding: 20px;
+}
+.points-card h3 { margin-bottom: 12px; font-size: 1.1em; }
+.rules-list { display: flex; flex-direction: column; gap: 8px; }
+.rule-item {
+  display: flex; justify-content: space-between;
+  padding: 8px 12px; border-radius: 8px; background: var(--hover-bg);
+}
+.rule-item small { color: var(--text-secondary); font-size: 0.85em; }
+.tx-row {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 8px 0; border-bottom: 1px solid var(--border-light);
+}
+.tx-earn .tx-amount { color: #10b981; font-weight: 600; }
+.tx-deduct .tx-amount { color: #ef4444; font-weight: 600; }
+.tx-reason { flex: 1; }
+.tx-date { color: var(--text-secondary); font-size: 0.85em; }
+.lb-list { list-style: none; display: flex; flex-direction: column; gap: 8px; }
+.lb-list li {
+  display: flex; align-items: center; gap: 12px;
+  padding: 8px 12px; border-radius: 8px; background: var(--hover-bg);
+}
+.lb-rank { font-weight: 700; color: var(--accent); min-width: 30px; }
+.lb-total { margin-left: auto; font-weight: 600; }
+#points-balance-display { transition: all 0.3s; }

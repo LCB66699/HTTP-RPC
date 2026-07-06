@@ -281,6 +281,7 @@ function showMainApp() {
     document.querySelector('[data-tab="sheets"]').classList.add('active');
   }
   loadAvatar();
+  loadBalanceWidget();
   const video = document.getElementById('video-bg');
   video.pause();
   video.style.display = 'none';
@@ -429,6 +430,7 @@ document.querySelectorAll('.tab').forEach(btn => {
     if (btn.dataset.tab === 'search') initSearch();
     if (btn.dataset.tab === 'profile') initProfile();
     if (btn.dataset.tab === 'workspace') loadWorkspaces();
+    if (btn.dataset.tab === 'points') loadPoints();
   });
 });
 
@@ -2035,6 +2037,64 @@ async function shareResourceById(type, id) {
   });
   const data = await res.json();
   alert(data.success ? '分享成功' : ('分享失败: ' + (data.error || '')));
+}
+
+// ============================================================
+//  Points
+// ============================================================
+async function loadPoints() {
+  await Promise.all([loadPointsBalance(), loadPointsTransactions(), loadPointsLeaderboard()]);
+}
+
+async function loadPointsBalance() {
+  try {
+    const data = await apiGet('/points/balance');
+    const el = document.getElementById('points-balance-display');
+    if (el && data && data.success) el.textContent = data.balance || 0;
+  } catch(e) {}
+}
+
+async function loadPointsTransactions() {
+  try {
+    const data = await apiGet('/points/transactions');
+    const el = document.getElementById('points-transactions');
+    if (!el) return;
+    if (!data || !data.success || !data.transactions || data.transactions.length === 0) {
+      el.innerHTML = '<p style="color:var(--text-secondary)">暂无记录</p>';
+      return;
+    }
+    el.innerHTML = data.transactions.slice(0, 20).map(tx => {
+      const cls = tx.type === 'earn' ? 'tx-earn' : 'tx-deduct';
+      return `<div class="tx-row ${cls}">
+        <span class="tx-reason">${escapeHtml(tx.reason || tx.type)}</span>
+        <span class="tx-amount">${tx.amount > 0 ? '+' : ''}${tx.amount}</span>
+        <span class="tx-date">${(tx.created_at || '').slice(0, 10)}</span>
+      </div>`;
+    }).join('');
+  } catch(e) {}
+}
+
+async function loadPointsLeaderboard() {
+  try {
+    const data = await apiGet('/points/leaderboard');
+    const el = document.getElementById('points-leaderboard');
+    if (!el) return;
+    if (!data || !data.success || !data.entries || data.entries.length === 0) {
+      el.innerHTML = '<p style="color:var(--text-secondary)">暂无数据</p>';
+      return;
+    }
+    el.innerHTML = '<ol class="lb-list">' + data.entries.map((e, i) =>
+      `<li><span class="lb-rank">#${i+1}</span> <span>ID:${e.user_id}</span> <span class="lb-total">${e.total_earned}</span></li>`
+    ).join('') + '</ol>';
+  } catch(e) {}
+}
+
+function loadBalanceWidget() {
+  if (!currentUser) return;
+  apiGet('/points/balance').then(data => {
+    const el = document.getElementById('points-balance-display');
+    if (el && data && data.success) el.textContent = data.balance || 0;
+  }).catch(() => {});
 }
 
 // ============================================================
