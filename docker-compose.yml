@@ -783,6 +783,29 @@
       start_period: 5s
     restart: unless-stopped
 
+  # ===== Mall Service (Go) =====
+  mall-server:
+    build:
+      context: .
+      dockerfile: services/mall-server/Dockerfile
+    image: ${DOCKER_USER:-http-rpc}/mall:latest
+    environment:
+      REDIS_ADDR: "redis-cluster-7000:7000"
+      REDIS_PASSWORD: "${REDIS_PASSWORD:-rpc-redis-123456}"
+    networks:
+      default:
+        aliases: [rpc-mall]
+    depends_on:
+      consul:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "grpc_health_probe", "-addr=localhost:50053"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+    restart: unless-stopped
+
   # ===== Prometheus Monitoring =====
   prometheus:
     image: prom/prometheus:v2.54.0
