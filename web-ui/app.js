@@ -431,6 +431,7 @@ document.querySelectorAll('.tab').forEach(btn => {
     if (btn.dataset.tab === 'profile') initProfile();
     if (btn.dataset.tab === 'workspace') loadWorkspaces();
     if (btn.dataset.tab === 'points') loadPoints();
+    if (btn.dataset.tab === 'mall') loadMall();
   });
 });
 
@@ -2095,6 +2096,132 @@ function loadBalanceWidget() {
     const el = document.getElementById('points-balance-display');
     if (el && data && data.success) el.textContent = data.balance || 0;
   }).catch(() => {});
+}
+
+// ============================================================
+//  Mall / Seckill
+// ============================================================
+let seckillTimers = {};
+
+async function loadMall() {
+  await Promise.all([loadMallProducts(), loadMallSeckills(), loadMallOrders()]);
+}
+
+async function loadMallProducts() {
+  try {
+    const data = await apiGet('/mall/products');
+    const el = document.getElementById('mall-products');
+    if (!el || !data || !data.success) return;
+    if (!data.products || data.products.length === 0) {
+      el.innerHTML = '<p style="color:var(--text-secondary)">暂无商品</p>';
+      return;
+    }
+    el.innerHTML = data.products.map(p =>
+      `<div class="product-card">
+        <div class="product-name">${escapeHtml(p.name)}</div>
+        <div class="product-desc">${escapeHtml(p.description || '')}</div>
+        <div class="product-price">${p.price} 积分</div>
+      </div>`).join('');
+  } catch(e) {}
+}
+
+async function loadMallSeckills() {
+  try {
+    const data = await apiGet('/mall/seckills');
+    const el = document.getElementById('mall-seckills');
+    if (!el || !data || !data.success) return;
+    if (!data.seckills || data.seckills.length === 0) {
+      el.innerHTML = '<p style="color:var(--text-secondary)">暂无秒杀</p>';
+      return;
+    }
+    el.innerHTML = data.seckills.map(sk => {
+      const now = Math.floor(Date.now() / 1000);
+      let status = '进行中';
+      let canBuy = true;
+      if (now < sk.start_at) { status = '未开始'; canBuy = false; }
+      if (now > sk.end_at) { status = '已结束'; canBuy = false; }
+      return `<div class="seckill-card" id="sk-${sk.id}">
+        <div class="sk-header">
+          <span class="sk-name">${escapeHtml(sk.product_name || '秒杀商品')}</span>
+          <span class="sk-status">${status}</span>
+        </div>
+        <div class="sk-info">
+          <span class="sk-price">${sk.seckill_price} 积分</span>
+          <span class="sk-stock">库存: <span id="sk-stock-${sk.id}">${sk.seckill_stock}</span></span>
+          <span class="sk-timer" id="sk-timer-${sk.id}"></span>
+        </div>
+        ${canBuy
+          ? `<button class="btn btn-primary btn-sm" onclick="doSeckill(${sk.id})">立即抢购</button>`
+          : `<button class="btn btn-sm" disabled>${status}</button>`}
+      </div>`;
+    }).join('');
+
+    // Start countdown timers
+    data.seckills.forEach(sk => {
+      updateSeckillTimer(sk.id, sk.start_at, sk.end_at);
+    });
+  } catch(e) {}
+}
+
+function updateSeckillTimer(skID, startAt, endAt) {
+  if (seckillTimers[skID]) clearInterval(seckillTimers[skID]);
+  seckillTimers[skID] = setInterval(() => {
+    const now = Math.floor(Date.now() / 1000);
+    const el = document.getElementById('sk-timer-' + skID);
+    if (!el) { clearInterval(seckillTimers[skID]); return; }
+    if (now < startAt) {
+      el.textContent = '倒计时: ' + formatCountdown(startAt - now);
+    } else if (now < endAt) {
+      el.textContent = '结束: ' + formatCountdown(endAt - now);
+    } else {
+      el.textContent = '已结束';
+      clearInterval(seckillTimers[skID]);
+    }
+  }, 1000);
+}
+
+function formatCountdown(seconds) {
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  const s = seconds % 60;
+  return `${h}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+}
+
+async function doSeckill(skID) {
+  if (!confirm('确定要抢购吗？将扣除对应积分。')) return;
+  const res = await fetch(API + '/mall/seckill/order', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ seckill_id: skID, idempotency_key: 'sk:' + skID + ':' + Date.now() }),
+    credentials: 'same-origin'
+  });
+  const data = await res.json();
+  if (data.success) {
+    alert('抢购成功！');
+    loadMall();
+    loadPointsBalance();
+  } else {
+    alert('抢购失败: ' + (data.error || '未知错误'));
+  }
+}
+
+async function loadMallOrders() {
+  try {
+    const data = await apiGet('/mall/orders');
+    const el = document.getElementById('mall-orders');
+    if (!el || !data || !data.success) return;
+    if (!data.orders || data.orders.length === 0) {
+      el.innerHTML = '<p style="color:var(--text-secondary)">暂无订单</p>';
+      return;
+    }
+    el.innerHTML = data.orders.map(o =>
+      `<div class="order-row">
+        <span>${escapeHtml(o.product_name || '商品')} #${o.seckill_id}</span>
+        <span class="order-amount">-${o.amount}</span>
+        <span class="order-status">${o.status}</span>
+        <span class="order-date">${(o.created_at || '').slice(0, 10)}</span>
+      </div>`).join('');
+  } catch(e) {}
 }
 
 // ============================================================

@@ -1639,3 +1639,35 @@ em.search-highlight {
 .lb-rank { font-weight: 700; color: var(--accent); min-width: 30px; }
 .lb-total { margin-left: auto; font-weight: 600; }
 #points-balance-display { transition: all 0.3s; }
+
+/* Mall */
+.mall-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; padding: 16px; }
+.mall-section { background: var(--card-bg); border-radius: 12px; padding: 20px; }
+.mall-section:last-child { grid-column: 1 / -1; }
+.products-grid { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
+.product-card {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 12px; border-radius: 8px; background: var(--hover-bg);
+}
+.product-name { font-weight: 600; }
+.product-desc { color: var(--text-secondary); font-size: 0.9em; }
+.product-price { font-weight: 700; color: var(--accent); }
+.seckill-list { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
+.seckill-card {
+  padding: 12px; border-radius: 8px; border: 1px solid var(--accent);
+  background: var(--hover-bg);
+}
+.sk-header { display: flex; justify-content: space-between; margin-bottom: 8px; }
+.sk-name { font-weight: 600; }
+.sk-status { font-size: 0.85em; color: var(--accent); }
+.sk-info { display: flex; gap: 16px; align-items: center; margin-bottom: 8px; }
+.sk-price { font-weight: 700; color: #ef4444; }
+.sk-stock { color: var(--text-secondary); }
+.sk-timer { font-family: 'JetBrains Mono', monospace; font-size: 0.9em; }
+.order-row {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 8px 0; border-bottom: 1px solid var(--border-light);
+}
+.order-amount { color: #ef4444; font-weight: 600; }
+.order-status { font-size: 0.85em; color: var(--accent); }
+.order-date { color: var(--text-secondary); font-size: 0.85em; }
