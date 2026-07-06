@@ -645,3 +645,90 @@ func TestServicesOK(t *testing.T) {
 
 	if w.Code != http.StatusOK { t.Fatalf("expected 200, got %d", w.Code) }
 }
+
+// ---- mock points client ----
+
+type mockPointsClient struct {
+	balanceFn      func(context.Context, *pb.GetBalanceRequest, ...grpc.CallOption) (*pb.BalanceResponse, error)
+	transactionsFn func(context.Context, *pb.GetTransactionsRequest, ...grpc.CallOption) (*pb.TransactionsResponse, error)
+	earnFn         func(context.Context, *pb.EarnRequest, ...grpc.CallOption) (*pb.BalanceResponse, error)
+	deductFn       func(context.Context, *pb.DeductRequest, ...grpc.CallOption) (*pb.BalanceResponse, error)
+}
+
+func (m *mockPointsClient) GetBalance(ctx context.Context, req *pb.GetBalanceRequest, opts ...grpc.CallOption) (*pb.BalanceResponse, error) {
+	if m.balanceFn != nil { return m.balanceFn(ctx, req, opts...) }
+	return &pb.BalanceResponse{Success: true, Balance: 0}, nil
+}
+func (m *mockPointsClient) GetTransactions(ctx context.Context, req *pb.GetTransactionsRequest, opts ...grpc.CallOption) (*pb.TransactionsResponse, error) {
+	if m.transactionsFn != nil { return m.transactionsFn(ctx, req, opts...) }
+	return &pb.TransactionsResponse{Success: true}, nil
+}
+func (m *mockPointsClient) Earn(ctx context.Context, req *pb.EarnRequest, opts ...grpc.CallOption) (*pb.BalanceResponse, error) {
+	if m.earnFn != nil { return m.earnFn(ctx, req, opts...) }
+	return &pb.BalanceResponse{Success: true, Balance: req.Amount}, nil
+}
+func (m *mockPointsClient) Deduct(ctx context.Context, req *pb.DeductRequest, opts ...grpc.CallOption) (*pb.BalanceResponse, error) {
+	if m.deductFn != nil { return m.deductFn(ctx, req, opts...) }
+	return &pb.BalanceResponse{Success: true, Balance: 0}, nil
+}
+func (m *mockPointsClient) GetLeaderboard(ctx context.Context, req *pb.LeaderboardRequest, opts ...grpc.CallOption) (*pb.LeaderboardResponse, error) {
+	return &pb.LeaderboardResponse{Success: true}, nil
+}
+
+// ---- Points handler tests ----
+
+func TestGetBalance(t *testing.T) {
+	h := newTestHandlers()
+	h.Points = &mockPointsClient{
+		balanceFn: func(ctx context.Context, req *pb.GetBalanceRequest, opts ...grpc.CallOption) (*pb.BalanceResponse, error) {
+			return &pb.BalanceResponse{Success: true, UserId: 42, Balance: 100, TotalEarned: 250}, nil
+		},
+	}
+
+	r := setupGin()
+	r.GET("/points/balance", h.GetBalance)
+	w := httptest.NewRecorder()
+	req, _ := http.NewRequest("GET", "/points/balance", nil)
+	req.Header.Set("X-Request-ID", "test")
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK { t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String()) }
+}
+
+func TestGetTransactions(t *testing.T) {
+	h := newTestHandlers()
+	h.Points = &mockPointsClient{
+		transactionsFn: func(ctx context.Context, req *pb.GetTransactionsRequest, opts ...grpc.CallOption) (*pb.TransactionsResponse, error) {
+			return &pb.TransactionsResponse{
+				Success: true,
+				Transactions: []*pb.Transaction{
+					{Id: 1, Type: "earn", Amount: 10, Reason: "daily_login"},
+					{Id: 2, Type: "deduct", Amount: -5, Reason: "seckill_order"},
+				},
+			}, nil
+		},
+	}
+
+	r := setupGin()
+	r.GET("/points/transactions", h.GetTransactions)
+	w := httptest.NewRecorder()
+	req, _ := http.NewRequest("GET", "/points/transactions", nil)
+	req.Header.Set("X-Request-ID", "test")
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK { t.Fatalf("expected 200, got %d", w.Code) }
+}
+
+func TestGetLeaderboard(t *testing.T) {
+	h := newTestHandlers()
+	h.Points = &mockPointsClient{}
+
+	r := setupGin()
+	r.GET("/points/leaderboard", h.GetLeaderboard)
+	w := httptest.NewRecorder()
+	req, _ := http.NewRequest("GET", "/points/leaderboard", nil)
+	req.Header.Set("X-Request-ID", "test")
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK { t.Fatalf("expected 200, got %d", w.Code) }
+}

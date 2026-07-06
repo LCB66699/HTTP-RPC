@@ -24,6 +24,9 @@ service PointsService {
       body: "*"
     };
   }
+  rpc GetLeaderboard(LeaderboardRequest) returns (LeaderboardResponse) {
+    option (google.api.http) = { get: "/api/v1/points/leaderboard" };
+  }
 }
 
 message GetBalanceRequest {
