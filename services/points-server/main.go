@@ -70,7 +70,7 @@ func (s *pointsServer) Earn(ctx context.Context, req *pb.EarnRequest) (*pb.Balan
 		dupKey := fmt.Sprintf("pts:dup:%s", req.IdempotencyKey)
 		ok, _ := s.rdb.SetNX(ctx, dupKey, "1", 5*time.Minute).Result()
 		if !ok {
-			bal, _ := s.balance(ctx, req.UserId)
+			bal := s.balance(ctx, req.UserId)
 			return &pb.BalanceResponse{
 				Success: false, UserId: req.UserId, Balance: bal,
 				Error: "duplicate earn request",
@@ -113,7 +113,7 @@ func (s *pointsServer) Deduct(ctx context.Context, req *pb.DeductRequest) (*pb.B
 	}
 	if newBal < 0 {
 		s.rdb.HIncrBy(ctx, key, "balance", req.Amount)
-		bal, _ := s.balance(ctx, req.UserId)
+		bal := s.balance(ctx, req.UserId)
 		return &pb.BalanceResponse{
 			Success: false, UserId: req.UserId, Balance: bal,
 			Error: "insufficient balance",
