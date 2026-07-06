@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"log/slog"
@@ -12,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	_ "github.com/go-sql-driver/mysql"
 	pb "gateway-grpc/gen/rpc"
 	"github.com/redis/go-redis/v9"
 	"google.golang.org/grpc"
@@ -22,143 +24,181 @@ import (
 
 type mallServer struct {
 	pb.UnimplementedMallServiceServer
+	db  *sql.DB
 	rdb *redis.Client
 }
 
-func (s *mallServer) initSampleData() {
-	ctx := context.Background()
-	products := []map[string]interface{}{
-		{"name": "10 积分礼包", "price": int64(10), "stock": int64(999), "desc": "小额积分兑换"},
-		{"name": "50 积分礼包", "price": int64(50), "stock": int64(500), "desc": "中等积分兑换"},
-		{"name": "100 积分礼包", "price": int64(100), "stock": int64(100), "desc": "大额积分兑换"},
+func initDB(dsn string) *sql.DB {
+	db, err := sql.Open("mysql", dsn)
+	if err != nil {
+		slog.Error("mysql open failed", "error", err)
+		os.Exit(1)
 	}
-	for i, p := range products {
-		b, _ := json.Marshal(p)
-		s.rdb.Set(ctx, fmt.Sprintf("mall:product:%d", i+1), string(b), 0)
+	db.SetMaxOpenConns(15)
+	db.SetMaxIdleConns(5)
+	db.SetConnMaxLifetime(5 * time.Minute)
+	if err := db.Ping(); err != nil {
+		slog.Error("mysql ping failed", "error", err)
+		os.Exit(1)
+	}
+	migrate(db)
+	seed(db)
+	return db
+}
+
+func migrate(db *sql.DB) {
+	ddls := []string{
+		`CREATE TABLE IF NOT EXISTS products (
+			id BIGINT PRIMARY KEY,
+			name VARCHAR(128) NOT NULL,
+			description TEXT,
+			price BIGINT NOT NULL,
+			stock BIGINT NOT NULL DEFAULT 0,
+			image_url VARCHAR(512) DEFAULT '',
+			created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+		)`,
+		`CREATE TABLE IF NOT EXISTS seckills (
+			id BIGINT PRIMARY KEY,
+			product_id BIGINT NOT NULL,
+			seckill_price BIGINT NOT NULL,
+			seckill_stock BIGINT NOT NULL,
+			start_at BIGINT NOT NULL,
+			end_at BIGINT NOT NULL,
+			created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+		)`,
+		`CREATE TABLE IF NOT EXISTS orders (
+			id BIGINT PRIMARY KEY,
+			user_id BIGINT NOT NULL,
+			product_id BIGINT NOT NULL,
+			seckill_id BIGINT DEFAULT 0,
+			amount BIGINT NOT NULL,
+			status VARCHAR(16) NOT NULL DEFAULT 'paid',
+			idempotency_key VARCHAR(128) DEFAULT '',
+			created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+			INDEX idx_user (user_id),
+			UNIQUE KEY uk_idempotency (idempotency_key)
+		)`,
+	}
+	for _, ddl := range ddls {
+		if _, err := db.Exec(ddl); err != nil {
+			slog.Warn("migrate warning", "error", err)
+		}
 	}
 }
 
-func (s *mallServer) getProduct(ctx context.Context, id int64) (*pb.Product, error) {
-	data, err := s.rdb.Get(ctx, fmt.Sprintf("mall:product:%d", id)).Result()
-	if err != nil {
-		return nil, err
+func seed(db *sql.DB) {
+	var cnt int
+	db.QueryRow("SELECT COUNT(*) FROM products").Scan(&cnt)
+	if cnt > 0 {
+		return
 	}
-	var p struct {
-		Name  string `json:"name"`
-		Price int64  `json:"price"`
-		Stock int64  `json:"stock"`
-		Desc  string `json:"desc"`
+	items := []struct {
+		id    int64
+		name  string
+		price int64
+		stock int64
+		desc  string
+	}{
+		{1, "10 积分礼包", 10, 999, "小额积分兑换"},
+		{2, "50 积分礼包", 50, 500, "中等积分兑换"},
+		{3, "100 积分礼包", 100, 100, "大额积分兑换"},
 	}
-	json.Unmarshal([]byte(data), &p)
-	return &pb.Product{
-		Id: id, Name: p.Name, Price: p.Price, Stock: p.Stock,
-		Description: p.Desc,
-	}, nil
+	for _, item := range items {
+		db.Exec("INSERT INTO products (id,name,description,price,stock) VALUES (?,?,?,?,?)",
+			item.id, item.name, item.desc, item.price, item.stock)
+	}
 }
 
 // ---- Products ----
 
 func (s *mallServer) ListProducts(ctx context.Context, req *pb.ListProductsRequest) (*pb.ListProductsResponse, error) {
+	rows, err := s.db.Query("SELECT id, name, description, price, stock, image_url FROM products ORDER BY id")
+	if err != nil {
+		return &pb.ListProductsResponse{Success: false, Error: err.Error()}, nil
+	}
+	defer rows.Close()
+
 	resp := &pb.ListProductsResponse{Success: true}
-	for id := int64(1); ; id++ {
-		p, err := s.getProduct(ctx, id)
-		if err != nil {
-			break
-		}
+	for rows.Next() {
+		p := &pb.Product{}
+		rows.Scan(&p.Id, &p.Name, &p.Description, &p.Price, &p.Stock, &p.ImageUrl)
 		resp.Products = append(resp.Products, p)
 	}
 	return resp, nil
 }
 
 func (s *mallServer) GetProduct(ctx context.Context, req *pb.GetProductRequest) (*pb.ProductResponse, error) {
-	p, err := s.getProduct(ctx, req.Id)
+	p := &pb.Product{}
+	err := s.db.QueryRow("SELECT id, name, description, price, stock, image_url FROM products WHERE id=?", req.Id).
+		Scan(&p.Id, &p.Name, &p.Description, &p.Price, &p.Stock, &p.ImageUrl)
 	if err != nil {
-		return &pb.ProductResponse{Success: false, Error: "Not found", ErrorCode: 4}, nil
+		return &pb.ProductResponse{Success: false, Error: "Not found"}, nil
 	}
 	return &pb.ProductResponse{Success: true, Product: p}, nil
 }
 
 func (s *mallServer) CreateProduct(ctx context.Context, req *pb.CreateProductRequest) (*pb.ProductResponse, error) {
-	id := s.rdb.Incr(ctx, "mall:product:seq").Val()
-	data := map[string]interface{}{
-		"name":  req.Name,
-		"price": req.Price,
-		"stock": req.Stock,
-		"desc":  req.Description,
+	id := s.rdb.Incr(ctx, "mall:seq:product").Val()
+	_, err := s.db.Exec("INSERT INTO products (id,name,description,price,stock,image_url) VALUES (?,?,?,?,?,?)",
+		id, req.Name, req.Description, req.Price, req.Stock, req.ImageUrl)
+	if err != nil {
+		return &pb.ProductResponse{Success: false, Error: err.Error()}, nil
 	}
-	b, _ := json.Marshal(data)
-	s.rdb.Set(ctx, fmt.Sprintf("mall:product:%d", id), string(b), 0)
 	return &pb.ProductResponse{
 		Success: true,
-		Product: &pb.Product{Id: id, Name: req.Name, Price: req.Price, Stock: req.Stock, Description: req.Description},
+		Product: &pb.Product{Id: id, Name: req.Name, Description: req.Description, Price: req.Price, Stock: req.Stock, ImageUrl: req.ImageUrl},
 	}, nil
 }
 
 // ---- Seckill ----
 
 func (s *mallServer) ListSeckills(ctx context.Context, req *pb.ListSeckillsRequest) (*pb.ListSeckillsResponse, error) {
+	rows, err := s.db.Query("SELECT s.id, s.product_id, p.name, s.seckill_price, s.seckill_stock, s.start_at, s.end_at FROM seckills s LEFT JOIN products p ON s.product_id=p.id ORDER BY s.id DESC")
+	if err != nil {
+		return &pb.ListSeckillsResponse{Success: false, Error: err.Error()}, nil
+	}
+	defer rows.Close()
+
 	resp := &pb.ListSeckillsResponse{Success: true}
-	for id := int64(1); ; id++ {
-		data, err := s.rdb.Get(ctx, fmt.Sprintf("mall:seckill:%d", id)).Result()
-		if err != nil {
-			break
+	for rows.Next() {
+		sk := &pb.Seckill{}
+		rows.Scan(&sk.Id, &sk.ProductId, &sk.ProductName, &sk.SeckillPrice, &sk.SeckillStock, &sk.StartAt, &sk.EndAt)
+		// Override stock with Redis real-time value
+		if stock, err := s.rdb.Get(ctx, fmt.Sprintf("seckill:stock:%d", sk.Id)).Int64(); err == nil {
+			sk.SeckillStock = stock
 		}
-		var sk struct {
-			ProductID     int64  `json:"product_id"`
-			SeckillPrice  int64  `json:"seckill_price"`
-			SeckillStock  int64  `json:"seckill_stock"`
-			StartAt       int64  `json:"start_at"`
-			EndAt         int64  `json:"end_at"`
-			ProductName   string `json:"product_name"`
-		}
-		json.Unmarshal([]byte(data), &sk)
-		resp.Seckills = append(resp.Seckills, &pb.Seckill{
-			Id: id, ProductId: sk.ProductID, SeckillPrice: sk.SeckillPrice,
-			SeckillStock: sk.SeckillStock, StartAt: sk.StartAt, EndAt: sk.EndAt,
-			ProductName: sk.ProductName,
-		})
+		resp.Seckills = append(resp.Seckills, sk)
 	}
 	return resp, nil
 }
 
 func (s *mallServer) CreateSeckill(ctx context.Context, req *pb.CreateSeckillRequest) (*pb.SeckillResponse, error) {
-	id := s.rdb.Incr(ctx, "mall:seckill:seq").Val()
+	id := s.rdb.Incr(ctx, "mall:seq:seckill").Val()
+	_, err := s.db.Exec("INSERT INTO seckills (id,product_id,seckill_price,seckill_stock,start_at,end_at) VALUES (?,?,?,?,?,?)",
+		id, req.ProductId, req.SeckillPrice, req.SeckillStock, req.StartAt, req.EndAt)
+	if err != nil {
+		return &pb.SeckillResponse{Success: false, Error: err.Error()}, nil
+	}
 
 	// Get product name
-	p, _ := s.getProduct(ctx, req.ProductId)
-	pName := ""
-	if p != nil {
-		pName = p.Name
-	}
+	var pName string
+	s.db.QueryRow("SELECT name FROM products WHERE id=?", req.ProductId).Scan(&pName)
 
-	sk := map[string]interface{}{
-		"product_id":    req.ProductId,
-		"seckill_price": req.SeckillPrice,
-		"seckill_stock": req.SeckillStock,
-		"start_at":      req.StartAt,
-		"end_at":        req.EndAt,
-		"product_name":  pName,
-	}
-	b, _ := json.Marshal(sk)
-	s.rdb.Set(ctx, fmt.Sprintf("mall:seckill:%d", id), string(b), 0)
-
-	// Init stock in Redis
+	// Init Redis stock
 	s.rdb.Set(ctx, fmt.Sprintf("seckill:stock:%d", id), req.SeckillStock, 0)
 
 	return &pb.SeckillResponse{
 		Success: true,
-		Seckill: &pb.Seckill{
-			Id: id, ProductId: req.ProductId, SeckillPrice: req.SeckillPrice,
-			SeckillStock: req.SeckillStock, StartAt: req.StartAt, EndAt: req.EndAt,
-			ProductName: pName,
-		},
+		Seckill: &pb.Seckill{Id: id, ProductId: req.ProductId, ProductName: pName,
+			SeckillPrice: req.SeckillPrice, SeckillStock: req.SeckillStock,
+			StartAt: req.StartAt, EndAt: req.EndAt},
 	}, nil
 }
 
 // ---- Orders ----
 
 func (s *mallServer) SeckillOrder(ctx context.Context, req *pb.SeckillOrderRequest) (*pb.OrderResponse, error) {
-	// Idempotency check
+	// Idempotency
 	if req.IdempotencyKey != "" {
 		ok, _ := s.rdb.SetNX(ctx, "mall:dup:"+req.IdempotencyKey, "1", 60*time.Second).Result()
 		if !ok {
@@ -166,129 +206,100 @@ func (s *mallServer) SeckillOrder(ctx context.Context, req *pb.SeckillOrderReque
 		}
 	}
 
-	// Load seckill
-	data, err := s.rdb.Get(ctx, fmt.Sprintf("mall:seckill:%d", req.SeckillId)).Result()
+	// Load seckill from MySQL
+	var skPID, skPrice, skStart, skEnd int64
+	var skName string
+	err := s.db.QueryRow("SELECT product_id, seckill_price, start_at, end_at FROM seckills WHERE id=?", req.SeckillId).
+		Scan(&skPID, &skPrice, &skStart, &skEnd)
 	if err != nil {
 		return &pb.OrderResponse{Success: false, Error: "seckill not found"}, nil
 	}
-	var sk struct {
-		ProductID    int64 `json:"product_id"`
-		SeckillPrice int64 `json:"seckill_price"`
-		StartAt      int64 `json:"start_at"`
-		EndAt        int64 `json:"end_at"`
-		ProductName  string `json:"product_name"`
-	}
-	json.Unmarshal([]byte(data), &sk)
+	s.db.QueryRow("SELECT name FROM products WHERE id=?", skPID).Scan(&skName)
 
-	// Time window check
+	// Time window
 	now := time.Now().Unix()
-	if now < sk.StartAt {
-		return &pb.OrderResponse{Success: false, Error: "seckill not started"}, nil
+	if now < skStart {
+		return &pb.OrderResponse{Success: false, Error: "not started"}, nil
 	}
-	if now > sk.EndAt {
-		return &pb.OrderResponse{Success: false, Error: "seckill ended"}, nil
+	if now > skEnd {
+		return &pb.OrderResponse{Success: false, Error: "ended"}, nil
 	}
 
-	// Stock check (atomic decrement)
+	// Stock check (Redis DECR)
 	stockKey := fmt.Sprintf("seckill:stock:%d", req.SeckillId)
 	newStock, err := s.rdb.Decr(ctx, stockKey).Result()
 	if err != nil {
 		return &pb.OrderResponse{Success: false, Error: "stock error"}, nil
 	}
 	if newStock < 0 {
-		s.rdb.Incr(ctx, stockKey) // rollback
+		s.rdb.Incr(ctx, stockKey)
 		return &pb.OrderResponse{Success: false, Error: "sold out"}, nil
 	}
 
-	// Create order
-	orderID := s.rdb.Incr(ctx, "mall:order:seq").Val()
-	order := map[string]interface{}{
-		"user_id":     req.UserId,
-		"product_id":  sk.ProductID,
-		"seckill_id":  req.SeckillId,
-		"amount":      sk.SeckillPrice,
-		"status":      "paid",
-		"created_at":  time.Now().Format(time.RFC3339),
-		"product_name": sk.ProductName,
+	// Create order in MySQL
+	orderID := s.rdb.Incr(ctx, "mall:seq:order").Val()
+	_, dbErr := s.db.Exec("INSERT INTO orders (id,user_id,product_id,seckill_id,amount,idempotency_key) VALUES (?,?,?,?,?,?)",
+		orderID, req.UserId, skPID, req.SeckillId, skPrice, req.IdempotencyKey)
+	if dbErr != nil {
+		s.rdb.Incr(ctx, stockKey) // rollback
+		return &pb.OrderResponse{Success: false, Error: "order failed"}, nil
 	}
-	b, _ := json.Marshal(order)
-	s.rdb.Set(ctx, fmt.Sprintf("mall:order:%d", orderID), string(b), 0)
-	s.rdb.LPush(ctx, fmt.Sprintf("mall:orders:%d", req.UserId), strconv.FormatInt(orderID, 10))
 
-	// Deduct points via points service event
-	s.rdb.Publish(ctx, "pts:earn", toJSON(map[string]interface{}{
-		"type":    "seckill_order",
-		"user_id": req.UserId,
-		"amount":  sk.SeckillPrice,
-		"key":     fmt.Sprintf("seckill:%d:%d", req.SeckillId, req.UserId),
-	}))
+	// Deduct points via event
+	ptsMsg, _ := json.Marshal(map[string]interface{}{
+		"type": "seckill_order", "user_id": req.UserId,
+		"amount": skPrice, "key": fmt.Sprintf("seckill:%d:%d", req.SeckillId, req.UserId),
+	})
+	s.rdb.Publish(ctx, "pts:earn", string(ptsMsg))
 
 	return &pb.OrderResponse{
 		Success: true,
-		Order: &pb.Order{
-			Id: orderID, UserId: req.UserId, ProductId: sk.ProductID,
-			SeckillId: req.SeckillId, Amount: sk.SeckillPrice,
-			Status: "paid", CreatedAt: time.Now().Format(time.RFC3339),
-			ProductName: sk.ProductName,
-		},
+		Order: &pb.Order{Id: orderID, UserId: req.UserId, ProductId: skPID,
+			SeckillId: req.SeckillId, Amount: skPrice,
+			Status: "paid", ProductName: skName, CreatedAt: time.Now().Format(time.RFC3339)},
 	}, nil
 }
 
 func (s *mallServer) ListOrders(ctx context.Context, req *pb.ListOrdersRequest) (*pb.ListOrdersResponse, error) {
+	rows, err := s.db.Query("SELECT o.id, o.product_id, o.seckill_id, o.amount, o.status, o.created_at, COALESCE(p.name,'') FROM orders o LEFT JOIN products p ON o.product_id=p.id WHERE o.user_id=? ORDER BY o.created_at DESC LIMIT 50", req.UserId)
+	if err != nil {
+		return &pb.ListOrdersResponse{Success: true}, nil
+	}
+	defer rows.Close()
+
 	resp := &pb.ListOrdersResponse{Success: true}
-	orderIDs, _ := s.rdb.LRange(ctx, fmt.Sprintf("mall:orders:%d", req.UserId), 0, 49).Result()
-	for _, idStr := range orderIDs {
-		data, err := s.rdb.Get(ctx, fmt.Sprintf("mall:order:%s", idStr)).Result()
-		if err != nil {
-			continue
-		}
-		var o struct {
-			UserID      int64  `json:"user_id"`
-			ProductID   int64  `json:"product_id"`
-			SeckillID   int64  `json:"seckill_id"`
-			Amount      int64  `json:"amount"`
-			Status      string `json:"status"`
-			CreatedAt   string `json:"created_at"`
-			ProductName string `json:"product_name"`
-		}
-		json.Unmarshal([]byte(data), &o)
-		id, _ := strconv.ParseInt(idStr, 10, 64)
-		resp.Orders = append(resp.Orders, &pb.Order{
-			Id: id, UserId: o.UserID, ProductId: o.ProductID,
-			SeckillId: o.SeckillID, Amount: o.Amount,
-			Status: o.Status, CreatedAt: o.CreatedAt, ProductName: o.ProductName,
-		})
+	for rows.Next() {
+		o := &pb.Order{UserId: req.UserId}
+		rows.Scan(&o.Id, &o.ProductId, &o.SeckillId, &o.Amount, &o.Status, &o.CreatedAt, &o.ProductName)
+		resp.Orders = append(resp.Orders, o)
 	}
 	return resp, nil
 }
 
-func toJSON(v interface{}) string {
-	b, _ := json.Marshal(v)
-	return string(b)
-}
+// ---- main ----
 
 func main() {
 	redisAddr := getenv("REDIS_ADDR", "redis-cluster-7000:7000")
 	redisPass := getenv("REDIS_PASSWORD", "rpc-redis-123456")
 	port := getenv("PORT", "50053")
+	mysqlDSN := fmt.Sprintf("%s:%s@tcp(%s)/%s?parseTime=true",
+		getenv("MYSQL_USER", "root"), getenv("MYSQL_PASSWORD", "123456"),
+		getenv("MYSQL_ADDR", "mysql-auth:3306"), getenv("MYSQL_DB", "rpc_auth"))
 
 	rdb := redis.NewClient(&redis.Options{Addr: redisAddr, Password: redisPass})
+	db := initDB(mysqlDSN)
 
-	srvImpl := &mallServer{rdb: rdb}
-	srvImpl.initSampleData()
+	srvImpl := &mallServer{db: db, rdb: rdb}
 
 	lis, _ := net.Listen("tcp", ":"+port)
 	srv := grpc.NewServer()
 	pb.RegisterMallServiceServer(srv, srvImpl)
-
 	hs := health.NewServer()
 	hs.SetServingStatus("", grpc_health_v1.HealthCheckResponse_SERVING)
 	grpc_health_v1.RegisterHealthServer(srv, hs)
 	reflection.Register(srv)
 
-	// Consul registration
 	registerConsul(port)
-
 	slog.Info("mall-server listening", "port", port)
 	srv.Serve(lis)
 }
@@ -310,12 +321,6 @@ func registerConsul(port string) {
 	if myIP == "" {
 		myIP = "127.0.0.1"
 	}
-	body := fmt.Sprintf(`{
-		"ID": "mall-%s","Name": "rpc-mall","Address": "%s","Port": %s,
-		"Check": {"Name": "mall gRPC","GRPC": "%s:%s","GRPCUseTLS": false,
-		"Interval": "10s","Timeout": "3s","DeregisterCriticalServiceAfter": "90s"}
-	}`, hostname, myIP, port, myIP, port)
-	go func() {
-		http.Post(consul+"/v1/agent/service/register", "application/json", strings.NewReader(body))
-	}()
+	body := fmt.Sprintf(`{"ID":"mall-%s","Name":"rpc-mall","Address":"%s","Port":%s,"Check":{"Name":"mall gRPC","GRPC":"%s:%s","GRPCUseTLS":false,"Interval":"10s","Timeout":"3s","DeregisterCriticalServiceAfter":"90s"}}`, hostname, myIP, port, myIP, port)
+	go func() { http.Post(consul+"/v1/agent/service/register", "application/json", strings.NewReader(body)) }()
 }

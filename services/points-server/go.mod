@@ -5,6 +5,7 @@ go 1.24
 require (
 	gateway-grpc/gen/rpc v0.0.0
 	github.com/alicebob/miniredis/v2 v2.34.0
+	github.com/go-sql-driver/mysql v1.8.1
 	github.com/redis/go-redis/v9 v9.7.0
 	google.golang.org/grpc v1.67.1
 )
