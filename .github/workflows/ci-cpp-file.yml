@@ -24,27 +24,36 @@ on:
   workflow_dispatch:
 
 jobs:
-  file-build-test:
+  file-ci:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Build auth image (dependency)
+      - name: Build builder image
         uses: docker/build-push-action@v6
         with:
           context: .
-          target: runtime
-          build-args: SERVICE=auth
+          target: builder
+          build-args: SERVICE=file
           cache-from: type=gha
           cache-to: type=gha,mode=max
           load: true
           push: false
+          tags: cpp-builder:latest
 
-      - name: Build file image
+      - name: Run C++ unit tests
+        run: |
+          docker run --rm cpp-builder:latest sh -c "
+            cd /src &&
+            cmake --build build --target cpp_test -j\$(nproc) &&
+            ./build/cpp_test
+          "
+
+      - name: Build file runtime image (compilation check)
         uses: docker/build-push-action@v6
         with:
           context: .
@@ -54,36 +63,3 @@ jobs:
           cache-to: type=gha,mode=max
           load: true
           push: false
-
-      - name: Start minimal services
-        env:
-          JWT_SECRET: ci-test-secret-32bytes-here!!!!
-          MYSQL_ROOT_PASSWORD: "123456"
-          REDIS_PASSWORD: rpc-redis-123456
-        run: |
-          docker compose up -d consul mysql-auth mysql-file-0 minio minio-init rabbitmq
-          for i in $(seq 1 90); do
-            if docker compose ps mysql-auth | grep -q 'healthy' && \
-               docker compose ps mysql-file-0 | grep -q 'healthy' && \
-               docker compose ps consul | grep -q 'healthy' && \
-               docker compose ps minio | grep -q 'healthy'; then
-              echo "infra ready after ${i}s"
-              break
-            fi
-            [ "$i" -eq 90 ] && { echo "timeout"; docker compose ps; exit 1; }
-            sleep 2
-          done
-          docker compose up -d auth-1 file-1
-          sleep 15
-
-      - name: Verify services
-        run: |
-          docker compose exec file-1 /usr/local/bin/grpc_health_probe -addr=localhost:50051
-          echo "File health check passed"
-
-      - name: Container logs on failure
-        if: failure()
-        run: |
-          docker compose logs auth-1 --tail=20
-          docker compose logs file-1 --tail=40
-          docker compose logs consul --tail=10

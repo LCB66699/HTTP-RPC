@@ -22,7 +22,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  search-build-test:
+  search-ci:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -31,7 +31,27 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Build search image
+      - name: Build builder image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          target: builder
+          build-args: SERVICE=search
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          load: true
+          push: false
+          tags: cpp-builder:latest
+
+      - name: Run C++ unit tests
+        run: |
+          docker run --rm cpp-builder:latest sh -c "
+            cd /src &&
+            cmake --build build --target cpp_test -j\$(nproc) &&
+            ./build/cpp_test
+          "
+
+      - name: Build search runtime image (compilation check)
         uses: docker/build-push-action@v6
         with:
           context: .
@@ -41,31 +61,3 @@ jobs:
           cache-to: type=gha,mode=max
           load: true
           push: false
-
-      - name: Start minimal services
-        env:
-          JWT_SECRET: ci-test-secret-32bytes-here!!!!
-        run: |
-          docker compose up -d consul elasticsearch es-init
-          for i in $(seq 1 90); do
-            if docker compose ps consul | grep -q 'healthy' && \
-               docker compose ps elasticsearch | grep -q 'healthy'; then
-              echo "infra ready after ${i}s"
-              break
-            fi
-            [ "$i" -eq 90 ] && { echo "timeout"; docker compose ps; exit 1; }
-            sleep 2
-          done
-          docker compose up -d search
-          sleep 10
-
-      - name: Verify services
-        run: |
-          docker compose exec search /usr/local/bin/grpc_health_probe -addr=localhost:50051
-          echo "Search health check passed"
-
-      - name: Container logs on failure
-        if: failure()
-        run: |
-          docker compose logs search --tail=40
-          docker compose logs consul --tail=10
