@@ -438,19 +438,19 @@ echo "$SHARE_RESP" | grep -q '"success":true' \
     || red "Share failed: $SHARE_RESP"
 
 # user2 reads the shared sheet — should succeed
-READ_SHARED=$($CURL "$API/api/v1/sheets/$SHARE_SHEET_ID" -b "$JAR2")
-echo "$READ_SHARED" | grep -q '"success":true' \
+READ_CODE=$($CURL -o /dev/null -w "%{http_code}" "$API/api/v1/sheets/$SHARE_SHEET_ID" -b "$JAR2")
+[ "$READ_CODE" = "200" ] \
     && green "Shared user read OK" \
-    || red "Shared user read denied: $READ_SHARED"
+    || red "Shared user read denied (code=$READ_CODE)"
 
 # user2 tries to update with view-only permission — should fail
-UPDATE_SHARED=$($CURL -X PUT "$API/api/v1/sheets/$SHARE_SHEET_ID" \
+UPDATE_CODE=$($CURL -o /dev/null -w "%{http_code}" -X PUT "$API/api/v1/sheets/$SHARE_SHEET_ID" \
     -H 'Content-Type: application/json' \
     -b "$JAR2" \
     -d '{"name":"hacked","headers_json":"[]","data_json":"[]"}')
-echo "$UPDATE_SHARED" | grep -q '"success":true' \
-    && red "Shared user with view-only was able to edit" \
-    || green "Shared user view-only edit blocked OK"
+[ "$UPDATE_CODE" != "200" ] \
+    && green "Shared user view-only edit blocked OK" \
+    || red "Shared user with view-only was able to edit"
 
 # user1 upgrades to edit permission
 $CURL -X POST "$API/api/v1/sheets/$SHARE_SHEET_ID/share" \
@@ -459,13 +459,13 @@ $CURL -X POST "$API/api/v1/sheets/$SHARE_SHEET_ID/share" \
     -d "{\"username\":\"$TEST_USER2\",\"permission\":\"edit\"}" > /dev/null 2>&1
 
 # user2 now tries to update — should succeed
-UPDATE_EDIT=$($CURL -X PUT "$API/api/v1/sheets/$SHARE_SHEET_ID" \
+UPDATE_EDIT_CODE=$($CURL -o /dev/null -w "%{http_code}" -X PUT "$API/api/v1/sheets/$SHARE_SHEET_ID" \
     -H 'Content-Type: application/json' \
     -b "$JAR2" \
     -d '{"name":"shared-edit","headers_json":"[]","data_json":"[]"}')
-echo "$UPDATE_EDIT" | grep -q '"success":true' \
+[ "$UPDATE_EDIT_CODE" = "200" ] \
     && green "Shared user edit OK" \
-    || warn "Shared user edit denied (may need Go proto regen): $UPDATE_EDIT"
+    || warn "Shared user edit denied (code=$UPDATE_EDIT_CODE)"
 
 # user2 tries to delete — should fail (only owner can delete)
 DELETE_SHARED=$($CURL -X DELETE "$API/api/v1/sheets/$SHARE_SHEET_ID" -b "$JAR2" -w "%{http_code}" -o /dev/null)
