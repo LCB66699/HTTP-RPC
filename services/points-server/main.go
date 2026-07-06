@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	amqp "github.com/rabbitmq/amqp091-go"
 	_ "github.com/go-sql-driver/mysql"
 	pb "gateway-grpc/gen/rpc"
 	"github.com/redis/go-redis/v9"
@@ -24,8 +25,9 @@ import (
 
 type pointsServer struct {
 	pb.UnimplementedPointsServiceServer
-	db  *sql.DB
-	rdb *redis.Client
+	db     *sql.DB
+	rdb    *redis.Client
+	amqpCh *amqp.Channel
 }
 
 func initDB(dsn string) *sql.DB {
@@ -43,6 +45,23 @@ func initDB(dsn string) *sql.DB {
 	}
 	migrate(db)
 	return db
+}
+
+func initAMQP(addr string) *amqp.Channel {
+	conn, err := amqp.Dial(addr)
+	if err != nil {
+		slog.Error("rabbitmq dial failed", "error", err)
+		os.Exit(1)
+	}
+	ch, err := conn.Channel()
+	if err != nil {
+		slog.Error("rabbitmq channel failed", "error", err)
+		os.Exit(1)
+	}
+	ch.ExchangeDeclare("rpc.events", "topic", true, false, false, false, nil)
+	q, _ := ch.QueueDeclare("pts.earn", true, false, false, false, nil)
+	ch.QueueBind(q.Name, "pts.*", "rpc.events", false, nil)
+	return ch
 }
 
 func migrate(db *sql.DB) {
@@ -71,27 +90,22 @@ func migrate(db *sql.DB) {
 	}
 }
 
-// ---- GetBalance ----
+// ---- GetBalance (Redis cache -> MySQL fallback) ----
 
 func (s *pointsServer) GetBalance(ctx context.Context, req *pb.GetBalanceRequest) (*pb.BalanceResponse, error) {
-	// Read Redis cache first
 	key := fmt.Sprintf("pts:%d", req.UserId)
 	bal, err := s.rdb.HGet(ctx, key, "balance").Int64()
 	if err == nil {
 		total, _ := s.rdb.HGet(ctx, key, "total_earned").Int64()
 		return &pb.BalanceResponse{Success: true, UserId: req.UserId, Balance: bal, TotalEarned: total}, nil
 	}
-	// Fallback to MySQL
 	var balance, totalEarned int64
 	s.db.QueryRow("SELECT balance, total_earned FROM point_accounts WHERE user_id=?", req.UserId).
 		Scan(&balance, &totalEarned)
-	// Write back to Redis
 	s.rdb.HSet(ctx, key, "balance", balance, "total_earned", totalEarned)
 	s.rdb.Expire(ctx, key, 5*time.Minute)
 	return &pb.BalanceResponse{Success: true, UserId: req.UserId, Balance: balance, TotalEarned: totalEarned}, nil
 }
-
-// ---- GetTransactions ----
 
 func (s *pointsServer) GetTransactions(ctx context.Context, req *pb.GetTransactionsRequest) (*pb.TransactionsResponse, error) {
 	limit := req.Limit
@@ -103,7 +117,6 @@ func (s *pointsServer) GetTransactions(ctx context.Context, req *pb.GetTransacti
 		return &pb.TransactionsResponse{Success: true}, nil
 	}
 	defer rows.Close()
-
 	resp := &pb.TransactionsResponse{Success: true}
 	for rows.Next() {
 		var tx pb.Transaction
@@ -113,10 +126,9 @@ func (s *pointsServer) GetTransactions(ctx context.Context, req *pb.GetTransacti
 	return resp, nil
 }
 
-// ---- Earn ----
+// ---- Earn: MySQL transaction -> Redis cache ----
 
 func (s *pointsServer) Earn(ctx context.Context, req *pb.EarnRequest) (*pb.BalanceResponse, error) {
-	// Idempotency
 	if req.IdempotencyKey != "" {
 		ok, _ := s.rdb.SetNX(ctx, "pts:dup:"+req.IdempotencyKey, "1", 5*time.Minute).Result()
 		if !ok {
@@ -124,33 +136,27 @@ func (s *pointsServer) Earn(ctx context.Context, req *pb.EarnRequest) (*pb.Balan
 			return &pb.BalanceResponse{Success: false, Balance: bal, Error: "duplicate"}, nil
 		}
 	}
-
 	tx, _ := s.db.Begin()
 	defer tx.Rollback()
-
-	// Upsert account
-	tx.Exec("INSERT INTO point_accounts (user_id, balance, total_earned) VALUES (?,?,?) ON DUPLICATE KEY UPDATE balance=balance+?, total_earned=total_earned+?", req.UserId, req.Amount, req.Amount, req.Amount, req.Amount)
-
-	// Insert transaction
-	res, err := tx.Exec("INSERT INTO point_transactions (user_id, type, amount, reason) VALUES (?,?,?,?)", req.UserId, "earn", req.Amount, req.Reason)
+	tx.Exec("INSERT INTO point_accounts (user_id, balance, total_earned) VALUES (?,?,?) ON DUPLICATE KEY UPDATE balance=balance+?, total_earned=total_earned+?",
+		req.UserId, req.Amount, req.Amount, req.Amount, req.Amount)
+	res, err := tx.Exec("INSERT INTO point_transactions (user_id, type, amount, reason) VALUES (?,?,?,?)",
+		req.UserId, "earn", req.Amount, req.Reason)
 	if err != nil {
 		return &pb.BalanceResponse{Success: false, Error: "db error"}, nil
 	}
 	txID, _ := res.LastInsertId()
 	tx.Commit()
 
-	// Update Redis cache
 	key := fmt.Sprintf("pts:%d", req.UserId)
 	pipe := s.rdb.Pipeline()
 	pipe.HIncrBy(ctx, key, "balance", req.Amount)
 	pipe.HIncrBy(ctx, key, "total_earned", req.Amount)
 	pipe.Expire(ctx, key, 5*time.Minute)
 	cmds, _ := pipe.Exec(ctx)
-
 	balance := cmds[0].(*redis.IntCmd).Val()
 	total := cmds[1].(*redis.IntCmd).Val()
 
-	// Redis transaction log (hot cache, optional)
 	b, _ := json.Marshal(map[string]interface{}{"id": txID, "type": "earn", "amount": req.Amount, "reason": req.Reason, "created_at": time.Now().Format(time.RFC3339)})
 	s.rdb.LPush(ctx, fmt.Sprintf("pts:tx:%d", req.UserId), string(b))
 	s.rdb.LTrim(ctx, fmt.Sprintf("pts:tx:%d", req.UserId), 0, 99)
@@ -158,12 +164,11 @@ func (s *pointsServer) Earn(ctx context.Context, req *pb.EarnRequest) (*pb.Balan
 	return &pb.BalanceResponse{Success: true, UserId: req.UserId, Balance: balance, TotalEarned: total}, nil
 }
 
-// ---- Deduct ----
+// ---- Deduct: MySQL FOR UPDATE -> transaction -> Redis ----
 
 func (s *pointsServer) Deduct(ctx context.Context, req *pb.DeductRequest) (*pb.BalanceResponse, error) {
 	tx, _ := s.db.Begin()
 	defer tx.Rollback()
-
 	var balance int64
 	err := tx.QueryRow("SELECT balance FROM point_accounts WHERE user_id=? FOR UPDATE", req.UserId).Scan(&balance)
 	if err != nil {
@@ -172,22 +177,19 @@ func (s *pointsServer) Deduct(ctx context.Context, req *pb.DeductRequest) (*pb.B
 	if balance < req.Amount {
 		return &pb.BalanceResponse{Success: false, Balance: balance, Error: "insufficient balance"}, nil
 	}
-
 	tx.Exec("UPDATE point_accounts SET balance=balance-? WHERE user_id=?", req.Amount, req.UserId)
-	tx.Exec("INSERT INTO point_transactions (user_id, type, amount, reason, ref_id) VALUES (?,?,?,?,?)", req.UserId, "deduct", -req.Amount, req.Reason, req.RefId)
+	tx.Exec("INSERT INTO point_transactions (user_id, type, amount, reason, ref_id) VALUES (?,?,?,?,?)",
+		req.UserId, "deduct", -req.Amount, req.Reason, req.RefId)
 	tx.Commit()
 
 	newBal := balance - req.Amount
-
-	// Update Redis
 	key := fmt.Sprintf("pts:%d", req.UserId)
 	s.rdb.HIncrBy(ctx, key, "balance", -req.Amount)
 	s.rdb.Expire(ctx, key, 5*time.Minute)
-
 	return &pb.BalanceResponse{Success: true, UserId: req.UserId, Balance: newBal}, nil
 }
 
-// ---- GetLeaderboard ----
+// ---- Leaderboard ----
 
 func (s *pointsServer) GetLeaderboard(ctx context.Context, req *pb.LeaderboardRequest) (*pb.LeaderboardResponse, error) {
 	limit := int(req.Limit)
@@ -199,7 +201,6 @@ func (s *pointsServer) GetLeaderboard(ctx context.Context, req *pb.LeaderboardRe
 		return &pb.LeaderboardResponse{Success: true}, nil
 	}
 	defer rows.Close()
-
 	resp := &pb.LeaderboardResponse{Success: true}
 	for rows.Next() {
 		var uid, total int64
@@ -209,7 +210,7 @@ func (s *pointsServer) GetLeaderboard(ctx context.Context, req *pb.LeaderboardRe
 	return resp, nil
 }
 
-// ---- Streak (Redis only, no DB needed) ----
+// ---- Streak (Redis only) ----
 
 func (s *pointsServer) checkLoginStreak(ctx context.Context, uid int64) (int64, bool) {
 	today := time.Now().Format("2006-01-02")
@@ -232,22 +233,24 @@ func (s *pointsServer) checkLoginStreak(ctx context.Context, uid int64) (int64, 
 	return streak, streak%7 == 0
 }
 
-// ---- Event consumer ----
+// ---- Event consumer (RabbitMQ) ----
 
 func (s *pointsServer) consumeEvents() {
-	pubsub := s.rdb.Subscribe(context.Background(), "pts:earn")
-	defer pubsub.Close()
-	ch := pubsub.Channel()
-
-	slog.Info("points: consuming events from Redis pts:earn")
-	for msg := range ch {
+	msgs, err := s.amqpCh.Consume("pts.earn", "", false, false, false, false, nil)
+	if err != nil {
+		slog.Error("pts: consume failed", "error", err)
+		return
+	}
+	slog.Info("points: consuming pts.* from RabbitMQ")
+	for msg := range msgs {
 		var ev struct {
 			Type           string `json:"type"`
 			UserID         int64  `json:"user_id"`
 			IdempotencyKey string `json:"key"`
 			Amount         int64  `json:"amount"`
 		}
-		if err := json.Unmarshal([]byte(msg.Payload), &ev); err != nil {
+		if err := json.Unmarshal(msg.Body, &ev); err != nil {
+			msg.Nack(false, false)
 			continue
 		}
 
@@ -272,14 +275,16 @@ func (s *pointsServer) consumeEvents() {
 			amount = 3
 			limit = 10
 		case "seckill_order":
-			ctx2, cancel2 := context.WithTimeout(context.Background(), 3*time.Second)
-			defer cancel2()
-			s.Deduct(ctx2, &pb.DeductRequest{
+			ctxDed, cancelDed := context.WithTimeout(context.Background(), 3*time.Second)
+			s.Deduct(ctxDed, &pb.DeductRequest{
 				UserId: ev.UserID, Amount: ev.Amount,
 				Reason: "seckill_order", RefId: ev.IdempotencyKey,
 			})
+			cancelDed()
+			msg.Ack(false)
 			continue
 		default:
+			msg.Nack(false, false)
 			continue
 		}
 
@@ -288,15 +293,17 @@ func (s *pointsServer) consumeEvents() {
 			n, _ := s.rdb.Incr(context.Background(), limitKey).Result()
 			s.rdb.Expire(context.Background(), limitKey, 24*time.Hour)
 			if n > int64(limit) {
+				msg.Ack(false)
 				continue
 			}
 		}
 
-		ctx2, cancel2 := context.WithTimeout(context.Background(), 3*time.Second)
-		_, _ = s.Earn(ctx2, &pb.EarnRequest{
+		ctxEarn, cancelEarn := context.WithTimeout(context.Background(), 3*time.Second)
+		_, _ = s.Earn(ctxEarn, &pb.EarnRequest{
 			UserId: ev.UserID, Amount: amount, Reason: ev.Type, IdempotencyKey: ev.IdempotencyKey,
 		})
-		cancel2()
+		cancelEarn()
+		msg.Ack(false)
 	}
 }
 
@@ -306,8 +313,6 @@ func (s *pointsServer) balanceFromMySQL(ctx context.Context, uid int64) int64 {
 	return b
 }
 
-// ---- main ----
-
 func main() {
 	redisAddr := getenv("REDIS_ADDR", "redis-cluster-7000:7000")
 	redisPass := getenv("REDIS_PASSWORD", "rpc-redis-123456")
@@ -315,11 +320,13 @@ func main() {
 	mysqlDSN := fmt.Sprintf("%s:%s@tcp(%s)/%s?parseTime=true",
 		getenv("MYSQL_USER", "root"), getenv("MYSQL_PASSWORD", "123456"),
 		getenv("MYSQL_ADDR", "mysql-auth:3306"), getenv("MYSQL_DB", "rpc_auth"))
+	amqpAddr := getenv("RABBITMQ_ADDR", "amqp://rpc:rpc-rabbit-123456@rabbitmq:5672/")
 
 	rdb := redis.NewClient(&redis.Options{Addr: redisAddr, Password: redisPass})
 	db := initDB(mysqlDSN)
+	amqpCh := initAMQP(amqpAddr)
 
-	srvImpl := &pointsServer{db: db, rdb: rdb}
+	srvImpl := &pointsServer{db: db, rdb: rdb, amqpCh: amqpCh}
 	go srvImpl.consumeEvents()
 
 	lis, _ := net.Listen("tcp", ":"+port)
@@ -329,7 +336,6 @@ func main() {
 	hs.SetServingStatus("", grpc_health_v1.HealthCheckResponse_SERVING)
 	grpc_health_v1.RegisterHealthServer(srv, hs)
 	reflection.Register(srv)
-
 	registerConsul(port)
 	slog.Info("points-server listening", "port", port)
 	srv.Serve(lis)

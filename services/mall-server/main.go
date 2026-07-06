@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	amqp "github.com/rabbitmq/amqp091-go"
 	_ "github.com/go-sql-driver/mysql"
 	pb "gateway-grpc/gen/rpc"
 	"github.com/redis/go-redis/v9"
@@ -24,8 +25,26 @@ import (
 
 type mallServer struct {
 	pb.UnimplementedMallServiceServer
-	db  *sql.DB
-	rdb *redis.Client
+	db      *sql.DB
+	rdb     *redis.Client
+	amqpCh  *amqp.Channel
+}
+
+func initAMQP(addr string) *amqp.Channel {
+	conn, err := amqp.Dial(addr)
+	if err != nil {
+		slog.Error("rabbitmq dial failed", "error", err)
+		os.Exit(1)
+	}
+	ch, err := conn.Channel()
+	if err != nil {
+		slog.Error("rabbitmq channel failed", "error", err)
+		os.Exit(1)
+	}
+	ch.ExchangeDeclare("rpc.events", "topic", true, false, false, false, nil)
+	q, _ := ch.QueueDeclare("mall.order", true, false, false, false, nil)
+	ch.QueueBind(q.Name, "order.created", "rpc.events", false, nil)
+	return ch
 }
 
 func initDB(dsn string) *sql.DB {
@@ -236,13 +255,19 @@ func (s *mallServer) SeckillOrder(ctx context.Context, req *pb.SeckillOrderReque
 		return &pb.OrderResponse{Success: false, Error: "sold out"}, nil
 	}
 
-	// Create order in MySQL
 	orderID := s.rdb.Incr(ctx, "mall:seq:order").Val()
-	_, dbErr := s.db.Exec("INSERT INTO orders (id,user_id,product_id,seckill_id,amount,idempotency_key) VALUES (?,?,?,?,?,?)",
-		orderID, req.UserId, skPID, req.SeckillId, skPrice, req.IdempotencyKey)
-	if dbErr != nil {
-		s.rdb.Incr(ctx, stockKey) // rollback
-		return &pb.OrderResponse{Success: false, Error: "order failed"}, nil
+
+	// Publish to RabbitMQ (durable, will be consumed to write MySQL)
+	orderMsg, _ := json.Marshal(map[string]interface{}{
+		"id": orderID, "user_id": req.UserId, "product_id": skPID,
+		"seckill_id": req.SeckillId, "amount": skPrice,
+		"idempotency_key": req.IdempotencyKey, "product_name": skName,
+	})
+	err = s.amqpCh.Publish("rpc.events", "order.created", false, false,
+		amqp.Publishing{ContentType: "application/json", Body: orderMsg, DeliveryMode: amqp.Persistent})
+	if err != nil {
+		s.rdb.Incr(ctx, stockKey) // rollback Redis stock
+		return &pb.OrderResponse{Success: false, Error: "system busy, retry"}, nil
 	}
 
 	// Deduct points via event
@@ -276,6 +301,37 @@ func (s *mallServer) ListOrders(ctx context.Context, req *pb.ListOrdersRequest) 
 	return resp, nil
 }
 
+func (s *mallServer) consumeOrders() {
+	msgs, err := s.amqpCh.Consume("mall.order", "", false, false, false, false, nil)
+	if err != nil {
+		slog.Error("consume orders failed", "error", err)
+		return
+	}
+	slog.Info("mall: consuming order.created from RabbitMQ")
+	for msg := range msgs {
+		var o struct {
+			ID             int64  `json:"id"`
+			UserID         int64  `json:"user_id"`
+			ProductID      int64  `json:"product_id"`
+			SeckillID      int64  `json:"seckill_id"`
+			Amount         int64  `json:"amount"`
+			IdempotencyKey string `json:"idempotency_key"`
+		}
+		if err := json.Unmarshal(msg.Body, &o); err != nil {
+			msg.Nack(false, false)
+			continue
+		}
+		_, dbErr := s.db.Exec("INSERT INTO orders (id,user_id,product_id,seckill_id,amount,idempotency_key) VALUES (?,?,?,?,?,?)",
+			o.ID, o.UserID, o.ProductID, o.SeckillID, o.Amount, o.IdempotencyKey)
+		if dbErr != nil {
+			slog.Warn("order insert failed, retrying", "id", o.ID, "error", dbErr)
+			msg.Nack(false, true) // re-queue
+			continue
+		}
+		msg.Ack(false)
+	}
+}
+
 // ---- main ----
 
 func main() {
@@ -288,8 +344,10 @@ func main() {
 
 	rdb := redis.NewClient(&redis.Options{Addr: redisAddr, Password: redisPass})
 	db := initDB(mysqlDSN)
+	amqpCh := initAMQP(getenv("RABBITMQ_ADDR", "amqp://rpc:rpc-rabbit-123456@rabbitmq:5672/"))
 
-	srvImpl := &mallServer{db: db, rdb: rdb}
+	srvImpl := &mallServer{db: db, rdb: rdb, amqpCh: amqpCh}
+	go srvImpl.consumeOrders()
 
 	lis, _ := net.Listen("tcp", ":"+port)
 	srv := grpc.NewServer()
