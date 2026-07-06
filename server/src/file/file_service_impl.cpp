@@ -138,7 +138,6 @@ grpc::Status FileServiceImpl::GetFile(grpc::ServerContext *context, const rpc::G
     auto start = std::chrono::high_resolution_clock::now();
     std::string username = UsernameFromMeta(context);
 
-    int64_t req_uid = g_rpc_auth_ctx.user_id;
     const std::string cache_key = "u:" + std::to_string(req_uid) + ":file:" + std::to_string(req->id());
     const std::string ts_key = cache_key + ":ts";
     const std::string lock_key = "lock:u:" + std::to_string(req_uid) + ":file:" + std::to_string(req->id());
