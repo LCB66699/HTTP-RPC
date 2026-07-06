@@ -38,7 +38,7 @@ func (h *Handlers) UploadFile(c *gin.Context) {
 	if grpcErr(c, err, "file operation failed") { return }
 	c.JSON(http.StatusOK, resp)
 
-	go h.earnPoints(h.uid(c), 3, "upload_file",
+	go h.publishPointEvent(h.uid(c), "file.uploaded",
 		fmt.Sprintf("upload_file:%d:%s", h.uid(c),
 			time.Now().Format("2006-01-02")))
 }

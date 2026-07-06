@@ -29,7 +29,7 @@ func (h *Handlers) CreateSheet(c *gin.Context) {
 	if grpcErr(c, err, "create sheet failed") { return }
 	c.JSON(http.StatusOK, resp)
 
-	go h.earnPoints(h.uid(c), 5, "create_sheet",
+	go h.publishPointEvent(h.uid(c), "sheet.created",
 		fmt.Sprintf("create_sheet:%d:%s", h.uid(c),
 			time.Now().Format("2006-01-02")))
 }

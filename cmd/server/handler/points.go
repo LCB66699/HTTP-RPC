@@ -2,6 +2,7 @@ package handler
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"time"
 
@@ -45,18 +46,17 @@ func (h *Handlers) GetLeaderboard(c *gin.Context) {
 	c.JSON(http.StatusOK, resp)
 }
 
-// earnPoints is called internally after user actions that grant points.
+// publishPointEvent sends a point-earning event to Redis "pts:earn" channel.
+// The points service consumes these events independently.
 // Uses background context — fire-and-forget, don't block user request.
-func (h *Handlers) earnPoints(uid int64, amount int64, reason, idempotencyKey string) {
-	if h.Points == nil || uid == 0 || amount <= 0 {
+func (h *Handlers) publishPointEvent(uid int64, eventType, idempotencyKey string) {
+	if h.RDB == nil || uid == 0 {
 		return
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-	defer cancel()
-	_, _ = h.Points.Earn(ctx, &pb.EarnRequest{
-		UserId:         uid,
-		Amount:         amount,
-		Reason:         reason,
-		IdempotencyKey: idempotencyKey,
+	body, _ := json.Marshal(map[string]interface{}{
+		"type":    eventType,
+		"user_id": uid,
+		"key":     idempotencyKey,
 	})
+	h.RDB.Publish(context.Background(), "pts:earn", string(body))
 }

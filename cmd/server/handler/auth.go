@@ -36,7 +36,7 @@ func (h *Handlers) Login(c *gin.Context) {
 	c.JSON(http.StatusOK, resp)
 
 	// Award login points (daily)
-	go h.earnPoints(resp.GetUserId(), 10, "daily_login",
+	go h.publishPointEvent(resp.GetUserId(), "user.logged_in",
 		fmt.Sprintf("login:%d:%s", resp.GetUserId(), time.Now().Format("2006-01-02")))
 }
 

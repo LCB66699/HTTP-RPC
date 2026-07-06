@@ -140,12 +140,58 @@ func (s *pointsServer) balance(ctx context.Context, uid int64) int64 {
 	return v
 }
 
+// consumeEvents listens on Redis "pts:earn" channel for point-earning events.
+func (s *pointsServer) consumeEvents() {
+	pubsub := s.rdb.Subscribe(context.Background(), "pts:earn")
+	defer pubsub.Close()
+	ch := pubsub.Channel()
+
+	slog.Info("points: consuming events from Redis pts:earn")
+	for msg := range ch {
+		var ev struct {
+			Type           string `json:"type"`
+			UserID         int64  `json:"user_id"`
+			IdempotencyKey string `json:"key"`
+		}
+		if err := json.Unmarshal([]byte(msg.Payload), &ev); err != nil {
+			continue
+		}
+
+		amount := int64(0)
+		switch ev.Type {
+		case "user.logged_in":
+			amount = 10
+		case "sheet.created":
+			amount = 5
+		case "file.uploaded":
+			amount = 3
+		default:
+			continue
+		}
+
+		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+		_, err := s.Earn(ctx, &pb.EarnRequest{
+			UserId:         ev.UserID,
+			Amount:         amount,
+			Reason:         ev.Type,
+			IdempotencyKey: ev.IdempotencyKey,
+		})
+		cancel()
+		if err != nil {
+			slog.Warn("points: earn failed", "type", ev.Type, "uid", ev.UserID)
+		}
+	}
+}
+
 func main() {
 	redisAddr := getenv("REDIS_ADDR", "redis-cluster-7000:7000")
 	redisPass := getenv("REDIS_PASSWORD", "rpc-redis-123456")
 	port := getenv("PORT", "50052")
 
 	rdb := redis.NewClient(&redis.Options{Addr: redisAddr, Password: redisPass})
+
+	srvImpl := &pointsServer{rdb: rdb}
+	go srvImpl.consumeEvents()
 
 	lis, err := net.Listen("tcp", ":"+port)
 	if err != nil {
