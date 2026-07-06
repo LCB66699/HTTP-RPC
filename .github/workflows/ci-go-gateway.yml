@@ -1,6 +1,8 @@
 name: CI Go Gateway
 
 on:
+  push:
+    branches-ignore: [main]
   pull_request:
     paths:
       - 'cmd/server/**'

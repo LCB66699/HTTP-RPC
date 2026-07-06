@@ -1,6 +1,8 @@
 name: CI C++ File
 
 on:
+  push:
+    branches-ignore: [main]
   pull_request:
     paths:
       - 'server/src/file/**'
