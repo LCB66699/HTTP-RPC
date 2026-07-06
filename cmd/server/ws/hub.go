@@ -3,6 +3,7 @@ package ws
 import (
 	"encoding/json"
 	"log/slog"
+	"time"
 
 	"github.com/redis/go-redis/v9"
 )
@@ -25,12 +26,26 @@ func NewHub(rdb *redis.Client) *Hub {
 	}
 }
 
-// Run starts the hub event loop and Redis subscription.
-func (h *Hub) Run() {
+// connectRedis tries to subscribe to the broadcast channel.
+// Returns nil channel if Redis is not available.
+func (h *Hub) connectRedis() <-chan *redis.Message {
 	pubsub := h.rdb.Subscribe(nil, "ws:broadcast")
-	defer pubsub.Close()
+	_, err := pubsub.Receive(nil)
+	if err != nil {
+		pubsub.Close()
+		return nil
+	}
+	return pubsub.Channel()
+}
 
-	ch := pubsub.Channel()
+// Run starts the hub event loop. Retries Redis subscription indefinitely.
+func (h *Hub) Run() {
+	var redisCh <-chan *redis.Message
+	retryTicker := time.NewTicker(5 * time.Second)
+	defer retryTicker.Stop()
+
+	// Initial connect
+	redisCh = h.connectRedis()
 
 	for {
 		select {
@@ -53,7 +68,11 @@ func (h *Hub) Run() {
 			}
 			close(client.send)
 
-		case msg := <-ch:
+		case msg, ok := <-redisCh:
+			if !ok {
+				redisCh = nil
+				continue
+			}
 			var broadcast struct {
 				Room string `json:"room"`
 			}
@@ -67,6 +86,14 @@ func (h *Hub) Run() {
 					default:
 						go h.unregisterClient(client)
 					}
+				}
+			}
+
+		case <-retryTicker.C:
+			if redisCh == nil {
+				if ch := h.connectRedis(); ch != nil {
+					redisCh = ch
+					slog.Info("ws: Redis reconnected, broadcast enabled")
 				}
 			}
 		}
