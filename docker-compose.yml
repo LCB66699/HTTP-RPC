@@ -760,6 +760,29 @@
         condition: service_healthy
     restart: unless-stopped
 
+  # ===== Points Service (Go) =====
+  points-server:
+    build:
+      context: .
+      dockerfile: services/points-server/Dockerfile
+    image: ${DOCKER_USER:-http-rpc}/points:latest
+    environment:
+      REDIS_ADDR: "redis-cluster-7000:7000"
+      REDIS_PASSWORD: "${REDIS_PASSWORD:-rpc-redis-123456}"
+    networks:
+      default:
+        aliases: [rpc-points]
+    depends_on:
+      consul:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "grpc_health_probe", "-addr=localhost:50052"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+    restart: unless-stopped
+
   # ===== Prometheus Monitoring =====
   prometheus:
     image: prom/prometheus:v2.54.0

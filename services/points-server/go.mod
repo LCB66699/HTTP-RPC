@@ -18,4 +18,4 @@ require (
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20240814211410-ddb44dafa142 // indirect
 )
 
-replace gateway-grpc/gen/rpc => ../server/gen/rpc
+replace gateway-grpc/gen/rpc => ../../cmd/server/gen/rpc
