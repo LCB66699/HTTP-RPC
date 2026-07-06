@@ -1,10 +1,6 @@
 name: CI Go Gateway
 
 on:
-  push:
-    paths:
-      - 'cmd/server/**'
-      - 'proto/*.proto'
   pull_request:
     paths:
       - 'cmd/server/**'
