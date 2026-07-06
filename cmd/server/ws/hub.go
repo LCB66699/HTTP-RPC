@@ -1,6 +1,7 @@
 package ws
 
 import (
+	"context"
 	"encoding/json"
 	"log/slog"
 	"time"
@@ -27,10 +28,12 @@ func NewHub(rdb *redis.Client) *Hub {
 }
 
 // connectRedis tries to subscribe to the broadcast channel.
-// Returns nil channel if Redis is not available.
+// Returns nil channel if Redis is not available within 3s.
 func (h *Hub) connectRedis() <-chan *redis.Message {
-	pubsub := h.rdb.Subscribe(nil, "ws:broadcast")
-	_, err := pubsub.Receive(nil)
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	pubsub := h.rdb.Subscribe(ctx, "ws:broadcast")
+	_, err := pubsub.Receive(ctx)
 	if err != nil {
 		pubsub.Close()
 		return nil
