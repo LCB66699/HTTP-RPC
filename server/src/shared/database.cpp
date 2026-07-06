@@ -282,8 +282,10 @@ bool Database::Initialize() {
         "data_json JSON NOT NULL, "
         "row_count INT NOT NULL DEFAULT 0, "
         "col_count INT NOT NULL DEFAULT 0, "
+        "workspace_id BIGINT NOT NULL DEFAULT 0, "
         "created_at DATETIME NOT NULL DEFAULT NOW(), "
         "updated_at DATETIME NOT NULL DEFAULT NOW())");
+    exec("ALTER TABLE spreadsheets ADD COLUMN workspace_id BIGINT NOT NULL DEFAULT 0");
     exec(
         "CREATE TABLE IF NOT EXISTS files ("
         "id BIGINT AUTO_INCREMENT PRIMARY KEY, "
@@ -292,7 +294,9 @@ bool Database::Initialize() {
         "size BIGINT NOT NULL DEFAULT 0, "
         "mime_type VARCHAR(128) DEFAULT '', "
         "file_content LONGBLOB, "
+        "workspace_id BIGINT NOT NULL DEFAULT 0, "
         "created_at DATETIME NOT NULL DEFAULT NOW())");
+    exec("ALTER TABLE files ADD COLUMN workspace_id BIGINT NOT NULL DEFAULT 0");
     exec(
         "CREATE TABLE IF NOT EXISTS outbox ("
         "id BIGINT AUTO_INCREMENT PRIMARY KEY, "
@@ -431,8 +435,10 @@ bool Database::Initialize() {
                 fprintf(stderr, "[DB] DDL error on read conn: %s\n", mysql_error(c));
         };
         exec("CREATE TABLE IF NOT EXISTS users (id BIGINT AUTO_INCREMENT PRIMARY KEY, username VARCHAR(64) UNIQUE NOT NULL, password_hash VARCHAR(256) NOT NULL, created_at DATETIME NOT NULL DEFAULT NOW())");
-        exec("CREATE TABLE IF NOT EXISTS spreadsheets (id BIGINT AUTO_INCREMENT PRIMARY KEY, username VARCHAR(64) NOT NULL, name VARCHAR(255) NOT NULL, description TEXT, headers_json JSON NOT NULL, data_json JSON NOT NULL, row_count INT NOT NULL DEFAULT 0, col_count INT NOT NULL DEFAULT 0, created_at DATETIME NOT NULL DEFAULT NOW(), updated_at DATETIME NOT NULL DEFAULT NOW())");
-        exec("CREATE TABLE IF NOT EXISTS files (id BIGINT AUTO_INCREMENT PRIMARY KEY, username VARCHAR(64) NOT NULL, original_name VARCHAR(512) NOT NULL, size BIGINT NOT NULL DEFAULT 0, mime_type VARCHAR(128) DEFAULT '', file_content LONGBLOB, created_at DATETIME NOT NULL DEFAULT NOW())");
+        exec("CREATE TABLE IF NOT EXISTS spreadsheets (id BIGINT AUTO_INCREMENT PRIMARY KEY, username VARCHAR(64) NOT NULL, name VARCHAR(255) NOT NULL, description TEXT, headers_json JSON NOT NULL, data_json JSON NOT NULL, row_count INT NOT NULL DEFAULT 0, col_count INT NOT NULL DEFAULT 0, workspace_id BIGINT NOT NULL DEFAULT 0, created_at DATETIME NOT NULL DEFAULT NOW(), updated_at DATETIME NOT NULL DEFAULT NOW())");
+        exec("ALTER TABLE spreadsheets ADD COLUMN workspace_id BIGINT NOT NULL DEFAULT 0");
+        exec("CREATE TABLE IF NOT EXISTS files (id BIGINT AUTO_INCREMENT PRIMARY KEY, username VARCHAR(64) NOT NULL, original_name VARCHAR(512) NOT NULL, size BIGINT NOT NULL DEFAULT 0, mime_type VARCHAR(128) DEFAULT '', file_content LONGBLOB, workspace_id BIGINT NOT NULL DEFAULT 0, created_at DATETIME NOT NULL DEFAULT NOW())");
+        exec("ALTER TABLE files ADD COLUMN workspace_id BIGINT NOT NULL DEFAULT 0");
         exec("CREATE TABLE IF NOT EXISTS outbox (id BIGINT AUTO_INCREMENT PRIMARY KEY, event_type VARCHAR(64) NOT NULL, payload JSON NOT NULL, created_at DATETIME DEFAULT NOW())");
     }
 
