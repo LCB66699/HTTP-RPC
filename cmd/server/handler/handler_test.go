@@ -732,3 +732,51 @@ func TestGetLeaderboard(t *testing.T) {
 
 	if w.Code != http.StatusOK { t.Fatalf("expected 200, got %d", w.Code) }
 }
+
+// ---- Points earning rule tests ----
+
+func TestEarnPointsCallsEarnRPC(t *testing.T) {
+	h := newTestHandlers()
+	earned := false
+	h.Points = &mockPointsClient{
+		earnFn: func(ctx context.Context, req *pb.EarnRequest, opts ...grpc.CallOption) (*pb.BalanceResponse, error) {
+			if req.UserId == 42 && req.Amount == 10 && req.Reason == "daily_login" {
+				earned = true
+			}
+			return &pb.BalanceResponse{Success: true, Balance: 10}, nil
+		},
+	}
+	h.earnPoints(42, 10, "daily_login", "test-key")
+	if !earned {
+		t.Error("earnPoints should call Earn RPC")
+	}
+}
+
+func TestEarnPointsIgnoresNilClient(t *testing.T) {
+	h := newTestHandlers()
+	h.earnPoints(42, 10, "daily_login", "test-key")
+}
+
+func TestEarnPointsZeroUID(t *testing.T) {
+	h := newTestHandlers()
+	called := false
+	h.Points = &mockPointsClient{
+		earnFn: func(ctx context.Context, req *pb.EarnRequest, opts ...grpc.CallOption) (*pb.BalanceResponse, error) {
+			called = true; return &pb.BalanceResponse{}, nil
+		},
+	}
+	h.earnPoints(0, 10, "daily_login", "test-key")
+	if called { t.Error("earnPoints with uid=0 should not call Earn") }
+}
+
+func TestEarnPointsZeroAmount(t *testing.T) {
+	h := newTestHandlers()
+	called := false
+	h.Points = &mockPointsClient{
+		earnFn: func(ctx context.Context, req *pb.EarnRequest, opts ...grpc.CallOption) (*pb.BalanceResponse, error) {
+			called = true; return &pb.BalanceResponse{}, nil
+		},
+	}
+	h.earnPoints(42, 0, "daily_login", "test-key")
+	if called { t.Error("earnPoints with amount=0 should not call Earn") }
+}

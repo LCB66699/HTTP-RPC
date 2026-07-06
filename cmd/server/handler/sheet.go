@@ -2,8 +2,10 @@ package handler
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	pb "gateway-grpc/gen/rpc"
@@ -26,6 +28,10 @@ func (h *Handlers) CreateSheet(c *gin.Context) {
 	resp, err := h.Sheet.CreateSpreadsheet(h.token(c.Request.Context(), c), &req)
 	if grpcErr(c, err, "create sheet failed") { return }
 	c.JSON(http.StatusOK, resp)
+
+	go h.earnPoints(h.uid(c), 5, "create_sheet",
+		fmt.Sprintf("create_sheet:%d:%s", h.uid(c),
+			time.Now().Format("2006-01-02")))
 }
 
 func (h *Handlers) GetSheet(c *gin.Context) {
