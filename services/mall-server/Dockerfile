@@ -7,8 +7,7 @@ RUN sed -i "s|dl-cdn.alpinelinux.org|mirrors.aliyun.com|g" /etc/apk/repositories
 WORKDIR /build
 COPY services/mall-server/ ./
 COPY cmd/server/gen /cmd/server/gen
-RUN go mod download
-RUN CGO_ENABLED=0 go build -o mall-server .
+RUN go mod tidy && CGO_ENABLED=0 go build -o mall-server .
 
 FROM alpine:latest
 RUN apk add --no-cache curl ca-certificates
