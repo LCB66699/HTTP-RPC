@@ -1,6 +1,8 @@
 ﻿#include "shared/helper/json_helpers.h"
 #include "shared/client/database.h"
 
+#include <nlohmann/json.hpp>
+
 #include <cstdio>
 #include <cstring>
 #include <fstream>
@@ -280,8 +282,10 @@ bool Database::Initialize() {
         "data_json JSON NOT NULL, "
         "row_count INT NOT NULL DEFAULT 0, "
         "col_count INT NOT NULL DEFAULT 0, "
+        "workspace_id BIGINT NOT NULL DEFAULT 0, "
         "created_at DATETIME NOT NULL DEFAULT NOW(), "
         "updated_at DATETIME NOT NULL DEFAULT NOW())");
+    exec("ALTER TABLE spreadsheets ADD COLUMN workspace_id BIGINT NOT NULL DEFAULT 0");
     exec(
         "CREATE TABLE IF NOT EXISTS files ("
         "id BIGINT AUTO_INCREMENT PRIMARY KEY, "
@@ -290,7 +294,9 @@ bool Database::Initialize() {
         "size BIGINT NOT NULL DEFAULT 0, "
         "mime_type VARCHAR(128) DEFAULT '', "
         "file_content LONGBLOB, "
+        "workspace_id BIGINT NOT NULL DEFAULT 0, "
         "created_at DATETIME NOT NULL DEFAULT NOW())");
+    exec("ALTER TABLE files ADD COLUMN workspace_id BIGINT NOT NULL DEFAULT 0");
     exec(
         "CREATE TABLE IF NOT EXISTS outbox ("
         "id BIGINT AUTO_INCREMENT PRIMARY KEY, "
@@ -429,8 +435,10 @@ bool Database::Initialize() {
                 fprintf(stderr, "[DB] DDL error on read conn: %s\n", mysql_error(c));
         };
         exec("CREATE TABLE IF NOT EXISTS users (id BIGINT AUTO_INCREMENT PRIMARY KEY, username VARCHAR(64) UNIQUE NOT NULL, password_hash VARCHAR(256) NOT NULL, created_at DATETIME NOT NULL DEFAULT NOW())");
-        exec("CREATE TABLE IF NOT EXISTS spreadsheets (id BIGINT AUTO_INCREMENT PRIMARY KEY, username VARCHAR(64) NOT NULL, name VARCHAR(255) NOT NULL, description TEXT, headers_json JSON NOT NULL, data_json JSON NOT NULL, row_count INT NOT NULL DEFAULT 0, col_count INT NOT NULL DEFAULT 0, created_at DATETIME NOT NULL DEFAULT NOW(), updated_at DATETIME NOT NULL DEFAULT NOW())");
-        exec("CREATE TABLE IF NOT EXISTS files (id BIGINT AUTO_INCREMENT PRIMARY KEY, username VARCHAR(64) NOT NULL, original_name VARCHAR(512) NOT NULL, size BIGINT NOT NULL DEFAULT 0, mime_type VARCHAR(128) DEFAULT '', file_content LONGBLOB, created_at DATETIME NOT NULL DEFAULT NOW())");
+        exec("CREATE TABLE IF NOT EXISTS spreadsheets (id BIGINT AUTO_INCREMENT PRIMARY KEY, username VARCHAR(64) NOT NULL, name VARCHAR(255) NOT NULL, description TEXT, headers_json JSON NOT NULL, data_json JSON NOT NULL, row_count INT NOT NULL DEFAULT 0, col_count INT NOT NULL DEFAULT 0, workspace_id BIGINT NOT NULL DEFAULT 0, created_at DATETIME NOT NULL DEFAULT NOW(), updated_at DATETIME NOT NULL DEFAULT NOW())");
+        exec("ALTER TABLE spreadsheets ADD COLUMN workspace_id BIGINT NOT NULL DEFAULT 0");
+        exec("CREATE TABLE IF NOT EXISTS files (id BIGINT AUTO_INCREMENT PRIMARY KEY, username VARCHAR(64) NOT NULL, original_name VARCHAR(512) NOT NULL, size BIGINT NOT NULL DEFAULT 0, mime_type VARCHAR(128) DEFAULT '', file_content LONGBLOB, workspace_id BIGINT NOT NULL DEFAULT 0, created_at DATETIME NOT NULL DEFAULT NOW())");
+        exec("ALTER TABLE files ADD COLUMN workspace_id BIGINT NOT NULL DEFAULT 0");
         exec("CREATE TABLE IF NOT EXISTS outbox (id BIGINT AUTO_INCREMENT PRIMARY KEY, event_type VARCHAR(64) NOT NULL, payload JSON NOT NULL, created_at DATETIME DEFAULT NOW())");
     }
 
@@ -1495,5 +1503,133 @@ bool Database::GetShareLinkByToken(const std::string &token, std::string &resour
         }
         return true;
     });
+    return found;
+}
+
+// ===== Workspace =====
+
+bool Database::EnsureWorkspaceTables() {
+    return ExecWrite(
+        "CREATE TABLE IF NOT EXISTS workspaces ("
+        "  id BIGINT PRIMARY KEY,"
+        "  name VARCHAR(128) NOT NULL,"
+        "  owner_id BIGINT NOT NULL,"
+        "  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP"
+        ")") &&
+    ExecWrite(
+        "CREATE TABLE IF NOT EXISTS workspace_members ("
+        "  workspace_id BIGINT NOT NULL,"
+        "  user_id BIGINT NOT NULL,"
+        "  username VARCHAR(64) NOT NULL,"
+        "  role VARCHAR(16) NOT NULL DEFAULT 'viewer',"
+        "  joined_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,"
+        "  PRIMARY KEY (workspace_id, user_id)"
+        ")");
+}
+
+bool Database::CreateWorkspace(int64_t owner_id, const std::string &name, int64_t &out_id) {
+    MYSQL *ec = EscConn();
+    return ExecWriteInsert(make_sql(
+        "INSERT INTO workspaces (id,name,owner_id) VALUES ({},{},{})",
+        owner_id, sql_param(ec, name), owner_id), out_id);
+}
+
+bool Database::GetWorkspace(int64_t id, std::string &name, int64_t &owner_id, std::string &created_at) {
+    bool found = false;
+    ExecRead(make_sql("SELECT name,owner_id,created_at FROM workspaces WHERE id={}", id),
+             [&](MYSQL_RES *res) -> bool {
+                 MYSQL_ROW row = mysql_fetch_row(res);
+                 if (row) {
+                     name = row[0] ? row[0] : "";
+                     owner_id = row[1] ? std::stoll(row[1]) : 0;
+                     created_at = row[2] ? row[2] : "";
+                     found = true;
+                 }
+                 return true;
+             });
+    return found;
+}
+
+bool Database::ListWorkspaces(int64_t user_id, std::string &out_json) {
+    std::vector<nlohmann::json> items;
+    ExecRead(make_sql(
+        "SELECT w.id,w.name,w.owner_id,w.created_at FROM workspaces w "
+        "INNER JOIN workspace_members m ON w.id=m.workspace_id "
+        "WHERE m.user_id={} ORDER BY w.created_at DESC", user_id),
+        [&](MYSQL_RES *res) -> bool {
+            MYSQL_ROW row;
+            while ((row = mysql_fetch_row(res))) {
+                nlohmann::json j;
+                j["id"] = row[0] ? std::stoll(row[0]) : 0;
+                j["name"] = row[1] ? row[1] : "";
+                j["owner_id"] = row[2] ? std::stoll(row[2]) : 0;
+                j["created_at"] = row[3] ? row[3] : "";
+                items.push_back(j);
+            }
+            return true;
+        });
+    out_json = nlohmann::json(items).dump();
+    return true;
+}
+
+bool Database::UpdateWorkspace(int64_t id, const std::string &name) {
+    MYSQL *ec = EscConn();
+    return ExecWrite(make_sql("UPDATE workspaces SET name={} WHERE id={}", sql_param(ec, name), id));
+}
+
+bool Database::DeleteWorkspace(int64_t id) {
+    ExecWrite(make_sql("DELETE FROM workspace_members WHERE workspace_id={}", id));
+    return ExecWrite(make_sql("DELETE FROM workspaces WHERE id={}", id));
+}
+
+bool Database::AddWorkspaceMember(int64_t wid, int64_t uid, const std::string &username, const std::string &role) {
+    MYSQL *ec = EscConn();
+    return ExecWrite(make_sql(
+        "INSERT INTO workspace_members (workspace_id,user_id,username,role) VALUES ({},{},{},{}) "
+        "ON DUPLICATE KEY UPDATE role={}",
+        wid, uid, sql_param(ec, username), sql_param(ec, role), sql_param(ec, role)));
+}
+
+bool Database::RemoveWorkspaceMember(int64_t wid, int64_t uid) {
+    return ExecWrite(make_sql("DELETE FROM workspace_members WHERE workspace_id={} AND user_id={}", wid, uid));
+}
+
+bool Database::IsWorkspaceOwner(int64_t wid, int64_t uid) {
+    bool found = false;
+    ExecRead(make_sql("SELECT 1 FROM workspaces WHERE id={} AND owner_id={}", wid, uid),
+             [&](MYSQL_RES *res) -> bool { found = (mysql_fetch_row(res) != nullptr); return true; });
+    return found;
+}
+
+bool Database::GetWorkspaceMemberRole(int64_t wid, int64_t uid, std::string &out_role) {
+    bool found = false;
+    ExecRead(make_sql("SELECT role FROM workspace_members WHERE workspace_id={} AND user_id={}", wid, uid),
+             [&](MYSQL_RES *res) -> bool {
+                 MYSQL_ROW row = mysql_fetch_row(res);
+                 if (row) { out_role = row[0] ? row[0] : ""; found = true; }
+                 return true;
+             });
+    return found;
+}
+
+bool Database::GetSpreadsheetWorkspaceId(int64_t id, int64_t &workspace_id) {
+    bool found = false;
+    ExecRead(make_sql("SELECT workspace_id FROM spreadsheets WHERE id={}", id),
+             [&](MYSQL_RES *res) -> bool {
+                 MYSQL_ROW row = mysql_fetch_row(res);
+                 if (row) { workspace_id = row[0] ? std::stoll(row[0]) : 0; found = true; }
+                 return true;
+             });
+    return found;
+}
+
+bool Database::GetFileWorkspaceId(int64_t id, int64_t &workspace_id) {
+    bool found = false;
+    ExecRead(make_sql("SELECT workspace_id FROM files WHERE id={}", id),
+             [&](MYSQL_RES *res) -> bool {
+                 MYSQL_ROW row = mysql_fetch_row(res);
+                 if (row) { workspace_id = row[0] ? std::stoll(row[0]) : 0; found = true; }
+                 return true;
+             });
     return found;
 }

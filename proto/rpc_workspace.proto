@@ -1,0 +1,94 @@
+syntax = "proto3";
+package rpc;
+
+option go_package = "rpc-server/proto/rpc";
+
+import "google/api/annotations.proto";
+
+service WorkspaceService {
+  rpc Create(CreateWorkspaceRequest) returns (WorkspaceResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/workspaces"
+      body: "*"
+    };
+  }
+  rpc Get(GetWorkspaceRequest) returns (WorkspaceResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/workspaces/{id}"
+    };
+  }
+  rpc List(ListWorkspacesRequest) returns (ListWorkspacesResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/workspaces"
+    };
+  }
+  rpc Update(UpdateWorkspaceRequest) returns (WorkspaceResponse) {
+    option (google.api.http) = {
+      put: "/api/v1/workspaces/{id}"
+      body: "*"
+    };
+  }
+  rpc Delete(DeleteWorkspaceRequest) returns (DeleteWorkspaceResponse) {
+    option (google.api.http) = {
+      delete: "/api/v1/workspaces/{id}"
+    };
+  }
+  rpc AddMember(AddMemberRequest) returns (WorkspaceResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/workspaces/{id}/members"
+      body: "*"
+    };
+  }
+  rpc RemoveMember(RemoveMemberRequest) returns (WorkspaceResponse) {
+    option (google.api.http) = {
+      delete: "/api/v1/workspaces/{id}/members/{user_id}"
+    };
+  }
+}
+
+message Workspace {
+  int64 id = 1;
+  string name = 2;
+  int64 owner_id = 3;
+  string created_at = 4;
+}
+
+message Member {
+  int64 user_id = 1;
+  string username = 2;
+  string role = 3;  // admin | editor | viewer
+  string joined_at = 4;
+}
+
+message CreateWorkspaceRequest {
+  string name = 1;
+  int64 owner_id = 2;
+}
+
+message GetWorkspaceRequest    { int64 id = 1; }
+message ListWorkspacesRequest  { int64 user_id = 1; }
+message UpdateWorkspaceRequest { int64 id = 1; string name = 2; }
+message DeleteWorkspaceRequest { int64 id = 1; }
+message AddMemberRequest       { int64 id = 1; int64 user_id = 2; string username = 3; string role = 4; }
+message RemoveMemberRequest    { int64 id = 1; int64 user_id = 2; }
+
+message WorkspaceResponse {
+  bool success = 1;
+  Workspace workspace = 2;
+  repeated Member members = 3;
+  string error = 4;
+  int32 error_code = 99;
+}
+
+message ListWorkspacesResponse {
+  bool success = 1;
+  repeated Workspace workspaces = 2;
+  string error = 3;
+  int32 error_code = 99;
+}
+
+message DeleteWorkspaceResponse {
+  bool success = 1;
+  string error = 2;
+  int32 error_code = 99;
+}

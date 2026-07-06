@@ -131,6 +131,13 @@ grpc::Status FileServiceImpl::GetFile(grpc::ServerContext *context, const rpc::G
         rpc::CheckAccessResponse cr;
         has_access = sharing_stub_->CheckAccess(&sctx, ca, &cr).ok() && cr.allowed();
     }
+    if (!has_access) {
+        int64_t wid = 0;
+        if (db_->GetFileWorkspaceId(req->id(), wid) && wid > 0) {
+            std::string role;
+            has_access = db_->GetWorkspaceMemberRole(wid, req_uid, role);
+        }
+    }
     if (!has_access)
         return WriteResult(resp, HandlerResult<>::Fail("Not found", rpc_error::NOT_FOUND)),
                grpc::Status(grpc::StatusCode::NOT_FOUND, "Not found");
@@ -138,7 +145,6 @@ grpc::Status FileServiceImpl::GetFile(grpc::ServerContext *context, const rpc::G
     auto start = std::chrono::high_resolution_clock::now();
     std::string username = UsernameFromMeta(context);
 
-    int64_t req_uid = g_rpc_auth_ctx.user_id;
     const std::string cache_key = "u:" + std::to_string(req_uid) + ":file:" + std::to_string(req->id());
     const std::string ts_key = cache_key + ":ts";
     const std::string lock_key = "lock:u:" + std::to_string(req_uid) + ":file:" + std::to_string(req->id());

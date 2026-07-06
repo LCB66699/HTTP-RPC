@@ -40,6 +40,10 @@ public:
          int limit, const std::string &cursor), (override));
     MOCK_METHOD(bool, DeleteFile, (int64_t id, int64_t uid), (override));
     MOCK_METHOD(bool, GetFileOwner, (int64_t id, int64_t &owner_uid), (override));
+    MOCK_METHOD(bool, GetFileWorkspaceId, (int64_t id, int64_t &wid), (override));
+    MOCK_METHOD(bool, GetSpreadsheetWorkspaceId, (int64_t id, int64_t &wid), (override));
+    MOCK_METHOD(bool, GetWorkspaceMemberRole,
+        (int64_t wid, int64_t uid, std::string &role), (override));
     MOCK_METHOD(bool, UpdateFileContent, (int64_t id, const std::string &content, int version), (override));
     MOCK_METHOD(bool, CreateFolder,
         (int64_t uid, const std::string &name, int64_t parent_id, int64_t &out_id), (override));

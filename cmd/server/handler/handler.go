@@ -2,6 +2,7 @@ package handler
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"strconv"
 	"time"
@@ -12,6 +13,7 @@ import (
 	"google.golang.org/grpc/metadata"
 
 	"github.com/lcb66699/http-rpc/server/middleware"
+	"github.com/lcb66699/http-rpc/server/ws"
 )
 
 // Handlers holds all dependencies for HTTP handlers.
@@ -20,18 +22,37 @@ type Handlers struct {
 	Sheet  pb.SpreadsheetServiceClient
 	File   pb.FileServiceClient
 	SearchClient pb.SearchServiceClient
-	Share  pb.SharingServiceClient
-	RDB    *redis.Client
+	Share     pb.SharingServiceClient
+	Workspace pb.WorkspaceServiceClient
+	RDB       *redis.Client
 
 	CBAuth   *middleware.CBSlow
 	CBSearch *middleware.CBSlow
 	CBSheet  *middleware.CBSlow
 	CBFile   *middleware.CBSlow
 
+	WSHub *ws.Hub
+	WS    *ws.Handler
+
 	JWTSecret string
 }
 
 // ---- helpers ----
+
+// broadcastRoom sends a real-time notification to all clients subscribed to a room.
+func (h *Handlers) broadcastRoom(room, eventType string, data map[string]interface{}) {
+	if h.RDB == nil {
+		return
+	}
+	msg := map[string]interface{}{
+		"room": room,
+		"type": eventType,
+		"data": data,
+		"ts":   time.Now().UnixMilli(),
+	}
+	body, _ := json.Marshal(msg)
+	h.RDB.Publish(context.Background(), "ws:broadcast", string(body))
+}
 
 func (h *Handlers) token(ctx context.Context, c *gin.Context) context.Context {
 	token, _ := c.Cookie("rpc_at")

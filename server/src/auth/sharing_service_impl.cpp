@@ -110,8 +110,14 @@ grpc::Status SharingServiceImpl::CheckAccess(grpc::ServerContext *ctx, const rpc
 
     db_->EnsureSharingTables();
 
+    std::string username = db_->GetUsernameById(req->user_id());
+    if (username.empty()) {
+        resp->set_allowed(false);
+        return grpc::Status::OK;
+    }
+
     std::string perm;
-    bool ok = db_->CheckShareAccess(std::to_string(req->user_id()), req->resource_type(),
+    bool ok = db_->CheckShareAccess(username, req->resource_type(),
                                      req->resource_id(), perm);
     resp->set_allowed(ok);
     if (ok) resp->set_permission(perm);

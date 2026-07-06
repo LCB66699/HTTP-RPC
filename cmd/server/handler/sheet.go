@@ -3,6 +3,7 @@ package handler
 import (
 	"encoding/json"
 	"net/http"
+	"strconv"
 
 	"github.com/gin-gonic/gin"
 	pb "gateway-grpc/gen/rpc"
@@ -54,7 +55,15 @@ func (h *Handlers) UpdateSheet(c *gin.Context) {
 	req.UserId = h.uid(c)
 	resp, err := h.Sheet.UpdateSpreadsheet(h.token(c.Request.Context(), c), &req)
 	if grpcErr(c, err, "update sheet failed") { return }
+	if !resp.GetSuccess() {
+		c.JSON(http.StatusForbidden, resp)
+		return
+	}
 	c.JSON(http.StatusOK, resp)
+
+	h.broadcastRoom("sheet:"+strconv.FormatInt(id, 10), "sheet.updated", map[string]interface{}{
+		"user": h.username(c),
+	})
 }
 
 func (h *Handlers) DeleteSheet(c *gin.Context) {

@@ -268,6 +268,8 @@ function showMainApp() {
   document.getElementById('main-header').classList.remove('hidden');
   document.querySelector('main').classList.remove('hidden');
   document.getElementById('user-display').textContent = currentUser.username;
+  document.querySelector('#main-header h1').textContent = currentUser.username + '的后花园';
+  document.title = currentUser.username + '的后花园';
   document.getElementById('profile-username').textContent = currentUser.username;
   document.getElementById('profile-join-date').textContent = currentUser.joinDate || new Date().toLocaleDateString('zh-CN');
   // 隐藏非管理员功能
@@ -426,6 +428,7 @@ document.querySelectorAll('.tab').forEach(btn => {
     if (btn.dataset.tab === 'monitor') loadMonitor();
     if (btn.dataset.tab === 'search') initSearch();
     if (btn.dataset.tab === 'profile') initProfile();
+    if (btn.dataset.tab === 'workspace') loadWorkspaces();
   });
 });
 
@@ -1589,6 +1592,7 @@ async function createFromXlsx(name, headers, data) {
 // ---- Open sheet (editor view) ----
 async function openSheet(id) {
   window.currentSheetId = id;
+  connectWS('sheet:' + id);
   console.log('[sheets] openSheet id:', id, 'authToken:', !!authToken);
   try {
     const data = await apiGet('/sheets/' + id);
@@ -2010,6 +2014,107 @@ async function shareResource(type) {
   });
   const data = await res.json();
   alert(data.success ? '分享成功' : ('分享失败: ' + (data.error || '')));
+}
+
+// ============================================================
+//  WebSocket / Real-time
+// ============================================================
+let ws = null;
+let wsRoom = null;
+
+function connectWS(room) {
+  if (ws && ws.readyState === WebSocket.OPEN && wsRoom === room) return;
+  if (ws && wsRoom !== room) {
+    ws.send(JSON.stringify({ action: 'unsubscribe', room: wsRoom }));
+    ws.close(); ws = null;
+  }
+  const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+  ws = new WebSocket(proto + '//' + location.host + API + '/ws');
+  wsRoom = room;
+
+  ws.onopen = () => {
+    ws.send(JSON.stringify({ action: 'subscribe', room }));
+  };
+
+  ws.onmessage = (event) => {
+    const msg = JSON.parse(event.data);
+    if (msg.type === 'sheet.updated' && window.currentSheetId) {
+      const sheetId = msg.room ? msg.room.replace('sheet:', '') : null;
+      if (sheetId && String(sheetId) === String(window.currentSheetId) && msg.data && msg.data.user !== currentUser) {
+        showToast(`Sheet updated by ${msg.data.user}`, 'info');
+        // Reload sheet data from API to get latest
+        loadSheet(window.currentSheetId);
+      }
+    }
+  };
+
+  ws.onclose = () => {
+    setTimeout(() => connectWS(wsRoom), 3000);
+  };
+}
+
+// ============================================================
+//  Workspace management
+// ============================================================
+async function loadWorkspaces() {
+  const data = await apiGet('/workspaces');
+  const container = document.getElementById('workspace-list');
+  if (!container) return;
+  if (!data || !data.success) {
+    container.innerHTML = '<div style="padding:12px;color:#888">Failed to load</div>';
+    return;
+  }
+  if (!data.workspaces || data.workspaces.length === 0) {
+    container.innerHTML = '<div style="padding:12px;color:#888">No workspaces</div>';
+    return;
+  }
+  container.innerHTML = data.workspaces.map(w =>
+    `<div class="ws-item" data-wid="${w.id}">
+      <span class="ws-name">${escapeHtml(w.name)}</span>
+      <span class="ws-badge">${w.owner_id}</span>
+    </div>`).join('');
+
+  container.querySelectorAll('.ws-item').forEach(el => {
+    el.onclick = () => {
+      container.querySelectorAll('.ws-item').forEach(e => e.classList.remove('active'));
+      el.classList.add('active');
+      window.currentWorkspaceId = parseInt(el.dataset.wid);
+      loadSheets(0);
+      loadFiles(0);
+    };
+  });
+}
+
+async function createWorkspace() {
+  const name = prompt('Workspace name:');
+  if (!name) return;
+  const res = await fetch(API + '/workspaces', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name }), credentials: 'same-origin'
+  });
+  const data = await res.json();
+  if (data.success) {
+    showToast('Workspace created', 'ok');
+    loadWorkspaces();
+  } else {
+    showToast('Failed: ' + (data.error || ''), 'error');
+  }
+}
+
+function showToast(msg, type) {
+  const el = document.getElementById('toast');
+  if (!el) return;
+  el.textContent = msg;
+  el.className = 'toast toast-' + (type || 'info');
+  el.style.display = 'block';
+  clearTimeout(el._timer);
+  el._timer = setTimeout(() => el.style.display = 'none', 3000);
+}
+
+function escapeHtml(s) {
+  const d = document.createElement('div');
+  d.textContent = s;
+  return d.innerHTML;
 }
 
 // ============================================================

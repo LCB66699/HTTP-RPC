@@ -10,6 +10,7 @@
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
+<div id="toast" class="toast" style="display:none"></div>
 <video id="video-bg" loop muted playsinline></video>
 <video id="video-main" loop muted playsinline style="display:none"></video>
 
@@ -73,6 +74,7 @@
   <h1>罗川柏的后花园</h1>
   <nav>
     <button class="tab active" data-tab="sheets">数据表格</button>
+    <button class="tab" data-tab="workspace">工作空间</button>
     <button class="tab" data-tab="files">文件管理</button>
     <button class="tab" data-tab="search">🔍 搜索</button>
     <button class="tab admin-only" data-tab="services" style="display:none">服务列表</button>
@@ -176,6 +178,17 @@
       <div class="sheet-grid-wrapper">
         <table id="sheet-grid" class="sheet-grid"></table>
       </div>
+    </div>
+  </section>
+
+  <!-- Workspace Panel -->
+  <section id="panel-workspace" class="panel">
+    <div class="toolbar">
+      <h2>工作空间</h2>
+      <button class="btn btn-primary" onclick="createWorkspace()">+ 新建</button>
+    </div>
+    <div id="workspace-list" class="ws-list">
+      <div style="padding:12px;color:#888">加载中...</div>
     </div>
   </section>
 

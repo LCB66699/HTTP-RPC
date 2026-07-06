@@ -189,6 +189,20 @@ class Database {
                              std::string &permission, int64_t &owner_id);
     bool EnsureSharingTables();
 
+    // Workspace
+    bool EnsureWorkspaceTables();
+    bool CreateWorkspace(int64_t owner_id, const std::string &name, int64_t &out_id);
+    bool GetWorkspace(int64_t id, std::string &name, int64_t &owner_id, std::string &created_at);
+    bool ListWorkspaces(int64_t user_id, std::string &out_json);
+    bool UpdateWorkspace(int64_t id, const std::string &name);
+    bool DeleteWorkspace(int64_t id);
+    bool AddWorkspaceMember(int64_t workspace_id, int64_t user_id, const std::string &username, const std::string &role);
+    bool RemoveWorkspaceMember(int64_t workspace_id, int64_t user_id);
+    bool IsWorkspaceOwner(int64_t workspace_id, int64_t user_id);
+    bool GetWorkspaceMemberRole(int64_t workspace_id, int64_t user_id, std::string &out_role);
+    bool GetSpreadsheetWorkspaceId(int64_t id, int64_t &workspace_id);
+    bool GetFileWorkspaceId(int64_t id, int64_t &workspace_id);
+
     // Undo log
     bool WriteUndoLog(const std::string &xid, const std::string &table_name, int64_t row_id,
                       const std::string &before_snapshot);
@@ -349,6 +363,19 @@ class ShardedDatabase : public IDatabase {
     bool EnsureSharingTables() {
         return shards_[0]->EnsureSharingTables();
     }
+
+    bool EnsureWorkspaceTables()    { return shards_[0]->EnsureWorkspaceTables(); }
+    bool CreateWorkspace(int64_t owner_id, const std::string &name, int64_t &out_id) { return shards_[0]->CreateWorkspace(owner_id, name, out_id); }
+    bool GetWorkspace(int64_t id, std::string &name, int64_t &owner_id, std::string &created_at) { return shards_[0]->GetWorkspace(id, name, owner_id, created_at); }
+    bool ListWorkspaces(int64_t user_id, std::string &out_json) { return shards_[0]->ListWorkspaces(user_id, out_json); }
+    bool UpdateWorkspace(int64_t id, const std::string &name) { return shards_[0]->UpdateWorkspace(id, name); }
+    bool DeleteWorkspace(int64_t id) { return shards_[0]->DeleteWorkspace(id); }
+    bool AddWorkspaceMember(int64_t wid, int64_t uid, const std::string &uname, const std::string &role) { return shards_[0]->AddWorkspaceMember(wid, uid, uname, role); }
+    bool RemoveWorkspaceMember(int64_t wid, int64_t uid) { return shards_[0]->RemoveWorkspaceMember(wid, uid); }
+    bool IsWorkspaceOwner(int64_t wid, int64_t uid) { return shards_[0]->IsWorkspaceOwner(wid, uid); }
+    bool GetWorkspaceMemberRole(int64_t wid, int64_t uid, std::string &role) { return shards_[0]->GetWorkspaceMemberRole(wid, uid, role); }
+    bool GetSpreadsheetWorkspaceId(int64_t id, int64_t &wid) { return shards_[0]->GetSpreadsheetWorkspaceId(id, wid); }
+    bool GetFileWorkspaceId(int64_t id, int64_t &wid) { return shards_[0]->GetFileWorkspaceId(id, wid); }
 
     // === Undo Log (by user_id or broadcast) ===
     bool WriteUndoLog(const std::string &xid, const std::string &table_name, int64_t row_id,
