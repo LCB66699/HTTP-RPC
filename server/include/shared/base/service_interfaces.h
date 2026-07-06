@@ -38,6 +38,9 @@ class IDatabase {
                            int limit = 20, const std::string &cursor = "") = 0;
     virtual bool DeleteFile(int64_t id, int64_t user_id = 0) = 0;
     virtual bool GetFileOwner(int64_t id, int64_t &owner_user_id) = 0;
+    virtual bool GetFileWorkspaceId(int64_t id, int64_t &workspace_id) = 0;
+    virtual bool GetSpreadsheetWorkspaceId(int64_t id, int64_t &workspace_id) = 0;
+    virtual bool GetWorkspaceMemberRole(int64_t workspace_id, int64_t user_id, std::string &out_role) = 0;
     virtual bool UpdateFileContent(int64_t id, const std::string &content, int version = 0) = 0;
     virtual bool CreateFolder(int64_t user_id, const std::string &name, int64_t parent_folder_id, int64_t &out_id) = 0;
     virtual bool MoveFile(int64_t id, int64_t target_folder_id, int version = 0) = 0;
