@@ -140,6 +140,30 @@ func (s *pointsServer) balance(ctx context.Context, uid int64) int64 {
 	return v
 }
 
+// checkLoginStreak returns current streak count and whether a 7-day bonus is triggered.
+func (s *pointsServer) checkLoginStreak(ctx context.Context, uid int64) (int, bool) {
+	today := time.Now().Format("2006-01-02")
+	lastKey := fmt.Sprintf("pts:streak:%d:last", uid)
+	countKey := fmt.Sprintf("pts:streak:%d:count", uid)
+
+	lastDate, _ := s.rdb.Get(ctx, lastKey).Result()
+	if lastDate == today {
+		streak, _ := s.rdb.Get(ctx, countKey).Int()
+		return streak, false
+	}
+
+	yesterday := time.Now().AddDate(0, 0, -1).Format("2006-01-02")
+	var streak int
+	if lastDate == yesterday {
+		streak, _ = s.rdb.Incr(ctx, countKey).Result()
+	} else {
+		s.rdb.Set(ctx, countKey, 1, 7*24*time.Hour)
+		streak = 1
+	}
+	s.rdb.Set(ctx, lastKey, today, 48*time.Hour)
+	return int(streak), streak%7 == 0
+}
+
 // consumeEvents listens on Redis "pts:earn" channel for point-earning events.
 func (s *pointsServer) consumeEvents() {
 	pubsub := s.rdb.Subscribe(context.Background(), "pts:earn")
@@ -158,15 +182,38 @@ func (s *pointsServer) consumeEvents() {
 		}
 
 		amount := int64(0)
+		limit := 0
 		switch ev.Type {
 		case "user.logged_in":
 			amount = 10
+			limit = 1
+			// Check streak bonus
+			if streak, bonus := s.checkLoginStreak(context.Background(), ev.UserID); bonus {
+				ctx2, cancel2 := context.WithTimeout(context.Background(), 3*time.Second)
+				s.Earn(ctx2, &pb.EarnRequest{
+					UserId: ev.UserID, Amount: 50, Reason: "login_streak_7day",
+					IdempotencyKey: fmt.Sprintf("streak:%d:%d", ev.UserID, streak),
+				})
+				cancel2()
+			}
 		case "sheet.created":
 			amount = 5
+			limit = 5
 		case "file.uploaded":
 			amount = 3
+			limit = 10
 		default:
 			continue
+		}
+
+		// Daily limit check
+		if limit > 0 {
+			limitKey := fmt.Sprintf("pts:limit:%d:%s:%s", ev.UserID, ev.Type, time.Now().Format("2006-01-02"))
+			n, _ := s.rdb.Incr(context.Background(), limitKey).Result()
+			s.rdb.Expire(context.Background(), limitKey, 24*time.Hour)
+			if n > int64(limit) {
+				continue
+			}
 		}
 
 		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)

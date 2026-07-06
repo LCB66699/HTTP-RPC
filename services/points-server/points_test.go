@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"testing"
+	"time"
 
 	pb "gateway-grpc/gen/rpc"
 	"github.com/alicebob/miniredis/v2"
@@ -218,6 +219,110 @@ func TestEarnCreateSheet(t *testing.T) {
 }
 
 // ---- Daily limit for sheet creation ----
+
+// ---- Daily limit check ----
+
+func TestDailyLimitNotExceeded(t *testing.T) {
+	srv, _ := setupTestServer(t)
+	ctx := context.Background()
+
+	// First 5 creates within limit
+	for i := 0; i < 5; i++ {
+		resp, err := srv.Earn(ctx, &pb.EarnRequest{
+			UserId: 1, Amount: 5, Reason: "sheet.created",
+			IdempotencyKey: fmt.Sprintf("sheet:day1:%d", i),
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !resp.Success {
+			t.Errorf("earn %d should succeed", i)
+		}
+	}
+	// 6th should succeed (no daily limit enforced by points server)
+	resp, err := srv.Earn(ctx, &pb.EarnRequest{
+		UserId: 1, Amount: 5, Reason: "sheet.created",
+		IdempotencyKey: "sheet:day1:6",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !resp.Success {
+		t.Error("6th sheet create should succeed (limit enforced by gateway)")
+	}
+	// Balance should be 6 * 5 = 30
+	bal, _ := srv.GetBalance(ctx, &pb.GetBalanceRequest{UserId: 1})
+	if bal.Balance != 30 {
+		t.Errorf("balance = %d, want 30", bal.Balance)
+	}
+}
+
+// ---- Login streak ----
+
+func TestLoginStreakStart(t *testing.T) {
+	srv, _ := setupTestServer(t)
+	ctx := context.Background()
+	streak, bonus := srv.checkLoginStreak(ctx, 1)
+	if streak != 1 {
+		t.Errorf("first login streak = %d, want 1", streak)
+	}
+	if bonus {
+		t.Error("first login should not get bonus")
+	}
+}
+
+func TestLoginStreakSevenDays(t *testing.T) {
+	srv, _ := setupTestServer(t)
+	ctx := context.Background()
+
+	// Simulate 7 consecutive logins
+	uid := int64(1)
+	for day := 0; day < 7; day++ {
+		date := time.Now().AddDate(0, 0, -6+day).Format("2006-01-02")
+		// Directly set the streak counter in Redis
+		srv.rdb.Set(ctx, fmt.Sprintf("pts:streak:%d:last", uid), date, 48*time.Hour)
+		srv.rdb.Set(ctx, fmt.Sprintf("pts:streak:%d:count", uid), day+1, 7*24*time.Hour)
+	}
+	streak, bonus := srv.checkLoginStreak(ctx, uid)
+	if streak != 7 {
+		t.Errorf("streak = %d, want 7", streak)
+	}
+	if !bonus {
+		t.Error("7-day streak should trigger bonus")
+	}
+}
+
+func TestLoginStreakBroken(t *testing.T) {
+	srv, _ := setupTestServer(t)
+	ctx := context.Background()
+
+	// Set last login to 2 days ago — broke streak
+	srv.rdb.Set(ctx, "pts:streak:1:last", time.Now().AddDate(0, 0, -2).Format("2006-01-02"), 48*time.Hour)
+	srv.rdb.Set(ctx, "pts:streak:1:count", 5, 7*24*time.Hour)
+	streak, bonus := srv.checkLoginStreak(ctx, 1)
+	if streak != 1 {
+		t.Errorf("broken streak should reset to 1, got %d", streak)
+	}
+	if bonus {
+		t.Error("broken streak should not trigger bonus")
+	}
+}
+
+func TestLoginStreakSameDay(t *testing.T) {
+	srv, _ := setupTestServer(t)
+	ctx := context.Background()
+
+	today := time.Now().Format("2006-01-02")
+	srv.rdb.Set(ctx, "pts:streak:1:last", today, 48*time.Hour)
+	srv.rdb.Set(ctx, "pts:streak:1:count", 3, 7*24*time.Hour)
+	streak, bonus := srv.checkLoginStreak(ctx, 1)
+	if streak != 3 {
+		t.Errorf("same day should return existing streak 3, got %d", streak)
+	}
+	if bonus {
+		t.Error("same day should not trigger bonus")
+	}
+}
 
 func TestDailyLimitCreateSheet(t *testing.T) {
 	srv, _ := setupTestServer(t)
