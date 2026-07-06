@@ -1,6 +1,8 @@
 ﻿#include "shared/helper/json_helpers.h"
 #include "shared/client/database.h"
 
+#include <nlohmann/json.hpp>
+
 #include <cstdio>
 #include <cstring>
 #include <fstream>
