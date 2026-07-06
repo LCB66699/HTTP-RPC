@@ -12,6 +12,7 @@ import (
 	"google.golang.org/grpc/metadata"
 
 	"github.com/lcb66699/http-rpc/server/middleware"
+	"github.com/lcb66699/http-rpc/server/ws"
 )
 
 // Handlers holds all dependencies for HTTP handlers.
@@ -27,6 +28,9 @@ type Handlers struct {
 	CBSearch *middleware.CBSlow
 	CBSheet  *middleware.CBSlow
 	CBFile   *middleware.CBSlow
+
+	WSHub *ws.Hub
+	WS    *ws.Handler
 
 	JWTSecret string
 }

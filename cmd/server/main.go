@@ -25,6 +25,7 @@ import (
 	"github.com/lcb66699/http-rpc/server/handler"
 	"github.com/lcb66699/http-rpc/server/middleware"
 	"github.com/lcb66699/http-rpc/server/router"
+	"github.com/lcb66699/http-rpc/server/ws"
 
 	// Register consul:// resolver for gRPC service discovery.
 	_ "github.com/lcb66699/http-rpc/server/discovery"
@@ -102,6 +103,9 @@ func main() {
 	redisPass := getenv("REDIS_PASSWORD", "rpc-redis-123456")
 	rdb := redis.NewClient(&redis.Options{Addr: redisAddr, Password: redisPass})
 
+	hub := ws.NewHub(rdb)
+	go hub.Run()
+
 	jwtSecret := getenv("JWT_SECRET", "")
 	if jwtSecret == "" {
 		slog.Error("JWT_SECRET environment variable is required")
@@ -116,6 +120,7 @@ func main() {
 		Share:   pb.NewSharingServiceClient(authConn),
 		RDB:     rdb,
 		CBAuth: cbAuth, CBSearch: cbSearch, CBSheet: cbSheet, CBFile: cbFile,
+		WSHub: hub, WS: &ws.Handler{Hub: hub},
 		JWTSecret: jwtSecret,
 	}
 

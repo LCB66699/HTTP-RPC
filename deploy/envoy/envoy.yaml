@@ -28,6 +28,9 @@ static_resources:
           codec_type: AUTO
           use_remote_address: true
 
+          upgrade_configs:
+          - upgrade_type: websocket
+
           http_filters:
           # JWT authentication — validates rpc_at cookie, injects headers
           - name: envoy.filters.http.jwt_authn

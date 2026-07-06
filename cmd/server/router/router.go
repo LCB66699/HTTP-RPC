@@ -35,5 +35,8 @@ func Setup(h *handler.Handlers, jwtSecret string) *gin.Engine {
 	h.RegisterSheetRoutes(auth)         // sheet CRUD
 	h.RegisterFileRoutes(auth)          // file CRUD + folder
 
+	// WebSocket
+	auth.GET("/ws", h.WS.ServeWS)
+
 	return r
 }
