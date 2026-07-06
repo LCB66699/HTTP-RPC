@@ -135,6 +135,61 @@ func (s *pointsServer) Deduct(ctx context.Context, req *pb.DeductRequest) (*pb.B
 	}, nil
 }
 
+func (s *pointsServer) GetLeaderboard(ctx context.Context, req *pb.LeaderboardRequest) (*pb.LeaderboardResponse, error) {
+	limit := int(req.Limit)
+	if limit <= 0 || limit > 100 {
+		limit = 20
+	}
+	resp := &pb.LeaderboardResponse{Success: true}
+
+	keys, err := s.rdb.Keys(ctx, "pts:*").Result()
+	if err != nil {
+		return resp, nil
+	}
+
+	type entry struct {
+		uid   int64
+		total int64
+	}
+	var entries []entry
+	for _, key := range keys {
+		if len(key) < 5 {
+			continue
+		}
+		suffix := key[4:]
+		if strings.ContainsAny(suffix, ":") {
+			continue // skip non-balance keys like pts:limit:*, pts:tx:*, pts:streak:*
+		}
+		uid, err := strconv.ParseInt(suffix, 10, 64)
+		if err != nil {
+			continue
+		}
+		total, _ := s.rdb.HGet(ctx, key, "total_earned").Int64()
+		if total > 0 {
+			entries = append(entries, entry{uid, total})
+		}
+	}
+
+	for i := 0; i < len(entries); i++ {
+		for j := i + 1; j < len(entries); j++ {
+			if entries[j].total > entries[i].total {
+				entries[i], entries[j] = entries[j], entries[i]
+			}
+		}
+	}
+	if len(entries) > limit {
+		entries = entries[:limit]
+	}
+
+	for _, e := range entries {
+		resp.Entries = append(resp.Entries, &pb.LeaderboardEntry{
+			UserId:      e.uid,
+			TotalEarned: e.total,
+		})
+	}
+	return resp, nil
+}
+
 func (s *pointsServer) balance(ctx context.Context, uid int64) int64 {
 	v, _ := s.rdb.HGet(ctx, fmt.Sprintf("pts:%d", uid), "balance").Int64()
 	return v
