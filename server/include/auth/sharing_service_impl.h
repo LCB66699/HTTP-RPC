@@ -20,6 +20,8 @@ class SharingServiceImpl final : public rpc::SharingService::Service {
                                  rpc::ShareLinkResponse *resp) override;
     grpc::Status GetByToken(grpc::ServerContext *ctx, const rpc::ShareTokenRequest *req,
                             rpc::SharedResourceResponse *resp) override;
+    grpc::Status CheckAccess(grpc::ServerContext *ctx, const rpc::CheckAccessRequest *req,
+                             rpc::CheckAccessResponse *resp) override;
 
    private:
     ShardedDatabase *db_ = nullptr;

@@ -5,6 +5,8 @@
 
 #include "generated/rpc_auth.grpc.pb.h"
 #include "generated/rpc_auth.pb.h"
+#include "generated/rpc_sharing.grpc.pb.h"
+#include "generated/rpc_sharing.pb.h"
 #include "generated/rpc_spreadsheet.grpc.pb.h"
 #include "generated/rpc_spreadsheet.pb.h"
 #include "shared/cache/circuit_breaker.h"
@@ -25,7 +27,10 @@ class SpreadsheetServiceImpl final : public rpc::SpreadsheetService::Service {
     void SetRabbitMQ(IRabbitPublisher *rb) { rabbit_ = rb; }
     void SetMinio(minio::Client *mc) { minio_ = mc; }
     void SetMongo(IMongoClient *mc) { mongo_ = mc; }
-    void SetAuthChannel(std::shared_ptr<grpc::Channel> ch) { auth_stub_ = rpc::AuthService::NewStub(ch); }
+    void SetAuthChannel(std::shared_ptr<grpc::Channel> ch) {
+        auth_stub_ = rpc::AuthService::NewStub(ch);
+        sharing_stub_ = rpc::SharingService::NewStub(ch);
+    }
 
     // 浠?gRPC metadata 鎻愬彇 token 骞惰皟鐢?Auth.ValidateUser
     bool ValidateCaller(grpc::ServerContext *ctx, int64_t user_id, std::string &out_username,
@@ -48,7 +53,8 @@ class SpreadsheetServiceImpl final : public rpc::SpreadsheetService::Service {
     L1Cache *l1_ = nullptr;
     CallLogger *logger_ = nullptr;
     SystemLogger *slog_ = nullptr;
-    std::unique_ptr<rpc::AuthService::Stub> auth_stub_;
+    std::unique_ptr<rpc::AuthService::Stub>    auth_stub_;
+    std::unique_ptr<rpc::SharingService::Stub> sharing_stub_;
     mutable GrpcCircuitBreaker auth_cb_;
     IRabbitPublisher *rabbit_ = nullptr;
     minio::Client *minio_ = nullptr;

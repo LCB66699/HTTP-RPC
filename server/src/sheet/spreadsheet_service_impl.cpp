@@ -123,14 +123,24 @@ grpc::Status SpreadsheetServiceImpl::GetSpreadsheet(grpc::ServerContext *context
             return ValidateCaller(ctx, uid, vu, vr);
         }))
         return *fail;
-    if (!CheckOwnerWithRetry(req->id(), g_rpc_auth_ctx.user_id, db_,
-            [&](auto id, auto &uid) { return db_->GetSpreadsheetOwner(id, uid); }, slog_))
+    int64_t req_uid = g_rpc_auth_ctx.user_id;
+    bool has_access = CheckOwnerWithRetry(req->id(), req_uid, db_,
+            [&](auto id, auto &uid) { return db_->GetSpreadsheetOwner(id, uid); }, slog_);
+    if (!has_access && sharing_stub_) {
+        grpc::ClientContext sctx;
+        sctx.set_deadline(std::chrono::system_clock::now() + std::chrono::milliseconds(1500));
+        rpc::CheckAccessRequest ca;
+        ca.set_user_id(req_uid);
+        ca.set_resource_type("sheet");
+        ca.set_resource_id(req->id());
+        rpc::CheckAccessResponse cr;
+        has_access = sharing_stub_->CheckAccess(&sctx, ca, &cr).ok() && cr.allowed();
+    }
+    if (!has_access)
         return WriteResult(resp, HandlerResult<>::Fail("Not found", rpc_error::NOT_FOUND)),
                grpc::Status(grpc::StatusCode::NOT_FOUND, "Not found");
     auto start = std::chrono::high_resolution_clock::now();
     std::string username = UsernameFromMeta(context);
-
-    int64_t req_uid = g_rpc_auth_ctx.user_id;
     const std::string cache_key = "u:" + std::to_string(req_uid) + ":sheet:" + std::to_string(req->id());
     const std::string ts_key = cache_key + ":ts";
     const std::string lock_key = "lock:u:" + std::to_string(req_uid) + ":sheet:" + std::to_string(req->id());
@@ -447,6 +457,19 @@ grpc::Status SpreadsheetServiceImpl::UpdateSpreadsheet(grpc::ServerContext *cont
         return grpc::Status::OK;
     }
 
+    bool skip_owner = false;
+    if (sharing_stub_) {
+        grpc::ClientContext sctx;
+        sctx.set_deadline(std::chrono::system_clock::now() + std::chrono::milliseconds(1500));
+        rpc::CheckAccessRequest ca;
+        ca.set_user_id(g_rpc_auth_ctx.user_id);
+        ca.set_resource_type("sheet");
+        ca.set_resource_id(req->id());
+        rpc::CheckAccessResponse cr;
+        if (sharing_stub_->CheckAccess(&sctx, ca, &cr).ok() && cr.allowed() && cr.permission() == "edit")
+            skip_owner = true;
+    }
+
     auto ok = UpdateWithCAS(
         req->id(), g_rpc_auth_ctx.user_id,
         [&](int64_t id, int64_t &owner, int &ver) {
@@ -457,7 +480,7 @@ grpc::Status SpreadsheetServiceImpl::UpdateSpreadsheet(grpc::ServerContext *cont
                 req->name(), req->description(),
                 req->headers_json(), req->data_json(), ver);
         },
-        [&](int latest) { resp->set_latest_version(latest); });
+        [&](int latest) { resp->set_latest_version(latest); }, {}, skip_owner);
 
     if (!ok) {
         if (resp->latest_version() > 0) {

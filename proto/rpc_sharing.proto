@@ -33,6 +33,12 @@ service SharingService {
       get: "/api/v1/s/{token}"
     };
   }
+  rpc CheckAccess(CheckAccessRequest) returns (CheckAccessResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/access/check"
+      body: "*"
+    };
+  }
 }
 
 message ShareRequest {
@@ -95,4 +101,14 @@ message SharedResourceResponse {
   SharedResourceInfo info = 2;
   string error = 3;
   int32 error_code = 99;
+}
+
+message CheckAccessRequest {
+  int64 user_id = 1;
+  string resource_type = 2;  // "sheet" | "file"
+  int64 resource_id = 3;
+}
+message CheckAccessResponse {
+  bool allowed = 1;
+  string permission = 2;  // "view" | "edit" | ""
 }

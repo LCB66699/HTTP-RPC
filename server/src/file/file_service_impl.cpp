@@ -118,8 +118,20 @@ grpc::Status FileServiceImpl::GetFile(grpc::ServerContext *context, const rpc::G
         }))
         return *fail;
 
-    if (!CheckOwnerWithRetry(req->id(), g_rpc_auth_ctx.user_id, db_,
-            [&](auto id, auto &uid) { return db_->GetFileOwner(id, uid); }, slog_))
+    int64_t req_uid = g_rpc_auth_ctx.user_id;
+    bool has_access = CheckOwnerWithRetry(req->id(), req_uid, db_,
+            [&](auto id, auto &uid) { return db_->GetFileOwner(id, uid); }, slog_);
+    if (!has_access && sharing_stub_) {
+        grpc::ClientContext sctx;
+        sctx.set_deadline(std::chrono::system_clock::now() + std::chrono::milliseconds(1500));
+        rpc::CheckAccessRequest ca;
+        ca.set_user_id(req_uid);
+        ca.set_resource_type("file");
+        ca.set_resource_id(req->id());
+        rpc::CheckAccessResponse cr;
+        has_access = sharing_stub_->CheckAccess(&sctx, ca, &cr).ok() && cr.allowed();
+    }
+    if (!has_access)
         return WriteResult(resp, HandlerResult<>::Fail("Not found", rpc_error::NOT_FOUND)),
                grpc::Status(grpc::StatusCode::NOT_FOUND, "Not found");
 

@@ -101,6 +101,23 @@ grpc::Status SharingServiceImpl::CreateShareLink(grpc::ServerContext *ctx, const
     return grpc::Status::OK;
 }
 
+grpc::Status SharingServiceImpl::CheckAccess(grpc::ServerContext *ctx, const rpc::CheckAccessRequest *req,
+                                              rpc::CheckAccessResponse *resp) {
+    if (!db_) {
+        resp->set_allowed(false);
+        return grpc::Status::OK;
+    }
+
+    db_->EnsureSharingTables();
+
+    std::string perm;
+    bool ok = db_->CheckShareAccess(std::to_string(req->user_id()), req->resource_type(),
+                                     req->resource_id(), perm);
+    resp->set_allowed(ok);
+    if (ok) resp->set_permission(perm);
+    return grpc::Status::OK;
+}
+
 grpc::Status SharingServiceImpl::GetByToken(grpc::ServerContext *ctx, const rpc::ShareTokenRequest *req,
                                              rpc::SharedResourceResponse *resp) {
     if (!db_) {

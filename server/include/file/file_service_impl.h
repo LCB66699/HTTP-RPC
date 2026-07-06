@@ -7,6 +7,8 @@
 #include "generated/rpc_auth.pb.h"
 #include "generated/rpc_file.grpc.pb.h"
 #include "generated/rpc_file.pb.h"
+#include "generated/rpc_sharing.grpc.pb.h"
+#include "generated/rpc_sharing.pb.h"
 #include "shared/cache/circuit_breaker.h"
 #include "shared/client/minio_client.h"
 #include "shared/base/service_interfaces.h"
@@ -24,7 +26,10 @@ class FileServiceImpl final : public rpc::FileService::Service {
     void SetSysLog(SystemLogger *slog) { slog_ = slog; }
     void SetMinio(minio::Client *mc) { minio_ = mc; }
     void SetRabbitMQ(IRabbitPublisher *rb) { rabbit_ = rb; }
-    void SetAuthChannel(std::shared_ptr<grpc::Channel> ch) { auth_stub_ = rpc::AuthService::NewStub(ch); }
+    void SetAuthChannel(std::shared_ptr<grpc::Channel> ch) {
+        auth_stub_ = rpc::AuthService::NewStub(ch);
+        sharing_stub_ = rpc::SharingService::NewStub(ch);
+    }
 
     bool ValidateCaller(grpc::ServerContext *ctx, int64_t user_id, std::string &out_username,
                         std::string &out_role) const;
@@ -49,7 +54,8 @@ class FileServiceImpl final : public rpc::FileService::Service {
     CallLogger *logger_ = nullptr;
     SystemLogger *slog_ = nullptr;
     minio::Client *minio_ = nullptr;
-    std::unique_ptr<rpc::AuthService::Stub> auth_stub_;
+    std::unique_ptr<rpc::AuthService::Stub>    auth_stub_;
+    std::unique_ptr<rpc::SharingService::Stub> sharing_stub_;
     mutable GrpcCircuitBreaker auth_cb_;
     IRabbitPublisher *rabbit_ = nullptr;
 };

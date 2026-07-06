@@ -143,11 +143,14 @@ template <typename ReadVer, typename DoWrite, typename OnConflict>
 bool UpdateWithCAS(int64_t id, int64_t caller_uid,
                    ReadVer read_ver, DoWrite do_write,
                    OnConflict on_conflict,
-                   const CasConfig &cfg = {}) {
+                   const CasConfig &cfg = {},
+                   bool skip_owner_check = false) {
     for (int attempt = 0; attempt < cfg.max_retries; ++attempt) {
         int64_t owner = 0;
         int version = 0;
-        if (!read_ver(id, owner, version) || owner != caller_uid)
+        if (!read_ver(id, owner, version))
+            return false;
+        if (!skip_owner_check && owner != caller_uid)
             return false;
 
         if (do_write(id, version))
