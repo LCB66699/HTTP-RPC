@@ -3,18 +3,6 @@ name: CI Integration
 on:
   push:
     branches: [main]
-  pull_request:
-    paths:
-      - 'proto/**'
-      - 'server/src/shared/**'
-      - 'server/include/shared/**'
-      - 'CMakeLists.txt'
-      - 'Dockerfile'
-      - 'docker-compose.yml'
-      - 'docker-compose.override.yml'
-      - 'deploy/**'
-      - 'test/e2e/**'
-      - '.github/workflows/ci.yml'
   workflow_dispatch:
 
 jobs:
