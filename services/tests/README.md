@@ -10,9 +10,18 @@ tests/
 └── README.md
 ```
 
+## 运行
+
+```bash
+bash services/tests/run_mock_tests.sh
+```
+
+自动发现 `services/` 下所有含 `go.mod` 的目录并运行 `go test ./...`。
+
 ## 现有对应单测
 
-| 包 | 文件 | 覆盖内容 |
+| 服务 | 文件 | 覆盖内容 |
 |------|------|----------|
 | notify-service | `outbox_test.go` | CAS 状态机、分片解析、回滚、trace 传播 |
 | notify-service | `redis_test.go` | RESP AUTH + PUBLISH 协议 |
+| points-server | `points_test.go` | 积分获取、幂等去重、扣减、交易记录、创建 sheet 规则 |

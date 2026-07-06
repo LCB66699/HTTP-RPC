@@ -34,6 +34,10 @@ func (h *Handlers) Login(c *gin.Context) {
 	}
 	h.setCookies(c, resp.GetAccessToken(), resp.GetRefreshToken())
 	c.JSON(http.StatusOK, resp)
+
+	// Award login points (daily)
+	go h.publishPointEvent(resp.GetUserId(), "user.logged_in",
+		fmt.Sprintf("login:%d:%s", resp.GetUserId(), time.Now().Format("2006-01-02")))
 }
 
 func (h *Handlers) Register(c *gin.Context) {

@@ -75,6 +75,7 @@
   <nav>
     <button class="tab active" data-tab="sheets">数据表格</button>
     <button class="tab" data-tab="workspace">工作空间</button>
+    <button class="tab" data-tab="points">积分</button>
     <button class="tab" data-tab="files">文件管理</button>
     <button class="tab" data-tab="search">🔍 搜索</button>
     <button class="tab admin-only" data-tab="services" style="display:none">服务列表</button>
@@ -189,6 +190,34 @@
     </div>
     <div id="workspace-list" class="ws-list">
       <div style="padding:12px;color:#888">加载中...</div>
+    </div>
+  </section>
+
+  <!-- Points Panel -->
+  <section id="panel-points" class="panel">
+    <div class="toolbar">
+      <h2>积分中心</h2>
+      <span id="points-balance-display" style="font-size:1.5em;font-weight:700;color:var(--accent)">0</span>
+      <span style="color:var(--text-secondary);margin-left:4px">积分</span>
+    </div>
+    <div class="points-grid">
+      <div class="points-card">
+        <h3>积分规则</h3>
+        <div class="rules-list">
+          <div class="rule-item"><span>每日登录</span><span>+10 <small>/ 天</small></span></div>
+          <div class="rule-item"><span>创建表格</span><span>+5 <small>/ 天(限5次)</small></span></div>
+          <div class="rule-item"><span>上传文件</span><span>+3 <small>/ 天(限10次)</small></span></div>
+          <div class="rule-item"><span>连续7天登录</span><span>+50 <small>额外</small></span></div>
+        </div>
+      </div>
+      <div class="points-card">
+        <h3>积分流水</h3>
+        <div id="points-transactions"><p style="color:var(--text-secondary)">加载中...</p></div>
+      </div>
+      <div class="points-card">
+        <h3>排行榜</h3>
+        <div id="points-leaderboard"><p style="color:var(--text-secondary)">加载中...</p></div>
+      </div>
     </div>
   </section>
 
