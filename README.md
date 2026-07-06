@@ -111,6 +111,14 @@ C++ 服务 ──RabbitMQ──→ Notify Service (Go) ──→ MongoDB + ES �
 | POST | `/api/v1/sheets/:id/share-link` | 是 | 创建分享链接 |
 | GET | `/api/v1/s/:token` | 否 | 通过分享 token 访问 |
 
+### 积分
+
+| 方法 | 路径 | 鉴权 | 说明 |
+|------|------|------|------|
+| GET | `/api/v1/points/balance` | 是 | 查询积分余额 |
+| GET | `/api/v1/points/transactions` | 是 | 积分流水记录 |
+| GET | `/api/v1/points/leaderboard` | 是 | 积分排行榜 |
+
 ### 搜索 & 健康
 
 | 方法 | 路径 | 鉴权 | 说明 |
