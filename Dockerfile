@@ -33,10 +33,11 @@ RUN if [ "$DEBUG" = "true" ]; then \
 RUN cmake -B build && cmake --build build --target rpc_${SERVICE} -j$(nproc)
 
 # ── Stage 3: runtime (inherits base-runtime, copies only the binary) ──
-FROM base-runtime
+FROM base-runtime AS runtime
 ARG DEBUG=false
 RUN if [ "$DEBUG" = "true" ]; then apt update && apt install -y gdb && rm -rf /var/lib/apt/lists/*; fi
 ADD https://github.com/grpc-ecosystem/grpc-health-probe/releases/download/v0.4.37/grpc_health_probe-linux-amd64 /usr/local/bin/grpc_health_probe
+RUN chmod +x /usr/local/bin/grpc_health_probe
 RUN chmod +x /usr/local/bin/grpc_health_probe
 COPY deploy/consul/register.sh /app/register.sh
 RUN chmod +x /app/register.sh
