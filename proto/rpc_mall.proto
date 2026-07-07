@@ -38,6 +38,12 @@ service MallService {
       body: "*"
     };
   }
+  rpc NormalOrder(NormalOrderRequest) returns (OrderResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/mall/order"
+      body: "*"
+    };
+  }
   rpc ListOrders(ListOrdersRequest) returns (ListOrdersResponse) {
     option (google.api.http) = { get: "/api/v1/mall/orders" };
   }
@@ -127,6 +133,12 @@ message Order {
 
 message SeckillOrderRequest {
   int64 seckill_id = 1;
+  string idempotency_key = 2;
+  int64 user_id = 3;
+}
+
+message NormalOrderRequest {
+  int64 product_id = 1;
   string idempotency_key = 2;
   int64 user_id = 3;
 }

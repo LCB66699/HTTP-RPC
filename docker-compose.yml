@@ -769,6 +769,10 @@
     environment:
       REDIS_ADDR: "redis-cluster-7000:7000"
       REDIS_PASSWORD: "${REDIS_PASSWORD:-rpc-redis-123456}"
+      MYSQL_ADDR: "mysql-auth:3306"
+      MYSQL_PASSWORD: "${MYSQL_ROOT_PASSWORD:-123456}"
+      MYSQL_DB: "rpc_auth"
+      RABBITMQ_ADDR: "amqp://rpc:rpc-rabbit-123456@rabbitmq:5672/"
     networks:
       default:
         aliases: [rpc-points]
@@ -792,6 +796,9 @@
     environment:
       REDIS_ADDR: "redis-cluster-7000:7000"
       REDIS_PASSWORD: "${REDIS_PASSWORD:-rpc-redis-123456}"
+      MYSQL_ADDR: "mysql-auth:3306"
+      MYSQL_PASSWORD: "${MYSQL_ROOT_PASSWORD:-123456}"
+      MYSQL_DB: "rpc_auth"
     networks:
       default:
         aliases: [rpc-mall]

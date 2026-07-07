@@ -3,6 +3,14 @@ name: CI C++ Search
 on:
   push:
     branches-ignore: [main]
+    paths:
+      - 'server/src/search/**'
+      - 'server/src/shared/**'
+      - 'server/include/shared/**'
+      - 'proto/rpc_search.proto'
+      - 'proto/rpc_common.proto'
+      - 'CMakeLists.txt'
+      - 'Dockerfile'
   pull_request:
     paths:
       - 'server/src/search/**'

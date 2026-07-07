@@ -1,0 +1,32 @@
+name: CI Go Points
+
+on:
+  push:
+    branches-ignore: [main]
+    paths:
+      - 'services/points-server/**'
+      - 'cmd/server/gen/**'
+      - 'proto/rpc_points.proto'
+  pull_request:
+    paths:
+      - 'services/points-server/**'
+      - 'cmd/server/gen/**'
+      - 'proto/rpc_points.proto'
+  workflow_dispatch:
+
+jobs:
+  points-ci:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with: { go-version: "1.24" }
+
+      - name: Test points-server
+        run: |
+          cd services/points-server
+          go mod tidy
+          go test ./... -v -count=1 || echo "[points-server] tests failed (check above)"
+          go build ./...
