@@ -3,7 +3,21 @@ name: CI Lint
 on:
   push:
     branches-ignore: [main]
+    paths:
+      - 'cmd/server/**'
+      - 'services/**'
+      - 'server/src/**'
+      - 'server/include/**'
+      - 'proto/**'
+      - 'web-ui/**'
   pull_request:
+    paths:
+      - 'cmd/server/**'
+      - 'services/**'
+      - 'server/src/**'
+      - 'server/include/**'
+      - 'proto/**'
+      - 'web-ui/**'
   workflow_dispatch:
 
 jobs:
