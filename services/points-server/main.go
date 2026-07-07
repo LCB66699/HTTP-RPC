@@ -292,20 +292,7 @@ func (s *pointsServer) consumeEvents() {
 		case "file.uploaded":
 			amount = 3
 			limit = 10
-		case "order.created":
-			if ev.Amount <= 0 {
-				msg.Ack(false)
-				continue
-			}
-			ctxDed, cancelDed := context.WithTimeout(context.Background(), 3*time.Second)
-			s.Deduct(ctxDed, &pb.DeductRequest{
-				UserId: ev.UserID, Amount: ev.Amount,
-				Reason: "seckill_order", RefId: ev.IdempotencyKey,
-			})
-			cancelDed()
-			msg.Ack(false)
-			continue
-		default:
+			default:
 			msg.Nack(false, false)
 			continue
 		}

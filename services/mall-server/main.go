@@ -17,6 +17,7 @@ import (
 	pb "gateway-grpc/gen/rpc"
 	"github.com/redis/go-redis/v9"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/health"
 	"google.golang.org/grpc/health/grpc_health_v1"
 	"google.golang.org/grpc/reflection"
@@ -24,9 +25,20 @@ import (
 
 type mallServer struct {
 	pb.UnimplementedMallServiceServer
-	db      *sql.DB
-	rdb     *redis.Client
-	amqpCh  *amqp.Channel
+	db          *sql.DB
+	rdb         *redis.Client
+	amqpCh      *amqp.Channel
+	pointsConn  *grpc.ClientConn
+	points      pb.PointsServiceClient
+}
+
+func initPoints(addr string) pb.PointsServiceClient {
+	conn, err := grpc.NewClient(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	if err != nil {
+		slog.Error("points dial failed", "error", err)
+		os.Exit(1)
+	}
+	return pb.NewPointsServiceClient(conn)
 }
 
 func initAMQP(addr string) *amqp.Channel {
@@ -234,14 +246,19 @@ func (s *mallServer) NormalOrder(ctx context.Context, req *pb.NormalOrderRequest
 	if stock <= 0 {
 		return &pb.OrderResponse{Success: false, Error: "sold out"}, nil
 	}
-	tx.Exec("UPDATE products SET stock = stock - 1 WHERE id=?", req.ProductId)
+	orderID := s.rdb.Incr(ctx, "mall:seq:order").Val()
+	_, dbErr := s.db.Exec("INSERT INTO orders (id,user_id,product_id,seckill_id,amount,status,idempotency_key) VALUES (?,?,?,?,?,?,?)",
+		orderID, req.UserId, req.ProductId, 0, price, "pending", req.IdempotencyKey)
+	if dbErr != nil {
+		tx.Exec("UPDATE products SET stock = stock + 1 WHERE id=?", req.ProductId)
+		tx.Rollback()
+		return &pb.OrderResponse{Success: false, Error: "order insert failed"}, nil
+	}
 	tx.Commit()
 
-	orderID := s.rdb.Incr(ctx, "mall:seq:order").Val()
 	orderMsg, _ := json.Marshal(map[string]interface{}{
 		"id": orderID, "user_id": req.UserId, "product_id": req.ProductId,
 		"seckill_id": 0, "amount": price,
-		"idempotency_key": req.IdempotencyKey, "product_name": pName,
 	})
 	s.amqpCh.Publish("rpc.events", "order.created", false, false,
 		amqp.Publishing{ContentType: "application/json", Body: orderMsg, DeliveryMode: amqp.Persistent})
@@ -249,7 +266,7 @@ func (s *mallServer) NormalOrder(ctx context.Context, req *pb.NormalOrderRequest
 	return &pb.OrderResponse{
 		Success: true,
 		Order: &pb.Order{Id: orderID, UserId: req.UserId, ProductId: req.ProductId,
-			Amount: price, Status: "paid", ProductName: pName, CreatedAt: time.Now().Format(time.RFC3339)},
+			Amount: price, Status: "pending", ProductName: pName, CreatedAt: time.Now().Format(time.RFC3339)},
 	}, nil
 }
 
@@ -294,24 +311,27 @@ func (s *mallServer) SeckillOrder(ctx context.Context, req *pb.SeckillOrderReque
 
 	orderID := s.rdb.Incr(ctx, "mall:seq:order").Val()
 
-	// Publish to RabbitMQ (durable, will be consumed to write MySQL)
+	// Insert order as pending
+	_, dbErr := s.db.Exec("INSERT INTO orders (id,user_id,product_id,seckill_id,amount,status,idempotency_key) VALUES (?,?,?,?,?,?,?)",
+		orderID, req.UserId, skPID, req.SeckillId, skPrice, "pending", req.IdempotencyKey)
+	if dbErr != nil {
+		s.rdb.Incr(ctx, stockKey)
+		return &pb.OrderResponse{Success: false, Error: "order insert failed"}, nil
+	}
+
+	// MQ 异步扣积分
 	orderMsg, _ := json.Marshal(map[string]interface{}{
 		"id": orderID, "user_id": req.UserId, "product_id": skPID,
 		"seckill_id": req.SeckillId, "amount": skPrice,
-		"idempotency_key": req.IdempotencyKey, "product_name": skName,
 	})
-	err = s.amqpCh.Publish("rpc.events", "order.created", false, false,
+	s.amqpCh.Publish("rpc.events", "order.created", false, false,
 		amqp.Publishing{ContentType: "application/json", Body: orderMsg, DeliveryMode: amqp.Persistent})
-	if err != nil {
-		s.rdb.Incr(ctx, stockKey) // rollback Redis stock
-		return &pb.OrderResponse{Success: false, Error: "system busy, retry"}, nil
-	}
 
 	return &pb.OrderResponse{
 		Success: true,
 		Order: &pb.Order{Id: orderID, UserId: req.UserId, ProductId: skPID,
 			SeckillId: req.SeckillId, Amount: skPrice,
-			Status: "paid", ProductName: skName, CreatedAt: time.Now().Format(time.RFC3339)},
+			Status: "pending", ProductName: skName, CreatedAt: time.Now().Format(time.RFC3339)},
 	}, nil
 }
 
@@ -340,24 +360,49 @@ func (s *mallServer) consumeOrders() {
 	slog.Info("mall: consuming order.created from RabbitMQ")
 	for msg := range msgs {
 		var o struct {
-			ID             int64  `json:"id"`
-			UserID         int64  `json:"user_id"`
-			ProductID      int64  `json:"product_id"`
-			SeckillID      int64  `json:"seckill_id"`
-			Amount         int64  `json:"amount"`
-			IdempotencyKey string `json:"idempotency_key"`
+			ID        int64 `json:"id"`
+			UserID    int64 `json:"user_id"`
+			ProductID int64 `json:"product_id"`
+			SeckillID int64 `json:"seckill_id"`
+			Amount    int64 `json:"amount"`
 		}
 		if err := json.Unmarshal(msg.Body, &o); err != nil {
 			msg.Nack(false, false)
 			continue
 		}
-		_, dbErr := s.db.Exec("INSERT INTO orders (id,user_id,product_id,seckill_id,amount,idempotency_key) VALUES (?,?,?,?,?,?)",
-			o.ID, o.UserID, o.ProductID, o.SeckillID, o.Amount, o.IdempotencyKey)
-		if dbErr != nil {
-			slog.Warn("order insert failed, retrying", "id", o.ID, "error", dbErr)
-			msg.Nack(false, true) // re-queue
+
+		// Check order status
+		var status string
+		s.db.QueryRow("SELECT status FROM orders WHERE id=?", o.ID).Scan(&status)
+		if status != "pending" {
+			msg.Ack(false)
 			continue
 		}
+
+		// Idempotency: only deduct once per order
+		deductKey := fmt.Sprintf("mall:deduct:%d", o.ID)
+		ok, _ := s.rdb.SetNX(context.Background(), deductKey, "1", 1*time.Hour).Result()
+		if ok {
+			ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+			deductResp, ptsErr := s.points.Deduct(ctx, &pb.DeductRequest{
+				UserId: o.UserID, Amount: o.Amount, Reason: "mall_order", RefId: fmt.Sprintf("order:%d", o.ID),
+			})
+			cancel()
+
+			if ptsErr == nil && deductResp.Success {
+				s.db.Exec("UPDATE orders SET status='paid' WHERE id=?", o.ID)
+				msg.Ack(false)
+				continue
+			}
+
+			// Deduct failed — rollback
+			slog.Warn("order deduct failed, rolling back", "order", o.ID)
+			s.db.Exec("UPDATE orders SET status='failed' WHERE id=?", o.ID)
+		} else {
+			// Already processed — ensure status is updated
+			s.db.Exec("UPDATE orders SET status='paid' WHERE id=?", o.ID)
+		}
+
 		msg.Ack(false)
 	}
 }
@@ -376,7 +421,8 @@ func main() {
 	db := initDB(mysqlDSN)
 	amqpCh := initAMQP(getenv("RABBITMQ_ADDR", "amqp://rpc:rpc-rabbit-123456@rabbitmq:5672/"))
 
-	srvImpl := &mallServer{db: db, rdb: rdb, amqpCh: amqpCh}
+	points := initPoints(getenv("POINTS_ADDR", "rpc-points:50052"))
+	srvImpl := &mallServer{db: db, rdb: rdb, amqpCh: amqpCh, points: points}
 	go srvImpl.consumeOrders()
 
 	lis, _ := net.Listen("tcp", ":"+port)
