@@ -72,8 +72,12 @@ func migrate(db *sql.DB) {
 			user_id BIGINT PRIMARY KEY,
 			balance BIGINT NOT NULL DEFAULT 0,
 			total_earned BIGINT NOT NULL DEFAULT 0,
+			streak_count INT NOT NULL DEFAULT 0,
+			last_login_date DATE,
 			updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 		)`,
+		`ALTER TABLE point_accounts ADD COLUMN streak_count INT NOT NULL DEFAULT 0`,
+		`ALTER TABLE point_accounts ADD COLUMN last_login_date DATE`,
 		`CREATE TABLE IF NOT EXISTS point_transactions (
 			id BIGINT AUTO_INCREMENT PRIMARY KEY,
 			user_id BIGINT NOT NULL,
@@ -218,11 +222,28 @@ func (s *pointsServer) checkLoginStreak(ctx context.Context, uid int64) (int64, 
 	today := time.Now().Format("2006-01-02")
 	lastKey := fmt.Sprintf("pts:streak:%d:last", uid)
 	countKey := fmt.Sprintf("pts:streak:%d:count", uid)
-	lastDate, _ := s.rdb.Get(ctx, lastKey).Result()
+
+	lastDate, err := s.rdb.Get(ctx, lastKey).Result()
+	if err != nil {
+		// Redis miss — load from MySQL
+		var dbDate sql.NullString
+		var dbCount int64
+		if s.db != nil {
+			s.db.QueryRow("SELECT last_login_date, streak_count FROM point_accounts WHERE user_id=?", uid).
+				Scan(&dbDate, &dbCount)
+			if dbDate.Valid {
+				lastDate = dbDate.String
+				s.rdb.Set(ctx, lastKey, lastDate, 48*time.Hour)
+				s.rdb.Set(ctx, countKey, dbCount, 7*24*time.Hour)
+			}
+		}
+	}
+
 	if lastDate == today {
 		streak, _ := s.rdb.Get(ctx, countKey).Int64()
 		return streak, false
 	}
+
 	yesterday := time.Now().AddDate(0, 0, -1).Format("2006-01-02")
 	var streak int64
 	if lastDate == yesterday {
@@ -232,6 +253,13 @@ func (s *pointsServer) checkLoginStreak(ctx context.Context, uid int64) (int64, 
 		streak = 1
 	}
 	s.rdb.Set(ctx, lastKey, today, 48*time.Hour)
+
+	// Fire-and-forget sync to MySQL
+	if s.db != nil {
+		go s.db.Exec("UPDATE point_accounts SET streak_count=?, last_login_date=? WHERE user_id=?",
+			streak, today, uid)
+	}
+
 	return streak, streak%7 == 0
 }
 
