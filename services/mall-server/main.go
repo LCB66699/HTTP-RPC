@@ -270,13 +270,6 @@ func (s *mallServer) SeckillOrder(ctx context.Context, req *pb.SeckillOrderReque
 		return &pb.OrderResponse{Success: false, Error: "system busy, retry"}, nil
 	}
 
-	// Deduct points via event
-	ptsMsg, _ := json.Marshal(map[string]interface{}{
-		"type": "seckill_order", "user_id": req.UserId,
-		"amount": skPrice, "key": fmt.Sprintf("seckill:%d:%d", req.SeckillId, req.UserId),
-	})
-	s.rdb.Publish(ctx, "pts:earn", string(ptsMsg))
-
 	return &pb.OrderResponse{
 		Success: true,
 		Order: &pb.Order{Id: orderID, UserId: req.UserId, ProductId: skPID,

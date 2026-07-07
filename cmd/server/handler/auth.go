@@ -35,9 +35,15 @@ func (h *Handlers) Login(c *gin.Context) {
 	h.setCookies(c, resp.GetAccessToken(), resp.GetRefreshToken())
 	c.JSON(http.StatusOK, resp)
 
-	// Award login points (daily)
-	go h.publishPointEvent(resp.GetUserId(), "user.logged_in",
-		fmt.Sprintf("login:%d:%s", resp.GetUserId(), time.Now().Format("2006-01-02")))
+	// Award login points (daily, fire-and-forget via gRPC)
+	go func(uid int64) {
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		defer cancel()
+		h.Points.Earn(ctx, &pb.EarnRequest{
+			UserId: uid, Amount: 10, Reason: "daily_login",
+			IdempotencyKey: fmt.Sprintf("login:%d:%s", uid, time.Now().Format("2006-01-02")),
+		})
+	}(resp.GetUserId())
 }
 
 func (h *Handlers) Register(c *gin.Context) {

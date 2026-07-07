@@ -1,10 +1,8 @@
 package handler
 
 import (
-	"fmt"
 	"io"
 	"net/http"
-	"time"
 
 	"github.com/gin-gonic/gin"
 	pb "gateway-grpc/gen/rpc"
@@ -37,10 +35,6 @@ func (h *Handlers) UploadFile(c *gin.Context) {
 	})
 	if grpcErr(c, err, "file operation failed") { return }
 	c.JSON(http.StatusOK, resp)
-
-	go h.publishPointEvent(h.uid(c), "file.uploaded",
-		fmt.Sprintf("upload_file:%d:%s", h.uid(c),
-			time.Now().Format("2006-01-02")))
 }
 
 func (h *Handlers) GetFile(c *gin.Context) {

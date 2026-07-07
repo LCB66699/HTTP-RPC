@@ -60,7 +60,9 @@ func initAMQP(addr string) *amqp.Channel {
 	}
 	ch.ExchangeDeclare("rpc.events", "topic", true, false, false, false, nil)
 	q, _ := ch.QueueDeclare("pts.earn", true, false, false, false, nil)
-	ch.QueueBind(q.Name, "pts.*", "rpc.events", false, nil)
+	ch.QueueBind(q.Name, "sheet.created", "rpc.events", false, nil)
+	ch.QueueBind(q.Name, "file.uploaded", "rpc.events", false, nil)
+	ch.QueueBind(q.Name, "order.created", "rpc.events", false, nil)
 	return ch
 }
 
@@ -257,24 +259,17 @@ func (s *pointsServer) consumeEvents() {
 		amount := int64(0)
 		limit := 0
 		switch ev.Type {
-		case "user.logged_in":
-			amount = 10
-			limit = 1
-			if streak, bonus := s.checkLoginStreak(context.Background(), ev.UserID); bonus {
-				ctx2, cancel2 := context.WithTimeout(context.Background(), 3*time.Second)
-				s.Earn(ctx2, &pb.EarnRequest{
-					UserId: ev.UserID, Amount: 50, Reason: "login_streak_7day",
-					IdempotencyKey: fmt.Sprintf("streak:%d:%d", ev.UserID, streak),
-				})
-				cancel2()
-			}
 		case "sheet.created":
 			amount = 5
 			limit = 5
 		case "file.uploaded":
 			amount = 3
 			limit = 10
-		case "seckill_order":
+		case "order.created":
+			if ev.Amount <= 0 {
+				msg.Ack(false)
+				continue
+			}
 			ctxDed, cancelDed := context.WithTimeout(context.Background(), 3*time.Second)
 			s.Deduct(ctxDed, &pb.DeductRequest{
 				UserId: ev.UserID, Amount: ev.Amount,

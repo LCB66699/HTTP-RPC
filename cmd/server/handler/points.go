@@ -1,8 +1,6 @@
 package handler
 
 import (
-	"context"
-	"encoding/json"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -43,19 +41,4 @@ func (h *Handlers) GetLeaderboard(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, resp)
-}
-
-// publishPointEvent sends a point-earning event to Redis "pts:earn" channel.
-// The points service consumes these events independently.
-// Uses background context — fire-and-forget, don't block user request.
-func (h *Handlers) publishPointEvent(uid int64, eventType, idempotencyKey string) {
-	if h.RDB == nil || uid == 0 {
-		return
-	}
-	body, _ := json.Marshal(map[string]interface{}{
-		"type":    eventType,
-		"user_id": uid,
-		"key":     idempotencyKey,
-	})
-	h.RDB.Publish(context.Background(), "pts:earn", string(body))
 }
