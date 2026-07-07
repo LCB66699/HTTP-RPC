@@ -9,7 +9,6 @@ import (
 	"net"
 	"net/http"
 	"os"
-	"strconv"
 	"strings"
 	"time"
 
@@ -138,7 +137,7 @@ func (s *pointsServer) Earn(ctx context.Context, req *pb.EarnRequest) (*pb.Balan
 	if req.IdempotencyKey != "" {
 		ok, _ := s.rdb.SetNX(ctx, "pts:dup:"+req.IdempotencyKey, "1", 5*time.Minute).Result()
 		if !ok {
-			bal, _ := s.balanceFromMySQL(ctx, req.UserId)
+			bal := s.balanceFromMySQL(ctx, req.UserId)
 			return &pb.BalanceResponse{Success: false, Balance: bal, Error: "duplicate"}, nil
 		}
 	}
