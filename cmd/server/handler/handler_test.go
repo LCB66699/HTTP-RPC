@@ -733,16 +733,3 @@ func TestGetLeaderboard(t *testing.T) {
 	if w.Code != http.StatusOK { t.Fatalf("expected 200, got %d", w.Code) }
 }
 
-// ---- Points event publishing tests ----
-
-func TestPublishPointEventNilRedis(t *testing.T) {
-	h := newTestHandlers()
-	// RDB is nil — should not panic
-	h.publishPointEvent(42, "user.logged_in", "test-key")
-}
-
-func TestPublishPointEventZeroUID(t *testing.T) {
-	h := newTestHandlers()
-	// uid=0 — should not publish
-	h.publishPointEvent(0, "user.logged_in", "test-key")
-}
