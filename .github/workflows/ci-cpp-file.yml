@@ -4,7 +4,6 @@ on:
   push:
     branches-ignore: [main]
     paths:
-    paths:
       - 'server/src/file/**'
       - 'server/src/shared/**'
       - 'server/include/file/**'
