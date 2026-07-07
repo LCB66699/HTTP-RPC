@@ -3,6 +3,16 @@ name: CI C++ File
 on:
   push:
     branches-ignore: [main]
+    paths:
+    paths:
+      - 'server/src/file/**'
+      - 'server/src/shared/**'
+      - 'server/include/file/**'
+      - 'server/include/shared/**'
+      - 'proto/rpc_file.proto'
+      - 'proto/rpc_common.proto'
+      - 'CMakeLists.txt'
+      - 'Dockerfile'
   pull_request:
     paths:
       - 'server/src/file/**'

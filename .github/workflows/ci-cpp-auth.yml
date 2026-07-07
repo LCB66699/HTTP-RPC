@@ -3,6 +3,16 @@ name: CI C++ Auth
 on:
   push:
     branches-ignore: [main]
+    paths:
+      - 'server/src/auth/**'
+      - 'server/src/shared/**'
+      - 'server/include/auth/**'
+      - 'server/include/shared/**'
+      - 'proto/rpc_auth.proto'
+      - 'proto/rpc_sharing.proto'
+      - 'proto/rpc_common.proto'
+      - 'CMakeLists.txt'
+      - 'Dockerfile'
   pull_request:
     paths:
       - 'server/src/auth/**'
