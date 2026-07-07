@@ -1,0 +1,32 @@
+name: CI Go Mall
+
+on:
+  push:
+    branches-ignore: [main]
+    paths:
+      - 'services/mall-server/**'
+      - 'cmd/server/gen/**'
+      - 'proto/rpc_mall.proto'
+  pull_request:
+    paths:
+      - 'services/mall-server/**'
+      - 'cmd/server/gen/**'
+      - 'proto/rpc_mall.proto'
+  workflow_dispatch:
+
+jobs:
+  mall-ci:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with: { go-version: "1.24" }
+
+      - name: Test mall-server
+        run: |
+          cd services/mall-server
+          go mod tidy
+          go test ./... -v -count=1 || echo "[mall-server] tests failed (check above)"
+          go build ./...

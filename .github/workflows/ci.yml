@@ -171,8 +171,8 @@ jobs:
           DOCKER_BUILDKIT: "1"
           COMPOSE_DOCKER_CLI_BUILD: "1"
         run: |
-          docker compose build base-runtime auth-1 sheet-1 file-1 search grpc-gateway notify-service
-          docker compose push base-runtime auth-1 sheet-1 file-1 search grpc-gateway notify-service
+          docker compose build base-runtime auth-1 sheet-1 file-1 search grpc-gateway notify-service points-server mall-server
+          docker compose push base-runtime auth-1 sheet-1 file-1 search grpc-gateway notify-service points-server mall-server
 
   # ===== Stage 4: 推送镜像到 ghcr.io + 生成本地部署脚本 =====
   deploy:
