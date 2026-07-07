@@ -2121,6 +2121,7 @@ async function loadMallProducts() {
         <div class="product-name">${escapeHtml(p.name)}</div>
         <div class="product-desc">${escapeHtml(p.description || '')}</div>
         <div class="product-price">${p.price} 积分</div>
+        <button class="btn btn-primary btn-sm" onclick="doNormalOrder(${p.id})">兑换</button>
       </div>`).join('');
   } catch(e) {}
 }
@@ -2202,6 +2203,24 @@ async function doSeckill(skID) {
     loadPointsBalance();
   } else {
     alert('抢购失败: ' + (data.error || '未知错误'));
+  }
+}
+
+async function doNormalOrder(productID) {
+  if (!confirm('确定要兑换吗？将扣除对应积分。')) return;
+  const res = await fetch(API + '/mall/order', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ product_id: productID, idempotency_key: 'order:' + productID + ':' + Date.now() }),
+    credentials: 'same-origin'
+  });
+  const data = await res.json();
+  if (data.success) {
+    alert('兑换成功！');
+    loadMall();
+    loadPointsBalance();
+  } else {
+    alert('兑换失败: ' + (data.error || '未知错误'));
   }
 }
 

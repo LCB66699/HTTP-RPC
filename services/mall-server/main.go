@@ -216,6 +216,44 @@ func (s *mallServer) CreateSeckill(ctx context.Context, req *pb.CreateSeckillReq
 
 // ---- Orders ----
 
+func (s *mallServer) NormalOrder(ctx context.Context, req *pb.NormalOrderRequest) (*pb.OrderResponse, error) {
+	if req.IdempotencyKey != "" {
+		ok, _ := s.rdb.SetNX(ctx, "mall:dup:"+req.IdempotencyKey, "1", 60*time.Second).Result()
+		if !ok {
+			return &pb.OrderResponse{Success: false, Error: "duplicate order"}, nil
+		}
+	}
+	tx, _ := s.db.Begin()
+	defer tx.Rollback()
+	var stock, price int64
+	var pName string
+	err := tx.QueryRow("SELECT stock, price, name FROM products WHERE id=? FOR UPDATE", req.ProductId).
+		Scan(&stock, &price, &pName)
+	if err != nil {
+		return &pb.OrderResponse{Success: false, Error: "product not found"}, nil
+	}
+	if stock <= 0 {
+		return &pb.OrderResponse{Success: false, Error: "sold out"}, nil
+	}
+	tx.Exec("UPDATE products SET stock = stock - 1 WHERE id=?", req.ProductId)
+	tx.Commit()
+
+	orderID := s.rdb.Incr(ctx, "mall:seq:order").Val()
+	orderMsg, _ := json.Marshal(map[string]interface{}{
+		"id": orderID, "user_id": req.UserId, "product_id": req.ProductId,
+		"seckill_id": 0, "amount": price,
+		"idempotency_key": req.IdempotencyKey, "product_name": pName,
+	})
+	s.amqpCh.Publish("rpc.events", "order.created", false, false,
+		amqp.Publishing{ContentType: "application/json", Body: orderMsg, DeliveryMode: amqp.Persistent})
+
+	return &pb.OrderResponse{
+		Success: true,
+		Order: &pb.Order{Id: orderID, UserId: req.UserId, ProductId: req.ProductId,
+			Amount: price, Status: "paid", ProductName: pName, CreatedAt: time.Now().Format(time.RFC3339)},
+	}, nil
+}
+
 func (s *mallServer) SeckillOrder(ctx context.Context, req *pb.SeckillOrderRequest) (*pb.OrderResponse, error) {
 	// Idempotency
 	if req.IdempotencyKey != "" {

@@ -25,6 +25,7 @@ const (
 	MallService_ListSeckills_FullMethodName  = "/rpc.MallService/ListSeckills"
 	MallService_CreateSeckill_FullMethodName = "/rpc.MallService/CreateSeckill"
 	MallService_SeckillOrder_FullMethodName  = "/rpc.MallService/SeckillOrder"
+	MallService_NormalOrder_FullMethodName   = "/rpc.MallService/NormalOrder"
 	MallService_ListOrders_FullMethodName    = "/rpc.MallService/ListOrders"
 )
 
@@ -41,6 +42,7 @@ type MallServiceClient interface {
 	CreateSeckill(ctx context.Context, in *CreateSeckillRequest, opts ...grpc.CallOption) (*SeckillResponse, error)
 	// Orders
 	SeckillOrder(ctx context.Context, in *SeckillOrderRequest, opts ...grpc.CallOption) (*OrderResponse, error)
+	NormalOrder(ctx context.Context, in *NormalOrderRequest, opts ...grpc.CallOption) (*OrderResponse, error)
 	ListOrders(ctx context.Context, in *ListOrdersRequest, opts ...grpc.CallOption) (*ListOrdersResponse, error)
 }
 
@@ -112,6 +114,16 @@ func (c *mallServiceClient) SeckillOrder(ctx context.Context, in *SeckillOrderRe
 	return out, nil
 }
 
+func (c *mallServiceClient) NormalOrder(ctx context.Context, in *NormalOrderRequest, opts ...grpc.CallOption) (*OrderResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(OrderResponse)
+	err := c.cc.Invoke(ctx, MallService_NormalOrder_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *mallServiceClient) ListOrders(ctx context.Context, in *ListOrdersRequest, opts ...grpc.CallOption) (*ListOrdersResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(ListOrdersResponse)
@@ -135,6 +147,7 @@ type MallServiceServer interface {
 	CreateSeckill(context.Context, *CreateSeckillRequest) (*SeckillResponse, error)
 	// Orders
 	SeckillOrder(context.Context, *SeckillOrderRequest) (*OrderResponse, error)
+	NormalOrder(context.Context, *NormalOrderRequest) (*OrderResponse, error)
 	ListOrders(context.Context, *ListOrdersRequest) (*ListOrdersResponse, error)
 	mustEmbedUnimplementedMallServiceServer()
 }
@@ -163,6 +176,9 @@ func (UnimplementedMallServiceServer) CreateSeckill(context.Context, *CreateSeck
 }
 func (UnimplementedMallServiceServer) SeckillOrder(context.Context, *SeckillOrderRequest) (*OrderResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method SeckillOrder not implemented")
+}
+func (UnimplementedMallServiceServer) NormalOrder(context.Context, *NormalOrderRequest) (*OrderResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method NormalOrder not implemented")
 }
 func (UnimplementedMallServiceServer) ListOrders(context.Context, *ListOrdersRequest) (*ListOrdersResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ListOrders not implemented")
@@ -296,6 +312,24 @@ func _MallService_SeckillOrder_Handler(srv interface{}, ctx context.Context, dec
 	return interceptor(ctx, in, info, handler)
 }
 
+func _MallService_NormalOrder_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(NormalOrderRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(MallServiceServer).NormalOrder(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: MallService_NormalOrder_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(MallServiceServer).NormalOrder(ctx, req.(*NormalOrderRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _MallService_ListOrders_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(ListOrdersRequest)
 	if err := dec(in); err != nil {
@@ -344,6 +378,10 @@ var MallService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "SeckillOrder",
 			Handler:    _MallService_SeckillOrder_Handler,
+		},
+		{
+			MethodName: "NormalOrder",
+			Handler:    _MallService_NormalOrder_Handler,
 		},
 		{
 			MethodName: "ListOrders",

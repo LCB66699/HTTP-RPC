@@ -12,6 +12,7 @@ func (h *Handlers) RegisterMallRoutes(auth *gin.RouterGroup) {
 	auth.GET("/mall/products/:id", h.GetProduct)
 	auth.GET("/mall/seckills", h.ListSeckills)
 	auth.POST("/mall/seckill/order", h.SeckillOrder)
+	auth.POST("/mall/order", h.NormalOrder)
 	auth.GET("/mall/orders", h.ListOrders)
 }
 
@@ -58,6 +59,29 @@ func (h *Handlers) SeckillOrder(c *gin.Context) {
 		UserId:         h.uid(c),
 	})
 	if grpcErr(c, err, "seckill order failed") {
+		return
+	}
+	c.JSON(http.StatusOK, resp)
+}
+
+func (h *Handlers) NormalOrder(c *gin.Context) {
+	var body struct {
+		ProductID      int64  `json:"product_id"`
+		IdempotencyKey string `json:"idempotency_key"`
+	}
+	if err := c.ShouldBindJSON(&body); err != nil || body.ProductID == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "product_id required"})
+		return
+	}
+	if body.IdempotencyKey == "" {
+		body.IdempotencyKey = c.GetHeader("Idempotency-Key")
+	}
+	resp, err := h.Mall.NormalOrder(c.Request.Context(), &pb.NormalOrderRequest{
+		ProductId:      body.ProductID,
+		IdempotencyKey: body.IdempotencyKey,
+		UserId:         h.uid(c),
+	})
+	if grpcErr(c, err, "order failed") {
 		return
 	}
 	c.JSON(http.StatusOK, resp)

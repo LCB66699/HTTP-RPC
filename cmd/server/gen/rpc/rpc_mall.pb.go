@@ -901,6 +901,66 @@ func (x *SeckillOrderRequest) GetUserId() int64 {
 	return 0
 }
 
+type NormalOrderRequest struct {
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	ProductId      int64                  `protobuf:"varint,1,opt,name=product_id,json=productId,proto3" json:"product_id,omitempty"`
+	IdempotencyKey string                 `protobuf:"bytes,2,opt,name=idempotency_key,json=idempotencyKey,proto3" json:"idempotency_key,omitempty"`
+	UserId         int64                  `protobuf:"varint,3,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *NormalOrderRequest) Reset() {
+	*x = NormalOrderRequest{}
+	mi := &file_rpc_mall_proto_msgTypes[13]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *NormalOrderRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*NormalOrderRequest) ProtoMessage() {}
+
+func (x *NormalOrderRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_rpc_mall_proto_msgTypes[13]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use NormalOrderRequest.ProtoReflect.Descriptor instead.
+func (*NormalOrderRequest) Descriptor() ([]byte, []int) {
+	return file_rpc_mall_proto_rawDescGZIP(), []int{13}
+}
+
+func (x *NormalOrderRequest) GetProductId() int64 {
+	if x != nil {
+		return x.ProductId
+	}
+	return 0
+}
+
+func (x *NormalOrderRequest) GetIdempotencyKey() string {
+	if x != nil {
+		return x.IdempotencyKey
+	}
+	return ""
+}
+
+func (x *NormalOrderRequest) GetUserId() int64 {
+	if x != nil {
+		return x.UserId
+	}
+	return 0
+}
+
 type ListOrdersRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	UserId        int64                  `protobuf:"varint,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
@@ -910,7 +970,7 @@ type ListOrdersRequest struct {
 
 func (x *ListOrdersRequest) Reset() {
 	*x = ListOrdersRequest{}
-	mi := &file_rpc_mall_proto_msgTypes[13]
+	mi := &file_rpc_mall_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -922,7 +982,7 @@ func (x *ListOrdersRequest) String() string {
 func (*ListOrdersRequest) ProtoMessage() {}
 
 func (x *ListOrdersRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_rpc_mall_proto_msgTypes[13]
+	mi := &file_rpc_mall_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -935,7 +995,7 @@ func (x *ListOrdersRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListOrdersRequest.ProtoReflect.Descriptor instead.
 func (*ListOrdersRequest) Descriptor() ([]byte, []int) {
-	return file_rpc_mall_proto_rawDescGZIP(), []int{13}
+	return file_rpc_mall_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *ListOrdersRequest) GetUserId() int64 {
@@ -957,7 +1017,7 @@ type OrderResponse struct {
 
 func (x *OrderResponse) Reset() {
 	*x = OrderResponse{}
-	mi := &file_rpc_mall_proto_msgTypes[14]
+	mi := &file_rpc_mall_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -969,7 +1029,7 @@ func (x *OrderResponse) String() string {
 func (*OrderResponse) ProtoMessage() {}
 
 func (x *OrderResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_rpc_mall_proto_msgTypes[14]
+	mi := &file_rpc_mall_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -982,7 +1042,7 @@ func (x *OrderResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use OrderResponse.ProtoReflect.Descriptor instead.
 func (*OrderResponse) Descriptor() ([]byte, []int) {
-	return file_rpc_mall_proto_rawDescGZIP(), []int{14}
+	return file_rpc_mall_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *OrderResponse) GetSuccess() bool {
@@ -1025,7 +1085,7 @@ type ListOrdersResponse struct {
 
 func (x *ListOrdersResponse) Reset() {
 	*x = ListOrdersResponse{}
-	mi := &file_rpc_mall_proto_msgTypes[15]
+	mi := &file_rpc_mall_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1037,7 +1097,7 @@ func (x *ListOrdersResponse) String() string {
 func (*ListOrdersResponse) ProtoMessage() {}
 
 func (x *ListOrdersResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_rpc_mall_proto_msgTypes[15]
+	mi := &file_rpc_mall_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1050,7 +1110,7 @@ func (x *ListOrdersResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListOrdersResponse.ProtoReflect.Descriptor instead.
 func (*ListOrdersResponse) Descriptor() ([]byte, []int) {
-	return file_rpc_mall_proto_rawDescGZIP(), []int{15}
+	return file_rpc_mall_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *ListOrdersResponse) GetSuccess() bool {
@@ -1159,6 +1219,11 @@ const file_rpc_mall_proto_rawDesc = "" +
 	"\n" +
 	"seckill_id\x18\x01 \x01(\x03R\tseckillId\x12'\n" +
 	"\x0fidempotency_key\x18\x02 \x01(\tR\x0eidempotencyKey\x12\x17\n" +
+	"\auser_id\x18\x03 \x01(\x03R\x06userId\"u\n" +
+	"\x12NormalOrderRequest\x12\x1d\n" +
+	"\n" +
+	"product_id\x18\x01 \x01(\x03R\tproductId\x12'\n" +
+	"\x0fidempotency_key\x18\x02 \x01(\tR\x0eidempotencyKey\x12\x17\n" +
 	"\auser_id\x18\x03 \x01(\x03R\x06userId\",\n" +
 	"\x11ListOrdersRequest\x12\x17\n" +
 	"\auser_id\x18\x01 \x01(\x03R\x06userId\"\x80\x01\n" +
@@ -1175,7 +1240,7 @@ const file_rpc_mall_proto_rawDesc = "" +
 	".rpc.OrderR\x06orders\x12\x14\n" +
 	"\x05error\x18\x03 \x01(\tR\x05error\x12\x1d\n" +
 	"\n" +
-	"error_code\x18c \x01(\x05R\terrorCode2\xbe\x05\n" +
+	"error_code\x18c \x01(\x05R\terrorCode2\x99\x06\n" +
 	"\vMallService\x12b\n" +
 	"\fListProducts\x12\x18.rpc.ListProductsRequest\x1a\x19.rpc.ListProductsResponse\"\x1d\x82\xd3\xe4\x93\x02\x17\x12\x15/api/v1/mall/products\x12^\n" +
 	"\n" +
@@ -1183,7 +1248,8 @@ const file_rpc_mall_proto_rawDesc = "" +
 	"\rCreateProduct\x12\x19.rpc.CreateProductRequest\x1a\x14.rpc.ProductResponse\" \x82\xd3\xe4\x93\x02\x1a:\x01*\"\x15/api/v1/mall/products\x12b\n" +
 	"\fListSeckills\x12\x18.rpc.ListSeckillsRequest\x1a\x19.rpc.ListSeckillsResponse\"\x1d\x82\xd3\xe4\x93\x02\x17\x12\x15/api/v1/mall/seckills\x12b\n" +
 	"\rCreateSeckill\x12\x19.rpc.CreateSeckillRequest\x1a\x14.rpc.SeckillResponse\" \x82\xd3\xe4\x93\x02\x1a:\x01*\"\x15/api/v1/mall/seckills\x12c\n" +
-	"\fSeckillOrder\x12\x18.rpc.SeckillOrderRequest\x1a\x12.rpc.OrderResponse\"%\x82\xd3\xe4\x93\x02\x1f:\x01*\"\x1a/api/v1/mall/seckill/order\x12Z\n" +
+	"\fSeckillOrder\x12\x18.rpc.SeckillOrderRequest\x1a\x12.rpc.OrderResponse\"%\x82\xd3\xe4\x93\x02\x1f:\x01*\"\x1a/api/v1/mall/seckill/order\x12Y\n" +
+	"\vNormalOrder\x12\x17.rpc.NormalOrderRequest\x1a\x12.rpc.OrderResponse\"\x1d\x82\xd3\xe4\x93\x02\x17:\x01*\"\x12/api/v1/mall/order\x12Z\n" +
 	"\n" +
 	"ListOrders\x12\x16.rpc.ListOrdersRequest\x1a\x17.rpc.ListOrdersResponse\"\x1b\x82\xd3\xe4\x93\x02\x15\x12\x13/api/v1/mall/ordersB\x16Z\x14rpc-server/proto/rpcb\x06proto3"
 
@@ -1199,7 +1265,7 @@ func file_rpc_mall_proto_rawDescGZIP() []byte {
 	return file_rpc_mall_proto_rawDescData
 }
 
-var file_rpc_mall_proto_msgTypes = make([]protoimpl.MessageInfo, 16)
+var file_rpc_mall_proto_msgTypes = make([]protoimpl.MessageInfo, 17)
 var file_rpc_mall_proto_goTypes = []any{
 	(*Product)(nil),              // 0: rpc.Product
 	(*CreateProductRequest)(nil), // 1: rpc.CreateProductRequest
@@ -1214,9 +1280,10 @@ var file_rpc_mall_proto_goTypes = []any{
 	(*ListSeckillsResponse)(nil), // 10: rpc.ListSeckillsResponse
 	(*Order)(nil),                // 11: rpc.Order
 	(*SeckillOrderRequest)(nil),  // 12: rpc.SeckillOrderRequest
-	(*ListOrdersRequest)(nil),    // 13: rpc.ListOrdersRequest
-	(*OrderResponse)(nil),        // 14: rpc.OrderResponse
-	(*ListOrdersResponse)(nil),   // 15: rpc.ListOrdersResponse
+	(*NormalOrderRequest)(nil),   // 13: rpc.NormalOrderRequest
+	(*ListOrdersRequest)(nil),    // 14: rpc.ListOrdersRequest
+	(*OrderResponse)(nil),        // 15: rpc.OrderResponse
+	(*ListOrdersResponse)(nil),   // 16: rpc.ListOrdersResponse
 }
 var file_rpc_mall_proto_depIdxs = []int32{
 	0,  // 0: rpc.ProductResponse.product:type_name -> rpc.Product
@@ -1231,16 +1298,18 @@ var file_rpc_mall_proto_depIdxs = []int32{
 	8,  // 9: rpc.MallService.ListSeckills:input_type -> rpc.ListSeckillsRequest
 	7,  // 10: rpc.MallService.CreateSeckill:input_type -> rpc.CreateSeckillRequest
 	12, // 11: rpc.MallService.SeckillOrder:input_type -> rpc.SeckillOrderRequest
-	13, // 12: rpc.MallService.ListOrders:input_type -> rpc.ListOrdersRequest
-	5,  // 13: rpc.MallService.ListProducts:output_type -> rpc.ListProductsResponse
-	4,  // 14: rpc.MallService.GetProduct:output_type -> rpc.ProductResponse
-	4,  // 15: rpc.MallService.CreateProduct:output_type -> rpc.ProductResponse
-	10, // 16: rpc.MallService.ListSeckills:output_type -> rpc.ListSeckillsResponse
-	9,  // 17: rpc.MallService.CreateSeckill:output_type -> rpc.SeckillResponse
-	14, // 18: rpc.MallService.SeckillOrder:output_type -> rpc.OrderResponse
-	15, // 19: rpc.MallService.ListOrders:output_type -> rpc.ListOrdersResponse
-	13, // [13:20] is the sub-list for method output_type
-	6,  // [6:13] is the sub-list for method input_type
+	13, // 12: rpc.MallService.NormalOrder:input_type -> rpc.NormalOrderRequest
+	14, // 13: rpc.MallService.ListOrders:input_type -> rpc.ListOrdersRequest
+	5,  // 14: rpc.MallService.ListProducts:output_type -> rpc.ListProductsResponse
+	4,  // 15: rpc.MallService.GetProduct:output_type -> rpc.ProductResponse
+	4,  // 16: rpc.MallService.CreateProduct:output_type -> rpc.ProductResponse
+	10, // 17: rpc.MallService.ListSeckills:output_type -> rpc.ListSeckillsResponse
+	9,  // 18: rpc.MallService.CreateSeckill:output_type -> rpc.SeckillResponse
+	15, // 19: rpc.MallService.SeckillOrder:output_type -> rpc.OrderResponse
+	15, // 20: rpc.MallService.NormalOrder:output_type -> rpc.OrderResponse
+	16, // 21: rpc.MallService.ListOrders:output_type -> rpc.ListOrdersResponse
+	14, // [14:22] is the sub-list for method output_type
+	6,  // [6:14] is the sub-list for method input_type
 	6,  // [6:6] is the sub-list for extension type_name
 	6,  // [6:6] is the sub-list for extension extendee
 	0,  // [0:6] is the sub-list for field type_name
@@ -1257,7 +1326,7 @@ func file_rpc_mall_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_rpc_mall_proto_rawDesc), len(file_rpc_mall_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   16,
+			NumMessages:   17,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
