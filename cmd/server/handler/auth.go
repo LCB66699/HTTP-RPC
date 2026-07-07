@@ -38,6 +38,9 @@ func (h *Handlers) Login(c *gin.Context) {
 
 	// Award login points (daily, fire-and-forget via gRPC)
 	go func(uid int64) {
+		if h.Points == nil || uid == 0 {
+			return
+		}
 		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 		defer cancel()
 		h.Points.Earn(ctx, &pb.EarnRequest{
