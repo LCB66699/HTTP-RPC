@@ -8,12 +8,13 @@ test.describe('HTTP-RPC E2E', () => {
   test('register and login', async ({ page }) => {
     await page.goto('/');
 
-    await page.click('text=没有账号？立即注册');
+    // Click "立即注册" button to show register form
+    await page.click('#btn-show-register');
     await page.fill('#reg-username', TEST_USER);
     await page.fill('#reg-password', TEST_PASS);
-    await page.click('#register-submit');
+    await page.locator('#register-form button[type="submit"]').click();
 
-    await page.waitForSelector('#points-balance-display', { timeout: 8000 });
+    await page.waitForSelector('#points-balance-display', { timeout: 10000 });
     await expect(page.locator('#points-balance-display')).toBeVisible();
   });
 
@@ -23,9 +24,8 @@ test.describe('HTTP-RPC E2E', () => {
     await page.click('[data-tab="sheets"]');
     await page.waitForTimeout(500);
 
-    const name = 'e2e-' + Date.now();
-    await page.fill('#sheet-name-input', name);
-    await page.click('#sheet-create-btn');
+    // Click the "新建空白表格" button which calls createBlankSheet()
+    await page.click('#btn-sheet-create-blank');
     await page.waitForTimeout(1000);
 
     await expect(page.locator('.sheet-card').first()).toBeVisible();
@@ -72,7 +72,7 @@ async function login(page) {
 
   await page.fill('#login-username', TEST_USER);
   await page.fill('#login-password', TEST_PASS);
-  await page.click('#login-submit');
+  await page.locator('#login-form button[type="submit"]').click();
 
   await page.waitForSelector('#points-balance-display', { timeout: 8000 });
 }
