@@ -126,6 +126,20 @@ jobs:
       - name: Functional tests
         run: bash test/e2e/functional_test.sh
 
+      - name: E2E browser tests (Playwright)
+        run: |
+          cd test/e2e/playwright
+          npm install
+          npx playwright install --with-deps chromium
+          npx playwright test --reporter=list
+
+      - name: Upload E2E screenshots on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-screenshots
+          path: test/e2e/playwright/test-results/
+
       - name: Container logs on failure
         if: failure()
         run: |
