@@ -145,6 +145,13 @@ jobs:
           load: true
           push: false
 
+      - name: Build infrastructure images
+        env:
+          DOCKER_BUILDKIT: "1"
+          COMPOSE_DOCKER_CLI_BUILD: "1"
+        run: |
+          docker compose build envoy envoy-2 elasticsearch
+
       - name: Start services
         env:
           LOG_LEVEL: debug
