@@ -5,3 +5,8 @@ build/
 *.exe
 .env
 test/logs/
+test/e2e/playwright/
+test/wrk/
+docs/
+*.md
+cmd/server/gin-gateway
