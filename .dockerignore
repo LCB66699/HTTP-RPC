@@ -10,3 +10,4 @@ test/wrk/
 docs/
 *.md
 cmd/server/gin-gateway
+.github/
