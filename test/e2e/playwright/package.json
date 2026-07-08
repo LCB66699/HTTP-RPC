@@ -1,0 +1,10 @@
+{
+  "name": "http-rpc-e2e",
+  "scripts": {
+    "test": "npx playwright test",
+    "test:ui": "npx playwright test --ui"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.49.0"
+  }
+}
