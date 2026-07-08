@@ -47,15 +47,103 @@ jobs:
             done
           done
 
-      - name: Build images (BuildKit with GHA cache)
-        env:
-          DOCKER_BUILDKIT: "1"
-          COMPOSE_DOCKER_CLI_BUILD: "1"
-          BUILDKIT_INLINE_CACHE: "1"
-        run: |
-          docker compose build \
-            --build-arg BUILDKIT_INLINE_CACHE=1 \
-            2>&1
+      - name: Build base-runtime (shared C++ base)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          target: base-runtime
+          tags: http-rpc/base-runtime:latest
+          cache-from: type=gha,scope=base-runtime
+          cache-to: type=gha,scope=base-runtime,mode=max
+          load: true
+          push: false
+
+      - name: Build auth
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          build-args: SERVICE=auth
+          tags: http-rpc/auth:latest
+          cache-from: type=gha,scope=auth
+          cache-to: type=gha,scope=auth,mode=max
+          load: true
+          push: false
+
+      - name: Build sheet
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          build-args: SERVICE=sheet
+          tags: http-rpc/sheet:latest
+          cache-from: type=gha,scope=sheet
+          cache-to: type=gha,scope=sheet,mode=max
+          load: true
+          push: false
+
+      - name: Build file
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          build-args: SERVICE=file
+          tags: http-rpc/file:latest
+          cache-from: type=gha,scope=file
+          cache-to: type=gha,scope=file,mode=max
+          load: true
+          push: false
+
+      - name: Build search
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          build-args: SERVICE=search
+          tags: http-rpc/search:latest
+          cache-from: type=gha,scope=search
+          cache-to: type=gha,scope=search,mode=max
+          load: true
+          push: false
+
+      - name: Build gateway
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: cmd/server/Dockerfile
+          tags: http-rpc/gateway:latest
+          cache-from: type=gha,scope=gateway
+          cache-to: type=gha,scope=gateway,mode=max
+          load: true
+          push: false
+
+      - name: Build notify
+        uses: docker/build-push-action@v6
+        with:
+          context: ./services/notify-service
+          tags: http-rpc/notify:latest
+          cache-from: type=gha,scope=notify
+          cache-to: type=gha,scope=notify,mode=max
+          load: true
+          push: false
+
+      - name: Build points
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: services/points-server/Dockerfile
+          tags: http-rpc/points:latest
+          cache-from: type=gha,scope=points
+          cache-to: type=gha,scope=points,mode=max
+          load: true
+          push: false
+
+      - name: Build mall
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: services/mall-server/Dockerfile
+          tags: http-rpc/mall:latest
+          cache-from: type=gha,scope=mall
+          cache-to: type=gha,scope=mall,mode=max
+          load: true
+          push: false
 
       - name: Start services
         env:
