@@ -14,8 +14,8 @@ test.describe('HTTP-RPC E2E', () => {
     await page.fill('#reg-password', TEST_PASS);
     await page.locator('#register-form button[type="submit"]').click();
 
-    await page.waitForSelector('#points-balance-display', { timeout: 10000 });
-    await expect(page.locator('#points-balance-display')).toBeVisible();
+    await page.waitForSelector('#main-header:not(.hidden)', { timeout: 10000 });
+    await expect(page.locator('#main-header')).toBeVisible();
   });
 
   test('create and open a sheet', async ({ page }) => {
@@ -66,7 +66,7 @@ test.describe('HTTP-RPC E2E', () => {
 async function login(page) {
   await page.goto('/');
 
-  if (await page.locator('#points-balance-display').isVisible({ timeout: 1000 }).catch(() => false)) {
+  if (await page.locator('#main-header:not(.hidden)').isVisible({ timeout: 1000 }).catch(() => false)) {
     return;
   }
 
@@ -74,5 +74,5 @@ async function login(page) {
   await page.fill('#login-password', TEST_PASS);
   await page.locator('#login-form button[type="submit"]').click();
 
-  await page.waitForSelector('#points-balance-display', { timeout: 8000 });
+  await page.waitForSelector('#main-header:not(.hidden)', { timeout: 8000 });
 }
