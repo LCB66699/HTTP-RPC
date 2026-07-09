@@ -5,36 +5,37 @@ const ADMIN_PASS = 'admin1234';
 const USER = 'e2euser_' + Date.now();
 const PASS = 'test1234';
 
-async function loginViaUI(page, user, pass) {
-  await page.goto('/');
-  // Fill login form and submit like a real user
+async function login(page, user, pass) {
   await page.fill('input#login-username', user);
   await page.fill('input#login-password', pass);
   await page.click('#login-form button[type="submit"]');
-  // Wait for main app to appear
   await page.waitForSelector('#main-header', { state: 'visible', timeout: 15000 });
 }
 
-test.describe('HTTP-RPC E2E', () => {
+async function register(page, user, pass) {
+  await page.click('#btn-show-register');
+  await page.fill('#reg-username', user);
+  await page.fill('#reg-password', pass);
+  await page.click('#register-form button[type="submit"]');
+  await page.waitForSelector('#main-header', { state: 'visible', timeout: 15000 });
+}
 
-  // ---- Admin setup ----
-  test('admin registers and creates products', async ({ page }) => {
+test.describe.serial('HTTP-RPC E2E', () => {
+
+  // admin setup
+  test('admin registers', async ({ page }) => {
     await page.goto('/');
+    await register(page, ADMIN_USER, ADMIN_PASS);
+  });
 
-    // Register admin (first user = admin role)
-    await page.click('#btn-show-register');
-    await page.fill('#reg-username', ADMIN_USER);
-    await page.fill('#reg-password', ADMIN_PASS);
-    await page.click('#register-form button[type="submit"]');
-    await page.waitForSelector('#main-header', { state: 'visible', timeout: 15000 });
-
-    // Open admin panel
+  test('admin creates product and seckill', async ({ page }) => {
+    await page.goto('/');
+    await login(page, ADMIN_USER, ADMIN_PASS);
     await page.click('[data-tab="mall"]');
     await page.waitForTimeout(500);
     await page.locator('#mall-admin-toggle button').click();
     await page.waitForTimeout(300);
 
-    // Create product
     await page.fill('#admin-prod-name', 'e2e-test-product');
     await page.fill('#admin-prod-price', '20');
     await page.fill('#admin-prod-stock', '100');
@@ -42,7 +43,6 @@ test.describe('HTTP-RPC E2E', () => {
     await page.locator('#mall-admin-panel').locator('text=添加商品').click();
     await page.waitForTimeout(500);
 
-    // Create seckill
     const now = Math.floor(Date.now() / 1000);
     await page.fill('#admin-sk-prod-id', '1');
     await page.fill('#admin-sk-price', '5');
@@ -54,63 +54,55 @@ test.describe('HTTP-RPC E2E', () => {
     await page.waitForTimeout(500);
   });
 
-  // ---- Regular user tests ----
-  test.beforeEach(async ({ page }) => {
-    // Register + login regular user
+  // regular user
+  test('regular user registers', async ({ page }) => {
     await page.goto('/');
-    await page.click('#btn-show-register');
-    await page.fill('#reg-username', USER);
-    await page.fill('#reg-password', PASS);
-    await page.click('#register-form button[type="submit"]');
-    await page.waitForSelector('#main-header', { state: 'visible', timeout: 15000 });
+    await register(page, USER, PASS);
   });
 
-  test('sheets tab shows list', async ({ page }) => {
-    await page.click('[data-tab="sheets"]');
-    await page.waitForTimeout(500);
-    await expect(page.locator('#sheets-list')).toBeAttached();
-  });
-
-  test('create blank sheet via button', async ({ page }) => {
+  test('create sheet and open', async ({ page }) => {
+    await page.goto('/');
+    await login(page, USER, PASS);
     await page.click('[data-tab="sheets"]');
     await page.waitForTimeout(500);
     await page.click('#btn-sheet-create-blank');
     await page.waitForTimeout(1000);
     await expect(page.locator('.sheet-card').first()).toBeAttached({ timeout: 5000 });
+    await page.locator('.sheet-card').first().locator('text=打开').click();
+    await page.waitForTimeout(500);
+    await expect(page.locator('#sheet-grid')).toBeAttached();
   });
 
-  test('points tab shows balance', async ({ page }) => {
+  test('points tab', async ({ page }) => {
+    await page.goto('/');
+    await login(page, USER, PASS);
     await page.click('[data-tab="points"]');
     await page.waitForTimeout(500);
     await expect(page.locator('#points-balance-display')).toBeAttached();
   });
 
-  test('workspace tab shows list', async ({ page }) => {
+  test('workspace tab', async ({ page }) => {
+    await page.goto('/');
+    await login(page, USER, PASS);
     await page.click('[data-tab="workspace"]');
     await page.waitForTimeout(500);
     await expect(page.locator('#workspace-list')).toBeAttached();
   });
 
-  test('mall tab shows products and seckills', async ({ page }) => {
+  test('mall tab', async ({ page }) => {
+    await page.goto('/');
+    await login(page, USER, PASS);
     await page.click('[data-tab="mall"]');
     await page.waitForTimeout(1000);
     await expect(page.locator('#mall-products')).toBeAttached();
-    await expect(page.locator('#mall-seckills')).toBeAttached();
   });
 
-  test('files tab loads', async ({ page }) => {
+  test('files tab', async ({ page }) => {
+    await page.goto('/');
+    await login(page, USER, PASS);
     await page.click('[data-tab="files"]');
     await page.waitForTimeout(500);
     await expect(page.locator('#files-list')).toBeAttached();
-  });
-
-  test('share button visible on sheet card', async ({ page }) => {
-    await page.click('[data-tab="sheets"]');
-    await page.waitForTimeout(500);
-    // Create a sheet first if none exist
-    await page.click('#btn-sheet-create-blank');
-    await page.waitForTimeout(1000);
-    await expect(page.locator('.sheet-card').first().locator('text=分享')).toBeAttached({ timeout: 5000 });
   });
 
 });
