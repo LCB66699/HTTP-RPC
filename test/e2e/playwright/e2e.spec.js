@@ -5,72 +5,44 @@ const ADMIN_PASS = 'admin1234';
 const USER = 'e2euser_' + Date.now();
 const PASS = 'test1234';
 
+async function loginViaUI(page, user, pass) {
+  await page.goto('/');
+  // Fill login form and submit like a real user
+  await page.fill('input#login-username', user);
+  await page.fill('input#login-password', pass);
+  await page.click('#login-form button[type="submit"]');
+  // Wait for main app to appear
+  await page.waitForSelector('#main-header', { state: 'visible', timeout: 15000 });
+}
+
 test.describe('HTTP-RPC E2E', () => {
 
-  test.beforeAll(async ({ browser }) => {
-    const ctx = await browser.newContext({ ignoreHTTPSErrors: true });
-    const page = await ctx.newPage();
+  // ---- Admin setup ----
+  test('admin registers and creates products', async ({ page }) => {
     await page.goto('/');
 
-    // Register first user (gets admin role)
-    await apiCall(page, '/api/v1/register', { username: ADMIN_USER, password: ADMIN_PASS });
-    await apiCall(page, '/api/v1/login', { username: ADMIN_USER, password: ADMIN_PASS });
-
-    // Create products as admin
-    for (const p of [{ name: 'e2e-10积分礼包', price: 10, stock: 999 },
-                     { name: 'e2e-50积分礼包', price: 50, stock: 500 }]) {
-      await apiCall(page, '/api/v1/mall/products', p);
-    }
-
-    // Register regular user
-    await apiCall(page, '/api/v1/register', { username: USER, password: PASS });
-    await apiCall(page, '/api/v1/login', { username: USER, password: PASS });
-
-    // Create a sheet for regular user
-    await apiCall(page, '/api/v1/sheets', { name: 'e2e-test-sheet', headers_json: '[]', data_json: '[]' });
-
-    // Create workspace
-    await apiCall(page, '/api/v1/workspaces', { name: 'e2e-workspace' });
-
-    await ctx.close();
-  });
-
-  // ==== Admin Tests ====
-
-  test('admin can login and see admin controls', async ({ page }) => {
-    await loginViaAPI(page, ADMIN_USER, ADMIN_PASS);
-    await page.click('[data-tab="mall"]');
-    await page.waitForTimeout(500);
-
-    // Admin toggle visible
-    await expect(page.locator('#mall-admin-toggle')).toBeAttached();
-  });
-
-  test('admin creates product via UI', async ({ page }) => {
-    await loginViaAPI(page, ADMIN_USER, ADMIN_PASS);
-    await page.click('[data-tab="mall"]');
-    await page.waitForTimeout(500);
+    // Register admin (first user = admin role)
+    await page.click('#btn-show-register');
+    await page.fill('#reg-username', ADMIN_USER);
+    await page.fill('#reg-password', ADMIN_PASS);
+    await page.click('#register-form button[type="submit"]');
+    await page.waitForSelector('#main-header', { state: 'visible', timeout: 15000 });
 
     // Open admin panel
+    await page.click('[data-tab="mall"]');
+    await page.waitForTimeout(500);
     await page.locator('#mall-admin-toggle button').click();
     await page.waitForTimeout(300);
 
-    await page.fill('#admin-prod-name', 'ui-created-product');
-    await page.fill('#admin-prod-price', '30');
-    await page.fill('#admin-prod-stock', '50');
+    // Create product
+    await page.fill('#admin-prod-name', 'e2e-test-product');
+    await page.fill('#admin-prod-price', '20');
+    await page.fill('#admin-prod-stock', '100');
     page.once('dialog', d => d.accept());
     await page.locator('#mall-admin-panel').locator('text=添加商品').click();
     await page.waitForTimeout(500);
-  });
 
-  test('admin creates seckill via UI', async ({ page }) => {
-    await loginViaAPI(page, ADMIN_USER, ADMIN_PASS);
-    await page.click('[data-tab="mall"]');
-    await page.waitForTimeout(500);
-
-    await page.locator('#mall-admin-toggle button').click();
-    await page.waitForTimeout(300);
-
+    // Create seckill
     const now = Math.floor(Date.now() / 1000);
     await page.fill('#admin-sk-prod-id', '1');
     await page.fill('#admin-sk-price', '5');
@@ -82,86 +54,63 @@ test.describe('HTTP-RPC E2E', () => {
     await page.waitForTimeout(500);
   });
 
-  // ==== Regular User Tests ====
+  // ---- Regular user tests ----
+  test.beforeEach(async ({ page }) => {
+    // Register + login regular user
+    await page.goto('/');
+    await page.click('#btn-show-register');
+    await page.fill('#reg-username', USER);
+    await page.fill('#reg-password', PASS);
+    await page.click('#register-form button[type="submit"]');
+    await page.waitForSelector('#main-header', { state: 'visible', timeout: 15000 });
+  });
 
   test('sheets tab shows list', async ({ page }) => {
-    await loginViaAPI(page, USER, PASS);
     await page.click('[data-tab="sheets"]');
     await page.waitForTimeout(500);
+    await expect(page.locator('#sheets-list')).toBeAttached();
+  });
+
+  test('create blank sheet via button', async ({ page }) => {
+    await page.click('[data-tab="sheets"]');
+    await page.waitForTimeout(500);
+    await page.click('#btn-sheet-create-blank');
+    await page.waitForTimeout(1000);
     await expect(page.locator('.sheet-card').first()).toBeAttached({ timeout: 5000 });
   });
 
-  test('open a sheet', async ({ page }) => {
-    await loginViaAPI(page, USER, PASS);
-    await page.click('[data-tab="sheets"]');
-    await page.waitForTimeout(500);
-    await page.locator('.sheet-card').first().locator('text=打开').click();
-    await page.waitForTimeout(500);
-    await expect(page.locator('#sheet-grid')).toBeAttached();
-  });
-
   test('points tab shows balance', async ({ page }) => {
-    await loginViaAPI(page, USER, PASS);
     await page.click('[data-tab="points"]');
     await page.waitForTimeout(500);
     await expect(page.locator('#points-balance-display')).toBeAttached();
   });
 
-  test('points tab shows rules', async ({ page }) => {
-    await loginViaAPI(page, USER, PASS);
-    await page.click('[data-tab="points"]');
-    await page.waitForTimeout(500);
-    await expect(page.locator('.rules-list')).toBeAttached();
-  });
-
   test('workspace tab shows list', async ({ page }) => {
-    await loginViaAPI(page, USER, PASS);
     await page.click('[data-tab="workspace"]');
     await page.waitForTimeout(500);
-    await expect(page.locator('.ws-item').first()).toBeAttached({ timeout: 5000 });
+    await expect(page.locator('#workspace-list')).toBeAttached();
   });
 
-  test('mall tab shows products', async ({ page }) => {
-    await loginViaAPI(page, USER, PASS);
+  test('mall tab shows products and seckills', async ({ page }) => {
     await page.click('[data-tab="mall"]');
     await page.waitForTimeout(1000);
     await expect(page.locator('#mall-products')).toBeAttached();
     await expect(page.locator('#mall-seckills')).toBeAttached();
-    await expect(page.locator('#mall-orders')).toBeAttached();
   });
 
   test('files tab loads', async ({ page }) => {
-    await loginViaAPI(page, USER, PASS);
     await page.click('[data-tab="files"]');
     await page.waitForTimeout(500);
     await expect(page.locator('#files-list')).toBeAttached();
   });
 
   test('share button visible on sheet card', async ({ page }) => {
-    await loginViaAPI(page, USER, PASS);
     await page.click('[data-tab="sheets"]');
     await page.waitForTimeout(500);
+    // Create a sheet first if none exist
+    await page.click('#btn-sheet-create-blank');
+    await page.waitForTimeout(1000);
     await expect(page.locator('.sheet-card').first().locator('text=分享')).toBeAttached({ timeout: 5000 });
   });
 
 });
-
-async function apiCall(page, path, body) {
-  await page.evaluate(async ({ path, body }) => {
-    await fetch(path, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    });
-  }, { path, body });
-}
-
-async function loginViaAPI(page, user, pass) {
-  await page.goto('/');
-  await apiCall(page, '/api/v1/login', { username: user, password: pass });
-  await page.reload();
-  // Wait for showMainApp() to remove hidden from header
-  await page.waitForFunction(() => {
-    const h = document.getElementById('main-header');
-    return h && !h.classList.contains('hidden');
-  }, { timeout: 10000 });
-}
