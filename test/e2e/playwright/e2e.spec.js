@@ -159,5 +159,9 @@ async function loginViaAPI(page, user, pass) {
   await page.goto('/');
   await apiCall(page, '/api/v1/login', { username: user, password: pass });
   await page.reload();
-  await page.waitForTimeout(1000);
+  // Wait for showMainApp() to remove hidden from header
+  await page.waitForFunction(() => {
+    const h = document.getElementById('main-header');
+    return h && !h.classList.contains('hidden');
+  }, { timeout: 10000 });
 }
