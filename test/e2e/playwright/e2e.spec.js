@@ -4,16 +4,18 @@ const ADMIN_USER = 'e2eadmin_' + Date.now();
 const ADMIN_PASS = 'admin1234';
 
 async function register(page, user, pass) {
+  page.on('console', msg => console.log('[browser]', msg.type(), msg.text()));
+  page.on('pageerror', err => console.error('[browser error]', err.message));
+
   await page.click('#btn-show-register');
   await page.fill('#reg-username', user);
   await page.fill('#reg-password', pass);
   await page.click('#register-form button[type="submit"]');
-  // After successful register, login modal reappears or main app shows
+
+  // Wait for showMainApp() — main-header loses 'hidden' class
   await page.waitForFunction(() => {
-    const main = document.getElementById('main-header');
-    const login = document.getElementById('login-modal');
-    return (main && !main.classList.contains('hidden')) ||
-           (login && login.classList.contains('hidden'));
+    const h = document.getElementById('main-header');
+    return h && !h.classList.contains('hidden');
   }, { timeout: 15000 });
 }
 
@@ -22,8 +24,8 @@ async function login(page, user, pass) {
   await page.fill('input#login-password', pass);
   await page.click('#login-form button[type="submit"]');
   await page.waitForFunction(() => {
-    const main = document.getElementById('main-header');
-    return main && !main.classList.contains('hidden');
+    const h = document.getElementById('main-header');
+    return h && !h.classList.contains('hidden');
   }, { timeout: 15000 });
 }
 
