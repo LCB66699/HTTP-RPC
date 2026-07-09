@@ -199,9 +199,9 @@ jobs:
         if: always()
         run: |
           echo "=== grpc-gateway logs ==="
-          docker compose logs grpc-gateway --tail=30 2>&1 || true
+          docker compose logs --tail=30 grpc-gateway 2>&1 || docker compose logs grpc-gateway 2>&1 || true
           echo "=== grpc-gateway-2 logs ==="
-          docker compose logs grpc-gateway-2 --tail=30 2>&1 || true
+          docker compose logs --tail=30 grpc-gateway-2 2>&1 || docker compose logs grpc-gateway-2 2>&1 || true
 
       - name: Restart nginx to reconnect envoy
         if: always()
@@ -240,15 +240,15 @@ jobs:
       - name: Container logs on failure
         if: failure()
         run: |
-          echo "=== sheet-1 ===" && docker compose logs sheet-1 --tail=40
-          echo "=== file-1 ===" && docker compose logs file-1 --tail=40
-          echo "=== grpc-gateway ===" && docker compose logs grpc-gateway --tail=20
-          echo "=== auth-1 ===" && docker compose logs auth-1 --tail=10
-          echo "=== mysql-spreadsheet-0 ===" && docker compose logs mysql-spreadsheet-0 --tail=10
-          echo "=== mysql-spreadsheet-1 ===" && docker compose logs mysql-spreadsheet-1 --tail=10
-          echo "=== envoy ===" && docker compose logs envoy --tail=20
-          echo "=== envoy-2 ===" && docker compose logs envoy-2 --tail=20
-          echo "=== nginx ===" && docker compose logs nginx --tail=20
+          echo "=== sheet-1 ===" && docker compose logs --tail=40 sheet-1
+          echo "=== file-1 ===" && docker compose logs --tail=40 file-1
+          echo "=== grpc-gateway ===" && docker compose logs --tail=20 grpc-gateway
+          echo "=== auth-1 ===" && docker compose logs --tail=10 auth-1
+          echo "=== mysql-spreadsheet-0 ===" && docker compose logs --tail=10 mysql-spreadsheet-0
+          echo "=== mysql-spreadsheet-1 ===" && docker compose logs --tail=10 mysql-spreadsheet-1
+          echo "=== envoy ===" && docker compose logs --tail=20 envoy
+          echo "=== envoy-2 ===" && docker compose logs --tail=20 envoy-2
+          echo "=== nginx ===" && docker compose logs --tail=20 nginx
 
   # ===== Stage 3: 推送镜像到 ghcr.io (仅 main 分支) =====
   push:
