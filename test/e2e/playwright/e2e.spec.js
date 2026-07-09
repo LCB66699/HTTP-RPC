@@ -12,24 +12,21 @@ test.describe('HTTP-RPC E2E', () => {
     await page.goto('/');
 
     // Register
-    await page.evaluate(async (user, pass) => {
-      const resp = await fetch('/api/v1/register', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username: user, password: pass }),
-      });
-      return resp.json();
-    }, TEST_USER, TEST_PASS);
+    const creds = { user: TEST_USER, pass: TEST_PASS };
 
-    // Login
-    await page.evaluate(async (user, pass) => {
-      const resp = await fetch('/api/v1/login', {
+    // Register
+    await page.evaluate(async ({ user, pass }) => {
+      await fetch('/api/v1/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username: user, password: pass }),
       });
-      return resp.json();
-    }, TEST_USER, TEST_PASS);
+      await fetch('/api/v1/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: user, password: pass }),
+      });
+    }, creds);
 
     await page.reload();
     await page.waitForTimeout(1000);
@@ -68,7 +65,7 @@ async function loginViaAPI(page) {
   await page.goto('/');
 
   // Register + login via API (idempotent — register returns success or already-exists)
-  await page.evaluate(async (user, pass) => {
+  await page.evaluate(async ({ user, pass }) => {
     await fetch('/api/v1/register', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -80,7 +77,7 @@ async function loginViaAPI(page) {
       credentials: 'same-origin',
       body: JSON.stringify({ username: user, password: pass }),
     });
-  }, TEST_USER, TEST_PASS);
+  }, { user: TEST_USER, pass: TEST_PASS });
 
   // Reload so the cookie takes effect and showMainApp() runs
   await page.reload();
