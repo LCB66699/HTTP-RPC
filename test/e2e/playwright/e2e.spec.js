@@ -14,8 +14,8 @@ test.describe('HTTP-RPC E2E', () => {
     await page.fill('#reg-password', TEST_PASS);
     await page.locator('#register-form button[type="submit"]').click();
 
-    // After register, the modal hides and main app shows
-    await page.waitForSelector('#register-modal.hidden', { timeout: 10000 });
+    // After register, the username shows in navbar
+    await page.waitForSelector('#user-display', { timeout: 10000 });
   });
 
   test('create and open a sheet', async ({ page }) => {
@@ -66,7 +66,7 @@ test.describe('HTTP-RPC E2E', () => {
 async function login(page) {
   await page.goto('/');
 
-  if (await page.locator('#register-modal.hidden').isVisible({ timeout: 500 }).catch(() => false)) {
+  if (await page.locator('#user-display').isVisible({ timeout: 500 }).catch(() => false)) {
     return;
   }
 
@@ -74,5 +74,5 @@ async function login(page) {
   await page.fill('#login-password', TEST_PASS);
   await page.locator('#login-form button[type="submit"]').click();
 
-  await page.waitForSelector('#login-modal.hidden', { timeout: 8000 });
+  await page.waitForSelector('#user-display', { timeout: 8000 });
 }
