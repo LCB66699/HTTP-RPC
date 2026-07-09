@@ -275,6 +275,7 @@ function showMainApp() {
   // 隐藏非管理员功能
   const isAdmin = currentUser && currentUser.role === 'admin';
   document.querySelector('[data-tab="monitor"]').style.display = isAdmin ? '' : 'none';
+  document.getElementById('mall-admin-toggle').style.display = isAdmin ? '' : 'none';
   if (!isAdmin && document.getElementById('panel-monitor').classList.contains('active')) {
     document.getElementById('panel-monitor').classList.remove('active');
     document.getElementById('panel-sheets').classList.add('active');
@@ -2241,6 +2242,48 @@ async function loadMallOrders() {
         <span class="order-date">${(o.created_at || '').slice(0, 10)}</span>
       </div>`).join('');
   } catch(e) {}
+}
+
+// ============================================================
+//  Mall Admin
+// ============================================================
+function toggleMallAdmin() {
+  const panel = document.getElementById('mall-admin-panel');
+  panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+}
+
+async function adminCreateProduct() {
+  const name = document.getElementById('admin-prod-name').value;
+  const price = parseInt(document.getElementById('admin-prod-price').value);
+  const stock = parseInt(document.getElementById('admin-prod-stock').value);
+  if (!name || !price) { alert('名称和价格必填'); return; }
+  const res = await fetch(API + '/mall/products', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name, price, stock, description: '' }),
+    credentials: 'same-origin'
+  });
+  const data = await res.json();
+  alert(data.success ? '商品添加成功' : '失败: ' + (data.error || ''));
+  if (data.success) loadMallProducts();
+}
+
+async function adminCreateSeckill() {
+  const product_id = parseInt(document.getElementById('admin-sk-prod-id').value);
+  const seckill_price = parseInt(document.getElementById('admin-sk-price').value);
+  const seckill_stock = parseInt(document.getElementById('admin-sk-stock').value);
+  const start_at = parseInt(document.getElementById('admin-sk-start').value);
+  const end_at = parseInt(document.getElementById('admin-sk-end').value);
+  if (!product_id || !seckill_price) { alert('商品ID和秒杀价必填'); return; }
+  const res = await fetch(API + '/mall/seckills', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ product_id, seckill_price, seckill_stock, start_at, end_at }),
+    credentials: 'same-origin'
+  });
+  const data = await res.json();
+  alert(data.success ? '秒杀创建成功' : '失败: ' + (data.error || ''));
+  if (data.success) loadMallSeckills();
 }
 
 // ============================================================
