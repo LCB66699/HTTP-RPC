@@ -1,16 +1,27 @@
-FROM nginx:1.27
-RUN apt-get update && apt-get install -y openssl apache2-utils curl && \
-    mkdir -p /certs && \
-    openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
-      -keyout /certs/server.key -out /certs/server.crt \
-      -subj "/CN=luochuanbaiRPC" && \
-    rm -rf /var/lib/apt/lists/*
-RUN echo '#!/bin/sh' > /usr/local/bin/realserver.sh && \
-    echo 'VIP=${VIP:-192.168.1.100}' >> /usr/local/bin/realserver.sh && \
-    echo 'ip addr add $VIP/32 dev lo 2>/dev/null || true' >> /usr/local/bin/realserver.sh && \
-    echo 'echo 1 > /proc/sys/net/ipv4/conf/lo/arp_ignore 2>/dev/null || true' >> /usr/local/bin/realserver.sh && \
-    echo 'echo 2 > /proc/sys/net/ipv4/conf/lo/arp_announce 2>/dev/null || true' >> /usr/local/bin/realserver.sh && \
-    echo 'echo 1 > /proc/sys/net/ipv4/conf/all/arp_ignore 2>/dev/null || true' >> /usr/local/bin/realserver.sh && \
-    echo 'echo 2 > /proc/sys/net/ipv4/conf/all/arp_announce 2>/dev/null || true' >> /usr/local/bin/realserver.sh && \
-    echo 'echo "[LVS] real server ready — VIP=$VIP bound to lo"' >> /usr/local/bin/realserver.sh && \
-    chmod +x /usr/local/bin/realserver.sh
+FROM node:22-alpine AS frontend-build
+
+WORKDIR /src/frontend
+COPY frontend/package.json frontend/package-lock.json ./
+RUN npm ci
+COPY frontend/ ./
+RUN npm run build
+
+FROM nginx:1.27-alpine
+
+RUN apk add --no-cache openssl apache2-utils curl \
+    && mkdir -p /certs \
+    && printf '%s\n' \
+      '#!/bin/sh' \
+      'VIP=${VIP:-192.168.1.100}' \
+      'ip addr add $VIP/32 dev lo 2>/dev/null || true' \
+      'echo 1 > /proc/sys/net/ipv4/conf/lo/arp_ignore 2>/dev/null || true' \
+      'echo 2 > /proc/sys/net/ipv4/conf/lo/arp_announce 2>/dev/null || true' \
+      'echo 1 > /proc/sys/net/ipv4/conf/all/arp_ignore 2>/dev/null || true' \
+      'echo 2 > /proc/sys/net/ipv4/conf/all/arp_announce 2>/dev/null || true' \
+      'echo "[LVS] real server ready: VIP=$VIP bound to lo"' \
+      > /usr/local/bin/realserver.sh \
+    && chmod +x /usr/local/bin/realserver.sh
+
+COPY deploy/nginx/nginx.frontend.conf /etc/nginx/nginx.conf
+COPY --from=frontend-build /src/frontend/dist /usr/share/nginx/html
+COPY web-ui /usr/share/nginx/html/legacy

@@ -333,7 +333,6 @@ document.getElementById('login-form').addEventListener('submit', async (e) => {
     if (data.success) {
       // JWT 已通过 Set-Cookie: rpc_token HttpOnly 设置，JS 无法读取，也不需要存储
       authToken = '1';   // 仅作登录状态标志
-      if (data._rt) { refreshToken = data._rt; refreshUsername = data.username; }
       const loginUsername = data.username || username;
       const joinDate = localStorage.getItem('rpc_join_date_' + loginUsername) || new Date().toLocaleDateString('zh-CN');
       const role = data._role || 'user';
@@ -391,7 +390,6 @@ document.getElementById('register-form').addEventListener('submit', async (e) =>
     const data = await res.json();
     if (data.success) {
       authToken = '1';   // JWT 在 HttpOnly cookie 中，JS 不存储
-      if (data._rt) { refreshToken = data._rt; refreshUsername = data.username; }
       const regUsername = data.username || username;
       const joinDate = new Date().toLocaleDateString('zh-CN');
       currentUser = { username: regUsername, joinDate };
@@ -507,7 +505,16 @@ async function doSearch() {
     if (sugg) {
       if (res.suggestion && res.suggestion !== q) {
         sugg.classList.remove('hidden');
-        sugg.innerHTML = `您是不是要找：<a href="#" onclick="var inp=document.getElementById('search-input');if(inp)inp.value='${res.suggestion}';searchPage=1;doSearch();return false;">${res.suggestion}</a>`;
+        const link = document.createElement('a');
+        link.href = '#';
+        link.textContent = res.suggestion;
+        link.addEventListener('click', event => {
+          event.preventDefault();
+          input.value = res.suggestion;
+          searchPage = 1;
+          void doSearch();
+        });
+        sugg.replaceChildren('您是不是要找：', link);
       } else {
         sugg.classList.add('hidden');
       }
@@ -540,8 +547,8 @@ function renderSearchResults(results) {
     const isSheet = !!(r.name);
     const title = isSheet ? (r.name || '未命名表格') : (r.original_name || '未知文件');
     const subtitle = isSheet
-      ? `表格 · ${r.username} · ${r.row_count || 0}行 × ${r.col_count || 0}列`
-      : `文件 · ${r.username} · ${formatFileSize(r.size)} · ${r.mime_type || ''}`;
+      ? `表格 · ${esc(r.username || '')} · ${r.row_count || 0}行 × ${r.col_count || 0}列`
+      : `文件 · ${esc(r.username || '')} · ${formatFileSize(r.size)} · ${esc(r.mime_type || '')}`;
     const date = isSheet ? r.updated_at : r.created_at;
 
     // 高亮片段
@@ -563,14 +570,16 @@ function renderSearchResults(results) {
             : `<span>${highlightText(title)}</span>`}
         </div>
         <div class="search-result-meta">${subtitle} · ${formatSearchDate(date)}</div>
-        ${snippet ? `<div class="search-result-snippet">${snippet}</div>` : ''}
+        ${snippet ? `<div class="search-result-snippet">${highlightText(snippet)}</div>` : ''}
       </div>
     `;
   }).join('');
 }
 
 function highlightText(text) {
-  return String(text).replace(/<em>/g, '<em class="search-highlight">').replace(/<\/em>/g, '</em>');
+  return esc(String(text))
+    .replace(/&lt;em&gt;/g, '<em class="search-highlight">')
+    .replace(/&lt;\/em&gt;/g, '</em>');
 }
 
 function formatSearchDate(d) {
