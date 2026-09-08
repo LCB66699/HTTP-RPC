@@ -6,10 +6,12 @@ on:
     paths:
       - 'cmd/server/**'
       - 'proto/*.proto'
+      - '.github/workflows/ci-go-gateway.yml'
   pull_request:
     paths:
       - 'cmd/server/**'
       - 'proto/*.proto'
+      - '.github/workflows/ci-go-gateway.yml'
   workflow_dispatch:
 
 jobs:
