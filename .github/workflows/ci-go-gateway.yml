@@ -23,11 +23,24 @@ jobs:
         with: { go-version: "1.24.2" }
 
       - name: Go test
+        env:
+          GOPROXY: https://goproxy.cn,direct
         run: |
           cd cmd/server
-          go test ./... -v -count=1
+          for attempt in 1 2 3; do
+            if go test ./... -v -count=1; then
+              exit 0
+            fi
+            if [ "$attempt" -eq 3 ]; then
+              exit 1
+            fi
+            go clean -modcache
+            sleep $((attempt * 5))
+          done
 
       - name: Go build
+        env:
+          GOPROXY: https://goproxy.cn,direct
         run: |
           cd cmd/server
           go build -o /dev/null ./...
