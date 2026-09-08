@@ -1,0 +1,53 @@
+name: Frontend Modernization
+
+on:
+  push:
+    branches: ["**"]
+    paths:
+      - "frontend/**"
+      - "web-ui/**"
+      - "Dockerfile.nginx"
+      - "deploy/nginx/nginx.frontend.conf"
+      - "docker-compose.frontend.yml"
+      - "docker-compose.local-verify.yml"
+      - ".github/workflows/ci-frontend.yml"
+  pull_request:
+    paths:
+      - "frontend/**"
+      - "web-ui/**"
+      - "Dockerfile.nginx"
+      - "deploy/nginx/nginx.frontend.conf"
+      - "docker-compose.frontend.yml"
+      - "docker-compose.local-verify.yml"
+      - ".github/workflows/ci-frontend.yml"
+
+jobs:
+  frontend:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - run: npm run check
+      - run: npm test
+      - run: npm run build
+      - name: Build frontend image
+        working-directory: .
+        run: docker build --tag http-rpc/nginx-frontend:ci --file Dockerfile.nginx .
+      - name: Export frontend image
+        working-directory: .
+        run: docker save http-rpc/nginx-frontend:ci --output nginx-frontend-image.tar
+      - uses: actions/upload-artifact@v4
+        with:
+          name: nginx-frontend-image
+          path: nginx-frontend-image.tar
+          retention-days: 7

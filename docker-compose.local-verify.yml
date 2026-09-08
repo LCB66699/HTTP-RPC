@@ -1,0 +1,41 @@
+services:
+  nginx:
+    ports: !override
+      - "127.0.0.1:9443:443"
+
+  envoy:
+    ports: !reset []
+
+  envoy-2:
+    ports: !reset []
+
+  consul:
+    ports: !reset []
+
+  rabbitmq:
+    ports: !reset []
+
+  minio:
+    ports: !reset []
+
+  elasticsearch:
+    ports: !reset []
+
+  mongodb:
+    ports: !reset []
+
+  grpc-gateway:
+    ports: !reset []
+
+  prometheus:
+    ports: !reset []
+
+  grafana:
+    ports: !reset []
+
+  jaeger:
+    ports: !reset []
+
+  mall-server:
+    environment:
+      RABBITMQ_ADDR: "amqp://rpc:${RABBITMQ_PASSWORD:?RABBITMQ_PASSWORD is required}@rabbitmq:5672/"
