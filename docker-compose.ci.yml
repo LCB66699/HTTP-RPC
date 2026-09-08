@@ -1,0 +1,3 @@
+services:
+  elasticsearch:
+    image: ${DOCKER_USER:-http-rpc}/elasticsearch:latest

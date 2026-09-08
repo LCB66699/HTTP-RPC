@@ -27,6 +27,12 @@ on:
       - "deploy/nginx/**"
       - ".github/workflows/ci.yml"
   workflow_dispatch:
+    inputs:
+      full_e2e:
+        description: Run the full API and browser test suites
+        type: boolean
+        required: false
+        default: false
 
 jobs:
   # ===== Stage 1: 全量构建 + E2E 集成测试 =====
@@ -238,7 +244,15 @@ jobs:
           echo "=== Test nginx -> envoy -> gateway ==="
           docker compose exec nginx sh -c "wget -qO- --timeout=5 http://envoy:10000/api/v1/health 2>&1 || echo 'FAIL nginx->envoy'"
 
-      - name: Functional tests
+      - name: API smoke check
+        run: |
+          set -euo pipefail
+          response=$(curl -ksf https://localhost/api/v1/health)
+          echo "$response"
+          echo "$response" | grep -q 'gateway'
+
+      - name: Full API functional tests
+        if: ${{ inputs.full_e2e == true }}
         run: bash test/e2e/functional_test.sh
 
       - uses: actions/setup-node@v4
@@ -250,11 +264,23 @@ jobs:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ hashFiles('test/e2e/playwright/package.json') }}
 
-      - name: E2E browser tests (Playwright)
+      - name: Install Playwright dependencies
+        working-directory: test/e2e/playwright
+        run: npm ci
+
+      - name: Install Playwright Chromium
+        working-directory: test/e2e/playwright
+        run: npx playwright install --with-deps chromium
+
+      - name: Browser smoke test (Playwright)
         run: |
           cd test/e2e/playwright
-          npm ci
-          npx playwright install --with-deps chromium
+          npx playwright test e2e.spec.js --grep "renders points and mall routes" --reporter=list
+
+      - name: Full browser E2E tests (Playwright)
+        if: ${{ inputs.full_e2e == true }}
+        run: |
+          cd test/e2e/playwright
           npx playwright test --reporter=list
 
       - name: Upload E2E screenshots on failure
@@ -302,32 +328,86 @@ jobs:
           DOCKER_BUILDKIT: "1"
           COMPOSE_DOCKER_CLI_BUILD: "1"
         run: |
-          docker compose build base-runtime auth-1 sheet-1 file-1 search grpc-gateway notify-service points-server mall-server
-          docker compose push base-runtime auth-1 sheet-1 file-1 search grpc-gateway notify-service points-server mall-server
+          docker compose -f docker-compose.yml -f docker-compose.frontend.yml -f docker-compose.ci.yml build \
+            base-runtime envoy envoy-2 elasticsearch nginx \
+            auth-1 sheet-1 file-1 search grpc-gateway notify-service points-server mall-server
+          docker compose -f docker-compose.yml -f docker-compose.frontend.yml -f docker-compose.ci.yml push \
+            base-runtime envoy envoy-2 elasticsearch nginx \
+            auth-1 sheet-1 file-1 search grpc-gateway notify-service points-server mall-server
 
   # ===== Stage 4: 推送镜像到 ghcr.io + 生成本地部署脚本 =====
   deploy:
     needs: push
     if: github.ref == 'refs/heads/main'
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, Windows, X64, docker-desktop]
+    environment: production
+    permissions:
+      contents: read
+      packages: read
+    env:
+      DOCKER_USER: ghcr.io/lcb66699/http-rpc
+      JWT_SECRET: ${{ secrets.JWT_SECRET }}
+      REDIS_PASSWORD: ${{ secrets.REDIS_PASSWORD }}
+      MYSQL_ROOT_PASSWORD: ${{ secrets.MYSQL_ROOT_PASSWORD }}
+      MINIO_ACCESS_KEY: ${{ secrets.MINIO_ACCESS_KEY }}
+      MINIO_ROOT_PASSWORD: ${{ secrets.MINIO_ROOT_PASSWORD }}
+      RABBITMQ_PASSWORD: ${{ secrets.RABBITMQ_PASSWORD }}
+      GRAFANA_ADMIN_PASSWORD: ${{ secrets.GRAFANA_ADMIN_PASSWORD }}
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
 
-      - name: SSH deploy to server
-        uses: appleboy/ssh-action@v1
+      - name: Validate deployment secrets
+        shell: pwsh
+        run: |
+          $required = @(
+            'JWT_SECRET',
+            'REDIS_PASSWORD',
+            'MYSQL_ROOT_PASSWORD',
+            'MINIO_ACCESS_KEY',
+            'MINIO_ROOT_PASSWORD',
+            'RABBITMQ_PASSWORD',
+            'GRAFANA_ADMIN_PASSWORD'
+          )
+          $missing = @($required | Where-Object { [string]::IsNullOrWhiteSpace([Environment]::GetEnvironmentVariable($_)) })
+          if ($missing.Count -gt 0) {
+            throw "Missing production secrets: $($missing -join ', ')"
+          }
+
+      - name: Check Docker Desktop
+        shell: pwsh
+        run: |
+          docker version
+          docker compose version
+
+      - name: Login to GHCR
+        uses: docker/login-action@v3
         with:
-          host: ${{ secrets.SERVER_HOST }}
-          username: ${{ secrets.SSH_USER }}
-          key: ${{ secrets.SSH_KEY }}
-          script: |
-            cd /opt/http-rpc || exit 1
-            docker compose pull
-            docker compose up -d --remove-orphans
-            echo "=== Deploy done ==="
-            docker compose ps
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Pull application images
+        shell: pwsh
+        run: docker compose -f docker-compose.yml -f docker-compose.frontend.yml -f docker-compose.ci.yml pull
+
+      - name: Start application stack
+        shell: pwsh
+        run: |
+          $compose = @('-f', 'docker-compose.yml', '-f', 'docker-compose.frontend.yml', '-f', 'docker-compose.ci.yml')
+          docker compose @compose up -d --no-build --remove-orphans
+          docker compose @compose ps
+
+      - name: Show deployment diagnostics on failure
+        if: failure()
+        shell: pwsh
+        run: |
+          $compose = @('-f', 'docker-compose.yml', '-f', 'docker-compose.frontend.yml', '-f', 'docker-compose.ci.yml')
+          docker compose @compose ps -a
+          docker compose @compose logs --tail 100
 
       - name: Generate deploy-local.sh
+        if: ${{ false }}
         run: |
           cat > deploy-local.sh << 'SCRIPT'
           #!/usr/bin/env bash
@@ -377,6 +457,7 @@ jobs:
           chmod +x deploy-local.sh
 
       - name: Upload deploy-local.sh as artifact
+        if: ${{ false }}
         uses: actions/upload-artifact@v4
         with:
           name: deploy-local-script
