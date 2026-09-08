@@ -1,135 +1,59 @@
-import { useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
-import { z } from 'zod'
-import { ApiError, createApiClient, type LoginInput, type User } from './lib/api'
+import { useMemo, useState } from 'react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { createRootRoute, createRoute, createRouter, RouterProvider } from '@tanstack/react-router'
+import { AppShell } from './components/AppShell'
+import { AuthScreen } from './features/auth/AuthScreen'
+import { createApiClient, type User } from './lib/api'
+import { SessionContext } from './lib/session'
+import { MallPage, PointsPage, SearchPage } from './pages/CommercePages'
+import { OperationsPage, OverviewPage, ProfilePage } from './pages/OperationsPages'
+import { FilesPage, SheetEditorPage, SheetsPage, WorkspacesPage } from './pages/ResourcesPages'
 import './styles.css'
 
-const api = createApiClient(window.fetch.bind(window))
-
-const loginSchema = z.object({
-  username: z.string().trim().min(1, 'Username is required').max(64),
-  password: z.string().min(1, 'Password is required').max(256)
-})
-
-function LoginScreen({ onAuthenticated }: { onAuthenticated: (user: User) => void }) {
-  const [input, setInput] = useState<LoginInput>({ username: '', password: '' })
-  const [error, setError] = useState<string>()
-  const [submitting, setSubmitting] = useState(false)
-
-  const submit = async (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault()
-    const parsed = loginSchema.safeParse(input)
-    if (!parsed.success) {
-      setError(parsed.error.issues[0]?.message)
-      return
-    }
-
-    setSubmitting(true)
-    setError(undefined)
-    try {
-      const response = await api.login(parsed.data)
-      if (!response.success) {
-        setError(response.error ?? 'Unable to sign in')
-        return
-      }
-      onAuthenticated({
-        user_id: response.user_id ?? 0,
-        username: response.username ?? parsed.data.username,
-        role: response.role
-      })
-    } catch (cause) {
-      setError(cause instanceof ApiError ? cause.message : 'Unable to sign in')
-    } finally {
-      setSubmitting(false)
-    }
-  }
-
-  return (
-    <main className="auth-layout">
-      <section className="auth-panel" aria-labelledby="app-title">
-        <p className="eyebrow">SERVICE OPERATIONS</p>
-        <h1 id="app-title">HTTP-RPC Console</h1>
-        <p className="lede">Manage service discovery, requests, and operational workflows from one authenticated console.</p>
-        <form onSubmit={submit} className="auth-form">
-          <label>
-            Username
-            <input
-              autoComplete="username"
-              name="username"
-              onChange={event => setInput(current => ({ ...current, username: event.target.value }))}
-              value={input.username}
-            />
-          </label>
-          <label>
-            Password
-            <input
-              autoComplete="current-password"
-              name="password"
-              onChange={event => setInput(current => ({ ...current, password: event.target.value }))}
-              type="password"
-              value={input.password}
-            />
-          </label>
-          {error && <p className="form-error" role="alert">{error}</p>}
-          <button disabled={submitting} type="submit">{submitting ? 'Signing in...' : 'Sign in'}</button>
-        </form>
-        <a className="legacy-link" href="/legacy/">Open legacy console</a>
-      </section>
-    </main>
-  )
+function RouteFailure() {
+  return <div className="page"><h1>Page unavailable</h1><p className="page-description">The requested page could not be rendered. Return to the overview and try again.</p></div>
 }
 
-function Dashboard({ user, onLogout }: { user: User; onLogout: () => void }) {
-  const services = useQuery({
-    queryKey: ['services'],
-    queryFn: api.listServices,
-    staleTime: 30_000
-  })
+const rootRoute = createRootRoute({ component: AppShell, errorComponent: RouteFailure, notFoundComponent: RouteFailure })
+const overviewRoute = createRoute({ getParentRoute: () => rootRoute, path: '/', component: OverviewPage })
+const sheetsRoute = createRoute({ getParentRoute: () => rootRoute, path: '/sheets', component: SheetsPage })
+const sheetEditorRoute = createRoute({ getParentRoute: () => rootRoute, path: '/sheets/$sheetId', component: SheetEditorPage })
+const filesRoute = createRoute({ getParentRoute: () => rootRoute, path: '/files', component: FilesPage })
+const workspacesRoute = createRoute({ getParentRoute: () => rootRoute, path: '/workspaces', component: WorkspacesPage })
+const pointsRoute = createRoute({ getParentRoute: () => rootRoute, path: '/points', component: PointsPage })
+const mallRoute = createRoute({ getParentRoute: () => rootRoute, path: '/mall', component: MallPage })
+const searchRoute = createRoute({ getParentRoute: () => rootRoute, path: '/search', component: SearchPage })
+const operationsRoute = createRoute({ getParentRoute: () => rootRoute, path: '/operations', component: OperationsPage })
+const profileRoute = createRoute({ getParentRoute: () => rootRoute, path: '/profile', component: ProfilePage })
 
-  return (
-    <main className="dashboard-layout">
-      <header className="topbar">
-        <div>
-          <p className="eyebrow">HTTP-RPC</p>
-          <h1>Service overview</h1>
-        </div>
-        <div className="account-actions">
-          <span>{user.username}</span>
-          <button className="secondary" onClick={onLogout} type="button">Sign out</button>
-        </div>
-      </header>
-      <section className="dashboard-content" aria-labelledby="services-title">
-        <div className="section-heading">
-          <div>
-            <h2 id="services-title">Registered services</h2>
-            <p>Live data from the existing Go gateway.</p>
-          </div>
-          <a className="legacy-link" href="/legacy/">Open full legacy console</a>
-        </div>
-        {services.isPending && <p>Loading services...</p>}
-        {services.isError && <p className="form-error" role="alert">Unable to load services. Open the legacy console to continue.</p>}
-        {services.data && (
-          <ul className="service-grid">
-            {services.data.map(service => (
-              <li key={service.name}>
-                <h3>{service.name}</h3>
-                <p>{service.description || 'No description provided.'}</p>
-                <span>{service.methods?.length ?? 0} methods</span>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
-    </main>
-  )
+const routeTree = rootRoute.addChildren([overviewRoute, sheetsRoute, sheetEditorRoute, filesRoute, workspacesRoute, pointsRoute, mallRoute, searchRoute, operationsRoute, profileRoute])
+const router = createRouter({ routeTree, defaultPreload: 'intent' })
+
+declare module '@tanstack/react-router' {
+  interface Register {
+    router: typeof router
+  }
 }
 
 export function App() {
-  const [user, setUser] = useState<User>()
+  const queryClient = useQueryClient()
+  const api = useMemo(() => createApiClient((input, init) => window.fetch(input, init)), [])
+  const session = useQuery({ queryKey: ['session'], queryFn: api.getMe, retry: false, staleTime: Infinity })
+  const [authenticatedUser, setAuthenticatedUser] = useState<User>()
+  const user = authenticatedUser ?? session.data
 
-  if (!user) return <LoginScreen onAuthenticated={setUser} />
+  if (session.isPending && !user) return <main className="boot-screen" role="status">Restoring secure session...</main>
+  if (!user) return <AuthScreen api={api} onAuthenticated={nextUser => { setAuthenticatedUser(nextUser); queryClient.setQueryData(['session'], nextUser) }} />
 
-  return <Dashboard user={user} onLogout={() => {
-    void api.logout().finally(() => setUser(undefined))
-  }} />
+  const signOut = async () => {
+    try {
+      await api.logout()
+    } finally {
+      setAuthenticatedUser(undefined)
+      queryClient.removeQueries()
+      void router.navigate({ to: '/' })
+    }
+  }
+
+  return <SessionContext.Provider value={{ api, user, signOut }}><RouterProvider router={router} /></SessionContext.Provider>
 }
