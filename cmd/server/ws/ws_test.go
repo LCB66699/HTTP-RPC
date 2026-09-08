@@ -1,12 +1,42 @@
 package ws
 
 import (
+	"net/http/httptest"
 	"testing"
 	"time"
 
 	"github.com/alicebob/miniredis/v2"
 	"github.com/redis/go-redis/v9"
 )
+
+func TestCheckOriginDefaultsToSameOrigin(t *testing.T) {
+	h := &Handler{}
+	req := httptest.NewRequest("GET", "http://app.example.com/api/v1/ws", nil)
+	req.Header.Set("Origin", "http://app.example.com")
+	if !h.checkOrigin(req) {
+		t.Fatal("same origin should be allowed")
+	}
+	req.Header.Set("Origin", "http://evil.example.com")
+	if h.checkOrigin(req) {
+		t.Fatal("cross origin should be rejected by default")
+	}
+}
+
+func TestCheckOriginUsesExactAllowlist(t *testing.T) {
+	h := &Handler{AllowedOrigins: []string{"https://app.example.com"}}
+	for _, origin := range []string{"https://app.example.com.evil.test", "https://evil.example.com"} {
+		req := httptest.NewRequest("GET", "http://gateway.internal/api/v1/ws", nil)
+		req.Header.Set("Origin", origin)
+		if h.checkOrigin(req) {
+			t.Fatalf("origin %q should be rejected", origin)
+		}
+	}
+	req := httptest.NewRequest("GET", "http://gateway.internal/api/v1/ws", nil)
+	req.Header.Set("Origin", "https://app.example.com")
+	if !h.checkOrigin(req) {
+		t.Fatal("configured origin should be allowed")
+	}
+}
 
 func setupTestHub(t *testing.T) (*Hub, *miniredis.Miniredis) {
 	t.Helper()
