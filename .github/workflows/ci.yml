@@ -264,7 +264,12 @@ jobs:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ hashFiles('test/e2e/playwright/package.json') }}
 
+      - name: Install Playwright dependencies
+        working-directory: test/e2e/playwright
+        run: npm ci
+
       - name: Install Playwright Chromium
+        working-directory: test/e2e/playwright
         run: npx playwright install --with-deps chromium
 
       - name: Browser smoke test (Playwright)
