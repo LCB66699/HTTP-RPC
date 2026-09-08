@@ -7,12 +7,14 @@
 
 * { box-sizing: border-box; }
 body { margin: 0; min-width: 320px; }
-button, input { font: inherit; }
+button, input, select { font: inherit; }
 button { align-items: center; background: #1261a6; border: 1px solid #1261a6; border-radius: 5px; color: #fff; cursor: pointer; display: inline-flex; font-weight: 650; gap: 7px; justify-content: center; min-height: 38px; padding: 8px 12px; }
 button:hover:not(:disabled) { background: #0d4b83; border-color: #0d4b83; }
 button:disabled { cursor: wait; opacity: .6; }
 input { background: #fff; border: 1px solid #c8d2df; border-radius: 4px; color: #172033; min-height: 38px; padding: 8px 10px; width: 100%; }
 input:focus { border-color: #1261a6; box-shadow: 0 0 0 3px #1261a622; outline: 0; }
+select { background: #fff; border: 1px solid #c8d2df; border-radius: 4px; color: #172033; min-height: 38px; padding: 8px 10px; }
+select:focus { border-color: #1261a6; box-shadow: 0 0 0 3px #1261a622; outline: 0; }
 h1, h2, h3, p { margin-top: 0; }
 h1 { font-size: 1.65rem; margin-bottom: 6px; }
 h2 { font-size: 1rem; margin-bottom: 8px; }
@@ -88,8 +90,9 @@ small { color: #69798f; }
 .status-card { min-height: 126px; }.status-card h2 { margin-top: 15px; }.status-card strong { color: #1261a6; }
 .history-list { padding: 8px 16px 8px 34px; }.history-list li { border-bottom: 1px solid #e4eaf1; padding: 10px 0; word-break: break-word; }.history-list li:last-child { border-bottom: 0; }
 .profile-panel { max-width: 520px; }
+.collaboration-panel { background: #fff; border: 1px solid #d8e0ea; margin-bottom: 16px; padding: 16px; }.collaboration-panel h2 { margin-bottom: 5px; }.collaboration-panel > div > p, .collaboration-panel > p { color: #607087; font-size: .9rem; }.compact-toolbar { background: #f8fafc; border: 0; margin: 14px 0; padding: 0; }.compact-toolbar select { flex: 0 1 150px; }.link-row { align-items: center; display: flex; flex-wrap: wrap; gap: 9px; margin-top: 14px; }.link-row input { flex: 1 1 320px; }.muted { color: #69798f; font-size: .9rem; }.remote-update { align-items: center; background: #e9f3fb; border: 1px solid #a9cbe7; color: #234b70; display: flex; flex-wrap: wrap; gap: 10px; justify-content: space-between; margin-bottom: 16px; padding: 10px 12px; }.remote-update button { min-height: 32px; }
 
 .editor-page { max-width: none; }.editor-meta { display: grid; gap: 10px; grid-template-columns: minmax(180px, 1fr) 2fr; margin-bottom: 16px; }.sheet-grid { background: #fff; border: 1px solid #c8d2df; max-height: calc(100vh - 310px); min-height: 360px; overflow: auto; }.grid-row { display: grid; grid-template-columns: 54px repeat(var(--columns, 8), minmax(150px, 1fr)); min-width: max-content; width: 100%; }.grid-row > span { align-items: center; background: #f4f7fa; border-bottom: 1px solid #d8e0ea; border-right: 1px solid #d8e0ea; display: flex; justify-content: center; min-height: 41px; }.grid-row input { border: 0; border-bottom: 1px solid #e4eaf1; border-radius: 0; min-height: 41px; padding: 7px 9px; }.grid-header { position: sticky; top: 0; z-index: 2; }.grid-header input { background: #f4f7fa; border-bottom-color: #d8e0ea; font-weight: 700; }.visually-hidden { height: 1px; margin: -1px; overflow: hidden; position: absolute; width: 1px; clip: rect(0, 0, 0, 0); }
 
 @media (max-width: 800px) { .app-shell { display: block; }.sidebar { min-height: auto; padding: 10px 12px; position: static; }.brand { margin: 0 8px 10px; }.sidebar nav { display: flex; overflow-x: auto; }.nav-link { flex: 0 0 auto; }.sidebar-footer { display: none; }.page { padding-top: 26px; }.page-header { flex-direction: column; gap: 14px; }.two-column { grid-template-columns: 1fr; }.editor-meta { grid-template-columns: 1fr; }.sheet-grid { max-height: 60vh; } }
-@media (max-width: 480px) { .auth-panel { padding: 24px; }.toolbar, .search-form { align-items: stretch; flex-direction: column; }.toolbar button, .search-form button { width: 100%; }.page-actions { width: 100%; }.page-actions button { flex: 1; }.resource-row { align-items: flex-start; }.row-actions { flex: 0 0 auto; } }
+@media (max-width: 480px) { .auth-panel { padding: 24px; }.toolbar, .search-form { align-items: stretch; flex-direction: column; }.toolbar button, .toolbar select, .search-form button { width: 100%; }.page-actions { width: 100%; }.page-actions button { flex: 1; }.resource-row { align-items: flex-start; }.row-actions { flex: 0 0 auto; }.remote-update { align-items: stretch; flex-direction: column; }.remote-update button { width: 100%; } }

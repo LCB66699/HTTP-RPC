@@ -7,7 +7,7 @@ import { createApiClient, type User } from './lib/api'
 import { SessionContext } from './lib/session'
 import { MallPage, PointsPage, SearchPage } from './pages/CommercePages'
 import { OperationsPage, OverviewPage, ProfilePage } from './pages/OperationsPages'
-import { FilesPage, SheetEditorPage, SheetsPage, WorkspacesPage } from './pages/ResourcesPages'
+import { FilesPage, SheetEditorPage, SheetsPage, WorkspaceDetailPage, WorkspacesPage } from './pages/ResourcesPages'
 import './styles.css'
 
 function RouteFailure() {
@@ -20,13 +20,14 @@ const sheetsRoute = createRoute({ getParentRoute: () => rootRoute, path: '/sheet
 const sheetEditorRoute = createRoute({ getParentRoute: () => rootRoute, path: '/sheets/$sheetId', component: SheetEditorPage })
 const filesRoute = createRoute({ getParentRoute: () => rootRoute, path: '/files', component: FilesPage })
 const workspacesRoute = createRoute({ getParentRoute: () => rootRoute, path: '/workspaces', component: WorkspacesPage })
+const workspaceDetailRoute = createRoute({ getParentRoute: () => rootRoute, path: '/workspaces/$workspaceId', component: WorkspaceDetailPage })
 const pointsRoute = createRoute({ getParentRoute: () => rootRoute, path: '/points', component: PointsPage })
 const mallRoute = createRoute({ getParentRoute: () => rootRoute, path: '/mall', component: MallPage })
 const searchRoute = createRoute({ getParentRoute: () => rootRoute, path: '/search', component: SearchPage })
 const operationsRoute = createRoute({ getParentRoute: () => rootRoute, path: '/operations', component: OperationsPage })
 const profileRoute = createRoute({ getParentRoute: () => rootRoute, path: '/profile', component: ProfilePage })
 
-const routeTree = rootRoute.addChildren([overviewRoute, sheetsRoute, sheetEditorRoute, filesRoute, workspacesRoute, pointsRoute, mallRoute, searchRoute, operationsRoute, profileRoute])
+const routeTree = rootRoute.addChildren([overviewRoute, sheetsRoute, sheetEditorRoute, filesRoute, workspacesRoute, workspaceDetailRoute, pointsRoute, mallRoute, searchRoute, operationsRoute, profileRoute])
 const router = createRouter({ routeTree, defaultPreload: 'intent' })
 
 declare module '@tanstack/react-router' {

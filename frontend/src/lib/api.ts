@@ -34,7 +34,7 @@ export interface HealthState {
 }
 
 export interface Sheet {
-  id: number
+  id: string | number
   name: string
   description?: string
   headers_json: string | string[]
@@ -53,7 +53,7 @@ export interface SheetListResponse {
 export interface SheetResponse {
   success: boolean
   spreadsheet?: Sheet
-  id?: number
+  id?: string | number
   cache_source?: string
   error?: string
 }
@@ -80,11 +80,26 @@ export interface WorkspaceMember {
   role?: string
 }
 
+export interface WorkspaceDetailResponse {
+  success?: boolean
+  workspace?: Workspace
+  members?: WorkspaceMember[]
+  error?: string
+}
+
 export interface Workspace {
   id: number
   name: string
   owner_id: number
   members?: WorkspaceMember[]
+}
+
+export type SharePermission = 'view' | 'edit'
+
+export interface ShareEntry {
+  username: string
+  permission: SharePermission
+  granted_at?: string
 }
 
 export interface Product {
@@ -145,6 +160,16 @@ function isJson(response: Response) {
   return response.headers.get('content-type')?.includes('application/json') ?? false
 }
 
+function parseJson<T>(body: string): T {
+  // Go's standard JSON encoding writes int64 values as numbers. Preserve IDs
+  // outside JavaScript's safe-integer range before JSON.parse can round them.
+  const idsAsStrings = body.replace(/"(?:id|[A-Za-z][A-Za-z0-9_]*_id)"\s*:\s*(-?\d{16,})/g, match => {
+    const separator = match.indexOf(':')
+    return `${match.slice(0, separator + 1)}"${match.slice(separator + 1).trim()}"`
+  })
+  return JSON.parse(idsAsStrings) as T
+}
+
 async function errorMessage(response: Response) {
   if (isJson(response)) {
     const body = await response.json().catch(() => null) as { error?: string } | null
@@ -187,7 +212,7 @@ export function createApiClient(fetcher: Fetcher) {
 
     if (!response.ok) throw new ApiError(response.status, await errorMessage(response))
     if (response.status === 204) return undefined as T
-    return response.json() as Promise<T>
+    return parseJson<T>(await response.text())
   }
 
   const json = <T>(path: string, method: 'POST' | 'PUT' | 'DELETE', body?: unknown, idempotent = false) =>
@@ -217,12 +242,20 @@ export function createApiClient(fetcher: Fetcher) {
     changePassword: (old_password: string, new_password: string) =>
       json<{ success: boolean; error?: string }>('/me/password', 'PUT', { old_password, new_password }),
     listSheets: () => request<SheetListResponse>('/sheets'),
-    getSheet: (id: number) => request<SheetResponse>(`/sheets/${id}`),
+    getSheet: (id: string | number) => request<SheetResponse>(`/sheets/${id}`),
     createSheet: (sheet: Pick<Sheet, 'name' | 'description' | 'headers_json' | 'data_json'>) =>
       json<SheetResponse>('/sheets', 'POST', sheet, true),
-    updateSheet: (id: number, sheet: Pick<Sheet, 'name' | 'description' | 'headers_json' | 'data_json'>) =>
+    updateSheet: (id: string | number, sheet: Pick<Sheet, 'name' | 'description' | 'headers_json' | 'data_json'>) =>
       json<SheetResponse>(`/sheets/${id}`, 'PUT', sheet),
-    deleteSheet: (id: number) => json<{ success: boolean; error?: string }>(`/sheets/${id}`, 'DELETE'),
+    deleteSheet: (id: string | number) => json<{ success: boolean; error?: string }>(`/sheets/${id}`, 'DELETE'),
+    shareSheet: (id: string | number, username: string, permission: SharePermission) =>
+      json<{ success: boolean; error?: string }>(`/sheets/${id}/share`, 'POST', { username, permission }),
+    listSheetShares: (id: string | number) =>
+      request<{ success?: boolean; entries?: ShareEntry[]; error?: string }>(`/sheets/${id}/share`),
+    revokeSheetShare: (id: string | number, username: string) =>
+      json<{ success: boolean; error?: string }>(`/sheets/${id}/share/${encodeURIComponent(username)}`, 'DELETE'),
+    createSheetShareLink: (id: string | number) =>
+      json<{ success: boolean; token?: string; error?: string }>(`/sheets/${id}/share-link`, 'POST'),
     listFiles: () => request<FileListResponse>('/files'),
     uploadFile: (file: File) => {
       const form = new FormData()
@@ -239,7 +272,7 @@ export function createApiClient(fetcher: Fetcher) {
     moveFile: (id: number, target_folder_id: number) =>
       json<{ success: boolean; error?: string }>(`/files/${id}/move`, 'PUT', { target_folder_id }),
     listWorkspaces: () => request<{ success?: boolean; workspaces?: Workspace[] }>('/workspaces'),
-    getWorkspace: (id: number) => request<{ success?: boolean; workspace?: Workspace }>(`/workspaces/${id}`),
+    getWorkspace: (id: number) => request<WorkspaceDetailResponse>(`/workspaces/${id}`),
     createWorkspace: (name: string) => json<{ success: boolean; error?: string }>('/workspaces', 'POST', { name }),
     updateWorkspace: (id: number, name: string) => json<{ success: boolean; error?: string }>(`/workspaces/${id}`, 'PUT', { name }),
     deleteWorkspace: (id: number) => json<{ success: boolean; error?: string }>(`/workspaces/${id}`, 'DELETE'),
