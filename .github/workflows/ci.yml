@@ -358,7 +358,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Validate deployment secrets
-        shell: pwsh
+        shell: powershell
         run: |
           $required = @(
             'JWT_SECRET',
@@ -375,7 +375,7 @@ jobs:
           }
 
       - name: Check Docker Desktop
-        shell: pwsh
+        shell: powershell
         run: |
           docker version
           docker compose version
@@ -388,11 +388,11 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Pull application images
-        shell: pwsh
+        shell: powershell
         run: docker compose -f docker-compose.yml -f docker-compose.frontend.yml -f docker-compose.ci.yml pull
 
       - name: Start application stack
-        shell: pwsh
+        shell: powershell
         run: |
           $compose = @('-f', 'docker-compose.yml', '-f', 'docker-compose.frontend.yml', '-f', 'docker-compose.ci.yml')
           docker compose @compose up -d --no-build --remove-orphans
@@ -400,7 +400,7 @@ jobs:
 
       - name: Show deployment diagnostics on failure
         if: failure()
-        shell: pwsh
+        shell: powershell
         run: |
           $compose = @('-f', 'docker-compose.yml', '-f', 'docker-compose.frontend.yml', '-f', 'docker-compose.ci.yml')
           docker compose @compose ps -a
