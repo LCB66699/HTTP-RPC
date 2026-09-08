@@ -8,6 +8,8 @@ test/logs/
 test/e2e/playwright/
 test/wrk/
 docs/
+frontend/node_modules/
+frontend/dist/
 *.md
 cmd/server/gin-gateway
 .github/
