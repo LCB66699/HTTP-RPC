@@ -302,15 +302,27 @@ std::string AuthServiceImpl::CreateRefreshToken(const std::string &username, int
              raw[2], raw[3], raw[4], raw[5], raw[6], raw[7], raw[8], raw[9], raw[10], raw[11], raw[12], raw[13],
              raw[14], raw[15]);
     std::string rt(buf);
-    if (redis_ && redis_->IsConnected())
+    if (redis_ && redis_->IsConnected()) {
         redis_->SetJSON("rt:" + username, "{\"token\":\"" + rt + "\",\"uid\":" + std::to_string(uid) + "}", 604800);
+        redis_->SetJSON("rt:index:" + rt, username, 604800);
+    }
     return rt;
 }
 
 grpc::Status AuthServiceImpl::RefreshToken(grpc::ServerContext *, const rpc::RefreshTokenRequest *req,
                                            rpc::RefreshTokenResponse *resp) {
+    std::string username = req->username();
+    if (username.empty()) {
+        if (req->refresh_token().empty() || !redis_ ||
+            !redis_->GetJSON("rt:index:" + req->refresh_token(), username) || username.empty()) {
+            resp->set_success(false);
+            SET_ERROR(resp, "Invalid refresh token", rpc_error::UNAUTHENTICATED);
+            return grpc::Status::OK;
+        }
+    }
+
     std::string stored;
-    if (!redis_ || !redis_->GetJSON("rt:" + req->username(), stored)) {
+    if (!redis_ || !redis_->GetJSON("rt:" + username, stored)) {
         resp->set_success(false);
         SET_ERROR(resp, "Invalid refresh token", rpc_error::UNAUTHENTICATED);
         return grpc::Status::OK;
@@ -327,15 +339,17 @@ grpc::Status AuthServiceImpl::RefreshToken(grpc::ServerContext *, const rpc::Ref
     if (stored_rt != req->refresh_token()) {
         // Token 涓嶅尮锟?锟?鐩楃敤妫€娴嬶紝鎾ら攢鎵€锟?
         if (redis_) {
-            redis_->DeleteKey("rt:" + req->username());
-            redis_->DeleteKey("rate:login:" + req->username() + ":total");
+            redis_->DeleteKey("rt:" + username);
+            if (!stored_rt.empty())
+                redis_->DeleteKey("rt:index:" + stored_rt);
+            redis_->DeleteKey("rate:login:" + username + ":total");
         }
         resp->set_success(false);
         SET_ERROR(resp, "Invalid refresh token", rpc_error::UNAUTHENTICATED);
         return grpc::Status::OK;
     }
-    std::string role = IsAdminUser(req->username()) ? "admin" : "user";
-    std::string at = CreateAccessToken(req->username(), stored_uid, role);
+    std::string role = IsAdminUser(username) ? "admin" : "user";
+    std::string at = CreateAccessToken(username, stored_uid, role);
     resp->set_success(true);
     resp->set_access_token(at);
     return grpc::Status::OK;

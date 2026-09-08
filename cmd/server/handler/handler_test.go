@@ -282,6 +282,62 @@ func TestLoginGrpcUnavailable(t *testing.T) {
 	if w.Code != http.StatusServiceUnavailable { t.Fatalf("expected 503, got %d", w.Code) }
 }
 
+func TestRefreshUsesHttpOnlyCookie(t *testing.T) {
+	h := newTestHandlers()
+	var got *pb.RefreshTokenRequest
+	h.Auth = &mockAuthClient{
+		refreshFn: func(ctx context.Context, req *pb.RefreshTokenRequest, opts ...grpc.CallOption) (*pb.RefreshTokenResponse, error) {
+			got = req
+			return &pb.RefreshTokenResponse{Success: true, AccessToken: "new-access"}, nil
+		},
+	}
+
+	r := setupGin()
+	r.POST("/refresh", h.Refresh)
+	w := httptest.NewRecorder()
+	req, _ := http.NewRequest("POST", "/refresh", strings.NewReader(""))
+	req.AddCookie(&http.Cookie{Name: "rpc_rt", Value: "refresh-cookie"})
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK { t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String()) }
+	if got == nil || got.GetRefreshToken() != "refresh-cookie" || got.GetUsername() != "" {
+		t.Fatalf("expected cookie-only refresh request, got %#v", got)
+	}
+	var accessCookie *http.Cookie
+	for _, cookie := range w.Result().Cookies() {
+		if cookie.Name == "rpc_at" {
+			accessCookie = cookie
+			break
+		}
+	}
+	if accessCookie == nil || accessCookie.Value != "new-access" {
+		t.Fatalf("expected refreshed access cookie, got %#v", accessCookie)
+	}
+}
+
+func TestRefreshInvalidTokenReturnsUnauthorized(t *testing.T) {
+	h := newTestHandlers()
+	h.Auth = &mockAuthClient{
+		refreshFn: func(ctx context.Context, req *pb.RefreshTokenRequest, opts ...grpc.CallOption) (*pb.RefreshTokenResponse, error) {
+			return &pb.RefreshTokenResponse{Success: false, Error: "Invalid refresh token"}, nil
+		},
+	}
+
+	r := setupGin()
+	r.POST("/refresh", h.Refresh)
+	w := httptest.NewRecorder()
+	req, _ := http.NewRequest("POST", "/refresh", strings.NewReader(""))
+	req.AddCookie(&http.Cookie{Name: "rpc_rt", Value: "invalid"})
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusUnauthorized { t.Fatalf("expected 401, got %d: %s", w.Code, w.Body.String()) }
+	for _, cookie := range w.Result().Cookies() {
+		if cookie.Name == "rpc_at" {
+			t.Fatalf("invalid refresh must not issue an access cookie")
+		}
+	}
+}
+
 func TestRegisterSuccess(t *testing.T) {
 	h := newTestHandlers()
 	h.Auth = &mockAuthClient{

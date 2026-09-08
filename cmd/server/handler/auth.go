@@ -107,6 +107,10 @@ func (h *Handlers) Refresh(c *gin.Context) {
 		slog.Error("refresh gRPC error", "error", err)
 	}
 	if grpcErr(c, err, "refresh failed") { return }
+	if !resp.GetSuccess() {
+		c.JSON(http.StatusUnauthorized, gin.H{"success": false, "error": resp.GetError()})
+		return
+	}
 	h.setCookies(c, resp.GetAccessToken(), "")
 	c.JSON(http.StatusOK, gin.H{"success": resp.GetSuccess(), "error": resp.GetError()})
 }
