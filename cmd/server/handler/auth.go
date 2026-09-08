@@ -3,15 +3,36 @@ package handler
 import (
 	"context"
 	"crypto/rand"
-	"encoding/binary"
+	"crypto/subtle"
+	"errors"
 	"fmt"
 	"log/slog"
+	"math/big"
+	"net"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/redis/go-redis/v9"
 	pb "gateway-grpc/gen/rpc"
 )
+
+const (
+	otpSendPhoneLimit     = 3
+	otpSendIPLimit        = 10
+	otpVerifyFailureLimit = 5
+	otpSendWindow         = 10 * time.Minute
+	otpVerifyWindow       = 15 * time.Minute
+)
+
+var incrementWithExpiry = redis.NewScript(`
+local count = redis.call('INCR', KEYS[1])
+if count == 1 then
+  redis.call('PEXPIRE', KEYS[1], ARGV[1])
+end
+return count
+`)
 
 func (h *Handlers) Login(c *gin.Context) {
 	var req pb.LoginRequest
@@ -34,7 +55,7 @@ func (h *Handlers) Login(c *gin.Context) {
 		return
 	}
 	h.setCookies(c, resp.GetAccessToken(), resp.GetRefreshToken())
-	c.JSON(http.StatusOK, resp)
+	c.JSON(http.StatusOK, authResponse(resp.GetSuccess(), resp.GetError(), resp.GetUserId(), resp.GetRole()))
 
 	// Award login points (daily, fire-and-forget via gRPC)
 	go func(uid int64) {
@@ -67,7 +88,7 @@ func (h *Handlers) Register(c *gin.Context) {
 		return
 	}
 	h.setCookies(c, resp.GetAccessToken(), resp.GetRefreshToken())
-	c.JSON(http.StatusOK, resp)
+	c.JSON(http.StatusOK, authResponse(resp.GetSuccess(), resp.GetError(), resp.GetUserId(), resp.GetRole()))
 }
 
 func (h *Handlers) Refresh(c *gin.Context) {
@@ -87,7 +108,7 @@ func (h *Handlers) Refresh(c *gin.Context) {
 	}
 	if grpcErr(c, err, "refresh failed") { return }
 	h.setCookies(c, resp.GetAccessToken(), "")
-	c.JSON(http.StatusOK, resp)
+	c.JSON(http.StatusOK, gin.H{"success": resp.GetSuccess(), "error": resp.GetError()})
 }
 
 func (h *Handlers) ChangePassword(c *gin.Context) {
@@ -111,18 +132,41 @@ func (h *Handlers) ChangePassword(c *gin.Context) {
 	req := &pb.ChangePasswordRequest{UserId: uid, OldPassword: body.OldPassword, NewPassword: body.NewPassword}
 	resp, err := h.Auth.ChangePassword(c.Request.Context(), req)
 	if grpcErr(c, err, "auth operation failed") { return }
-	c.JSON(http.StatusOK, resp)
+	writeProtoJSON(c, http.StatusOK, resp)
 }
 
 func (h *Handlers) OTPSend(c *gin.Context) {
 	var body struct{ Phone string `json:"phone"` }
-	if err := c.ShouldBindJSON(&body); err != nil || body.Phone == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "phone required"})
+	if err := c.ShouldBindJSON(&body); err != nil || !validPhone(body.Phone) {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "invalid phone"})
 		return
 	}
-	code := randomOTP()
-	h.RDB.Set(c.Request.Context(), "otp:"+body.Phone, code, 5*time.Minute)
-	slog.Info("otp sent", "phone", body.Phone, "code", code)
+	ctx := c.Request.Context()
+	phoneLimited, err := h.consumeOTPLimit(ctx, "rate:otp:send:phone:"+body.Phone, otpSendPhoneLimit, otpSendWindow)
+	if err != nil {
+		otpUnavailable(c)
+		return
+	}
+	ipLimited, err := h.consumeOTPLimit(ctx, "rate:otp:send:ip:"+sourceIP(c.Request), otpSendIPLimit, otpSendWindow)
+	if err != nil {
+		otpUnavailable(c)
+		return
+	}
+	if phoneLimited || ipLimited {
+		c.JSON(http.StatusTooManyRequests, gin.H{"success": false, "error": "Too many OTP requests"})
+		return
+	}
+	code, err := randomOTP()
+	if err != nil {
+		slog.Error("otp generation failed", "error", err)
+		otpUnavailable(c)
+		return
+	}
+	if err := h.RDB.Set(ctx, "otp:"+body.Phone, code, 5*time.Minute).Err(); err != nil {
+		otpUnavailable(c)
+		return
+	}
+	slog.Info("otp generated")
 	c.JSON(http.StatusOK, gin.H{"success": true})
 }
 
@@ -131,28 +175,110 @@ func (h *Handlers) PhoneLogin(c *gin.Context) {
 		Phone string `json:"phone"`
 		OTP   string `json:"otp"`
 	}
-	if err := c.ShouldBindJSON(&body); err != nil {
+	if err := c.ShouldBindJSON(&body); err != nil || !validPhone(body.Phone) || !validOTP(body.OTP) {
 		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "invalid request"})
 		return
 	}
-	stored, _ := h.RDB.Get(c.Request.Context(), "otp:"+body.Phone).Result()
-	if stored == "" || stored != body.OTP {
+	if h.RDB == nil {
+		otpUnavailable(c)
+		return
+	}
+	ctx := c.Request.Context()
+	failureKey := "rate:otp:verify:" + body.Phone
+	failures, err := h.RDB.Get(ctx, failureKey).Int64()
+	if err != nil && !errors.Is(err, redis.Nil) {
+		otpUnavailable(c)
+		return
+	}
+	if failures >= otpVerifyFailureLimit {
+		c.JSON(http.StatusTooManyRequests, gin.H{"success": false, "error": "Too many verification attempts"})
+		return
+	}
+	stored, err := h.RDB.Get(ctx, "otp:"+body.Phone).Result()
+	if err != nil && !errors.Is(err, redis.Nil) {
+		otpUnavailable(c)
+		return
+	}
+	if len(stored) != len(body.OTP) || subtle.ConstantTimeCompare([]byte(stored), []byte(body.OTP)) != 1 {
+		if _, err := h.consumeOTPLimit(ctx, failureKey, otpVerifyFailureLimit, otpVerifyWindow); err != nil {
+			otpUnavailable(c)
+			return
+		}
 		c.JSON(http.StatusUnauthorized, gin.H{"success": false, "error": "Invalid OTP"})
 		return
 	}
-	h.RDB.Del(c.Request.Context(), "otp:"+body.Phone)
-	resp, err := h.Auth.LoginByPhone(c.Request.Context(), &pb.PhoneLoginRequest{Phone: body.Phone, Otp: body.OTP})
+	if _, err := h.RDB.TxPipelined(ctx, func(pipe redis.Pipeliner) error {
+		pipe.Del(ctx, "otp:"+body.Phone)
+		pipe.Del(ctx, failureKey)
+		return nil
+	}); err != nil {
+		otpUnavailable(c)
+		return
+	}
+	resp, err := h.Auth.LoginByPhone(ctx, &pb.PhoneLoginRequest{Phone: body.Phone, Otp: body.OTP})
 	if grpcErr(c, err, "phone login failed") { return }
 	h.setCookies(c, resp.GetAccessToken(), resp.GetRefreshToken())
-	c.JSON(http.StatusOK, resp)
+	c.JSON(http.StatusOK, authResponse(resp.GetSuccess(), resp.GetError(), resp.GetUserId(), resp.GetRole()))
 }
 
-func randomOTP() string {
-	b := make([]byte, 4)
-	if _, err := rand.Read(b); err != nil {
-		return fmt.Sprintf("%06d", time.Now().UnixNano()%1000000)
+func randomOTP() (string, error) {
+	n, err := rand.Int(rand.Reader, big.NewInt(1_000_000))
+	if err != nil {
+		return "", err
 	}
-	return fmt.Sprintf("%06d", binary.BigEndian.Uint32(b)%1000000)
+	return fmt.Sprintf("%06d", n.Int64()), nil
+}
+
+func (h *Handlers) consumeOTPLimit(ctx context.Context, key string, limit int64, window time.Duration) (bool, error) {
+	if h.RDB == nil {
+		return false, errors.New("redis unavailable")
+	}
+	count, err := incrementWithExpiry.Run(ctx, h.RDB, []string{key}, window.Milliseconds()).Int64()
+	if err != nil {
+		return false, err
+	}
+	return count > limit, nil
+}
+
+func validPhone(phone string) bool {
+	if len(phone) < 9 || len(phone) > 16 || phone[0] != '+' || phone[1] == '0' {
+		return false
+	}
+	for i := 1; i < len(phone); i++ {
+		if phone[i] < '0' || phone[i] > '9' {
+			return false
+		}
+	}
+	return true
+}
+
+func validOTP(code string) bool {
+	if len(code) != 6 {
+		return false
+	}
+	for i := range code {
+		if code[i] < '0' || code[i] > '9' {
+			return false
+		}
+	}
+	return true
+}
+
+func sourceIP(r *http.Request) string {
+	host, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err == nil {
+		if ip := net.ParseIP(host); ip != nil {
+			return ip.String()
+		}
+	}
+	if ip := net.ParseIP(r.RemoteAddr); ip != nil {
+		return ip.String()
+	}
+	return "unknown"
+}
+
+func otpUnavailable(c *gin.Context) {
+	c.JSON(http.StatusServiceUnavailable, gin.H{"success": false, "error": "OTP service unavailable"})
 }
 
 func validateLogin(username, password string) (string, int) {
@@ -163,6 +289,17 @@ func validateLogin(username, password string) (string, int) {
 		return "password required", http.StatusBadRequest
 	}
 	return "", 0
+}
+
+// Access and refresh tokens are intentionally omitted from JSON responses.
+// They are delivered only through HttpOnly, Secure cookies in setCookies.
+func authResponse(success bool, err string, userID int64, role string) gin.H {
+	return gin.H{
+		"success": success,
+		"error":   err,
+		"user_id": strconv.FormatInt(userID, 10),
+		"role":    role,
+	}
 }
 
 func validateRegister(username, password string) (string, int) {

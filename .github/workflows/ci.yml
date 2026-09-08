@@ -2,7 +2,30 @@ name: CI Integration
 
 on:
   push:
-    branches: [main]
+    branches: ["**"]
+    paths:
+      - "frontend/**"
+      - "cmd/server/**"
+      - "server/**"
+      - "proto/**"
+      - "test/e2e/**"
+      - "Dockerfile.nginx"
+      - "docker-compose.yml"
+      - "docker-compose.frontend.yml"
+      - "deploy/nginx/**"
+      - ".github/workflows/ci.yml"
+  pull_request:
+    paths:
+      - "frontend/**"
+      - "cmd/server/**"
+      - "server/**"
+      - "proto/**"
+      - "test/e2e/**"
+      - "Dockerfile.nginx"
+      - "docker-compose.yml"
+      - "docker-compose.frontend.yml"
+      - "deploy/nginx/**"
+      - ".github/workflows/ci.yml"
   workflow_dispatch:
 
 jobs:
@@ -10,6 +33,8 @@ jobs:
   integration:
     runs-on: ubuntu-latest
     timeout-minutes: 60
+    env:
+      COMPOSE_FILE: docker-compose.yml:docker-compose.frontend.yml
     steps:
       - uses: actions/checkout@v4
 
@@ -143,7 +168,7 @@ jobs:
           DOCKER_BUILDKIT: "1"
           COMPOSE_DOCKER_CLI_BUILD: "1"
         run: |
-          docker compose build envoy envoy-2 elasticsearch
+          docker compose build envoy envoy-2 elasticsearch nginx
 
       - name: Start services
         env:
@@ -226,7 +251,7 @@ jobs:
       - name: E2E browser tests (Playwright)
         run: |
           cd test/e2e/playwright
-          npm install
+          npm ci
           npx playwright install --with-deps chromium
           npx playwright test --reporter=list
 

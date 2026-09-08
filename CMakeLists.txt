@@ -121,10 +121,13 @@ add_executable(cpp_test
     test/unit/test_data_helpers.cpp
     test/unit/test_l1_cache.cpp test/unit/test_call_logger.cpp
     test/unit/test_auth_service.cpp
+    test/unit/test_sharing_service.cpp
+    test/unit/test_workspace_service.cpp
     test/unit/test_sheet_mock.cpp
     server/src/shared/l1_cache.cpp
     server/src/auth/auth_service_impl.cpp
     server/src/auth/sharing_service_impl.cpp
+    server/src/auth/workspace_service_impl.cpp
     server/src/sheet/spreadsheet_service_impl.cpp
     ${SHARED_SRCS}
     ${PROTO_LIB_SRCS})

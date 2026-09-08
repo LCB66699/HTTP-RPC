@@ -20,7 +20,7 @@ func (h *Handlers) GetBalance(c *gin.Context) {
 	if grpcErr(c, err, "get balance failed") {
 		return
 	}
-	c.JSON(http.StatusOK, resp)
+	writeProtoJSON(c, http.StatusOK, resp)
 }
 
 func (h *Handlers) GetTransactions(c *gin.Context) {
@@ -32,7 +32,7 @@ func (h *Handlers) GetTransactions(c *gin.Context) {
 	if grpcErr(c, err, "get transactions failed") {
 		return
 	}
-	c.JSON(http.StatusOK, resp)
+	writeProtoJSON(c, http.StatusOK, resp)
 }
 
 func (h *Handlers) GetLeaderboard(c *gin.Context) {
@@ -40,5 +40,5 @@ func (h *Handlers) GetLeaderboard(c *gin.Context) {
 	if grpcErr(c, err, "get leaderboard failed") {
 		return
 	}
-	c.JSON(http.StatusOK, resp)
+	writeProtoJSON(c, http.StatusOK, resp)
 }

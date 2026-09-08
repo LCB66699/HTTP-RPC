@@ -95,5 +95,5 @@ func (h *Handlers) Search(c *gin.Context) {
 		Query: body.Q, UserId: 0, Sort: body.Sort,
 	})
 	if grpcErr(c, err, "search failed") { return }
-	c.JSON(http.StatusOK, resp)
+	writeProtoJSON(c, http.StatusOK, resp)
 }

@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strconv"
 	"syscall"
 	"time"
 
@@ -110,7 +111,11 @@ func main() {
 			grpc.WithChainUnaryInterceptor(middleware.GrpcMetricsInterceptor()))...)
 
 	redisAddr := getenv("REDIS_ADDR", "redis-cluster-7000:7000")
-	redisPass := getenv("REDIS_PASSWORD", "rpc-redis-123456")
+	redisPass := os.Getenv("REDIS_PASSWORD")
+	if redisPass == "" {
+		slog.Error("REDIS_PASSWORD environment variable is required")
+		os.Exit(1)
+	}
 	rdb := redis.NewClient(&redis.Options{Addr: redisAddr, Password: redisPass})
 
 	hub := ws.NewHub(rdb)
@@ -133,8 +138,12 @@ func main() {
 		Mall:      pb.NewMallServiceClient(mallConn),
 		RDB:       rdb,
 		CBAuth: cbAuth, CBSearch: cbSearch, CBSheet: cbSheet, CBFile: cbFile,
-		WSHub: hub, WS: &ws.Handler{Hub: hub},
+		WSHub: hub, WS: &ws.Handler{
+			Hub: hub,
+			AllowedOrigins: middleware.ParseOriginAllowlist(os.Getenv("WS_ALLOWED_ORIGINS")),
+		},
 		JWTSecret: jwtSecret,
+		MaxUploadBytes: getenvPositiveInt64("UPLOAD_MAX_BYTES", 50*1024*1024),
 	}
 
 	r := router.Setup(&h, jwtSecret)
@@ -163,4 +172,17 @@ func getenv(key, fallback string) string {
 		return v
 	}
 	return fallback
+}
+
+func getenvPositiveInt64(key string, fallback int64) int64 {
+	raw := os.Getenv(key)
+	if raw == "" {
+		return fallback
+	}
+	value, err := strconv.ParseInt(raw, 10, 64)
+	if err != nil || value <= 0 {
+		slog.Warn("invalid positive integer configuration; using fallback", "key", key)
+		return fallback
+	}
+	return value
 }

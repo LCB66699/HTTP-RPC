@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, useNavigate, useParams } from '@tanstack/react-router'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import { Download, Eye, FilePlus2, FolderInput, FolderPlus, Plus, Save, Trash2, Upload, UserPlus, Users } from 'lucide-react'
-import type { FileEntry, Sheet, WorkspaceMember } from '../lib/api'
+import type { FileEntry, ResourceId, Sheet, WorkspaceMember } from '../lib/api'
 import { SharingPanel } from '../features/sheets/SharingPanel'
 import { useSheetUpdates } from '../features/sheets/useSheetUpdates'
 import { useSession } from '../lib/session'
@@ -197,9 +197,9 @@ export function FilesPage() {
   const files = useQuery({ queryKey: fileKey, queryFn: api.listFiles })
   const refresh = () => client.invalidateQueries({ queryKey: fileKey })
   const upload = useMutation({ mutationFn: api.uploadFile, onSuccess: refresh })
-  const folder = useMutation({ mutationFn: () => api.createFolder(folderName.trim()), onSuccess: () => { setFolderName(''); return refresh() } })
-  const remove = useMutation({ mutationFn: api.deleteFile, onSuccess: refresh })
-  const move = useMutation({ mutationFn: ({ id, target }: { id: number; target: number }) => api.moveFile(id, target).then(requireSuccess), onSuccess: refresh })
+  const folder = useMutation({ mutationFn: () => api.createFolder(folderName.trim()).then(requireSuccess), onSuccess: () => { setFolderName(''); return refresh() } })
+  const remove = useMutation({ mutationFn: (id: ResourceId) => api.deleteFile(id).then(requireSuccess), onSuccess: refresh })
+  const move = useMutation({ mutationFn: ({ id, target }: { id: ResourceId; target: ResourceId }) => api.moveFile(id, target).then(requireSuccess), onSuccess: refresh })
   const chooseFile = (file: File | undefined) => {
     if (!file) return
     if (file.size > 50 * 1024 * 1024) { setUploadError('Files must be 50 MB or smaller.'); return }
@@ -214,10 +214,10 @@ export function FilesPage() {
     {files.data && (files.data.files?.length ? <div className="resource-list">{files.data.files.map(file => <FileRow file={file} folders={folders} key={file.id} moving={move.isPending} onDelete={() => { if (window.confirm(`Delete ${file.original_name}?`)) remove.mutate(file.id) }} onMove={target => move.mutate({ id: file.id, target })} />)}</div> : <EmptyState><FilePlus2 aria-hidden="true" size={28} /><p>No files yet.</p></EmptyState>)}</div>
 }
 
-function FileRow({ file, folders, moving, onDelete, onMove }: { file: FileEntry; folders: FileEntry[]; moving: boolean; onDelete: () => void; onMove: (target: number) => void }) {
+function FileRow({ file, folders, moving, onDelete, onMove }: { file: FileEntry; folders: FileEntry[]; moving: boolean; onDelete: () => void; onMove: (target: ResourceId) => void }) {
   const [target, setTarget] = useState('')
   const targets = folders.filter(folder => folder.id !== file.id)
-  return <article className="resource-row"><div><h2>{file.is_folder ? 'Folder' : 'File'}: {file.original_name}</h2><p>{file.is_folder ? 'Folder' : file.mime_type || 'Unknown format'}</p><small>{file.is_folder ? 'Container' : formatBytes(file.size)}</small></div><div className="row-actions">{!file.is_folder && <a aria-label={`Preview ${file.original_name}`} className="icon-button" href={`/api/v1/files/${file.id}`} rel="noreferrer" target="_blank" title="Preview"><Eye aria-hidden="true" size={17} /></a>}{!file.is_folder && <a aria-label={`Download ${file.original_name}`} className="icon-button" href={`/api/v1/files/${file.id}`} title="Download"><Download aria-hidden="true" size={17} /></a>}{targets.length > 0 && <><select aria-label={`Move ${file.original_name} to folder`} onChange={event => setTarget(event.target.value)} value={target}><option value="">Move to...</option>{targets.map(folder => <option key={folder.id} value={String(folder.id)}>{folder.original_name}</option>)}</select><button aria-label={`Move ${file.original_name}`} className="icon-button" disabled={!target || moving} onClick={() => onMove(Number(target))} title="Move to folder" type="button"><FolderInput aria-hidden="true" size={17} /></button></>}<button aria-label={`Delete ${file.original_name}`} className="icon-button danger" onClick={onDelete} title="Delete" type="button"><Trash2 aria-hidden="true" size={17} /></button></div></article>
+  return <article className="resource-row"><div><h2>{file.is_folder ? 'Folder' : 'File'}: {file.original_name}</h2><p>{file.is_folder ? 'Folder' : file.mime_type || 'Unknown format'}</p><small>{file.is_folder ? 'Container' : formatBytes(file.size)}</small></div><div className="row-actions">{!file.is_folder && <a aria-label={`Preview ${file.original_name}`} className="icon-button" href={`/api/v1/files/${file.id}`} rel="noreferrer" target="_blank" title="Preview"><Eye aria-hidden="true" size={17} /></a>}{!file.is_folder && <a aria-label={`Download ${file.original_name}`} className="icon-button" href={`/api/v1/files/${file.id}`} title="Download"><Download aria-hidden="true" size={17} /></a>}{targets.length > 0 && <><select aria-label={`Move ${file.original_name} to folder`} onChange={event => setTarget(event.target.value)} value={target}><option value="">Move to...</option>{targets.map(folder => <option key={folder.id} value={String(folder.id)}>{folder.original_name}</option>)}</select><button aria-label={`Move ${file.original_name}`} className="icon-button" disabled={!target || moving} onClick={() => onMove(target)} title="Move to folder" type="button"><FolderInput aria-hidden="true" size={17} /></button></>}<button aria-label={`Delete ${file.original_name}`} className="icon-button danger" onClick={onDelete} title="Delete" type="button"><Trash2 aria-hidden="true" size={17} /></button></div></article>
 }
 
 export function WorkspacesPage() {
@@ -232,7 +232,7 @@ export function WorkspacesPage() {
 
 export function WorkspaceDetailPage() {
   const { workspaceId } = useParams({ from: '/workspaces/$workspaceId' })
-  const id = Number(workspaceId)
+  const id = workspaceId
   const { api } = useSession()
   const client = useQueryClient()
   const workspace = useQuery({ queryKey: ['workspace', id], queryFn: () => api.getWorkspace(id) })
@@ -243,7 +243,7 @@ export function WorkspaceDetailPage() {
   const refresh = () => Promise.all([client.invalidateQueries({ queryKey: ['workspace', id] }), client.invalidateQueries({ queryKey: workspaceKey })])
   const update = useMutation({ mutationFn: () => api.updateWorkspace(id, name.trim()).then(requireSuccess), onSuccess: refresh })
   const add = useMutation({ mutationFn: () => api.addWorkspaceMember(id, username.trim(), role).then(requireSuccess), onSuccess: () => { setUsername(''); return refresh() } })
-  const remove = useMutation({ mutationFn: (userId: number) => api.removeWorkspaceMember(id, userId).then(requireSuccess), onSuccess: refresh })
+  const remove = useMutation({ mutationFn: (userId: ResourceId) => api.removeWorkspaceMember(id, userId).then(requireSuccess), onSuccess: refresh })
   if (workspace.isPending) return <div className="page"><LoadingState label="Loading workspace..." /></div>
   if (workspace.isError || !workspace.data?.workspace) return <div className="page"><ErrorState message="The workspace could not be loaded." /></div>
   const members = workspace.data.members ?? []

@@ -1,114 +1,63 @@
 const { test, expect } = require('@playwright/test');
 
-const ADMIN_USER = 'e2eadmin_' + Date.now();
-const ADMIN_PASS = 'admin1234';
+const password = 'e2e-test-password';
 
-async function register(page, user, pass) {
-  page.on('console', msg => console.log('[browser]', msg.type(), msg.text()));
-  page.on('pageerror', err => console.error('[browser error]', err.message));
+async function register(page, prefix) {
+  const username = `${prefix.slice(0, 3)}${Date.now().toString().slice(-8)}${Math.floor(Math.random() * 1000).toString().padStart(3, '0')}`;
 
-  await page.click('#btn-show-register');
-  await page.fill('#reg-username', user);
-  await page.fill('#reg-password', pass);
-  await page.click('#register-form button[type="submit"]');
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Create an account' }).click();
+  await page.locator('input[autocomplete="username"]').fill(username);
+  await page.locator('input[autocomplete="new-password"]').fill(password);
+  await page.getByRole('button', { name: 'Create account' }).click();
+  await expect(page.getByRole('navigation', { name: 'Primary' })).toBeVisible();
 
-  // Wait for showMainApp() — main-header loses 'hidden' class
-  await page.waitForFunction(() => {
-    const h = document.getElementById('main-header');
-    return h && !h.classList.contains('hidden');
-  }, { timeout: 15000 });
+  return username;
 }
 
-async function login(page, user, pass) {
-  await page.fill('input#login-username', user);
-  await page.fill('input#login-password', pass);
-  await page.click('#login-form button[type="submit"]');
-  await page.waitForFunction(() => {
-    const h = document.getElementById('main-header');
-    return h && !h.classList.contains('hidden');
-  }, { timeout: 15000 });
-}
+test.describe('Modern console E2E', () => {
+  test('creates a spreadsheet and exposes collaboration controls', async ({ page }) => {
+    await register(page, 'sheet');
+    await page.getByRole('link', { name: 'Spreadsheets' }).click();
+    await page.getByLabel('New spreadsheet name').fill('E2E spreadsheet');
+    await page.getByRole('button', { name: 'Create', exact: true }).click();
 
-test.describe.serial('HTTP-RPC E2E', () => {
-
-  test('admin registers', async ({ page }) => {
-    await page.goto('/');
-    await register(page, ADMIN_USER, ADMIN_PASS);
-    await expect(page.locator('#main-header')).not.toHaveClass(/hidden/);
+    await expect(page.getByRole('heading', { name: 'E2E spreadsheet' })).toBeVisible();
+    await page.getByRole('button', { name: 'Share' }).click();
+    await expect(page.getByRole('region', { name: 'Spreadsheet sharing' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Create view link' })).toBeVisible();
   });
 
-  test('admin creates product and seckill', async ({ page }) => {
-    await page.goto('/');
-    await login(page, ADMIN_USER, ADMIN_PASS);
+  test('creates and opens a workspace without converting its ID to a number', async ({ page }) => {
+    await register(page, 'workspace');
+    await page.getByRole('link', { name: 'Workspaces' }).click();
+    await page.getByLabel('Workspace name').fill('E2E workspace');
+    await page.getByRole('button', { name: 'Create workspace' }).click();
 
-    await page.click('[data-tab="mall"]');
-    await page.waitForTimeout(500);
-    await page.locator('#mall-admin-toggle button').click();
-    await page.waitForTimeout(300);
-
-    await page.fill('#admin-prod-name', 'e2e-test-product');
-    await page.fill('#admin-prod-price', '20');
-    await page.fill('#admin-prod-stock', '100');
-    page.once('dialog', d => d.accept());
-    await page.locator('#mall-admin-panel').locator('text=添加商品').click();
-    await page.waitForTimeout(500);
-
-    const now = Math.floor(Date.now() / 1000);
-    await page.fill('#admin-sk-prod-id', '1');
-    await page.fill('#admin-sk-price', '5');
-    await page.fill('#admin-sk-stock', '20');
-    await page.fill('#admin-sk-start', String(now - 10));
-    await page.fill('#admin-sk-end', String(now + 3600));
-    page.once('dialog', d => d.accept());
-    await page.locator('#mall-admin-panel').locator('text=创建秒杀').click();
-    await page.waitForTimeout(500);
+    const workspace = page.getByRole('link', { name: 'E2E workspace' });
+    await expect(workspace).toBeVisible();
+    await workspace.click();
+    await expect(page.getByRole('heading', { name: 'E2E workspace' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Members' })).toBeVisible();
   });
 
-  test('regular user registers and creates sheet', async ({ page }) => {
-    await page.goto('/');
-    const USER = 'e2euser_' + Date.now();
-    await register(page, USER, 'test1234');
-
-    await page.click('[data-tab="sheets"]');
-    await page.waitForTimeout(500);
-    await page.click('#btn-sheet-create-blank');
-    await page.waitForTimeout(1000);
-    await expect(page.locator('.sheet-card').first()).toBeAttached({ timeout: 5000 });
-    await page.locator('.sheet-card').first().locator('text=打开').click();
-    await page.waitForTimeout(500);
-    await expect(page.locator('#sheet-grid')).toBeAttached();
+  test('creates a folder through the modern files page', async ({ page }) => {
+    await register(page, 'files');
+    await page.getByRole('link', { name: 'Files' }).click();
+    await page.getByLabel('Folder name').fill('E2E folder');
+    const [response] = await Promise.all([
+      page.waitForResponse(candidate => candidate.url().includes('/api/v1/files/folder') && candidate.request().method() === 'POST'),
+      page.getByRole('button', { name: 'Create folder' }).click()
+    ]);
+    expect((await response.json()).success).toBe(true);
+    await expect(page.getByRole('heading', { name: /Folder: E2E folder/ })).toBeVisible();
   });
 
-  test('points tab', async ({ page }) => {
-    await page.goto('/');
-    await login(page, ADMIN_USER, ADMIN_PASS);
-    await page.click('[data-tab="points"]');
-    await page.waitForTimeout(500);
-    await expect(page.locator('#points-balance-display')).toBeAttached();
+  test('renders points and mall routes from the modern navigation', async ({ page }) => {
+    await register(page, 'navigation');
+    await page.getByRole('link', { name: 'Points' }).click();
+    await expect(page.getByRole('heading', { name: 'Points' })).toBeVisible();
+    await page.getByRole('link', { name: 'Mall' }).click();
+    await expect(page.getByRole('heading', { name: 'Mall' })).toBeVisible();
   });
-
-  test('workspace tab', async ({ page }) => {
-    await page.goto('/');
-    await login(page, ADMIN_USER, ADMIN_PASS);
-    await page.click('[data-tab="workspace"]');
-    await page.waitForTimeout(500);
-    await expect(page.locator('#workspace-list')).toBeAttached();
-  });
-
-  test('mall tab', async ({ page }) => {
-    await page.goto('/');
-    await login(page, ADMIN_USER, ADMIN_PASS);
-    await page.click('[data-tab="mall"]');
-    await page.waitForTimeout(1000);
-    await expect(page.locator('#mall-products')).toBeAttached();
-  });
-
-  test('files tab', async ({ page }) => {
-    await page.goto('/');
-    await login(page, ADMIN_USER, ADMIN_PASS);
-    await page.click('[data-tab="files"]');
-    await page.waitForTimeout(500);
-    await expect(page.locator('#files-list')).toBeAttached();
-  });
-
 });

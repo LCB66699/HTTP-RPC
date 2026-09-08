@@ -37,6 +37,7 @@ type Handlers struct {
 	WS    *ws.Handler
 
 	JWTSecret string
+	MaxUploadBytes int64
 }
 
 // ---- helpers ----
@@ -94,7 +95,11 @@ func (h *Handlers) username(c *gin.Context) string {
 }
 
 func parseID(c *gin.Context) int64 {
-	n, _ := strconv.ParseInt(c.Param("id"), 10, 64)
+	n, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	if err != nil || n <= 0 {
+		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"success": false, "error": "invalid id"})
+		return 0
+	}
 	return n
 }
 

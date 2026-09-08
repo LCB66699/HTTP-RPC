@@ -21,16 +21,17 @@ func (h *Handlers) ListProducts(c *gin.Context) {
 	if grpcErr(c, err, "list products failed") {
 		return
 	}
-	c.JSON(http.StatusOK, resp)
+	writeProtoJSON(c, http.StatusOK, resp)
 }
 
 func (h *Handlers) GetProduct(c *gin.Context) {
 	id := parseID(c)
+	if c.IsAborted() { return }
 	resp, err := h.Mall.GetProduct(c.Request.Context(), &pb.GetProductRequest{Id: id})
 	if grpcErr(c, err, "get product failed") {
 		return
 	}
-	c.JSON(http.StatusOK, resp)
+	writeProtoJSON(c, http.StatusOK, resp)
 }
 
 func (h *Handlers) ListSeckills(c *gin.Context) {
@@ -38,7 +39,7 @@ func (h *Handlers) ListSeckills(c *gin.Context) {
 	if grpcErr(c, err, "list seckills failed") {
 		return
 	}
-	c.JSON(http.StatusOK, resp)
+	writeProtoJSON(c, http.StatusOK, resp)
 }
 
 func (h *Handlers) SeckillOrder(c *gin.Context) {
@@ -61,7 +62,7 @@ func (h *Handlers) SeckillOrder(c *gin.Context) {
 	if grpcErr(c, err, "seckill order failed") {
 		return
 	}
-	c.JSON(http.StatusOK, resp)
+	writeProtoJSON(c, http.StatusOK, resp)
 }
 
 func (h *Handlers) NormalOrder(c *gin.Context) {
@@ -84,7 +85,7 @@ func (h *Handlers) NormalOrder(c *gin.Context) {
 	if grpcErr(c, err, "order failed") {
 		return
 	}
-	c.JSON(http.StatusOK, resp)
+	writeProtoJSON(c, http.StatusOK, resp)
 }
 
 func (h *Handlers) ListOrders(c *gin.Context) {
@@ -94,5 +95,5 @@ func (h *Handlers) ListOrders(c *gin.Context) {
 	if grpcErr(c, err, "list orders failed") {
 		return
 	}
-	c.JSON(http.StatusOK, resp)
+	writeProtoJSON(c, http.StatusOK, resp)
 }

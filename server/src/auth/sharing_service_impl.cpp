@@ -1,20 +1,77 @@
 #include "auth/sharing_service_impl.h"
 
+#include <openssl/rand.h>
+
 #include <nlohmann/json.hpp>
 
+#include "shared/base/rpc_interceptor.h"
 #include "shared/client/database.h"
 #include "shared/base/error_codes.h"
 
+namespace {
+
+template <typename Response>
+grpc::Status Fail(Response *resp, const char *message, int error_code) {
+    resp->set_success(false);
+    resp->set_error(message);
+    resp->set_error_code(error_code);
+    return grpc::Status::OK;
+}
+
+bool HasPrincipal() {
+    return g_rpc_auth_ctx.authenticated && g_rpc_auth_ctx.user_id > 0;
+}
+
+bool IsValidResourceType(const std::string &resource_type) {
+    return resource_type == "sheet" || resource_type == "file";
+}
+
+bool IsValidPermission(const std::string &permission) {
+    return permission == "view" || permission == "edit";
+}
+
+bool GenerateToken(std::string &out_token) {
+    unsigned char bytes[16];
+    if (RAND_bytes(bytes, sizeof(bytes)) != 1) return false;
+    static constexpr char hex[] = "0123456789abcdef";
+    out_token.resize(sizeof(bytes) * 2);
+    for (size_t i = 0; i < sizeof(bytes); ++i) {
+        out_token[i * 2] = hex[bytes[i] >> 4];
+        out_token[i * 2 + 1] = hex[bytes[i] & 0x0f];
+    }
+    return true;
+}
+
+template <typename Request, typename Response>
+bool ValidateOwnedResource(const Request *req, Response *resp) {
+    if (!HasPrincipal()) {
+        Fail(resp, "Authentication required", rpc_error::UNAUTHENTICATED);
+        return false;
+    }
+    if (req->owner_id() != g_rpc_auth_ctx.user_id) {
+        Fail(resp, "Access denied", rpc_error::FORBIDDEN);
+        return false;
+    }
+    if (req->resource_id() <= 0 || !IsValidResourceType(req->resource_type())) {
+        Fail(resp, "Invalid shared resource", rpc_error::BAD_REQUEST);
+        return false;
+    }
+    return true;
+}
+
+}  // namespace
+
 grpc::Status SharingServiceImpl::Share(grpc::ServerContext *ctx, const rpc::ShareRequest *req,
                                         rpc::ShareResponse *resp) {
+    if (!ValidateOwnedResource(req, resp)) return grpc::Status::OK;
+    if (req->grantee_username().empty() || !IsValidPermission(req->permission())) {
+        return Fail(resp, "Invalid sharing request", rpc_error::BAD_REQUEST);
+    }
     if (!db_) {
-        resp->set_success(false);
-        resp->set_error("Database not available");
-        resp->set_error_code(rpc_error::INTERNAL);
-        return grpc::Status::OK;
+        return Fail(resp, "Database not available", rpc_error::INTERNAL);
     }
 
-    db_->EnsureSharingTables();
+    if (!db_->EnsureSharingTables()) return Fail(resp, "Database not available", rpc_error::INTERNAL);
 
     bool ok = db_->CreateResourceShare(req->owner_id(), req->resource_type(),
                                         req->resource_id(), req->grantee_username(),
@@ -29,11 +86,10 @@ grpc::Status SharingServiceImpl::Share(grpc::ServerContext *ctx, const rpc::Shar
 
 grpc::Status SharingServiceImpl::Revoke(grpc::ServerContext *ctx, const rpc::RevokeRequest *req,
                                          rpc::RevokeResponse *resp) {
+    if (!ValidateOwnedResource(req, resp)) return grpc::Status::OK;
+    if (req->grantee_username().empty()) return Fail(resp, "Invalid sharing request", rpc_error::BAD_REQUEST);
     if (!db_) {
-        resp->set_success(false);
-        resp->set_error("Database not available");
-        resp->set_error_code(rpc_error::INTERNAL);
-        return grpc::Status::OK;
+        return Fail(resp, "Database not available", rpc_error::INTERNAL);
     }
 
     bool ok = db_->RevokeResourceShare(req->owner_id(), req->resource_type(),
@@ -48,14 +104,12 @@ grpc::Status SharingServiceImpl::Revoke(grpc::ServerContext *ctx, const rpc::Rev
 
 grpc::Status SharingServiceImpl::ListShares(grpc::ServerContext *ctx, const rpc::ResourceRequest *req,
                                              rpc::ShareListResponse *resp) {
+    if (!ValidateOwnedResource(req, resp)) return grpc::Status::OK;
     if (!db_) {
-        resp->set_success(false);
-        resp->set_error("Database not available");
-        resp->set_error_code(rpc_error::INTERNAL);
-        return grpc::Status::OK;
+        return Fail(resp, "Database not available", rpc_error::INTERNAL);
     }
 
-    db_->EnsureSharingTables();
+    if (!db_->EnsureSharingTables()) return Fail(resp, "Database not available", rpc_error::INTERNAL);
 
     std::string entries_json;
     bool ok = db_->ListResourceShares(req->owner_id(), req->resource_type(),
@@ -79,18 +133,18 @@ grpc::Status SharingServiceImpl::ListShares(grpc::ServerContext *ctx, const rpc:
 
 grpc::Status SharingServiceImpl::CreateShareLink(grpc::ServerContext *ctx, const rpc::ShareLinkRequest *req,
                                                   rpc::ShareLinkResponse *resp) {
+    if (!ValidateOwnedResource(req, resp)) return grpc::Status::OK;
+    if (!IsValidPermission(req->permission())) return Fail(resp, "Invalid sharing request", rpc_error::BAD_REQUEST);
     if (!db_) {
-        resp->set_success(false);
-        resp->set_error("Database not available");
-        resp->set_error_code(rpc_error::INTERNAL);
-        return grpc::Status::OK;
+        return Fail(resp, "Database not available", rpc_error::INTERNAL);
     }
 
-    db_->EnsureSharingTables();
+    if (!db_->EnsureSharingTables()) return Fail(resp, "Database not available", rpc_error::INTERNAL);
 
     std::string token;
-    bool ok = db_->CreateShareLink(req->owner_id(), req->resource_type(),
-                                    req->resource_id(), req->permission(), token);
+    const bool token_ready = GenerateToken(token);
+    bool ok = token_ready && db_->CreateShareLink(req->owner_id(), req->resource_type(),
+                                                   req->resource_id(), req->permission(), token);
     resp->set_success(ok);
     if (ok) {
         resp->set_token(token);
@@ -108,7 +162,7 @@ grpc::Status SharingServiceImpl::CheckAccess(grpc::ServerContext *ctx, const rpc
         return grpc::Status::OK;
     }
 
-    db_->EnsureSharingTables();
+    if (!db_->EnsureSharingTables()) return grpc::Status::OK;
 
     std::string username = db_->GetUsernameById(req->user_id());
     if (username.empty()) {
@@ -133,6 +187,7 @@ grpc::Status SharingServiceImpl::GetByToken(grpc::ServerContext *ctx, const rpc:
         return grpc::Status::OK;
     }
 
+    if (req->token().size() != 32) return Fail(resp, "Invalid share token", rpc_error::NOT_FOUND);
     std::string resource_type, permission;
     int64_t resource_id = 0, owner_id = 0;
     bool ok = db_->GetShareLinkByToken(req->token(), resource_type, resource_id, permission, owner_id);

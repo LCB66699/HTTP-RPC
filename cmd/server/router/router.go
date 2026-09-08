@@ -1,6 +1,8 @@
 package router
 
 import (
+	"os"
+
 	"github.com/gin-gonic/gin"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/lcb66699/http-rpc/server/handler"
@@ -16,7 +18,8 @@ func MetricsHandler() gin.HandlerFunc {
 
 func Setup(h *handler.Handlers, jwtSecret string) *gin.Engine {
 	r := gin.New()
-	r.Use(middleware.CORSMiddleware())
+	r.Use(middleware.CORSMiddleware(middleware.ParseOriginAllowlist(os.Getenv("CORS_ALLOWED_ORIGINS"))))
+	r.Use(middleware.PositiveIDParam())
 	r.Use(middleware.RequestID())
 	r.Use(middleware.GinMetrics())
 	r.Use(middleware.Logger())

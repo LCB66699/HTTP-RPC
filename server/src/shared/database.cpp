@@ -815,7 +815,7 @@ bool Database::ListFiles(int64_t user_id, std::vector<FileRow> &out,
     // Fetch limit+1 rows to detect has_more without COUNT(*)
     std::string sql =
         "SELECT "
-        "f.id,f.username,f.original_name,f.size,f.mime_type,f.created_at "
+        "f.id,f.username,f.original_name,f.size,f.mime_type,f.created_at,f.folder_id,f.is_folder "
         "FROM files f "
         "JOIN (SELECT id FROM files " +
         where + make_sql(" ORDER BY id DESC LIMIT {}", limit + 1) +
@@ -839,6 +839,8 @@ bool Database::ListFiles(int64_t user_id, std::vector<FileRow> &out,
             f.size = row[3] ? std::stoll(row[3]) : 0;
             f.mime_type = row[4] ? row[4] : "";
             f.created_at = row[5] ? row[5] : "";
+            f.folder_id = row[6] ? std::stoll(row[6]) : 0;
+            f.is_folder = row[7] && std::stoi(row[7]) != 0;
             out.push_back(f);
             count++;
         }
@@ -1405,14 +1407,6 @@ bool Database::EnsureSharingTables() {
     return ExecWrite(sql_shares) && ExecWrite(sql_links);
 }
 
-static std::string make_token() {
-    static const char hex[] = "0123456789abcdef";
-    std::string tok(32, '\0');
-    for (size_t i = 0; i < 32; ++i)
-        tok[i] = hex[(rand() >> 4) & 15];
-    return tok;
-}
-
 bool Database::CreateResourceShare(int64_t owner_id, const std::string &resource_type, int64_t resource_id,
                                     const std::string &grantee_username, const std::string &permission) {
     MYSQL *ec = EscConn();
@@ -1478,7 +1472,7 @@ bool Database::CheckShareAccess(const std::string &username, const std::string &
 bool Database::CreateShareLink(int64_t owner_id, const std::string &resource_type, int64_t resource_id,
                                 const std::string &permission, std::string &out_token) {
     MYSQL *ec = EscConn();
-    out_token = make_token();
+    if (out_token.size() != 32) return false;
     return ExecWrite(make_sql(
         "INSERT INTO share_links (token,owner_id,resource_type,resource_id,permission) VALUES ({},{},{},{},{})",
         sql_param(ec, out_token), owner_id, sql_param(ec, resource_type), resource_id,
@@ -1529,9 +1523,13 @@ bool Database::EnsureWorkspaceTables() {
 
 bool Database::CreateWorkspace(int64_t owner_id, const std::string &name, int64_t &out_id) {
     MYSQL *ec = EscConn();
-    return ExecWriteInsert(make_sql(
+    const int64_t workspace_id = snowflake_ ? snowflake_->Next() : 0;
+    if (workspace_id <= 0) return false;
+    if (!ExecWrite(make_sql(
         "INSERT INTO workspaces (id,name,owner_id) VALUES ({},{},{})",
-        owner_id, sql_param(ec, name), owner_id), out_id);
+        workspace_id, sql_param(ec, name), owner_id))) return false;
+    out_id = workspace_id;
+    return true;
 }
 
 bool Database::GetWorkspace(int64_t id, std::string &name, int64_t &owner_id, std::string &created_at) {
@@ -1568,6 +1566,28 @@ bool Database::ListWorkspaces(int64_t user_id, std::string &out_json) {
             }
             return true;
         });
+    out_json = nlohmann::json(items).dump();
+    return true;
+}
+
+bool Database::ListWorkspaceMembers(int64_t workspace_id, std::string &out_json) {
+    std::vector<nlohmann::json> items;
+    const bool read = ExecRead(make_sql(
+        "SELECT user_id,username,role,joined_at FROM workspace_members WHERE workspace_id={} ORDER BY joined_at",
+        workspace_id),
+        [&](MYSQL_RES *res) -> bool {
+            MYSQL_ROW row;
+            while ((row = mysql_fetch_row(res))) {
+                nlohmann::json member;
+                member["user_id"] = row[0] ? std::stoll(row[0]) : 0;
+                member["username"] = row[1] ? row[1] : "";
+                member["role"] = row[2] ? row[2] : "";
+                member["joined_at"] = row[3] ? row[3] : "";
+                items.push_back(std::move(member));
+            }
+            return true;
+        });
+    if (!read) return false;
     out_json = nlohmann::json(items).dump();
     return true;
 }

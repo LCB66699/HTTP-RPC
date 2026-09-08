@@ -63,9 +63,9 @@ describe('API client', () => {
     }))
   })
 
-  it('preserves 64-bit resource IDs instead of rounding them in JavaScript', async () => {
+  it('accepts canonical protobuf JSON string IDs', async () => {
     const fetcher = vi.fn().mockResolvedValue(
-      new Response('{"success":true,"id":90652009677533184}', { status: 200, headers: { 'content-type': 'application/json' } })
+      new Response('{"success":true,"id":"90652009677533184"}', { status: 200, headers: { 'content-type': 'application/json' } })
     )
     const api = createApiClient(fetcher)
 
