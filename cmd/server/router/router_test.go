@@ -124,15 +124,20 @@ func TestRequestIDInResponse(t *testing.T) {
 }
 
 func TestCORSMiddleware(t *testing.T) {
+	t.Setenv("CORS_ALLOWED_ORIGINS", "https://app.example.com")
 	r := setupTestRouter()
 	w := httptest.NewRecorder()
 	req, _ := http.NewRequest("OPTIONS", "/api/v1/health", nil)
+	req.Header.Set("Origin", "https://app.example.com")
 	r.ServeHTTP(w, req)
 
 	if w.Code != http.StatusNoContent {
 		t.Fatalf("expected 204 for OPTIONS, got %d", w.Code)
 	}
-	if w.Header().Get("Access-Control-Allow-Origin") != "*" {
-		t.Fatal("expected CORS header")
+	if w.Header().Get("Access-Control-Allow-Origin") != "https://app.example.com" {
+		t.Fatal("expected exact configured CORS origin")
+	}
+	if w.Header().Get("Access-Control-Allow-Credentials") != "true" {
+		t.Fatal("expected credentials to be allowed")
 	}
 }

@@ -7,3 +7,7 @@ services:
     volumes: !override
       - ./deploy/nginx/nginx.frontend.conf:/etc/nginx/nginx.conf:ro
       - nginx_certs:/certs
+
+volumes:
+  nginx_certs:
+    driver: local

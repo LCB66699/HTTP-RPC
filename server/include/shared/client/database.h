@@ -96,6 +96,8 @@ struct FileRow {
     int64_t id = 0;
     std::string username, original_name;
     int64_t size = 0;
+    int64_t folder_id = 0;
+    bool is_folder = false;
     std::string mime_type, created_at, file_content;
     std::string storage_path;  // non-empty 鈫?content lives in object storage, not
                                // file_content
@@ -194,6 +196,7 @@ class Database {
     bool CreateWorkspace(int64_t owner_id, const std::string &name, int64_t &out_id);
     bool GetWorkspace(int64_t id, std::string &name, int64_t &owner_id, std::string &created_at);
     bool ListWorkspaces(int64_t user_id, std::string &out_json);
+    bool ListWorkspaceMembers(int64_t workspace_id, std::string &out_json);
     bool UpdateWorkspace(int64_t id, const std::string &name);
     bool DeleteWorkspace(int64_t id);
     bool AddWorkspaceMember(int64_t workspace_id, int64_t user_id, const std::string &username, const std::string &role);
@@ -368,6 +371,7 @@ class ShardedDatabase : public IDatabase {
     bool CreateWorkspace(int64_t owner_id, const std::string &name, int64_t &out_id) { return shards_[0]->CreateWorkspace(owner_id, name, out_id); }
     bool GetWorkspace(int64_t id, std::string &name, int64_t &owner_id, std::string &created_at) { return shards_[0]->GetWorkspace(id, name, owner_id, created_at); }
     bool ListWorkspaces(int64_t user_id, std::string &out_json) { return shards_[0]->ListWorkspaces(user_id, out_json); }
+    bool ListWorkspaceMembers(int64_t workspace_id, std::string &out_json) { return shards_[0]->ListWorkspaceMembers(workspace_id, out_json); }
     bool UpdateWorkspace(int64_t id, const std::string &name) { return shards_[0]->UpdateWorkspace(id, name); }
     bool DeleteWorkspace(int64_t id) { return shards_[0]->DeleteWorkspace(id); }
     bool AddWorkspaceMember(int64_t wid, int64_t uid, const std::string &uname, const std::string &role) { return shards_[0]->AddWorkspaceMember(wid, uid, uname, role); }

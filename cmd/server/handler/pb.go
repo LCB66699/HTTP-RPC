@@ -7,7 +7,22 @@ import (
 	"github.com/sony/gobreaker/v2"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/encoding/protojson"
+	"google.golang.org/protobuf/proto"
 )
+
+var responseJSON = protojson.MarshalOptions{UseProtoNames: true}
+
+// writeProtoJSON preserves protobuf's canonical JSON mapping, including int64
+// values encoded as strings so browser clients cannot lose precision.
+func writeProtoJSON(c *gin.Context, statusCode int, message proto.Message) {
+	payload, err := responseJSON.Marshal(message)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": "response serialization failed"})
+		return
+	}
+	c.Data(statusCode, "application/json; charset=utf-8", payload)
+}
 
 // grpcCodeToHTTP maps gRPC status codes to HTTP status codes.
 func grpcCodeToHTTP(code codes.Code) int {

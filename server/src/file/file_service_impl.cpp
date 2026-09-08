@@ -374,6 +374,8 @@ grpc::Status FileServiceImpl::ListFiles(grpc::ServerContext *context, const rpc:
         f->set_size(row.size);
         f->set_mime_type(row.mime_type);
         f->set_created_at(row.created_at);
+        f->set_folder_id(row.folder_id);
+        f->set_is_folder(row.is_folder);
     }
     resp->set_next_cursor(next_cursor);
     resp->set_has_more(has_more);
@@ -419,6 +421,8 @@ grpc::Status FileServiceImpl::CreateFolder(grpc::ServerContext *ctx, const rpc::
         resp->set_id(id);
     else
         SET_ERROR(resp, "Failed to create folder", rpc_error::INTERNAL);
+    if (ok && redis_)
+        redis_->Increment(FileVersionKey(g_rpc_auth_ctx.user_id));
     return grpc::Status::OK;
 }
 grpc::Status FileServiceImpl::MoveFile(grpc::ServerContext *ctx, const rpc::MoveFileRequest *req,

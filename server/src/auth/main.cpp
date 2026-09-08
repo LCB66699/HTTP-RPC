@@ -5,8 +5,11 @@
 #include <csignal>
 #include <cstdio>
 #include <cstdlib>
+#include <memory>
+#include <vector>
 
 #include "shared/base/auth_interceptor.h"
+#include "shared/base/rpc_interceptor.h"
 #include "auth/auth_service_impl.h"
 #include "auth/sharing_service_impl.h"
 #include "auth/workspace_service_impl.h"
@@ -29,7 +32,9 @@ int main(int argc, char *argv[]) {
     int port = 50051;
     int mysql_shards = 1;
     std::string mysql_host = "mysql-auth", mysql_db = "rpc_auth";
-    std::string mysql_user = "root", mysql_password = "123456";
+    std::string mysql_user = "root";
+    const char *env_mysql_password = std::getenv("MYSQL_ROOT_PASSWORD");
+    std::string mysql_password = env_mysql_password ? env_mysql_password : "";
     int mysql_port = 3306;
     int db_min_idle = 2;
     int db_idle_timeout_sec = 300;
@@ -66,6 +71,14 @@ int main(int argc, char *argv[]) {
             db_min_idle = std::atoi(argv[++i]);
         else if (arg == "--db-idle-timeout-sec" && i + 1 < argc)
             db_idle_timeout_sec = std::atoi(argv[++i]);
+    }
+    if (mysql_password.empty()) {
+        fprintf(stderr, "FATAL: MYSQL_ROOT_PASSWORD or --mysql-password is required\n");
+        return 1;
+    }
+    if (!redis_cluster_seeds.empty() && redis_password.empty()) {
+        fprintf(stderr, "FATAL: REDIS_PASSWORD or --redis-password is required with Redis Cluster\n");
+        return 1;
     }
 
     auto db = std::make_unique<ShardedDatabase>(mysql_shards, mysql_host, mysql_port, mysql_host, mysql_port,
@@ -104,6 +117,9 @@ int main(int argc, char *argv[]) {
     builder.AddListeningPort(addr, grpc::InsecureServerCredentials());
     builder.SetMaxSendMessageSize(64 * 1024 * 1024);
     builder.SetMaxReceiveMessageSize(64 * 1024 * 1024);
+    std::vector<std::unique_ptr<grpc::experimental::ServerInterceptorFactoryInterface>> interceptors;
+    interceptors.push_back(std::make_unique<RpcAuthInterceptorFactory>(jwt_secret));
+    builder.experimental().SetInterceptorCreators(std::move(interceptors));
 
     builder.RegisterService(&health_monitor);
     AuthServiceImpl auth_service(jwt_secret, db.get());

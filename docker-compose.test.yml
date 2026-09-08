@@ -1,0 +1,63 @@
+services:
+  gateway-test:
+    image: golang:1.24-alpine
+    environment:
+      GOPROXY: https://goproxy.cn,direct
+    working_dir: /workspace/cmd/server
+    volumes:
+      - .:/workspace:ro
+      - gateway_go_cache:/go/pkg/mod
+      - gateway_build_cache:/root/.cache/go-build
+    command: sh -c "go test ./... -count=1"
+
+  points-test:
+    image: golang:1.24-alpine
+    environment:
+      GOPROXY: https://goproxy.cn,direct
+    working_dir: /workspace/services/points-server
+    volumes:
+      - .:/workspace:ro
+      - points_go_cache:/go/pkg/mod
+      - points_build_cache:/root/.cache/go-build
+    command: sh -c "go test ./... -count=1"
+
+  mall-test:
+    image: golang:1.24-alpine
+    environment:
+      GOPROXY: https://goproxy.cn,direct
+    working_dir: /workspace/services/mall-server
+    volumes:
+      - .:/workspace:ro
+      - mall_go_cache:/go/pkg/mod
+      - mall_build_cache:/root/.cache/go-build
+    command: sh -c "go test ./... -count=1"
+
+  notify-test:
+    image: golang:1.24-alpine
+    environment:
+      GOPROXY: https://goproxy.cn,direct
+    working_dir: /workspace/services/notify-service
+    volumes:
+      - .:/workspace:ro
+      - notify_go_cache:/go/pkg/mod
+      - notify_build_cache:/root/.cache/go-build
+    command: sh -c "go test ./... -count=1"
+
+  cpp-test:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: builder
+      args:
+        SERVICE: auth
+    command: sh -c "cd /src && cmake --build build --target cpp_test -j$$(nproc) && ./build/cpp_test"
+
+volumes:
+  gateway_go_cache:
+  gateway_build_cache:
+  points_go_cache:
+  points_build_cache:
+  mall_go_cache:
+  mall_build_cache:
+  notify_go_cache:
+  notify_build_cache:

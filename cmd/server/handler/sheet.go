@@ -25,14 +25,15 @@ func (h *Handlers) CreateSheet(c *gin.Context) {
 	}
 	resp, err := h.Sheet.CreateSpreadsheet(h.token(c.Request.Context(), c), &req)
 	if grpcErr(c, err, "create sheet failed") { return }
-	c.JSON(http.StatusOK, resp)
+	writeProtoJSON(c, http.StatusOK, resp)
 }
 
 func (h *Handlers) GetSheet(c *gin.Context) {
 	id := parseID(c)
+	if c.IsAborted() { return }
 	resp, err := h.Sheet.GetSpreadsheet(h.token(c.Request.Context(), c), &pb.GetSpreadsheetRequest{Id: id})
 	if grpcErr(c, err, "Not found") { return }
-	c.JSON(http.StatusOK, resp)
+	writeProtoJSON(c, http.StatusOK, resp)
 }
 
 func (h *Handlers) ListSheets(c *gin.Context) {
@@ -41,11 +42,12 @@ func (h *Handlers) ListSheets(c *gin.Context) {
 		&pb.ListSpreadsheetsRequest{UserId: 0},
 	)
 	if grpcErr(c, err, "list sheets failed") { return }
-	c.JSON(http.StatusOK, resp)
+	writeProtoJSON(c, http.StatusOK, resp)
 }
 
 func (h *Handlers) UpdateSheet(c *gin.Context) {
 	id := parseID(c)
+	if c.IsAborted() { return }
 	var req pb.UpdateSpreadsheetRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "invalid request body"})
@@ -56,10 +58,10 @@ func (h *Handlers) UpdateSheet(c *gin.Context) {
 	resp, err := h.Sheet.UpdateSpreadsheet(h.token(c.Request.Context(), c), &req)
 	if grpcErr(c, err, "update sheet failed") { return }
 	if !resp.GetSuccess() {
-		c.JSON(http.StatusForbidden, resp)
+		writeProtoJSON(c, http.StatusForbidden, resp)
 		return
 	}
-	c.JSON(http.StatusOK, resp)
+	writeProtoJSON(c, http.StatusOK, resp)
 
 	h.broadcastRoom("sheet:"+strconv.FormatInt(id, 10), "sheet.updated", map[string]interface{}{
 		"user": h.username(c),
@@ -68,12 +70,13 @@ func (h *Handlers) UpdateSheet(c *gin.Context) {
 
 func (h *Handlers) DeleteSheet(c *gin.Context) {
 	id := parseID(c)
+	if c.IsAborted() { return }
 	resp, err := h.Sheet.DeleteSpreadsheet(
 		h.token(c.Request.Context(), c),
 		&pb.DeleteSpreadsheetRequest{Id: id, UserId: h.uid(c)},
 	)
 	if grpcErr(c, err, "delete sheet failed") { return }
-	c.JSON(http.StatusOK, resp)
+	writeProtoJSON(c, http.StatusOK, resp)
 }
 
 func (h *Handlers) RegisterSheetRoutes(auth *gin.RouterGroup) {

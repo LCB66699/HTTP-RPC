@@ -10,6 +10,10 @@ on:
       - "deploy/nginx/nginx.frontend.conf"
       - "docker-compose.frontend.yml"
       - "docker-compose.local-verify.yml"
+      - "cmd/server/**"
+      - "server/**"
+      - "proto/**"
+      - "test/e2e/playwright/**"
       - ".github/workflows/ci-frontend.yml"
   pull_request:
     paths:
@@ -19,6 +23,10 @@ on:
       - "deploy/nginx/nginx.frontend.conf"
       - "docker-compose.frontend.yml"
       - "docker-compose.local-verify.yml"
+      - "cmd/server/**"
+      - "server/**"
+      - "proto/**"
+      - "test/e2e/playwright/**"
       - ".github/workflows/ci-frontend.yml"
 
 jobs:

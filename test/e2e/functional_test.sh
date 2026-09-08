@@ -297,29 +297,25 @@ echo "$FDEL" | grep -q '"success":true' \
 title "5. Token 刷新 (RefreshToken)"
 sleep 3
 
-REFRESH_LOGIN=$(curl -sk -X POST "$API/api/v1/login" \
-    -H 'Content-Type: application/json' \
-    -d "{\"username\":\"$TEST_USER\",\"password\":\"test1234\"}")
-REFRESH_TOKEN=$(echo "$REFRESH_LOGIN" | python3 -c "import sys,json; print(json.load(sys.stdin).get('refresh_token',''))" 2>/dev/null)
+REFRESH_HEADERS="/tmp/rpc_refresh_hdr_$$"
+REFRESH_LOGIN=$($CURL -X POST "$API/api/v1/refresh" \
+    -b "$JAR" -c "$JAR" -D "$REFRESH_HEADERS")
+REFRESH_TOKEN=$(extract_token "$REFRESH_HEADERS")
 [ -n "$REFRESH_TOKEN" ] \
-    && green "Refresh token captured: ${REFRESH_TOKEN:0:8}..." \
-    || red "No refresh_token in login response"
+    && green "Refresh rotates the HttpOnly access cookie" \
+    || red "Refresh did not set rpc_at"
 
 if [ -n "$REFRESH_TOKEN" ]; then
     title "5.1 POST /api/v1/refresh"
-    REFRESH_RESP=$($CURL -X POST "$API/api/v1/refresh" \
-        -H 'Content-Type: application/json' \
-        -b "$JAR" \
-        -d "{\"username\":\"$TEST_USER\",\"refresh_token\":\"$REFRESH_TOKEN\"}")
-    echo "DEBUG[refresh] resp=$REFRESH_RESP"
-    NEW_AT=$(echo "$REFRESH_RESP" | python3 -c "import sys,json; print(json.load(sys.stdin).get('access_token',''))" 2>/dev/null)
+    REFRESH_RESP="$REFRESH_LOGIN"
+    NEW_AT="$REFRESH_TOKEN"
     if [ -n "$NEW_AT" ]; then
-        green "Token refresh OK (new access_token: ${NEW_AT:0:8}...)"
+        green "Cookie-based token refresh OK"
         title "5.2 新 token 验证"
         NEW_RESP=$(curl -sk -w "\n%{http_code}" -H "Cookie: rpc_at=$NEW_AT" "$API/api/v1/sheets?page=0&page_size=1" 2>/dev/null)
         NEW_CODE=$(echo "$NEW_RESP" | tail -1)
         NEW_BODY=$(echo "$NEW_RESP" | head -n -1)
-        echo "DEBUG: NEW_AT len=${#NEW_AT} first8=${NEW_AT:0:8} code=$NEW_CODE body=$NEW_BODY"
+        echo "DEBUG: refreshed cookie accepted with code=$NEW_CODE"
         [ "$NEW_CODE" = "200" ] \
             && green "Refreshed token accepted" \
             || red "Refreshed token rejected (got $NEW_CODE)"

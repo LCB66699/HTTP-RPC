@@ -33,7 +33,7 @@ func (h *Handlers) CreateWorkspace(c *gin.Context) {
 	if grpcErr(c, err, "create workspace failed") {
 		return
 	}
-	c.JSON(http.StatusOK, resp)
+	writeProtoJSON(c, http.StatusOK, resp)
 }
 
 func (h *Handlers) ListWorkspaces(c *gin.Context) {
@@ -44,20 +44,26 @@ func (h *Handlers) ListWorkspaces(c *gin.Context) {
 	if grpcErr(c, err, "list workspaces failed") {
 		return
 	}
-	c.JSON(http.StatusOK, resp)
+	writeProtoJSON(c, http.StatusOK, resp)
 }
 
 func (h *Handlers) GetWorkspace(c *gin.Context) {
 	id := parseID(c)
+	if c.IsAborted() {
+		return
+	}
 	resp, err := h.Workspace.Get(h.token(c.Request.Context(), c), &pb.GetWorkspaceRequest{Id: id})
 	if grpcErr(c, err, "get workspace failed") {
 		return
 	}
-	c.JSON(http.StatusOK, resp)
+	writeProtoJSON(c, http.StatusOK, resp)
 }
 
 func (h *Handlers) UpdateWorkspace(c *gin.Context) {
 	id := parseID(c)
+	if c.IsAborted() {
+		return
+	}
 	var body struct{ Name string `json:"name"` }
 	if err := c.ShouldBindJSON(&body); err != nil || body.Name == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "name required"})
@@ -67,20 +73,26 @@ func (h *Handlers) UpdateWorkspace(c *gin.Context) {
 	if grpcErr(c, err, "update workspace failed") {
 		return
 	}
-	c.JSON(http.StatusOK, resp)
+	writeProtoJSON(c, http.StatusOK, resp)
 }
 
 func (h *Handlers) DeleteWorkspace(c *gin.Context) {
 	id := parseID(c)
+	if c.IsAborted() {
+		return
+	}
 	resp, err := h.Workspace.Delete(h.token(c.Request.Context(), c), &pb.DeleteWorkspaceRequest{Id: id})
 	if grpcErr(c, err, "delete workspace failed") {
 		return
 	}
-	c.JSON(http.StatusOK, resp)
+	writeProtoJSON(c, http.StatusOK, resp)
 }
 
 func (h *Handlers) AddWorkspaceMember(c *gin.Context) {
 	id := parseID(c)
+	if c.IsAborted() {
+		return
+	}
 	var body struct {
 		Username string `json:"username"`
 		Role     string `json:"role"`
@@ -95,17 +107,24 @@ func (h *Handlers) AddWorkspaceMember(c *gin.Context) {
 	if grpcErr(c, err, "add member failed") {
 		return
 	}
-	c.JSON(http.StatusOK, resp)
+	writeProtoJSON(c, http.StatusOK, resp)
 }
 
 func (h *Handlers) RemoveWorkspaceMember(c *gin.Context) {
 	id := parseID(c)
-	uidParam, _ := strconv.ParseInt(c.Param("uid"), 10, 64)
+	if c.IsAborted() {
+		return
+	}
+	uidParam, err := strconv.ParseInt(c.Param("uid"), 10, 64)
+	if err != nil || uidParam <= 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "invalid uid"})
+		return
+	}
 	resp, err := h.Workspace.RemoveMember(h.token(c.Request.Context(), c), &pb.RemoveMemberRequest{
 		Id: id, UserId: uidParam,
 	})
 	if grpcErr(c, err, "remove member failed") {
 		return
 	}
-	c.JSON(http.StatusOK, resp)
+	writeProtoJSON(c, http.StatusOK, resp)
 }

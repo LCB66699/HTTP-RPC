@@ -22,6 +22,7 @@ type mockAuthClient struct {
 	refreshFn   func(context.Context, *pb.RefreshTokenRequest, ...grpc.CallOption) (*pb.RefreshTokenResponse, error)
 	chgPwdFn    func(context.Context, *pb.ChangePasswordRequest, ...grpc.CallOption) (*pb.ChangePasswordResponse, error)
 	phoneLoginFn func(context.Context, *pb.PhoneLoginRequest, ...grpc.CallOption) (*pb.LoginResponse, error)
+	validateFn  func(context.Context, *pb.ValidateUserRequest, ...grpc.CallOption) (*pb.ValidateUserResponse, error)
 }
 
 func (m *mockAuthClient) Login(ctx context.Context, req *pb.LoginRequest, opts ...grpc.CallOption) (*pb.LoginResponse, error) {
@@ -44,7 +45,10 @@ func (m *mockAuthClient) LoginByPhone(ctx context.Context, req *pb.PhoneLoginReq
 	if m.phoneLoginFn != nil { return m.phoneLoginFn(ctx, req, opts...) }
 	return nil, nil
 }
-func (m *mockAuthClient) ValidateUser(ctx context.Context, req *pb.ValidateUserRequest, opts ...grpc.CallOption) (*pb.ValidateUserResponse, error) { return nil, nil }
+func (m *mockAuthClient) ValidateUser(ctx context.Context, req *pb.ValidateUserRequest, opts ...grpc.CallOption) (*pb.ValidateUserResponse, error) {
+	if m.validateFn != nil { return m.validateFn(ctx, req, opts...) }
+	return nil, nil
+}
 func (m *mockAuthClient) SendOTP(ctx context.Context, req *pb.SendOTPRequest, opts ...grpc.CallOption) (*pb.SendOTPResponse, error) { return nil, nil }
 func (m *mockAuthClient) BindPhone(ctx context.Context, req *pb.BindPhoneRequest, opts ...grpc.CallOption) (*pb.BindPhoneResponse, error) { return nil, nil }
 func (m *mockAuthClient) UpdateProfile(ctx context.Context, req *pb.UpdateProfileRequest, opts ...grpc.CallOption) (*pb.UpdateProfileResponse, error) { return nil, nil }
@@ -146,6 +150,33 @@ type mockSearchClient struct {
 	searchFn func(context.Context, *pb.SearchRequest, ...grpc.CallOption) (*pb.SearchResponse, error)
 }
 
+type mockWorkspaceClient struct {
+	addMemberFn func(context.Context, *pb.AddMemberRequest, ...grpc.CallOption) (*pb.WorkspaceResponse, error)
+}
+
+func (m *mockWorkspaceClient) Create(context.Context, *pb.CreateWorkspaceRequest, ...grpc.CallOption) (*pb.WorkspaceResponse, error) {
+	return nil, nil
+}
+func (m *mockWorkspaceClient) Get(context.Context, *pb.GetWorkspaceRequest, ...grpc.CallOption) (*pb.WorkspaceResponse, error) {
+	return nil, nil
+}
+func (m *mockWorkspaceClient) List(context.Context, *pb.ListWorkspacesRequest, ...grpc.CallOption) (*pb.ListWorkspacesResponse, error) {
+	return nil, nil
+}
+func (m *mockWorkspaceClient) Update(context.Context, *pb.UpdateWorkspaceRequest, ...grpc.CallOption) (*pb.WorkspaceResponse, error) {
+	return nil, nil
+}
+func (m *mockWorkspaceClient) Delete(context.Context, *pb.DeleteWorkspaceRequest, ...grpc.CallOption) (*pb.DeleteWorkspaceResponse, error) {
+	return nil, nil
+}
+func (m *mockWorkspaceClient) AddMember(ctx context.Context, req *pb.AddMemberRequest, opts ...grpc.CallOption) (*pb.WorkspaceResponse, error) {
+	if m.addMemberFn != nil { return m.addMemberFn(ctx, req, opts...) }
+	return nil, nil
+}
+func (m *mockWorkspaceClient) RemoveMember(context.Context, *pb.RemoveMemberRequest, ...grpc.CallOption) (*pb.WorkspaceResponse, error) {
+	return nil, nil
+}
+
 func (m *mockSearchClient) Search(ctx context.Context, req *pb.SearchRequest, opts ...grpc.CallOption) (*pb.SearchResponse, error) {
 	if m.searchFn != nil { return m.searchFn(ctx, req, opts...) }
 	return nil, nil
@@ -181,6 +212,12 @@ func TestLoginSuccess(t *testing.T) {
 	r.ServeHTTP(w, req)
 
 	if w.Code != http.StatusOK { t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String()) }
+	if strings.Contains(w.Body.String(), "\"access_token\"") || strings.Contains(w.Body.String(), "\"refresh_token\"") {
+		t.Fatalf("authentication tokens must only be delivered in cookies: %s", w.Body.String())
+	}
+	if len(w.Result().Cookies()) == 0 {
+		t.Fatal("expected HttpOnly authentication cookies")
+	}
 }
 
 func TestLoginWrongPassword(t *testing.T) {
@@ -245,6 +282,62 @@ func TestLoginGrpcUnavailable(t *testing.T) {
 	if w.Code != http.StatusServiceUnavailable { t.Fatalf("expected 503, got %d", w.Code) }
 }
 
+func TestRefreshUsesHttpOnlyCookie(t *testing.T) {
+	h := newTestHandlers()
+	var got *pb.RefreshTokenRequest
+	h.Auth = &mockAuthClient{
+		refreshFn: func(ctx context.Context, req *pb.RefreshTokenRequest, opts ...grpc.CallOption) (*pb.RefreshTokenResponse, error) {
+			got = req
+			return &pb.RefreshTokenResponse{Success: true, AccessToken: "new-access"}, nil
+		},
+	}
+
+	r := setupGin()
+	r.POST("/refresh", h.Refresh)
+	w := httptest.NewRecorder()
+	req, _ := http.NewRequest("POST", "/refresh", strings.NewReader(""))
+	req.AddCookie(&http.Cookie{Name: "rpc_rt", Value: "refresh-cookie"})
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK { t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String()) }
+	if got == nil || got.GetRefreshToken() != "refresh-cookie" || got.GetUsername() != "" {
+		t.Fatalf("expected cookie-only refresh request, got %#v", got)
+	}
+	var accessCookie *http.Cookie
+	for _, cookie := range w.Result().Cookies() {
+		if cookie.Name == "rpc_at" {
+			accessCookie = cookie
+			break
+		}
+	}
+	if accessCookie == nil || accessCookie.Value != "new-access" {
+		t.Fatalf("expected refreshed access cookie, got %#v", accessCookie)
+	}
+}
+
+func TestRefreshInvalidTokenReturnsUnauthorized(t *testing.T) {
+	h := newTestHandlers()
+	h.Auth = &mockAuthClient{
+		refreshFn: func(ctx context.Context, req *pb.RefreshTokenRequest, opts ...grpc.CallOption) (*pb.RefreshTokenResponse, error) {
+			return &pb.RefreshTokenResponse{Success: false, Error: "Invalid refresh token"}, nil
+		},
+	}
+
+	r := setupGin()
+	r.POST("/refresh", h.Refresh)
+	w := httptest.NewRecorder()
+	req, _ := http.NewRequest("POST", "/refresh", strings.NewReader(""))
+	req.AddCookie(&http.Cookie{Name: "rpc_rt", Value: "invalid"})
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusUnauthorized { t.Fatalf("expected 401, got %d: %s", w.Code, w.Body.String()) }
+	for _, cookie := range w.Result().Cookies() {
+		if cookie.Name == "rpc_at" {
+			t.Fatalf("invalid refresh must not issue an access cookie")
+		}
+	}
+}
+
 func TestRegisterSuccess(t *testing.T) {
 	h := newTestHandlers()
 	h.Auth = &mockAuthClient{
@@ -261,6 +354,9 @@ func TestRegisterSuccess(t *testing.T) {
 	r.ServeHTTP(w, req)
 
 	if w.Code != http.StatusOK { t.Fatalf("expected 200, got %d", w.Code) }
+	if strings.Contains(w.Body.String(), "\"access_token\"") || strings.Contains(w.Body.String(), "\"refresh_token\"") {
+		t.Fatalf("authentication tokens must only be delivered in cookies: %s", w.Body.String())
+	}
 }
 
 func TestRegisterUsernameTooShort(t *testing.T) {
@@ -313,7 +409,7 @@ func TestSheetCreateSuccess(t *testing.T) {
 	h := newTestHandlers()
 	h.Sheet = &mockSheetClient{
 		createFn: func(ctx context.Context, req *pb.CreateSpreadsheetRequest, opts ...grpc.CallOption) (*pb.CreateSpreadsheetResponse, error) {
-			return &pb.CreateSpreadsheetResponse{Success: true, Id: 1}, nil
+			return &pb.CreateSpreadsheetResponse{Success: true, Id: 90652009677533184}, nil
 		},
 	}
 	r := setupGin()
@@ -324,6 +420,9 @@ func TestSheetCreateSuccess(t *testing.T) {
 	r.ServeHTTP(w, req)
 
 	if w.Code != http.StatusOK { t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String()) }
+	if !strings.Contains(w.Body.String(), `"id":"90652009677533184"`) {
+		t.Fatalf("int64 IDs must be serialized as strings: %s", w.Body.String())
+	}
 }
 
 func TestSheetCreateValidation(t *testing.T) {

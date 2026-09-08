@@ -10,6 +10,7 @@ import (
 
 func (h *Handlers) ShareSheet(c *gin.Context) {
 	id := parseID(c)
+	if c.IsAborted() { return }
 	var body struct {
 		Username   string `json:"username"`
 		Permission string `json:"permission"`
@@ -23,36 +24,39 @@ func (h *Handlers) ShareSheet(c *gin.Context) {
 		GranteeUsername: body.Username, Permission: body.Permission,
 	})
 	if grpcErr(c, err, "sharing operation failed") { return }
-	c.JSON(http.StatusOK, resp)
+	writeProtoJSON(c, http.StatusOK, resp)
 }
 
 func (h *Handlers) RevokeShare(c *gin.Context) {
 	id := parseID(c)
+	if c.IsAborted() { return }
 	username := c.Param("username")
 	resp, err := h.Share.Revoke(h.token(c.Request.Context(), c), &pb.RevokeRequest{
 		OwnerId: h.uid(c), ResourceType: "sheet", ResourceId: id,
 		GranteeUsername: username,
 	})
 	if grpcErr(c, err, "sharing operation failed") { return }
-	c.JSON(http.StatusOK, resp)
+	writeProtoJSON(c, http.StatusOK, resp)
 }
 
 func (h *Handlers) ListShares(c *gin.Context) {
 	id := parseID(c)
+	if c.IsAborted() { return }
 	resp, err := h.Share.ListShares(h.token(c.Request.Context(), c), &pb.ResourceRequest{
 		OwnerId: h.uid(c), ResourceType: "sheet", ResourceId: id,
 	})
 	if grpcErr(c, err, "sharing operation failed") { return }
-	c.JSON(http.StatusOK, resp)
+	writeProtoJSON(c, http.StatusOK, resp)
 }
 
 func (h *Handlers) CreateShareLink(c *gin.Context) {
 	id := parseID(c)
+	if c.IsAborted() { return }
 	resp, err := h.Share.CreateShareLink(h.token(c.Request.Context(), c), &pb.ShareLinkRequest{
 		OwnerId: h.uid(c), ResourceType: "sheet", ResourceId: id, Permission: "view",
 	})
 	if grpcErr(c, err, "sharing operation failed") { return }
-	c.JSON(http.StatusOK, resp)
+	writeProtoJSON(c, http.StatusOK, resp)
 }
 
 func (h *Handlers) RegisterSharingRoutes(public, auth *gin.RouterGroup) {

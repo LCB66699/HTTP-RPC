@@ -1,5 +1,7 @@
+export type ResourceId = string | number
+
 export interface User {
-  user_id: number
+  user_id: ResourceId
   username: string
   role?: string
 }
@@ -12,7 +14,7 @@ export interface LoginInput {
 export interface LoginResponse {
   success: boolean
   username?: string
-  user_id?: number
+  user_id?: ResourceId
   role?: string
   error?: string
 }
@@ -34,7 +36,7 @@ export interface HealthState {
 }
 
 export interface Sheet {
-  id: number
+  id: ResourceId
   name: string
   description?: string
   headers_json: string | string[]
@@ -53,18 +55,18 @@ export interface SheetListResponse {
 export interface SheetResponse {
   success: boolean
   spreadsheet?: Sheet
-  id?: number
+  id?: ResourceId
   cache_source?: string
   error?: string
 }
 
 export interface FileEntry {
-  id: number
+  id: ResourceId
   original_name: string
   size?: number
   mime_type?: string
   is_folder?: boolean
-  parent_folder_id?: number
+  parent_folder_id?: ResourceId
   created_at?: string
 }
 
@@ -75,16 +77,31 @@ export interface FileListResponse {
 }
 
 export interface WorkspaceMember {
-  user_id: number
+  user_id: ResourceId
   username?: string
   role?: string
 }
 
-export interface Workspace {
-  id: number
-  name: string
-  owner_id: number
+export interface WorkspaceDetailResponse {
+  success?: boolean
+  workspace?: Workspace
   members?: WorkspaceMember[]
+  error?: string
+}
+
+export interface Workspace {
+  id: ResourceId
+  name: string
+  owner_id: ResourceId
+  members?: WorkspaceMember[]
+}
+
+export type SharePermission = 'view' | 'edit'
+
+export interface ShareEntry {
+  username: string
+  permission: SharePermission
+  granted_at?: string
 }
 
 export interface Product {
@@ -187,7 +204,7 @@ export function createApiClient(fetcher: Fetcher) {
 
     if (!response.ok) throw new ApiError(response.status, await errorMessage(response))
     if (response.status === 204) return undefined as T
-    return response.json() as Promise<T>
+    return JSON.parse(await response.text()) as T
   }
 
   const json = <T>(path: string, method: 'POST' | 'PUT' | 'DELETE', body?: unknown, idempotent = false) =>
@@ -217,12 +234,20 @@ export function createApiClient(fetcher: Fetcher) {
     changePassword: (old_password: string, new_password: string) =>
       json<{ success: boolean; error?: string }>('/me/password', 'PUT', { old_password, new_password }),
     listSheets: () => request<SheetListResponse>('/sheets'),
-    getSheet: (id: number) => request<SheetResponse>(`/sheets/${id}`),
+    getSheet: (id: ResourceId) => request<SheetResponse>(`/sheets/${id}`),
     createSheet: (sheet: Pick<Sheet, 'name' | 'description' | 'headers_json' | 'data_json'>) =>
       json<SheetResponse>('/sheets', 'POST', sheet, true),
-    updateSheet: (id: number, sheet: Pick<Sheet, 'name' | 'description' | 'headers_json' | 'data_json'>) =>
+    updateSheet: (id: ResourceId, sheet: Pick<Sheet, 'name' | 'description' | 'headers_json' | 'data_json'>) =>
       json<SheetResponse>(`/sheets/${id}`, 'PUT', sheet),
-    deleteSheet: (id: number) => json<{ success: boolean; error?: string }>(`/sheets/${id}`, 'DELETE'),
+    deleteSheet: (id: ResourceId) => json<{ success: boolean; error?: string }>(`/sheets/${id}`, 'DELETE'),
+    shareSheet: (id: ResourceId, username: string, permission: SharePermission) =>
+      json<{ success: boolean; error?: string }>(`/sheets/${id}/share`, 'POST', { username, permission }),
+    listSheetShares: (id: ResourceId) =>
+      request<{ success?: boolean; entries?: ShareEntry[]; error?: string }>(`/sheets/${id}/share`),
+    revokeSheetShare: (id: ResourceId, username: string) =>
+      json<{ success: boolean; error?: string }>(`/sheets/${id}/share/${encodeURIComponent(username)}`, 'DELETE'),
+    createSheetShareLink: (id: ResourceId) =>
+      json<{ success: boolean; token?: string; error?: string }>(`/sheets/${id}/share-link`, 'POST'),
     listFiles: () => request<FileListResponse>('/files'),
     uploadFile: (file: File) => {
       const form = new FormData()
@@ -233,19 +258,19 @@ export function createApiClient(fetcher: Fetcher) {
         body: form
       })
     },
-    deleteFile: (id: number) => json<{ success: boolean; error?: string }>(`/files/${id}`, 'DELETE'),
+    deleteFile: (id: ResourceId) => json<{ success: boolean; error?: string }>(`/files/${id}`, 'DELETE'),
     createFolder: (name: string, parent_folder_id = 0) =>
       json<{ success: boolean; error?: string }>('/files/folder', 'POST', { name, parent_folder_id }),
-    moveFile: (id: number, target_folder_id: number) =>
+    moveFile: (id: ResourceId, target_folder_id: ResourceId) =>
       json<{ success: boolean; error?: string }>(`/files/${id}/move`, 'PUT', { target_folder_id }),
     listWorkspaces: () => request<{ success?: boolean; workspaces?: Workspace[] }>('/workspaces'),
-    getWorkspace: (id: number) => request<{ success?: boolean; workspace?: Workspace }>(`/workspaces/${id}`),
+    getWorkspace: (id: ResourceId) => request<WorkspaceDetailResponse>(`/workspaces/${id}`),
     createWorkspace: (name: string) => json<{ success: boolean; error?: string }>('/workspaces', 'POST', { name }),
-    updateWorkspace: (id: number, name: string) => json<{ success: boolean; error?: string }>(`/workspaces/${id}`, 'PUT', { name }),
-    deleteWorkspace: (id: number) => json<{ success: boolean; error?: string }>(`/workspaces/${id}`, 'DELETE'),
-    addWorkspaceMember: (id: number, username: string, role: string) =>
+    updateWorkspace: (id: ResourceId, name: string) => json<{ success: boolean; error?: string }>(`/workspaces/${id}`, 'PUT', { name }),
+    deleteWorkspace: (id: ResourceId) => json<{ success: boolean; error?: string }>(`/workspaces/${id}`, 'DELETE'),
+    addWorkspaceMember: (id: ResourceId, username: string, role: string) =>
       json<{ success: boolean; error?: string }>(`/workspaces/${id}/members`, 'POST', { username, role }),
-    removeWorkspaceMember: (id: number, userId: number) =>
+    removeWorkspaceMember: (id: ResourceId, userId: ResourceId) =>
       json<{ success: boolean; error?: string }>(`/workspaces/${id}/members/${userId}`, 'DELETE'),
     getBalance: () => request<{ success?: boolean; balance?: number }>('/points/balance'),
     getTransactions: () => request<{ success?: boolean; transactions?: Transaction[] }>('/points/transactions'),
