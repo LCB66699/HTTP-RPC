@@ -35,6 +35,8 @@ jobs:
     timeout-minutes: 60
     env:
       COMPOSE_FILE: docker-compose.yml:docker-compose.frontend.yml
+      RABBITMQ_PASSWORD: ci-${{ github.run_id }}-${{ github.run_attempt }}
+      GRAFANA_ADMIN_PASSWORD: ci-${{ github.run_id }}-${{ github.run_attempt }}
     steps:
       - uses: actions/checkout@v4
 
