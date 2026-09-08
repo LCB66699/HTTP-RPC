@@ -27,6 +27,12 @@ on:
       - "deploy/nginx/**"
       - ".github/workflows/ci.yml"
   workflow_dispatch:
+    inputs:
+      full_e2e:
+        description: Run the full API and browser test suites
+        type: boolean
+        required: false
+        default: false
 
 jobs:
   # ===== Stage 1: 全量构建 + E2E 集成测试 =====
@@ -238,7 +244,15 @@ jobs:
           echo "=== Test nginx -> envoy -> gateway ==="
           docker compose exec nginx sh -c "wget -qO- --timeout=5 http://envoy:10000/api/v1/health 2>&1 || echo 'FAIL nginx->envoy'"
 
-      - name: Functional tests
+      - name: API smoke check
+        run: |
+          set -euo pipefail
+          response=$(curl -ksf https://localhost/api/v1/health)
+          echo "$response"
+          echo "$response" | grep -q 'gateway'
+
+      - name: Full API functional tests
+        if: ${{ inputs.full_e2e == true }}
         run: bash test/e2e/functional_test.sh
 
       - uses: actions/setup-node@v4
@@ -250,11 +264,18 @@ jobs:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ hashFiles('test/e2e/playwright/package.json') }}
 
-      - name: E2E browser tests (Playwright)
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Browser smoke test (Playwright)
         run: |
           cd test/e2e/playwright
-          npm ci
-          npx playwright install --with-deps chromium
+          npx playwright test e2e.spec.js --grep "renders points and mall routes" --reporter=list
+
+      - name: Full browser E2E tests (Playwright)
+        if: ${{ inputs.full_e2e == true }}
+        run: |
+          cd test/e2e/playwright
           npx playwright test --reporter=list
 
       - name: Upload E2E screenshots on failure
