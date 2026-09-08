@@ -9,6 +9,7 @@ on:
       - "Dockerfile.nginx"
       - "deploy/nginx/nginx.frontend.conf"
       - "docker-compose.frontend.yml"
+      - "docker-compose.local-verify.yml"
       - ".github/workflows/ci-frontend.yml"
   pull_request:
     paths:
@@ -17,6 +18,7 @@ on:
       - "Dockerfile.nginx"
       - "deploy/nginx/nginx.frontend.conf"
       - "docker-compose.frontend.yml"
+      - "docker-compose.local-verify.yml"
       - ".github/workflows/ci-frontend.yml"
 
 jobs:
