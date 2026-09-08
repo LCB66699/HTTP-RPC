@@ -309,25 +309,79 @@ jobs:
   deploy:
     needs: push
     if: github.ref == 'refs/heads/main'
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, Windows, X64, docker-desktop]
+    environment: production
+    permissions:
+      contents: read
+      packages: read
+    env:
+      DOCKER_USER: ghcr.io/lcb66699/http-rpc
+      JWT_SECRET: ${{ secrets.JWT_SECRET }}
+      REDIS_PASSWORD: ${{ secrets.REDIS_PASSWORD }}
+      MYSQL_ROOT_PASSWORD: ${{ secrets.MYSQL_ROOT_PASSWORD }}
+      MINIO_ACCESS_KEY: ${{ secrets.MINIO_ACCESS_KEY }}
+      MINIO_ROOT_PASSWORD: ${{ secrets.MINIO_ROOT_PASSWORD }}
+      RABBITMQ_PASSWORD: ${{ secrets.RABBITMQ_PASSWORD }}
+      GRAFANA_ADMIN_PASSWORD: ${{ secrets.GRAFANA_ADMIN_PASSWORD }}
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
 
-      - name: SSH deploy to server
-        uses: appleboy/ssh-action@v1
+      - name: Validate deployment secrets
+        shell: pwsh
+        run: |
+          $required = @(
+            'JWT_SECRET',
+            'REDIS_PASSWORD',
+            'MYSQL_ROOT_PASSWORD',
+            'MINIO_ACCESS_KEY',
+            'MINIO_ROOT_PASSWORD',
+            'RABBITMQ_PASSWORD',
+            'GRAFANA_ADMIN_PASSWORD'
+          )
+          $missing = @($required | Where-Object { [string]::IsNullOrWhiteSpace([Environment]::GetEnvironmentVariable($_)) })
+          if ($missing.Count -gt 0) {
+            throw "Missing production secrets: $($missing -join ', ')"
+          }
+
+      - name: Check Docker Desktop
+        shell: pwsh
+        run: |
+          docker version
+          docker compose version
+
+      - name: Login to GHCR
+        uses: docker/login-action@v3
         with:
-          host: ${{ secrets.SERVER_HOST }}
-          username: ${{ secrets.SSH_USER }}
-          key: ${{ secrets.SSH_KEY }}
-          script: |
-            cd /opt/http-rpc || exit 1
-            docker compose pull
-            docker compose up -d --remove-orphans
-            echo "=== Deploy done ==="
-            docker compose ps
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build local edge and frontend images
+        shell: pwsh
+        run: docker compose -f docker-compose.yml -f docker-compose.frontend.yml build envoy envoy-2 elasticsearch nginx
+
+      - name: Pull application images
+        shell: pwsh
+        run: docker compose -f docker-compose.yml -f docker-compose.frontend.yml pull base-runtime auth-1 sheet-1 file-1 search grpc-gateway notify-service points-server mall-server
+
+      - name: Start application stack
+        shell: pwsh
+        run: |
+          $compose = @('-f', 'docker-compose.yml', '-f', 'docker-compose.frontend.yml')
+          docker compose @compose up -d --no-build --remove-orphans
+          docker compose @compose ps
+
+      - name: Show deployment diagnostics on failure
+        if: failure()
+        shell: pwsh
+        run: |
+          $compose = @('-f', 'docker-compose.yml', '-f', 'docker-compose.frontend.yml')
+          docker compose @compose ps -a
+          docker compose @compose logs --tail 100
 
       - name: Generate deploy-local.sh
+        if: ${{ false }}
         run: |
           cat > deploy-local.sh << 'SCRIPT'
           #!/usr/bin/env bash
@@ -377,6 +431,7 @@ jobs:
           chmod +x deploy-local.sh
 
       - name: Upload deploy-local.sh as artifact
+        if: ${{ false }}
         uses: actions/upload-artifact@v4
         with:
           name: deploy-local-script
