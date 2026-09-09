@@ -11,6 +11,7 @@ on:
       - "test/e2e/**"
       - "Dockerfile.nginx"
       - "docker-compose.yml"
+      - "docker-compose.frontend.yml"
       - "deploy/nginx/**"
       - ".github/workflows/ci.yml"
   pull_request:
@@ -22,6 +23,7 @@ on:
       - "test/e2e/**"
       - "Dockerfile.nginx"
       - "docker-compose.yml"
+      - "docker-compose.frontend.yml"
       - "deploy/nginx/**"
       - ".github/workflows/ci.yml"
   workflow_dispatch:
@@ -48,6 +50,13 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
+      - name: Select Compose frontend configuration
+        shell: bash
+        run: |
+          if [[ -f docker-compose.frontend.yml ]]; then
+            echo 'COMPOSE_FILE=docker-compose.yml:docker-compose.frontend.yml' >> "$GITHUB_ENV"
+          fi
+
       - name: Free disk
         run: sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc
 
@@ -60,7 +69,7 @@ jobs:
 
       - name: Pull upstream images (with retry)
         run: |
-          IMAGES="nginx redis-cluster-1 redis-cluster-2 redis-cluster-3 \
+          IMAGES="redis-cluster-1 redis-cluster-2 redis-cluster-3 \
                   redis-cluster-4 redis-cluster-5 redis-cluster-6 \
                   mysql-auth mysql-spreadsheet-0 mysql-spreadsheet-1 \
                   mysql-file-0 mysql-file-1 minio elasticsearch jaeger"
@@ -379,12 +388,22 @@ jobs:
 
       - name: Pull application images
         shell: powershell
-        run: docker compose -f docker-compose.yml -f docker-compose.ci.yml pull
+        run: |
+          $compose = @('-f', 'docker-compose.yml')
+          if (Test-Path 'docker-compose.frontend.yml') {
+            $compose += @('-f', 'docker-compose.frontend.yml')
+          }
+          $compose += @('-f', 'docker-compose.ci.yml')
+          docker compose @compose pull
 
       - name: Start application stack
         shell: powershell
         run: |
-          $compose = @('-f', 'docker-compose.yml', '-f', 'docker-compose.ci.yml')
+          $compose = @('-f', 'docker-compose.yml')
+          if (Test-Path 'docker-compose.frontend.yml') {
+            $compose += @('-f', 'docker-compose.frontend.yml')
+          }
+          $compose += @('-f', 'docker-compose.ci.yml')
           docker compose @compose up -d --no-build --remove-orphans --wait --wait-timeout 300
           $health = curl.exe -kfsS --retry 5 --retry-all-errors https://localhost/api/v1/health
           if ($health -notmatch '"gateway"') {
@@ -397,7 +416,11 @@ jobs:
         if: failure()
         shell: powershell
         run: |
-          $compose = @('-f', 'docker-compose.yml', '-f', 'docker-compose.ci.yml')
+          $compose = @('-f', 'docker-compose.yml')
+          if (Test-Path 'docker-compose.frontend.yml') {
+            $compose += @('-f', 'docker-compose.frontend.yml')
+          }
+          $compose += @('-f', 'docker-compose.ci.yml')
           docker compose @compose ps -a
           docker compose @compose logs --tail 100
 
