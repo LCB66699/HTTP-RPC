@@ -395,7 +395,12 @@ jobs:
         shell: powershell
         run: |
           $compose = @('-f', 'docker-compose.yml', '-f', 'docker-compose.frontend.yml', '-f', 'docker-compose.ci.yml')
-          docker compose @compose up -d --no-build --remove-orphans
+          docker compose @compose up -d --no-build --remove-orphans --wait --wait-timeout 300
+          $health = curl.exe -kfsS --retry 5 --retry-all-errors https://localhost/api/v1/health
+          if ($health -notmatch '"gateway"') {
+            throw 'Deployment health endpoint did not report a ready gateway.'
+          }
+          Write-Output $health
           docker compose @compose ps
 
       - name: Show deployment diagnostics on failure
