@@ -256,13 +256,13 @@ jobs:
           echo "=== grpc-gateway-2 logs ==="
           docker compose logs --tail=30 grpc-gateway-2 2>&1 || docker compose logs grpc-gateway-2 2>&1 || true
 
-      - name: Restart nginx to reconnect envoy
+      - name: Ensure nginx is available for diagnostics
         if: always()
         run: |
-          docker compose restart nginx
+          docker compose up -d --no-deps nginx || echo "Nginx could not be started for diagnostics"
           sleep 5
           echo "=== Test nginx -> envoy -> gateway ==="
-          docker compose exec nginx sh -c "wget -qO- --timeout=5 http://envoy:10000/api/v1/health 2>&1 || echo 'FAIL nginx->envoy'"
+          docker compose exec nginx sh -c "wget -qO- --timeout=5 http://envoy:10000/api/v1/health 2>&1 || echo 'FAIL nginx->envoy'" || echo "Nginx diagnostic exec unavailable"
 
       - name: API smoke check
         run: |
