@@ -1,14 +1,16 @@
 ﻿services:
   # ===== Nginx (TLS termination + rate limiting) =====
   nginx:
-    image: nginx:1.27
+    build:
+      context: .
+      dockerfile: Dockerfile.nginx
+    image: ${DOCKER_USER:-http-rpc}/nginx-frontend:latest
     ports:
-      - "80:80"
-      - "443:443"
+      - "127.0.0.1:80:80"
+      - "127.0.0.1:443:443"
     volumes:
-      - ./deploy/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
-      - ./web-ui:/app/web-ui:ro
-      - ./certs:/certs
+      - ./deploy/nginx/nginx.frontend.conf:/etc/nginx/nginx.conf:ro
+      - nginx_certs:/certs
     entrypoint: >
       sh -c "mkdir -p /certs && openssl req -x509 -nodes -days 365 -newkey rsa:2048 -keyout /certs/server.key -out /certs/server.crt -subj '/CN=luochuanbaiRPC' 2>/dev/null; nginx -g 'daemon off;'"
     depends_on:
@@ -22,13 +24,13 @@
       dockerfile: deploy/envoy/Dockerfile
     image: ${DOCKER_USER:-http-rpc}/envoy:latest
     environment:
-      JWT_SECRET: "${JWT_SECRET:-default-secret-32bytes-here!!!!!}"
+      JWT_SECRET: "${JWT_SECRET:?JWT_SECRET is required}"
     volumes:
       - ./deploy/envoy/envoy.yaml:/etc/envoy/envoy.yaml:ro
     command: ["-c", "/etc/envoy/envoy.yaml", "--log-level", "info"]
     ports:
-      - "10000:10000"
-      - "9901:9901"
+      - "127.0.0.1:10000:10000"
+      - "127.0.0.1:9901:9901"
     depends_on: [grpc-gateway, grpc-gateway-2]
     restart: unless-stopped
     healthcheck:
@@ -44,13 +46,13 @@
       dockerfile: deploy/envoy/Dockerfile
     image: ${DOCKER_USER:-http-rpc}/envoy:latest
     environment:
-      JWT_SECRET: "${JWT_SECRET:-default-secret-32bytes-here!!!!!}"
+      JWT_SECRET: "${JWT_SECRET:?JWT_SECRET is required}"
     volumes:
       - ./deploy/envoy/envoy.yaml:/etc/envoy/envoy.yaml:ro
     command: ["-c", "/etc/envoy/envoy.yaml", "--log-level", "info"]
     ports:
-      - "10001:10000"
-      - "9902:9901"
+      - "127.0.0.1:10001:10000"
+      - "127.0.0.1:9902:9901"
     depends_on: [grpc-gateway, grpc-gateway-2]
     restart: unless-stopped
     healthcheck:
@@ -65,13 +67,13 @@
     image: mysql:8.0
     command: --innodb-buffer-pool-size=32M --innodb-log-buffer-size=4M --innodb-log-file-size=16M --performance-schema=OFF --skip-innodb-doublewrite
     environment:
-      MYSQL_ROOT_PASSWORD: "${MYSQL_ROOT_PASSWORD:-123456}"
+      MYSQL_ROOT_PASSWORD: "${MYSQL_ROOT_PASSWORD:?MYSQL_ROOT_PASSWORD is required}"
     volumes:
       - ./deploy/mysql/master/conf.d:/etc/mysql/conf.d
       - ./deploy/mysql/init.sql:/docker-entrypoint-initdb.d/init.sql
-      - ./data/mysql-auth:/var/lib/mysql
+      - mysql_auth_data:/var/lib/mysql
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      test: ["CMD-SHELL", "MYSQL_PWD=\"$${MYSQL_ROOT_PASSWORD}\" mysqladmin ping -h localhost -uroot"]
       interval: 5s
       timeout: 3s
       retries: 10
@@ -80,13 +82,13 @@
   mysql-spreadsheet-0:
     image: mysql:8.0
     command: --innodb-buffer-pool-size=32M --innodb-log-buffer-size=4M --innodb-log-file-size=16M --performance-schema=OFF --skip-innodb-doublewrite
-    environment: { MYSQL_ROOT_PASSWORD: "${MYSQL_ROOT_PASSWORD:-123456}" }
-    volumes: ["./deploy/mysql/init.sql:/docker-entrypoint-initdb.d/init.sql", "./data/mysql-sp-0:/var/lib/mysql"]
+    environment: { MYSQL_ROOT_PASSWORD: "${MYSQL_ROOT_PASSWORD:?MYSQL_ROOT_PASSWORD is required}" }
+    volumes: ["./deploy/mysql/init.sql:/docker-entrypoint-initdb.d/init.sql", "mysql_sp_0_data:/var/lib/mysql"]
     networks:
       default:
         aliases: [mysql-spreadsheet]
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      test: ["CMD-SHELL", "MYSQL_PWD=\"$${MYSQL_ROOT_PASSWORD}\" mysqladmin ping -h localhost -uroot"]
       interval: 5s
       timeout: 3s
       retries: 10
@@ -95,17 +97,17 @@
     image: mysql:8.0
     command: --innodb-buffer-pool-size=32M --innodb-log-buffer-size=4M --innodb-log-file-size=16M --performance-schema=OFF --skip-innodb-doublewrite
     environment:
-      MYSQL_ROOT_PASSWORD: "${MYSQL_ROOT_PASSWORD:-123456}"
+      MYSQL_ROOT_PASSWORD: "${MYSQL_ROOT_PASSWORD:?MYSQL_ROOT_PASSWORD is required}"
       MYSQL_MASTER_HOST: mysql-spreadsheet-0
     volumes:
       - "./deploy/mysql/slave/conf.d:/etc/mysql/conf.d"
       - "./deploy/mysql/slave/init-slave.sh:/docker-entrypoint-initdb.d/init-slave.sh"
-      - "./data/mysql-sp-0s:/var/lib/mysql"
+      - mysql_sp_0_replica_data:/var/lib/mysql
     networks:
       default:
         aliases: [mysql-spreadsheet-r, mysql-spreadsheet-r-0]
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      test: ["CMD-SHELL", "MYSQL_PWD=\"$${MYSQL_ROOT_PASSWORD}\" mysqladmin ping -h localhost -uroot"]
       interval: 5s
       timeout: 3s
       retries: 10
@@ -114,13 +116,13 @@
   mysql-spreadsheet-1:
     image: mysql:8.0
     command: --innodb-buffer-pool-size=32M --innodb-log-buffer-size=4M --innodb-log-file-size=16M --performance-schema=OFF --skip-innodb-doublewrite
-    environment: { MYSQL_ROOT_PASSWORD: "${MYSQL_ROOT_PASSWORD:-123456}" }
-    volumes: ["./deploy/mysql/init.sql:/docker-entrypoint-initdb.d/init.sql", "./data/mysql-sp-1:/var/lib/mysql"]
+    environment: { MYSQL_ROOT_PASSWORD: "${MYSQL_ROOT_PASSWORD:?MYSQL_ROOT_PASSWORD is required}" }
+    volumes: ["./deploy/mysql/init.sql:/docker-entrypoint-initdb.d/init.sql", "mysql_sp_1_data:/var/lib/mysql"]
     # mysql-spreadsheet-1 不共享 mysql-spreadsheet 别名。--mysql-shards 2 时
     # 作为分片 1 写主机（ShardFor(user_id%2)==1 → mysql-spreadsheet-1）。
     # mysql-spreadsheet-0 仍作为 "mysql-spreadsheet" 服务（分片 0 写主机）。
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      test: ["CMD-SHELL", "MYSQL_PWD=\"$${MYSQL_ROOT_PASSWORD}\" mysqladmin ping -h localhost -uroot"]
       interval: 5s
       timeout: 3s
       retries: 10
@@ -129,17 +131,17 @@
     image: mysql:8.0
     command: --innodb-buffer-pool-size=32M --innodb-log-buffer-size=4M --innodb-log-file-size=16M --performance-schema=OFF --skip-innodb-doublewrite
     environment:
-      MYSQL_ROOT_PASSWORD: "${MYSQL_ROOT_PASSWORD:-123456}"
+      MYSQL_ROOT_PASSWORD: "${MYSQL_ROOT_PASSWORD:?MYSQL_ROOT_PASSWORD is required}"
       MYSQL_MASTER_HOST: mysql-spreadsheet-1
     volumes:
       - "./deploy/mysql/slave1/conf.d:/etc/mysql/conf.d"
       - "./deploy/mysql/slave/init-slave.sh:/docker-entrypoint-initdb.d/init-slave.sh"
-      - "./data/mysql-sp-1s:/var/lib/mysql"
+      - mysql_sp_1_replica_data:/var/lib/mysql
     networks:
       default:
         aliases: [mysql-spreadsheet-r-1]
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      test: ["CMD-SHELL", "MYSQL_PWD=\"$${MYSQL_ROOT_PASSWORD}\" mysqladmin ping -h localhost -uroot"]
       interval: 5s
       timeout: 3s
       retries: 10
@@ -149,13 +151,13 @@
   mysql-file-0:
     image: mysql:8.0
     command: --innodb-buffer-pool-size=32M --innodb-log-buffer-size=4M --innodb-log-file-size=16M --performance-schema=OFF --skip-innodb-doublewrite
-    environment: { MYSQL_ROOT_PASSWORD: "${MYSQL_ROOT_PASSWORD:-123456}" }
-    volumes: ["./deploy/mysql/init.sql:/docker-entrypoint-initdb.d/init.sql", "./data/mysql-f-0:/var/lib/mysql"]
+    environment: { MYSQL_ROOT_PASSWORD: "${MYSQL_ROOT_PASSWORD:?MYSQL_ROOT_PASSWORD is required}" }
+    volumes: ["./deploy/mysql/init.sql:/docker-entrypoint-initdb.d/init.sql", "mysql_file_0_data:/var/lib/mysql"]
     networks:
       default:
         aliases: [mysql-file]
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      test: ["CMD-SHELL", "MYSQL_PWD=\"$${MYSQL_ROOT_PASSWORD}\" mysqladmin ping -h localhost -uroot"]
       interval: 5s
       timeout: 3s
       retries: 10
@@ -164,17 +166,17 @@
     image: mysql:8.0
     command: --innodb-buffer-pool-size=32M --innodb-log-buffer-size=4M --innodb-log-file-size=16M --performance-schema=OFF --skip-innodb-doublewrite
     environment:
-      MYSQL_ROOT_PASSWORD: "${MYSQL_ROOT_PASSWORD:-123456}"
+      MYSQL_ROOT_PASSWORD: "${MYSQL_ROOT_PASSWORD:?MYSQL_ROOT_PASSWORD is required}"
       MYSQL_MASTER_HOST: mysql-file-0
     volumes:
       - "./deploy/mysql/slave/conf.d:/etc/mysql/conf.d"
       - "./deploy/mysql/slave/init-slave.sh:/docker-entrypoint-initdb.d/init-slave.sh"
-      - "./data/mysql-f-0s:/var/lib/mysql"
+      - mysql_file_0_replica_data:/var/lib/mysql
     networks:
       default:
         aliases: [mysql-file-r, mysql-file-r-0]
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      test: ["CMD-SHELL", "MYSQL_PWD=\"$${MYSQL_ROOT_PASSWORD}\" mysqladmin ping -h localhost -uroot"]
       interval: 5s
       timeout: 3s
       retries: 10
@@ -183,13 +185,13 @@
   mysql-file-1:
     image: mysql:8.0
     command: --innodb-buffer-pool-size=32M --innodb-log-buffer-size=4M --innodb-log-file-size=16M --performance-schema=OFF --skip-innodb-doublewrite
-    environment: { MYSQL_ROOT_PASSWORD: "${MYSQL_ROOT_PASSWORD:-123456}" }
-    volumes: ["./deploy/mysql/init.sql:/docker-entrypoint-initdb.d/init.sql", "./data/mysql-f-1:/var/lib/mysql"]
+    environment: { MYSQL_ROOT_PASSWORD: "${MYSQL_ROOT_PASSWORD:?MYSQL_ROOT_PASSWORD is required}" }
+    volumes: ["./deploy/mysql/init.sql:/docker-entrypoint-initdb.d/init.sql", "mysql_file_1_data:/var/lib/mysql"]
     # mysql-file-1 不共享 mysql-file 别名。--mysql-shards 2 时
     # 作为分片 1 写主机（ShardFor(user_id%2)==1 → mysql-file-1）。
     # mysql-file-0 仍作为 "mysql-file" 服务（分片 0 写主机）。
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      test: ["CMD-SHELL", "MYSQL_PWD=\"$${MYSQL_ROOT_PASSWORD}\" mysqladmin ping -h localhost -uroot"]
       interval: 5s
       timeout: 3s
       retries: 10
@@ -198,17 +200,17 @@
     image: mysql:8.0
     command: --innodb-buffer-pool-size=32M --innodb-log-buffer-size=4M --innodb-log-file-size=16M --performance-schema=OFF --skip-innodb-doublewrite
     environment:
-      MYSQL_ROOT_PASSWORD: "${MYSQL_ROOT_PASSWORD:-123456}"
+      MYSQL_ROOT_PASSWORD: "${MYSQL_ROOT_PASSWORD:?MYSQL_ROOT_PASSWORD is required}"
       MYSQL_MASTER_HOST: mysql-file-1
     volumes:
       - "./deploy/mysql/slave1/conf.d:/etc/mysql/conf.d"
       - "./deploy/mysql/slave/init-slave.sh:/docker-entrypoint-initdb.d/init-slave.sh"
-      - "./data/mysql-f-1s:/var/lib/mysql"
+      - mysql_file_1_replica_data:/var/lib/mysql
     networks:
       default:
         aliases: [mysql-file-r-1]
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      test: ["CMD-SHELL", "MYSQL_PWD=\"$${MYSQL_ROOT_PASSWORD}\" mysqladmin ping -h localhost -uroot"]
       interval: 5s
       timeout: 3s
       retries: 10
@@ -219,13 +221,13 @@
     image: redis:7-alpine
     volumes:
       - ./deploy/redis/cluster/redis.conf:/usr/local/etc/redis/redis.conf
-      - ./data/redis-cluster-1:/data
-    command: redis-server /usr/local/etc/redis/redis.conf --port 7000 --requirepass ${REDIS_PASSWORD:-rpc-redis-123456} --masterauth ${REDIS_PASSWORD:-rpc-redis-123456} --cluster-announce-hostname redis-cluster-1 --maxmemory 32mb --maxmemory-policy allkeys-lru
+      - redis_cluster_1_data:/data
+    command: redis-server /usr/local/etc/redis/redis.conf --port 7000 --requirepass ${REDIS_PASSWORD:?REDIS_PASSWORD is required} --masterauth ${REDIS_PASSWORD:?REDIS_PASSWORD is required} --cluster-announce-hostname redis-cluster-1 --maxmemory 32mb --maxmemory-policy allkeys-lru
     networks:
       default:
         aliases: [redis-cluster, redis-cluster-7000]
     healthcheck:
-      test: ["CMD-SHELL", "redis-cli -p 7000 -a ${REDIS_PASSWORD:-rpc-redis-123456} ping"]
+      test: ["CMD-SHELL", "redis-cli -p 7000 -a ${REDIS_PASSWORD:?REDIS_PASSWORD is required} ping"]
       interval: 5s
       timeout: 3s
       retries: 5
@@ -234,32 +236,32 @@
     image: redis:7-alpine
     volumes:
       - ./deploy/redis/cluster/redis.conf:/usr/local/etc/redis/redis.conf
-      - ./data/redis-cluster-2:/data
-    command: redis-server /usr/local/etc/redis/redis.conf --port 7001 --requirepass ${REDIS_PASSWORD:-rpc-redis-123456} --masterauth ${REDIS_PASSWORD:-rpc-redis-123456} --cluster-announce-hostname redis-cluster-2 --maxmemory 32mb --maxmemory-policy allkeys-lru
+      - redis_cluster_2_data:/data
+    command: redis-server /usr/local/etc/redis/redis.conf --port 7001 --requirepass ${REDIS_PASSWORD:?REDIS_PASSWORD is required} --masterauth ${REDIS_PASSWORD:?REDIS_PASSWORD is required} --cluster-announce-hostname redis-cluster-2 --maxmemory 32mb --maxmemory-policy allkeys-lru
     networks: { default: { aliases: [redis-cluster, redis-cluster-7001] } }
 
   redis-cluster-3:
     image: redis:7-alpine
-    volumes: [./deploy/redis/cluster/redis.conf:/usr/local/etc/redis/redis.conf, ./data/redis-cluster-3:/data]
-    command: redis-server /usr/local/etc/redis/redis.conf --port 7002 --requirepass ${REDIS_PASSWORD:-rpc-redis-123456} --masterauth ${REDIS_PASSWORD:-rpc-redis-123456} --cluster-announce-hostname redis-cluster-3 --maxmemory 32mb --maxmemory-policy allkeys-lru
+    volumes: [./deploy/redis/cluster/redis.conf:/usr/local/etc/redis/redis.conf, redis_cluster_3_data:/data]
+    command: redis-server /usr/local/etc/redis/redis.conf --port 7002 --requirepass ${REDIS_PASSWORD:?REDIS_PASSWORD is required} --masterauth ${REDIS_PASSWORD:?REDIS_PASSWORD is required} --cluster-announce-hostname redis-cluster-3 --maxmemory 32mb --maxmemory-policy allkeys-lru
     networks: { default: { aliases: [redis-cluster, redis-cluster-7002] } }
 
   redis-cluster-4:
     image: redis:7-alpine
-    volumes: [./deploy/redis/cluster/redis.conf:/usr/local/etc/redis/redis.conf, ./data/redis-cluster-4:/data]
-    command: redis-server /usr/local/etc/redis/redis.conf --port 7003 --requirepass ${REDIS_PASSWORD:-rpc-redis-123456} --masterauth ${REDIS_PASSWORD:-rpc-redis-123456} --cluster-announce-hostname redis-cluster-4 --maxmemory 32mb --maxmemory-policy allkeys-lru
+    volumes: [./deploy/redis/cluster/redis.conf:/usr/local/etc/redis/redis.conf, redis_cluster_4_data:/data]
+    command: redis-server /usr/local/etc/redis/redis.conf --port 7003 --requirepass ${REDIS_PASSWORD:?REDIS_PASSWORD is required} --masterauth ${REDIS_PASSWORD:?REDIS_PASSWORD is required} --cluster-announce-hostname redis-cluster-4 --maxmemory 32mb --maxmemory-policy allkeys-lru
     networks: { default: { aliases: [redis-cluster, redis-cluster-7003] } }
 
   redis-cluster-5:
     image: redis:7-alpine
-    volumes: [./deploy/redis/cluster/redis.conf:/usr/local/etc/redis/redis.conf, ./data/redis-cluster-5:/data]
-    command: redis-server /usr/local/etc/redis/redis.conf --port 7004 --requirepass ${REDIS_PASSWORD:-rpc-redis-123456} --masterauth ${REDIS_PASSWORD:-rpc-redis-123456} --cluster-announce-hostname redis-cluster-5 --maxmemory 32mb --maxmemory-policy allkeys-lru
+    volumes: [./deploy/redis/cluster/redis.conf:/usr/local/etc/redis/redis.conf, redis_cluster_5_data:/data]
+    command: redis-server /usr/local/etc/redis/redis.conf --port 7004 --requirepass ${REDIS_PASSWORD:?REDIS_PASSWORD is required} --masterauth ${REDIS_PASSWORD:?REDIS_PASSWORD is required} --cluster-announce-hostname redis-cluster-5 --maxmemory 32mb --maxmemory-policy allkeys-lru
     networks: { default: { aliases: [redis-cluster, redis-cluster-7004] } }
 
   redis-cluster-6:
     image: redis:7-alpine
-    volumes: [./deploy/redis/cluster/redis.conf:/usr/local/etc/redis/redis.conf, ./data/redis-cluster-6:/data]
-    command: redis-server /usr/local/etc/redis/redis.conf --port 7005 --requirepass ${REDIS_PASSWORD:-rpc-redis-123456} --masterauth ${REDIS_PASSWORD:-rpc-redis-123456} --cluster-announce-hostname redis-cluster-6 --maxmemory 32mb --maxmemory-policy allkeys-lru
+    volumes: [./deploy/redis/cluster/redis.conf:/usr/local/etc/redis/redis.conf, redis_cluster_6_data:/data]
+    command: redis-server /usr/local/etc/redis/redis.conf --port 7005 --requirepass ${REDIS_PASSWORD:?REDIS_PASSWORD is required} --masterauth ${REDIS_PASSWORD:?REDIS_PASSWORD is required} --cluster-announce-hostname redis-cluster-6 --maxmemory 32mb --maxmemory-policy allkeys-lru
     networks: { default: { aliases: [redis-cluster, redis-cluster-7005] } }
 
   redis-cluster-init:
@@ -274,7 +276,7 @@
     volumes:
       - ./deploy/redis/cluster/init.sh:/init.sh:ro
     environment:
-      - REDIS_PASSWORD=${REDIS_PASSWORD:-rpc-redis-123456}
+      - REDIS_PASSWORD=${REDIS_PASSWORD:?REDIS_PASSWORD is required}
     entrypoint: ["/bin/sh", "/init.sh"]
     restart: "no"
 
@@ -285,8 +287,8 @@
       - ./deploy/consul/consul.hcl:/consul/config/consul.hcl:ro
       - consul_data:/consul/data
     ports:
-      - "8500:8500"
-      - "8600:8600/udp"
+      - "127.0.0.1:8500:8500"
+      - "127.0.0.1:8600:8600/udp"
     command: agent
     healthcheck:
       test: ["CMD", "consul", "operator", "raft", "list-peers"]
@@ -300,12 +302,12 @@
     image: rabbitmq:3.13-management-alpine
     environment:
       RABBITMQ_DEFAULT_USER: rpc
-      RABBITMQ_DEFAULT_PASS: rpc-rabbit-123456
+      RABBITMQ_DEFAULT_PASS: "${RABBITMQ_PASSWORD:?RABBITMQ_PASSWORD is required}"
     ports:
-      - "5672:5672"
-      - "15672:15672"
+      - "127.0.0.1:5672:5672"
+      - "127.0.0.1:15672:15672"
     volumes:
-      - ./data/rabbitmq:/var/lib/rabbitmq
+      - rabbitmq_data:/var/lib/rabbitmq
     healthcheck:
       test: ["CMD", "rabbitmq-diagnostics", "check_port_connectivity"]
       interval: 10s
@@ -318,12 +320,12 @@
     image: minio/minio:latest
     command: server /data --console-address :9001
     ports:
-      - "9000:9000"
+      - "127.0.0.1:9000:9000"
     environment:
-      MINIO_ROOT_USER: rpc-minio
-      MINIO_ROOT_PASSWORD: "${MINIO_ROOT_PASSWORD:-rpc-minio-123456}"
+      MINIO_ROOT_USER: "${MINIO_ACCESS_KEY:?MINIO_ACCESS_KEY is required}"
+      MINIO_ROOT_PASSWORD: "${MINIO_ROOT_PASSWORD:?MINIO_ROOT_PASSWORD is required}"
     volumes:
-      - ./data/minio:/data
+      - minio_data:/data
     networks:
       default:
         aliases: [minio]
@@ -343,12 +345,13 @@
       - /bin/sh
       - -c
       - |
-        mc alias set local http://minio:9000 rpc-minio $${MINIO_ROOT_PASSWORD:-rpc-minio-123456}
+        mc alias set local http://minio:9000 "$${MINIO_ACCESS_KEY}" "$${MINIO_ROOT_PASSWORD}"
         mc mb --ignore-existing local/rpc-files
-        mc anonymous set download local/rpc-files
+        mc anonymous set none local/rpc-files
         echo "=== MinIO bucket ready ==="
     environment:
-      MINIO_ROOT_PASSWORD: "${MINIO_ROOT_PASSWORD:-rpc-minio-123456}"
+      MINIO_ACCESS_KEY: "${MINIO_ACCESS_KEY:?MINIO_ACCESS_KEY is required}"
+      MINIO_ROOT_PASSWORD: "${MINIO_ROOT_PASSWORD:?MINIO_ROOT_PASSWORD is required}"
     restart: "no"
 
   # ===== Elasticsearch =====
@@ -368,7 +371,7 @@
     volumes:
       - es_data:/usr/share/elasticsearch/data
     ports:
-      - "9200:9200"
+      - "127.0.0.1:9200:9200"
     healthcheck:
       test: ["CMD-SHELL", "curl -s http://localhost:9200/_cluster/health | grep -qE 'green|yellow'"]
       interval: 10s
@@ -384,10 +387,10 @@
     environment:
       MONGO_INITDB_DATABASE: rpc_search
     volumes:
-      - ./data/mongodb:/data/db
+      - mongodb_data:/data/db
       - ./deploy/mongo/init.js:/docker-entrypoint-initdb.d/init.js:ro
     ports:
-      - "27017:27017"
+      - "127.0.0.1:27017:27017"
     healthcheck:
       test: ["CMD-SHELL", "mongosh --eval 'db.adminCommand(\"ping\")'"]
       interval: 5s
@@ -424,13 +427,13 @@
         SERVICE: auth
     image: ${DOCKER_USER:-http-rpc}/auth:latest
     environment:
-      JWT_SECRET: "${JWT_SECRET:-default-secret-32bytes-here!!!!!}"
+      JWT_SECRET: "${JWT_SECRET:?JWT_SECRET is required}"
       LOG_LEVEL: "${LOG_LEVEL:-INFO}"
     command: >
       /app/register.sh rpc-auth 50051 -- /app/rpc_server
       --service auth --port 50051
-      --mysql-write-host mysql-auth --mysql-read-hosts mysql-auth --mysql-password ${MYSQL_ROOT_PASSWORD:-123456} --mysql-db rpc_auth --mysql-shards 1
-      --redis-cluster redis-cluster-7000:7000 --redis-cluster redis-cluster-7001:7001 --redis-cluster redis-cluster-7002:7002 --redis-password ${REDIS_PASSWORD:-rpc-redis-123456}
+      --mysql-write-host mysql-auth --mysql-read-hosts mysql-auth --mysql-password ${MYSQL_ROOT_PASSWORD:?MYSQL_ROOT_PASSWORD is required} --mysql-db rpc_auth --mysql-shards 1
+      --redis-cluster redis-cluster-7000:7000 --redis-cluster redis-cluster-7001:7001 --redis-cluster redis-cluster-7002:7002 --redis-password ${REDIS_PASSWORD:?REDIS_PASSWORD is required}
     networks:
       default:
         aliases: [rpc-auth]
@@ -449,13 +452,13 @@
   auth-2:
     image: ${DOCKER_USER:-http-rpc}/auth:latest
     environment:
-      JWT_SECRET: "${JWT_SECRET:-default-secret-32bytes-here!!!!!}"
+      JWT_SECRET: "${JWT_SECRET:?JWT_SECRET is required}"
       LOG_LEVEL: "${LOG_LEVEL:-INFO}"
     command: >
       /app/register.sh rpc-auth 50051 -- /app/rpc_server
       --service auth --port 50051
-      --mysql-write-host mysql-auth --mysql-read-hosts mysql-auth --mysql-password ${MYSQL_ROOT_PASSWORD:-123456} --mysql-db rpc_auth --mysql-shards 1
-      --redis-cluster redis-cluster-7000:7000 --redis-cluster redis-cluster-7001:7001 --redis-cluster redis-cluster-7002:7002 --redis-password ${REDIS_PASSWORD:-rpc-redis-123456}
+      --mysql-write-host mysql-auth --mysql-read-hosts mysql-auth --mysql-password ${MYSQL_ROOT_PASSWORD:?MYSQL_ROOT_PASSWORD is required} --mysql-db rpc_auth --mysql-shards 1
+      --redis-cluster redis-cluster-7000:7000 --redis-cluster redis-cluster-7001:7001 --redis-cluster redis-cluster-7002:7002 --redis-password ${REDIS_PASSWORD:?REDIS_PASSWORD is required}
     networks:
       default:
         aliases: [rpc-auth]
@@ -481,20 +484,22 @@
     image: ${DOCKER_USER:-http-rpc}/sheet:latest
     environment:
       AUTH_SVC_ADDR: "rpc-auth:50051"
-      JWT_SECRET: "${JWT_SECRET:-default-secret-32bytes-here!!!!!}"
+      JWT_SECRET: "${JWT_SECRET:?JWT_SECRET is required}"
       LOG_LEVEL: "${LOG_LEVEL:-INFO}"
       RABBITMQ_HOST: "rabbitmq"
+      RABBITMQ_USER: "rpc"
+      RABBITMQ_PASSWORD: "${RABBITMQ_PASSWORD:?RABBITMQ_PASSWORD is required}"
       MINIO_ENDPOINT: "minio:9000"
-      MINIO_ACCESS_KEY: "rpc-minio"
-      MINIO_SECRET_KEY: "${MINIO_ROOT_PASSWORD:-rpc-minio-123456}"
+      MINIO_ACCESS_KEY: "${MINIO_ACCESS_KEY:?MINIO_ACCESS_KEY is required}"
+      MINIO_SECRET_KEY: "${MINIO_ROOT_PASSWORD:?MINIO_ROOT_PASSWORD is required}"
       MINIO_BUCKET: "rpc-files"
       MINIO_PUBLIC_URL: "http://localhost:9000"
       MONGODB_URI: "${MONGODB_URI:-mongodb://mongodb:27017}"
     command: >
       /app/register.sh rpc-sheet 50051 -- /app/rpc_server
       --service spreadsheet --port 50051
-      --mysql-write-host mysql-spreadsheet --mysql-read-hosts mysql-spreadsheet-r --mysql-password ${MYSQL_ROOT_PASSWORD:-123456} --mysql-db rpc_spreadsheet --mysql-shards 2
-      --redis-cluster redis-cluster-7000:7000 --redis-cluster redis-cluster-7001:7001 --redis-cluster redis-cluster-7002:7002 --redis-password ${REDIS_PASSWORD:-rpc-redis-123456}
+      --mysql-write-host mysql-spreadsheet --mysql-read-hosts mysql-spreadsheet-r --mysql-password ${MYSQL_ROOT_PASSWORD:?MYSQL_ROOT_PASSWORD is required} --mysql-db rpc_spreadsheet --mysql-shards 2
+      --redis-cluster redis-cluster-7000:7000 --redis-cluster redis-cluster-7001:7001 --redis-cluster redis-cluster-7002:7002 --redis-password ${REDIS_PASSWORD:?REDIS_PASSWORD is required}
     networks:
       default:
         aliases: [rpc-sheet]
@@ -518,20 +523,22 @@
     image: ${DOCKER_USER:-http-rpc}/sheet:latest
     environment:
       AUTH_SVC_ADDR: "rpc-auth:50051"
-      JWT_SECRET: "${JWT_SECRET:-default-secret-32bytes-here!!!!!}"
+      JWT_SECRET: "${JWT_SECRET:?JWT_SECRET is required}"
       LOG_LEVEL: "${LOG_LEVEL:-INFO}"
       RABBITMQ_HOST: "rabbitmq"
+      RABBITMQ_USER: "rpc"
+      RABBITMQ_PASSWORD: "${RABBITMQ_PASSWORD:?RABBITMQ_PASSWORD is required}"
       MINIO_ENDPOINT: "minio:9000"
-      MINIO_ACCESS_KEY: "rpc-minio"
-      MINIO_SECRET_KEY: "${MINIO_ROOT_PASSWORD:-rpc-minio-123456}"
+      MINIO_ACCESS_KEY: "${MINIO_ACCESS_KEY:?MINIO_ACCESS_KEY is required}"
+      MINIO_SECRET_KEY: "${MINIO_ROOT_PASSWORD:?MINIO_ROOT_PASSWORD is required}"
       MINIO_BUCKET: "rpc-files"
       MINIO_PUBLIC_URL: "http://localhost:9000"
       MONGODB_URI: "${MONGODB_URI:-mongodb://mongodb:27017}"
     command: >
       /app/register.sh rpc-sheet 50051 -- /app/rpc_server
       --service spreadsheet --port 50051
-      --mysql-write-host mysql-spreadsheet --mysql-read-hosts mysql-spreadsheet-r --mysql-password ${MYSQL_ROOT_PASSWORD:-123456} --mysql-db rpc_spreadsheet --mysql-shards 2
-      --redis-cluster redis-cluster-7000:7000 --redis-cluster redis-cluster-7001:7001 --redis-cluster redis-cluster-7002:7002 --redis-password ${REDIS_PASSWORD:-rpc-redis-123456}
+      --mysql-write-host mysql-spreadsheet --mysql-read-hosts mysql-spreadsheet-r --mysql-password ${MYSQL_ROOT_PASSWORD:?MYSQL_ROOT_PASSWORD is required} --mysql-db rpc_spreadsheet --mysql-shards 2
+      --redis-cluster redis-cluster-7000:7000 --redis-cluster redis-cluster-7001:7001 --redis-cluster redis-cluster-7002:7002 --redis-password ${REDIS_PASSWORD:?REDIS_PASSWORD is required}
     networks:
       default:
         aliases: [rpc-sheet]
@@ -561,19 +568,21 @@
     image: ${DOCKER_USER:-http-rpc}/file:latest
     environment:
       AUTH_SVC_ADDR: "rpc-auth:50051"
-      JWT_SECRET: "${JWT_SECRET:-default-secret-32bytes-here!!!!!}"
+      JWT_SECRET: "${JWT_SECRET:?JWT_SECRET is required}"
       LOG_LEVEL: "${LOG_LEVEL:-INFO}"
       RABBITMQ_HOST: "rabbitmq"
+      RABBITMQ_USER: "rpc"
+      RABBITMQ_PASSWORD: "${RABBITMQ_PASSWORD:?RABBITMQ_PASSWORD is required}"
       MINIO_ENDPOINT: "minio:9000"
-      MINIO_ACCESS_KEY: "rpc-minio"
-      MINIO_SECRET_KEY: "${MINIO_ROOT_PASSWORD:-rpc-minio-123456}"
+      MINIO_ACCESS_KEY: "${MINIO_ACCESS_KEY:?MINIO_ACCESS_KEY is required}"
+      MINIO_SECRET_KEY: "${MINIO_ROOT_PASSWORD:?MINIO_ROOT_PASSWORD is required}"
       MINIO_BUCKET: "rpc-files"
       MINIO_PUBLIC_URL: "http://localhost:9000"
     command: >
       /app/register.sh rpc-file 50051 -- /app/rpc_server
       --service file --port 50051
-      --mysql-write-host mysql-file --mysql-read-hosts mysql-file-r --mysql-password ${MYSQL_ROOT_PASSWORD:-123456} --mysql-db rpc_file --mysql-shards 2
-      --redis-cluster redis-cluster-7000:7000 --redis-cluster redis-cluster-7001:7001 --redis-cluster redis-cluster-7002:7002 --redis-password ${REDIS_PASSWORD:-rpc-redis-123456}
+      --mysql-write-host mysql-file --mysql-read-hosts mysql-file-r --mysql-password ${MYSQL_ROOT_PASSWORD:?MYSQL_ROOT_PASSWORD is required} --mysql-db rpc_file --mysql-shards 2
+      --redis-cluster redis-cluster-7000:7000 --redis-cluster redis-cluster-7001:7001 --redis-cluster redis-cluster-7002:7002 --redis-password ${REDIS_PASSWORD:?REDIS_PASSWORD is required}
     networks:
       default:
         aliases: [rpc-file]
@@ -597,19 +606,21 @@
     image: ${DOCKER_USER:-http-rpc}/file:latest
     environment:
       AUTH_SVC_ADDR: "rpc-auth:50051"
-      JWT_SECRET: "${JWT_SECRET:-default-secret-32bytes-here!!!!!}"
+      JWT_SECRET: "${JWT_SECRET:?JWT_SECRET is required}"
       LOG_LEVEL: "${LOG_LEVEL:-INFO}"
       RABBITMQ_HOST: "rabbitmq"
+      RABBITMQ_USER: "rpc"
+      RABBITMQ_PASSWORD: "${RABBITMQ_PASSWORD:?RABBITMQ_PASSWORD is required}"
       MINIO_ENDPOINT: "minio:9000"
-      MINIO_ACCESS_KEY: "rpc-minio"
-      MINIO_SECRET_KEY: "${MINIO_ROOT_PASSWORD:-rpc-minio-123456}"
+      MINIO_ACCESS_KEY: "${MINIO_ACCESS_KEY:?MINIO_ACCESS_KEY is required}"
+      MINIO_SECRET_KEY: "${MINIO_ROOT_PASSWORD:?MINIO_ROOT_PASSWORD is required}"
       MINIO_BUCKET: "rpc-files"
       MINIO_PUBLIC_URL: "http://localhost:9000"
     command: >
       /app/register.sh rpc-file 50051 -- /app/rpc_server
       --service file --port 50051
-      --mysql-write-host mysql-file --mysql-read-hosts mysql-file-r --mysql-password ${MYSQL_ROOT_PASSWORD:-123456} --mysql-db rpc_file --mysql-shards 2
-      --redis-cluster redis-cluster-7000:7000 --redis-cluster redis-cluster-7001:7001 --redis-cluster redis-cluster-7002:7002 --redis-password ${REDIS_PASSWORD:-rpc-redis-123456}
+      --mysql-write-host mysql-file --mysql-read-hosts mysql-file-r --mysql-password ${MYSQL_ROOT_PASSWORD:?MYSQL_ROOT_PASSWORD is required} --mysql-db rpc_file --mysql-shards 2
+      --redis-cluster redis-cluster-7000:7000 --redis-cluster redis-cluster-7001:7001 --redis-cluster redis-cluster-7002:7002 --redis-password ${REDIS_PASSWORD:?REDIS_PASSWORD is required}
     networks:
       default:
         aliases: [rpc-file]
@@ -639,7 +650,7 @@
     image: ${DOCKER_USER:-http-rpc}/search:latest
     environment:
       ES_HOST: "http://elasticsearch:9200"
-      JWT_SECRET: "${JWT_SECRET:-default-secret-32bytes-here!!!!!}"
+      JWT_SECRET: "${JWT_SECRET:?JWT_SECRET is required}"
     command: >
       /app/register.sh rpc-search 50051 -- /app/rpc_server
       --service search --port 50051
@@ -665,17 +676,17 @@
       dockerfile: cmd/server/Dockerfile
     image: ${DOCKER_USER:-http-rpc}/gateway:latest
     environment:
-      JWT_SECRET: "${JWT_SECRET:-default-secret-32bytes-here!!!!!}"
+      JWT_SECRET: "${JWT_SECRET:?JWT_SECRET is required}"
       LOG_LEVEL: "${LOG_LEVEL:-INFO}"
       AUTH_ADDR: "rpc-auth"
       SHEET_ADDR: "rpc-sheet"
       REDIS_ADDR: "redis-cluster-7000:7000"
-      REDIS_PASSWORD: "${REDIS_PASSWORD:-rpc-redis-123456}"
+      REDIS_PASSWORD: "${REDIS_PASSWORD:?REDIS_PASSWORD is required}"
       MONGO_URI: "mongodb://mongodb:27017"
       FILE_ADDR: "rpc-file"
       SEARCH_ADDR: "rpc-search"
     ports:
-      - "8082:8080"
+      - "127.0.0.1:8082:8080"
     depends_on:
       auth-1:
         condition: service_healthy
@@ -697,12 +708,12 @@
       dockerfile: cmd/server/Dockerfile
     image: ${DOCKER_USER:-http-rpc}/gateway:latest
     environment:
-      JWT_SECRET: "${JWT_SECRET:-default-secret-32bytes-here!!!!!}"
+      JWT_SECRET: "${JWT_SECRET:?JWT_SECRET is required}"
       LOG_LEVEL: "${LOG_LEVEL:-INFO}"
       AUTH_ADDR: "rpc-auth"
       SHEET_ADDR: "rpc-sheet"
       REDIS_ADDR: "redis-cluster-7000:7000"
-      REDIS_PASSWORD: "${REDIS_PASSWORD:-rpc-redis-123456}"
+      REDIS_PASSWORD: "${REDIS_PASSWORD:?REDIS_PASSWORD is required}"
       MONGO_URI: "mongodb://mongodb:27017"
       FILE_ADDR: "rpc-file"
       SEARCH_ADDR: "rpc-search"
@@ -733,20 +744,20 @@
     environment:
       RABBITMQ_HOST: "rabbitmq"
       MINIO_ENDPOINT: "minio:9000"
-      MINIO_ACCESS_KEY: "rpc-minio"
-      MINIO_SECRET_KEY: "${MINIO_ROOT_PASSWORD:-rpc-minio-123456}"
+      MINIO_ACCESS_KEY: "${MINIO_ACCESS_KEY:?MINIO_ACCESS_KEY is required}"
+      MINIO_SECRET_KEY: "${MINIO_ROOT_PASSWORD:?MINIO_ROOT_PASSWORD is required}"
       MINIO_BUCKET: "rpc-files"
       RABBITMQ_USER: "rpc"
-      RABBITMQ_PASS: "rpc-rabbit-123456"
+      RABBITMQ_PASS: "${RABBITMQ_PASSWORD:?RABBITMQ_PASSWORD is required}"
       MONGO_URI: "mongodb://mongodb:27017"
       MONGO_DB: "rpc_search"
       ES_HOST: "http://elasticsearch:9200"
       CANAL_MYSQL_HOST: "mysql-spreadsheet-0"
       OUTBOX_SHEET_HOSTS: "mysql-spreadsheet-0:rpc_spreadsheet,mysql-spreadsheet-1:rpc_spreadsheet_1"
       OUTBOX_FILE_HOSTS: "mysql-file-0:rpc_file,mysql-file-1:rpc_file_1"
-      MYSQL_ROOT_PASSWORD: "${MYSQL_ROOT_PASSWORD:-123456}"
+      MYSQL_ROOT_PASSWORD: "${MYSQL_ROOT_PASSWORD:?MYSQL_ROOT_PASSWORD is required}"
       REDIS_ADDR: "redis-cluster-7000:7000"
-      REDIS_PASSWORD: "${REDIS_PASSWORD:-rpc-redis-123456}"
+      REDIS_PASSWORD: "${REDIS_PASSWORD:?REDIS_PASSWORD is required}"
     depends_on:
       rabbitmq:
         condition: service_healthy
@@ -768,11 +779,11 @@
     image: ${DOCKER_USER:-http-rpc}/points:latest
     environment:
       REDIS_ADDR: "redis-cluster-7000:7000"
-      REDIS_PASSWORD: "${REDIS_PASSWORD:-rpc-redis-123456}"
+      REDIS_PASSWORD: "${REDIS_PASSWORD:?REDIS_PASSWORD is required}"
       MYSQL_ADDR: "mysql-auth:3306"
-      MYSQL_PASSWORD: "${MYSQL_ROOT_PASSWORD:-123456}"
+      MYSQL_PASSWORD: "${MYSQL_ROOT_PASSWORD:?MYSQL_ROOT_PASSWORD is required}"
       MYSQL_DB: "rpc_auth"
-      RABBITMQ_ADDR: "amqp://rpc:rpc-rabbit-123456@rabbitmq:5672/"
+      RABBITMQ_ADDR: "amqp://rpc:${RABBITMQ_PASSWORD:?RABBITMQ_PASSWORD is required}@rabbitmq:5672/"
     networks:
       default:
         aliases: [rpc-points]
@@ -795,9 +806,9 @@
     image: ${DOCKER_USER:-http-rpc}/mall:latest
     environment:
       REDIS_ADDR: "redis-cluster-7000:7000"
-      REDIS_PASSWORD: "${REDIS_PASSWORD:-rpc-redis-123456}"
+      REDIS_PASSWORD: "${REDIS_PASSWORD:?REDIS_PASSWORD is required}"
       MYSQL_ADDR: "mysql-auth:3306"
-      MYSQL_PASSWORD: "${MYSQL_ROOT_PASSWORD:-123456}"
+      MYSQL_PASSWORD: "${MYSQL_ROOT_PASSWORD:?MYSQL_ROOT_PASSWORD is required}"
       MYSQL_DB: "rpc_auth"
     networks:
       default:
@@ -818,9 +829,9 @@
     image: prom/prometheus:v2.54.0
     volumes:
       - ./deploy/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
-      - ./data/prometheus:/prometheus
+      - prometheus_data:/prometheus
     ports:
-      - "9090:9090"
+      - "127.0.0.1:9090:9090"
     command:
       - '--config.file=/etc/prometheus/prometheus.yml'
       - '--storage.tsdb.path=/prometheus'
@@ -834,12 +845,12 @@
   grafana:
     image: grafana/grafana:11.1.0
     volumes:
-      - ./data/grafana:/var/lib/grafana
+      - grafana_data:/var/lib/grafana
     ports:
-      - "3000:3000"
+      - "127.0.0.1:3000:3000"
     environment:
       - GF_SECURITY_ADMIN_USER=admin
-      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:?GRAFANA_ADMIN_PASSWORD is required}
       - GF_INSTALL_PLUGINS=
     depends_on:
       - prometheus
@@ -851,9 +862,9 @@
     environment:
       - COLLECTOR_OTLP_ENABLED=true
     ports:
-      - "4317:4317"    # OTLP gRPC
-      - "4318:4318"    # OTLP HTTP
-      - "16686:16686"  # Jaeger UI
+      - "127.0.0.1:4317:4317"    # OTLP gRPC
+      - "127.0.0.1:4318:4318"    # OTLP HTTP
+      - "127.0.0.1:16686:16686"  # Jaeger UI
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:16686"]
       interval: 10s
@@ -865,4 +876,46 @@ volumes:
   es_data:
     driver: local
   consul_data:
+    driver: local
+  nginx_certs:
+    driver: local
+  mysql_auth_data:
+    driver: local
+  mysql_sp_0_data:
+    driver: local
+  mysql_sp_0_replica_data:
+    driver: local
+  mysql_sp_1_data:
+    driver: local
+  mysql_sp_1_replica_data:
+    driver: local
+  mysql_file_0_data:
+    driver: local
+  mysql_file_0_replica_data:
+    driver: local
+  mysql_file_1_data:
+    driver: local
+  mysql_file_1_replica_data:
+    driver: local
+  redis_cluster_1_data:
+    driver: local
+  redis_cluster_2_data:
+    driver: local
+  redis_cluster_3_data:
+    driver: local
+  redis_cluster_4_data:
+    driver: local
+  redis_cluster_5_data:
+    driver: local
+  redis_cluster_6_data:
+    driver: local
+  rabbitmq_data:
+    driver: local
+  minio_data:
+    driver: local
+  mongodb_data:
+    driver: local
+  prometheus_data:
+    driver: local
+  grafana_data:
     driver: local

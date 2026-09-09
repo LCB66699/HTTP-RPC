@@ -45,6 +45,11 @@ jobs:
     env:
       COMPOSE_FILE: docker-compose.yml
       DOCKER_USER: ${{ github.ref == 'refs/heads/main' && 'ghcr.io/lcb66699/http-rpc' || 'http-rpc' }}
+      JWT_SECRET: ci-jwt-${{ github.run_id }}-${{ github.run_attempt }}
+      REDIS_PASSWORD: ci-redis-${{ github.run_id }}-${{ github.run_attempt }}
+      MYSQL_ROOT_PASSWORD: ci-mysql-${{ github.run_id }}-${{ github.run_attempt }}
+      MINIO_ACCESS_KEY: ci-minio-${{ github.run_id }}-${{ github.run_attempt }}
+      MINIO_ROOT_PASSWORD: ci-minio-root-${{ github.run_id }}-${{ github.run_attempt }}
       RABBITMQ_PASSWORD: ci-${{ github.run_id }}-${{ github.run_attempt }}
       GRAFANA_ADMIN_PASSWORD: ci-${{ github.run_id }}-${{ github.run_attempt }}
     steps:
