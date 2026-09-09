@@ -41,7 +41,7 @@ virtual_server 192.168.1.100 443 {
 
 **nginx 层 — least_conn + failover**
 
-`deploy/nginx/nginx.conf:26-33`:
+`deploy/nginx/nginx.frontend.conf:26-33`:
 ```nginx
 upstream gateway_pool {
     least_conn;          ← 策略：七层可感知，选连接最少的 upstream

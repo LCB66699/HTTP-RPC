@@ -45,7 +45,6 @@ RUN chmod +x /app/register.sh
 ARG SERVICE=auth
 WORKDIR /app
 COPY --from=builder /src/build/rpc_${SERVICE} /app/rpc_server
-COPY --from=builder /src/web-ui /app/web-ui
 
 EXPOSE 50051
 CMD ["/app/rpc_server"]

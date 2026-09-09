@@ -9,7 +9,6 @@ on:
       - 'server/src/**'
       - 'server/include/**'
       - 'proto/**'
-      - 'web-ui/**'
   pull_request:
     paths:
       - 'cmd/server/**'
@@ -17,7 +16,6 @@ on:
       - 'server/src/**'
       - 'server/include/**'
       - 'proto/**'
-      - 'web-ui/**'
   workflow_dispatch:
 
 jobs:

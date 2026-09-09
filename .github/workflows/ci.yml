@@ -11,7 +11,6 @@ on:
       - "test/e2e/**"
       - "Dockerfile.nginx"
       - "docker-compose.yml"
-      - "docker-compose.frontend.yml"
       - "deploy/nginx/**"
       - ".github/workflows/ci.yml"
   pull_request:
@@ -23,7 +22,6 @@ on:
       - "test/e2e/**"
       - "Dockerfile.nginx"
       - "docker-compose.yml"
-      - "docker-compose.frontend.yml"
       - "deploy/nginx/**"
       - ".github/workflows/ci.yml"
   workflow_dispatch:
@@ -40,7 +38,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 60
     env:
-      COMPOSE_FILE: docker-compose.yml:docker-compose.frontend.yml
+      COMPOSE_FILE: docker-compose.yml
       RABBITMQ_PASSWORD: ci-${{ github.run_id }}-${{ github.run_attempt }}
       GRAFANA_ADMIN_PASSWORD: ci-${{ github.run_id }}-${{ github.run_attempt }}
     steps:
@@ -328,10 +326,10 @@ jobs:
           DOCKER_BUILDKIT: "1"
           COMPOSE_DOCKER_CLI_BUILD: "1"
         run: |
-          docker compose -f docker-compose.yml -f docker-compose.frontend.yml -f docker-compose.ci.yml build \
+          docker compose -f docker-compose.yml -f docker-compose.ci.yml build \
             base-runtime envoy envoy-2 elasticsearch nginx \
             auth-1 sheet-1 file-1 search grpc-gateway notify-service points-server mall-server
-          docker compose -f docker-compose.yml -f docker-compose.frontend.yml -f docker-compose.ci.yml push \
+          docker compose -f docker-compose.yml -f docker-compose.ci.yml push \
             base-runtime envoy envoy-2 elasticsearch nginx \
             auth-1 sheet-1 file-1 search grpc-gateway notify-service points-server mall-server
 
@@ -389,12 +387,12 @@ jobs:
 
       - name: Pull application images
         shell: powershell
-        run: docker compose -f docker-compose.yml -f docker-compose.frontend.yml -f docker-compose.ci.yml pull
+        run: docker compose -f docker-compose.yml -f docker-compose.ci.yml pull
 
       - name: Start application stack
         shell: powershell
         run: |
-          $compose = @('-f', 'docker-compose.yml', '-f', 'docker-compose.frontend.yml', '-f', 'docker-compose.ci.yml')
+          $compose = @('-f', 'docker-compose.yml', '-f', 'docker-compose.ci.yml')
           docker compose @compose up -d --no-build --remove-orphans
           docker compose @compose ps
 
@@ -402,7 +400,7 @@ jobs:
         if: failure()
         shell: powershell
         run: |
-          $compose = @('-f', 'docker-compose.yml', '-f', 'docker-compose.frontend.yml', '-f', 'docker-compose.ci.yml')
+          $compose = @('-f', 'docker-compose.yml', '-f', 'docker-compose.ci.yml')
           docker compose @compose ps -a
           docker compose @compose logs --tail 100
 

@@ -69,7 +69,6 @@ export function AuthScreen({ api, onAuthenticated }: AuthScreenProps) {
           <button className="text-button" onClick={() => { form.clearErrors(); setMessage(undefined); setMode(isLogin ? 'register' : 'login') }} type="button">
             {isLogin ? 'Create an account' : 'Back to sign in'}
           </button>
-          <a className="legacy-link" href="/legacy/">Open legacy console</a>
         </div>
       </section>
     </main>

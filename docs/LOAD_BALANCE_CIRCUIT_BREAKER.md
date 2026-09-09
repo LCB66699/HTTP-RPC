@@ -7,7 +7,7 @@
 | Envoy ROUND_ROBIN | `envoy/envoy.yaml` | 活跃 | 单端点，ROUND_ROBIN 无意义 |
 | Envoy circuit_breaker | `envoy/envoy.yaml` | 活跃 | 阈值 1024，从未触发 |
 | C++ CircuitBreaker | `server/include/circuit_breaker.h` | **死代码**（687 行） | 从未 include/实例化 |
-| Nginx upstream | `deploy/nginx/nginx.conf` | 活跃 | least_conn，但后端只有 1 个 envoy |
+| Nginx upstream | `deploy/nginx/nginx.frontend.conf` | 活跃 | least_conn，但后端只有 1 个 envoy |
 | Gateway gRPC | `cmd/gateway-grpc/main.go` | 活跃 | passthrough，单 IP 固定连接 |
 | C++ gRPC 调用 | `main_sheet.cpp` | 活跃 | 单 channel，2s deadline |
 

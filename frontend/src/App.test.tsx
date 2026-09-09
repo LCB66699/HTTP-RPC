@@ -24,7 +24,7 @@ describe('App', () => {
 
     expect(await screen.findByRole('heading', { name: 'HTTP-RPC Console' })).toBeVisible()
     expect(screen.queryByRole('navigation', { name: 'Primary' })).not.toBeInTheDocument()
-    expect(screen.getByRole('link', { name: 'Open legacy console' })).toHaveAttribute('href', '/legacy/')
+    expect(screen.queryByRole('link', { name: /legacy/i })).not.toBeInTheDocument()
   })
 
   it('restores a cookie-backed session and renders the requested protected route', async () => {

@@ -24,4 +24,3 @@ RUN apk add --no-cache openssl apache2-utils curl \
 
 COPY deploy/nginx/nginx.frontend.conf /etc/nginx/nginx.conf
 COPY --from=frontend-build /src/frontend/dist /usr/share/nginx/html
-COPY web-ui /usr/share/nginx/html/legacy

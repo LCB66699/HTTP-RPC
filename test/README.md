@@ -20,7 +20,7 @@
            ├─ /api/* → Envoy:8080 (JWT Cookie 验签)
            │              └→ gRPC-Gateway:8082 (HTTP→gRPC 自动转码)
            │                   └→ gRPC → Auth(x2) / Sheet(x3) / File(x2) / Search
-           └─ /*     → serve /app/web-ui 静态文件
+           └─ /*     → serve React 静态构建产物
 
 微服务集群:
   Auth Service ×2   (C++, 认证+Token签发, 独立镜像 176MB)

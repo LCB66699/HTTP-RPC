@@ -31,7 +31,6 @@ label { color: #344258; display: grid; font-size: .88rem; font-weight: 650; gap:
 .auth-links { align-items: center; display: flex; flex-wrap: wrap; gap: 14px; justify-content: space-between; }
 .text-button { background: transparent; border: 0; color: #1261a6; min-height: auto; padding: 0; }
 .text-button:hover:not(:disabled) { background: transparent; color: #0d4b83; }
-.legacy-link { color: #1261a6; font-size: .9rem; text-underline-offset: 3px; }
 .form-error, .error { color: #b42318; }
 
 .app-shell { background: #f6f8fb; display: grid; grid-template-columns: 230px minmax(0, 1fr); min-height: 100vh; }
